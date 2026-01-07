@@ -2,7 +2,7 @@
 	import { onMount } from 'svelte';
 	import { format } from 'date-fns';
 	import { initializeDatabase, getMonthKey, parseMonthKey, type Transaction, type Category, type Settings, type MonthlyBudget, DEFAULT_SETTINGS } from '$lib/db';
-	import { addTransaction, deleteTransaction, getTransactionsByMonth, getAvailableMonths } from '$lib/stores/transactions';
+	import { addTransaction, updateTransaction, deleteTransaction, getTransactionsByMonth, getAvailableMonths } from '$lib/stores/transactions';
 	import { getAllCategories } from '$lib/stores/categories';
 	import { getSettings } from '$lib/stores/settings';
 	import { getBudgetForMonth, saveBudget } from '$lib/stores/budget';
@@ -10,6 +10,7 @@
 	import TransactionForm, { type TransactionFormData } from '$lib/components/TransactionForm.svelte';
 	import CashFlowCard from '$lib/components/CashFlowCard.svelte';
 	import BudgetModal from '$lib/components/BudgetModal.svelte';
+	import EditTransactionModal, { type TransactionUpdateData } from '$lib/components/EditTransactionModal.svelte';
 	import HeaderNav from '$lib/components/HeaderNav.svelte';
 	import MonthPicker from '$lib/components/MonthPicker.svelte';
 
@@ -20,6 +21,7 @@
 	let settings = $state<Settings>(DEFAULT_SETTINGS);
 	let budget = $state<MonthlyBudget | null>(null);
 	let showBudgetModal = $state(false);
+	let editingTransaction = $state<Transaction | null>(null);
 	let currentMonth = $state(getMonthKey(new Date()));
 	let availableMonths = $state<string[]>([getMonthKey(new Date())]);
 
@@ -94,6 +96,27 @@
 		}
 	}
 
+	// Handle edit - open modal
+	function handleEdit(transaction: Transaction) {
+		editingTransaction = transaction;
+	}
+
+	// Handle save edit
+	async function handleSaveEdit(id: number, data: TransactionUpdateData) {
+		try {
+			await updateTransaction(id, {
+				...data,
+				isSettled: editingTransaction?.isSettled ?? false
+			});
+			// Reload transactions and available months (in case date changed)
+			transactions = await getTransactionsByMonth(currentMonth);
+			availableMonths = await getAvailableMonths();
+			editingTransaction = null;
+		} catch (error) {
+			console.error('Failed to update transaction:', error);
+		}
+	}
+
 	// Handle delete
 	async function handleDelete(id: number) {
 		if (confirm('Are you sure you want to delete this transaction?')) {
@@ -162,6 +185,8 @@
 				<TransactionList
 					{transactions}
 					{categories}
+					{settings}
+					onEdit={handleEdit}
 					onDelete={handleDelete}
 				/>
 			</div>
@@ -177,4 +202,14 @@
 	{monthDisplay}
 	onSave={handleSaveBudget}
 	onClose={() => showBudgetModal = false}
+/>
+
+<!-- Edit Transaction Modal -->
+<EditTransactionModal
+	isOpen={editingTransaction !== null}
+	transaction={editingTransaction}
+	{categories}
+	{settings}
+	onSave={handleSaveEdit}
+	onClose={() => editingTransaction = null}
 />

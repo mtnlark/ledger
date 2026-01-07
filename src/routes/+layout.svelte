@@ -2,6 +2,7 @@
 	import '../app.css';
 	import favicon from '$lib/assets/favicon.svg';
 	import BottomNav from '$lib/components/BottomNav.svelte';
+	import PWAInstallPrompt from '$lib/components/PWAInstallPrompt.svelte';
 
 	let { children } = $props();
 </script>
@@ -17,3 +18,6 @@
 
 <!-- Mobile bottom navigation -->
 <BottomNav />
+
+<!-- PWA Install Prompt -->
+<PWAInstallPrompt />

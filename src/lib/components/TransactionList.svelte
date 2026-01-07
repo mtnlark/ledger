@@ -1,15 +1,19 @@
 <script lang="ts">
 	import { format } from 'date-fns';
-	import type { Transaction, Category } from '$lib/db';
+	import type { Transaction, Category, Settings } from '$lib/db';
 
 	interface Props {
 		transactions: Transaction[];
 		categories: Category[];
+		settings?: Settings;
 		onEdit?: (transaction: Transaction) => void;
 		onDelete?: (id: number) => void;
 	}
 
-	let { transactions, categories, onEdit, onDelete }: Props = $props();
+	let { transactions, categories, settings, onEdit, onDelete }: Props = $props();
+
+	// Get partner name from settings or use default
+	let partnerName = $derived(settings?.partnerName || 'Partner');
 
 	function getCategoryName(categoryId: number): string {
 		const cat = categories.find((c) => c.id === categoryId);
@@ -73,7 +77,7 @@
 						{#if transaction.isShared}
 							<span>·</span>
 							<span class="text-blue-600">
-								Partner: {formatCurrency(transaction.partnerShare)}
+								{partnerName}: {formatCurrency(transaction.partnerShare)}
 							</span>
 						{/if}
 					</div>
