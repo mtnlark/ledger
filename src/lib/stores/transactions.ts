@@ -132,6 +132,31 @@ export async function getEarliestTransactionMonth(): Promise<string | null> {
 	return getMonthKey(earliest);
 }
 
+// Get spending totals by month for trends chart
+export async function getMonthlySpendingTrends(months: string[]): Promise<Map<string, number>> {
+	const allTransactions = await db.transactions.toArray();
+	const spending = new Map<string, number>();
+
+	// Initialize all months with 0
+	for (const month of months) {
+		spending.set(month, 0);
+	}
+
+	// Sum spending for each month
+	for (const t of allTransactions) {
+		const date = new Date(t.date);
+		const monthKey = getMonthKey(date);
+
+		if (spending.has(monthKey)) {
+			// For shared transactions, only count your portion
+			const amount = t.isShared ? t.amount - t.partnerShare : t.amount;
+			spending.set(monthKey, (spending.get(monthKey) || 0) + amount);
+		}
+	}
+
+	return spending;
+}
+
 // Get all months that have data (transactions or budgets)
 export async function getAvailableMonths(): Promise<string[]> {
 	const currentMonthKey = getMonthKey(new Date());

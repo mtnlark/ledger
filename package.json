@@ -33,7 +33,9 @@
 		"vitest": "^4.0.16"
 	},
 	"dependencies": {
+		"chart.js": "^4.5.1",
 		"date-fns": "^4.1.0",
-		"dexie": "^4.2.1"
+		"dexie": "^4.2.1",
+		"xlsx": "^0.18.5"
 	}
 }
