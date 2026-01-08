@@ -82,3 +82,12 @@ export function calculateCashFlow(income: number, saved: number, spent: number):
 		isOverBudget: surplus < 0
 	};
 }
+
+/**
+ * Get all budgets (for savings rate tracking over time)
+ * @returns Array of all MonthlyBudget entries sorted by month
+ */
+export async function getAllBudgets(): Promise<MonthlyBudget[]> {
+	const budgets = await db.monthlyBudgets.toArray();
+	return budgets.sort((a, b) => a.month.localeCompare(b.month));
+}

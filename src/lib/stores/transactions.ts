@@ -183,3 +183,72 @@ export async function getAvailableMonths(): Promise<string[]> {
 
 	return months;
 }
+
+// Get all transactions (for YTD calculations)
+export async function getAllTransactions(): Promise<Transaction[]> {
+	return db.transactions.toArray();
+}
+
+// Get spending by category across multiple months
+export async function getCategoryTrends(
+	categoryId: number,
+	months: string[]
+): Promise<Map<string, number>> {
+	const allTransactions = await db.transactions.toArray();
+	const spending = new Map<string, number>();
+
+	// Initialize all months with 0
+	for (const month of months) {
+		spending.set(month, 0);
+	}
+
+	// Sum spending for the category in each month
+	for (const t of allTransactions) {
+		if (t.categoryId !== categoryId) continue;
+
+		const monthKey = getMonthKey(new Date(t.date));
+		if (spending.has(monthKey)) {
+			const amount = t.isShared ? t.amount - t.partnerShare : t.amount;
+			spending.set(monthKey, (spending.get(monthKey) || 0) + amount);
+		}
+	}
+
+	return spending;
+}
+
+// Get daily spending for a month (for velocity chart)
+export async function getDailySpending(
+	month: string
+): Promise<{ day: number; amount: number; cumulative: number }[]> {
+	const transactions = await getTransactionsByMonth(month);
+
+	// Parse month to get days in month
+	const [year, monthNum] = month.split('-').map(Number);
+	const daysInMonth = new Date(year, monthNum, 0).getDate();
+
+	// Initialize all days with 0
+	const dailyAmounts = new Map<number, number>();
+	for (let d = 1; d <= daysInMonth; d++) {
+		dailyAmounts.set(d, 0);
+	}
+
+	// Sum spending by day
+	for (const t of transactions) {
+		const date = new Date(t.date);
+		const day = date.getDate();
+		const amount = t.isShared ? t.amount - t.partnerShare : t.amount;
+		dailyAmounts.set(day, (dailyAmounts.get(day) || 0) + amount);
+	}
+
+	// Build result with cumulative totals
+	const result: { day: number; amount: number; cumulative: number }[] = [];
+	let cumulative = 0;
+
+	for (let d = 1; d <= daysInMonth; d++) {
+		const amount = dailyAmounts.get(d) || 0;
+		cumulative += amount;
+		result.push({ day: d, amount, cumulative });
+	}
+
+	return result;
+}

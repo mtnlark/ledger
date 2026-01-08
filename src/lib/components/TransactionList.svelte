@@ -42,7 +42,10 @@
 		// Convert to array with labels
 		const result: DateGroup[] = [];
 		for (const [dateKey, txs] of groups) {
-			const date = new Date(dateKey);
+			// Parse date string as local time, not UTC
+			// (new Date("yyyy-MM-dd") interprets as UTC, causing off-by-one day issues)
+			const [year, month, day] = dateKey.split('-').map(Number);
+			const date = new Date(year, month - 1, day);
 			let label: string;
 
 			if (isToday(date)) {
