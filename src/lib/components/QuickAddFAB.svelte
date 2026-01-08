@@ -18,6 +18,7 @@
 		amount: number;
 		categoryId: number;
 		isShared: boolean;
+		isSettled: boolean;
 		splitType: 'percentage' | 'fixed';
 		splitValue: number;
 	}
@@ -28,6 +29,8 @@
 	let merchant = $state('');
 	let amountStr = $state('');
 	let categoryId = $state(0);
+	let isShared = $state(false);
+	let isSettled = $state(false);
 	let isSubmitting = $state(false);
 
 	// Focus management
@@ -61,6 +64,8 @@
 		merchant = '';
 		amountStr = '';
 		categoryId = 0;
+		isShared = false;
+		isSettled = false;
 		isSubmitting = false;
 	}
 
@@ -94,7 +99,8 @@
 				merchant: merchant.trim(),
 				amount,
 				categoryId,
-				isShared: false, // Quick add defaults to not shared
+				isShared,
+				isSettled: isShared ? isSettled : false,
 				splitType: settings.defaultSplitType,
 				splitValue: settings.defaultSplitValue
 			});
@@ -197,6 +203,28 @@
 							value={categoryId}
 							onSelect={(id) => (categoryId = id)}
 						/>
+					</div>
+
+					<!-- Shared Toggle -->
+					<div class="flex items-center gap-4">
+						<label class="flex items-center gap-2 cursor-pointer">
+							<input
+								type="checkbox"
+								bind:checked={isShared}
+								class="w-4 h-4 text-success-500 border-gray-300 rounded focus:ring-success-500/20"
+							/>
+							<span class="text-sm text-charcoal-soft">Shared with {settings.partnerName}</span>
+						</label>
+						{#if isShared}
+							<label class="flex items-center gap-2 cursor-pointer">
+								<input
+									type="checkbox"
+									bind:checked={isSettled}
+									class="w-4 h-4 text-success-500 border-gray-300 rounded focus:ring-success-500/20"
+								/>
+								<span class="text-sm text-charcoal-soft">Already settled</span>
+							</label>
+						{/if}
 					</div>
 				</div>
 

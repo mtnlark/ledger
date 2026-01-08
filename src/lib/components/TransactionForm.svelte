@@ -19,6 +19,7 @@
 		amount: number;
 		categoryId: number;
 		isShared: boolean;
+		isSettled: boolean;
 		splitType: 'percentage' | 'fixed';
 		splitValue: number;
 		notes?: string;
@@ -38,6 +39,7 @@
 	let amountStr = $state('');
 	let categoryId = $state(0);
 	let isShared = $state(false);
+	let isSettled = $state(false);
 	let splitType = $state<'percentage' | 'fixed'>(settings.defaultSplitType);
 	let splitValue = $state(settings.defaultSplitValue);
 	let notes = $state('');
@@ -68,6 +70,7 @@
 			amount,
 			categoryId,
 			isShared,
+			isSettled: isShared ? isSettled : false,
 			splitType,
 			splitValue,
 			notes: notes.trim() || undefined
@@ -78,6 +81,7 @@
 		amountStr = '';
 		categoryId = 0;
 		isShared = false;
+		isSettled = false;
 		splitType = settings.defaultSplitType;
 		splitValue = settings.defaultSplitValue;
 		notes = '';
@@ -264,6 +268,16 @@
 							</div>
 						</div>
 					{/if}
+
+					<!-- Already Settled Option -->
+					<label class="flex items-center gap-2 pt-2 cursor-pointer">
+						<input
+							type="checkbox"
+							bind:checked={isSettled}
+							class="w-4 h-4 text-success-500 border-gray-300 rounded focus:ring-success-500/20"
+						/>
+						<span class="text-sm text-charcoal-soft">Already settled</span>
+					</label>
 				</div>
 			{/if}
 		</div>

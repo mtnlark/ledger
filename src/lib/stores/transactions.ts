@@ -132,11 +132,13 @@ export async function markAsSettled(ids: number[]): Promise<void> {
 	});
 }
 
-// Get unsettled transactions
+// Get unsettled transactions (sorted by date, most recent first)
 export async function getUnsettledTransactions(): Promise<Transaction[]> {
 	// Filter for shared transactions that haven't been settled
 	const allTransactions = await db.transactions.toArray();
-	return allTransactions.filter((t) => t.isShared && !t.isSettled);
+	return allTransactions
+		.filter((t) => t.isShared && !t.isSettled)
+		.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 }
 
 // Calculate outstanding balance (what partner owes)

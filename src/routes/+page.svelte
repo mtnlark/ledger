@@ -146,7 +146,7 @@
 		try {
 			await addTransaction({
 				...data,
-				isSettled: false
+				isSettled: data.isSettled
 			});
 			// Reload transactions and available months (in case new month was added)
 			transactions = await getTransactionsByMonth(currentMonth);
@@ -167,7 +167,7 @@
 		try {
 			await addTransaction({
 				...data,
-				isSettled: false
+				isSettled: data.isSettled
 			});
 			// Reload transactions and available months
 			transactions = await getTransactionsByMonth(currentMonth);
