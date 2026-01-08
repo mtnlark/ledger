@@ -84,7 +84,14 @@
 
 				<!-- Name -->
 				<div class="flex-1 min-w-0">
-					<span class="font-medium text-charcoal truncate block">{category.name}</span>
+					<div class="flex items-center gap-2">
+						<span class="font-medium text-charcoal truncate">{category.name}</span>
+						{#if category.isEssential}
+							<span class="text-xs px-1.5 py-0.5 bg-primary-100 text-primary-700 rounded font-medium">
+								Need
+							</span>
+						{/if}
+					</div>
 					{#if !category.isActive}
 						<span class="text-xs text-charcoal-muted">Inactive</span>
 					{/if}

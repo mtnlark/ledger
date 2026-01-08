@@ -25,6 +25,7 @@ export interface Category {
 	color?: string;
 	isActive: boolean;
 	sortOrder: number;
+	isEssential: boolean; // Needs vs wants - essential spending
 }
 
 export interface MonthlyBudget {
@@ -42,6 +43,7 @@ export interface Settings {
 	defaultSplitValue: number;
 	currency: string;
 	theme: 'light' | 'dark' | 'system';
+	dismissedRecurring: string[]; // Normalized merchant names to hide from recurring detection
 }
 
 // Database class
@@ -99,29 +101,29 @@ export function navigateMonth(monthKey: string, delta: number): string {
 // Default categories from your spreadsheets
 // Warm Ledger color palette - muted, earthy tones
 export const DEFAULT_CATEGORIES: Omit<Category, 'id'>[] = [
-	{ name: 'Car', icon: '🚗', color: '#7C8B99', isActive: true, sortOrder: 1 },        // Slate blue-gray
-	{ name: 'Cash withdrawals', icon: '💵', color: '#6B8E6B', isActive: true, sortOrder: 2 }, // Sage green
-	{ name: 'Clothes & accessories', icon: '👕', color: '#C49BA0', isActive: true, sortOrder: 3 }, // Dusty rose
-	{ name: 'Coffee & snacks', icon: '☕', color: '#A67B5B', isActive: true, sortOrder: 4 }, // Coffee brown
-	{ name: 'Donations', icon: '💝', color: '#D4A59A', isActive: true, sortOrder: 5 },  // Muted coral
-	{ name: 'Electronics', icon: '📱', color: '#6B7B8C', isActive: true, sortOrder: 6 }, // Steel gray
-	{ name: 'Fitness & wellness', icon: '🏋️', color: '#5B8A8A', isActive: true, sortOrder: 7 }, // Dusty teal
-	{ name: 'Fun & hobbies', icon: '🎮', color: '#9B8AA6', isActive: true, sortOrder: 8 }, // Dusty lavender
-	{ name: 'Gas', icon: '⛽', color: '#D4915D', isActive: true, sortOrder: 9 },        // Amber (warning-500)
-	{ name: 'Gifts', icon: '🎁', color: '#C9A9A9', isActive: true, sortOrder: 10 },     // Dusty pink
-	{ name: 'Groceries', icon: '🛒', color: '#5B8C5A', isActive: true, sortOrder: 11 }, // Sage (success-500)
-	{ name: 'Grooming', icon: '💇', color: '#7BA3A3', isActive: true, sortOrder: 12 },  // Muted teal
-	{ name: 'Health', icon: '🏥', color: '#B87070', isActive: true, sortOrder: 13 },    // Muted rust
-	{ name: 'Home', icon: '🏠', color: '#8B7B99', isActive: true, sortOrder: 14 },      // Warm violet
-	{ name: 'Household supplies', icon: '🧹', color: '#8A847C', isActive: true, sortOrder: 15 }, // Warm gray
-	{ name: 'Insurance', icon: '🛡️', color: '#6B8299', isActive: true, sortOrder: 16 }, // Slate blue
-	{ name: 'Parking & tolls', icon: '🅿️', color: '#9C9588', isActive: true, sortOrder: 17 }, // Stone
-	{ name: 'Pet', icon: '🐈‍⬛', color: '#C4956A', isActive: true, sortOrder: 18 },      // Warm tan
-	{ name: 'Rent', icon: '🏢', color: '#7B6B8C', isActive: true, sortOrder: 19 },      // Muted indigo
-	{ name: 'Restaurants', icon: '🍽️', color: '#C45D3A', isActive: true, sortOrder: 20 }, // Terracotta (primary-500)
-	{ name: 'Subscriptions', icon: '📺', color: '#6B8399', isActive: true, sortOrder: 21 }, // Steel blue
-	{ name: 'Travel', icon: '✈️', color: '#5B8B8B', isActive: true, sortOrder: 22 },   // Dusty teal
-	{ name: 'Utilities', icon: '💡', color: '#C9A855', isActive: true, sortOrder: 23 }  // Golden amber
+	{ name: 'Car', icon: '🚗', color: '#7C8B99', isActive: true, sortOrder: 1, isEssential: true },
+	{ name: 'Cash withdrawals', icon: '💵', color: '#6B8E6B', isActive: true, sortOrder: 2, isEssential: false },
+	{ name: 'Clothes & accessories', icon: '👕', color: '#C49BA0', isActive: true, sortOrder: 3, isEssential: false },
+	{ name: 'Coffee & snacks', icon: '☕', color: '#A67B5B', isActive: true, sortOrder: 4, isEssential: false },
+	{ name: 'Donations', icon: '💝', color: '#D4A59A', isActive: true, sortOrder: 5, isEssential: false },
+	{ name: 'Electronics', icon: '📱', color: '#6B7B8C', isActive: true, sortOrder: 6, isEssential: false },
+	{ name: 'Fitness & wellness', icon: '🏋️', color: '#5B8A8A', isActive: true, sortOrder: 7, isEssential: false },
+	{ name: 'Fun & hobbies', icon: '🎮', color: '#9B8AA6', isActive: true, sortOrder: 8, isEssential: false },
+	{ name: 'Gas', icon: '⛽', color: '#D4915D', isActive: true, sortOrder: 9, isEssential: true },
+	{ name: 'Gifts', icon: '🎁', color: '#C9A9A9', isActive: true, sortOrder: 10, isEssential: false },
+	{ name: 'Groceries', icon: '🛒', color: '#5B8C5A', isActive: true, sortOrder: 11, isEssential: true },
+	{ name: 'Grooming', icon: '💇', color: '#7BA3A3', isActive: true, sortOrder: 12, isEssential: false },
+	{ name: 'Health', icon: '🏥', color: '#B87070', isActive: true, sortOrder: 13, isEssential: true },
+	{ name: 'Home', icon: '🏠', color: '#8B7B99', isActive: true, sortOrder: 14, isEssential: false },
+	{ name: 'Household supplies', icon: '🧹', color: '#8A847C', isActive: true, sortOrder: 15, isEssential: true },
+	{ name: 'Insurance', icon: '🛡️', color: '#6B8299', isActive: true, sortOrder: 16, isEssential: true },
+	{ name: 'Parking & tolls', icon: '🅿️', color: '#9C9588', isActive: true, sortOrder: 17, isEssential: true },
+	{ name: 'Pet', icon: '🐈‍⬛', color: '#C4956A', isActive: true, sortOrder: 18, isEssential: true },
+	{ name: 'Rent', icon: '🏢', color: '#7B6B8C', isActive: true, sortOrder: 19, isEssential: true },
+	{ name: 'Restaurants', icon: '🍽️', color: '#C45D3A', isActive: true, sortOrder: 20, isEssential: false },
+	{ name: 'Subscriptions', icon: '📺', color: '#6B8399', isActive: true, sortOrder: 21, isEssential: false },
+	{ name: 'Travel', icon: '✈️', color: '#5B8B8B', isActive: true, sortOrder: 22, isEssential: false },
+	{ name: 'Utilities', icon: '💡', color: '#C9A855', isActive: true, sortOrder: 23, isEssential: true }
 ];
 
 // Default settings
@@ -131,7 +133,8 @@ export const DEFAULT_SETTINGS: Settings = {
 	defaultSplitType: 'percentage',
 	defaultSplitValue: 0.5,
 	currency: 'USD',
-	theme: 'system'
+	theme: 'system',
+	dismissedRecurring: []
 };
 
 // Initialize database with defaults
@@ -194,5 +197,48 @@ export async function initializeDatabase(): Promise<void> {
 			}
 		}
 		console.log('Migrated category colors to Warm Ledger palette');
+	}
+
+	// Migrate: Add isEssential field to categories
+	const essentialCategories: Record<string, boolean> = {
+		'Car': true,
+		'Cash withdrawals': false,
+		'Clothes & accessories': false,
+		'Coffee & snacks': false,
+		'Donations': false,
+		'Electronics': false,
+		'Fitness & wellness': false,
+		'Fun & hobbies': false,
+		'Gas': true,
+		'Gifts': false,
+		'Groceries': true,
+		'Grooming': false,
+		'Health': true,
+		'Home': false,
+		'Household supplies': true,
+		'Insurance': true,
+		'Parking & tolls': true,
+		'Pet': true,
+		'Rent': true,
+		'Restaurants': false,
+		'Subscriptions': false,
+		'Travel': false,
+		'Utilities': true
+	};
+
+	// Check if any category is missing isEssential field
+	const allCategoriesForEssential = await db.categories.toArray();
+	for (const category of allCategoriesForEssential) {
+		if (category.isEssential === undefined) {
+			const isEssential = essentialCategories[category.name] ?? false;
+			await db.categories.update(category.id!, { isEssential });
+		}
+	}
+
+	// Migrate: Add dismissedRecurring field to settings
+	const currentSettings = await db.settings.get(1);
+	if (currentSettings && currentSettings.dismissedRecurring === undefined) {
+		await db.settings.update(1, { dismissedRecurring: [] });
+		console.log('Added dismissedRecurring field to settings');
 	}
 }

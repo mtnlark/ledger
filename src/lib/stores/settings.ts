@@ -32,3 +32,34 @@ export async function updateDefaultSplit(
 export async function updateTheme(theme: 'light' | 'dark' | 'system'): Promise<void> {
 	await db.settings.update(1, { theme });
 }
+
+// Normalize merchant name for dismissed recurring comparison
+function normalizeMerchant(name: string): string {
+	return name.toLowerCase().trim();
+}
+
+// Dismiss a recurring expense (hide from detection)
+export async function dismissRecurring(merchant: string): Promise<void> {
+	const settings = await getSettings();
+	const normalized = normalizeMerchant(merchant);
+	const dismissed = settings.dismissedRecurring ?? [];
+	if (!dismissed.includes(normalized)) {
+		await db.settings.update(1, { dismissedRecurring: [...dismissed, normalized] });
+	}
+}
+
+// Restore a dismissed recurring expense
+export async function restoreRecurring(merchant: string): Promise<void> {
+	const settings = await getSettings();
+	const normalized = normalizeMerchant(merchant);
+	const dismissed = settings.dismissedRecurring ?? [];
+	await db.settings.update(1, {
+		dismissedRecurring: dismissed.filter((m) => m !== normalized)
+	});
+}
+
+// Get list of dismissed recurring merchants
+export async function getDismissedRecurring(): Promise<string[]> {
+	const settings = await getSettings();
+	return settings.dismissedRecurring ?? [];
+}

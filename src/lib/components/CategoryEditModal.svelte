@@ -20,6 +20,7 @@
 	let name = $state(category?.name ?? '');
 	let icon = $state(category?.icon ?? '');
 	let color = $state(category?.color ?? '#6B7280');
+	let isEssential = $state(category?.isEssential ?? false);
 	let isSaving = $state(false);
 
 	// Delete state
@@ -77,7 +78,8 @@
 				await updateCategory(category.id!, {
 					name: name.trim(),
 					icon: icon.trim(),
-					color
+					color,
+					isEssential
 				});
 				toast.success('Category updated');
 			} else {
@@ -85,7 +87,8 @@
 					name: name.trim(),
 					icon: icon.trim(),
 					color,
-					isActive: true
+					isActive: true,
+					isEssential
 				});
 				toast.success('Category added');
 			}
@@ -241,6 +244,29 @@
 						/>
 						<span class="text-xs text-charcoal-muted">Custom color</span>
 					</div>
+				</div>
+
+				<!-- Essential Toggle -->
+				<div class="pt-4 border-t border-dashed border-gray-200">
+					<label class="flex items-center justify-between cursor-pointer">
+						<div>
+							<span class="font-medium text-charcoal">Essential spending</span>
+							<p class="text-sm text-charcoal-muted mt-0.5">
+								Mark as a "need" vs discretionary "want"
+							</p>
+						</div>
+						<button
+							type="button"
+							onclick={() => (isEssential = !isEssential)}
+							class="relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:ring-offset-2 {isEssential ? 'bg-primary-500' : 'bg-gray-200'}"
+							role="switch"
+							aria-checked={isEssential}
+						>
+							<span
+								class="pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out {isEssential ? 'translate-x-5' : 'translate-x-0'}"
+							></span>
+						</button>
+					</label>
 				</div>
 
 				<!-- Delete Section (only when editing) -->

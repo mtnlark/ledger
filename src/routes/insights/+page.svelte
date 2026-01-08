@@ -27,6 +27,9 @@
 	import CategoryDeepDives from '$lib/components/insights/CategoryDeepDives.svelte';
 	import PredictiveInsights from '$lib/components/insights/PredictiveInsights.svelte';
 	import YTDSummary from '$lib/components/insights/YTDSummary.svelte';
+	import RecurringInsights from '$lib/components/insights/RecurringInsights.svelte';
+	import NeedsWantsInsights from '$lib/components/insights/NeedsWantsInsights.svelte';
+	import { detectRecurringExpenses, type DetectedRecurring } from '$lib/stores/recurring';
 
 	// State
 	let isLoading = $state(true);
@@ -39,6 +42,7 @@
 	let dailySpending = $state<{ day: number; amount: number; cumulative: number }[]>([]);
 	let budget = $state<MonthlyBudget | null>(null);
 	let allBudgets = $state<MonthlyBudget[]>([]);
+	let recurring = $state<DetectedRecurring[]>([]);
 
 	// Computed
 	let monthDisplay = $derived(format(parseMonthKey(currentMonth), 'MMMM yyyy'));
@@ -52,6 +56,7 @@
 			availableMonths = await getAvailableMonths();
 			allTransactions = await getAllTransactions();
 			allBudgets = await getAllBudgets();
+			recurring = await detectRecurringExpenses();
 			await loadMonthData();
 			// Get trends for all available months
 			monthlyTrends = await getMonthlySpendingTrends(availableMonths);
@@ -180,6 +185,12 @@
 
 			<!-- Predictive Insights -->
 			<PredictiveInsights {currentMonth} {dailySpending} {budget} {allBudgets} />
+
+			<!-- Recurring Expenses -->
+			<RecurringInsights {recurring} {categories} onDismiss={async () => { recurring = await detectRecurringExpenses(); }} />
+
+			<!-- Needs vs Wants -->
+			<NeedsWantsInsights {transactions} {categories} {allTransactions} />
 
 			<!-- Year-to-Date Summary -->
 			<YTDSummary transactions={allTransactions} {categories} />
