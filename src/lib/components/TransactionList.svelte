@@ -134,6 +134,9 @@
 										</span>
 									{/if}
 								</div>
+								{#if transaction.notes}
+									<p class="text-xs text-charcoal-muted/70 mt-1 italic truncate">{transaction.notes}</p>
+								{/if}
 							</div>
 
 							<!-- Amount -->
