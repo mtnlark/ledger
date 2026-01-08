@@ -6,6 +6,7 @@
 	import { getAllCategories } from '$lib/stores/categories';
 	import { getSettings } from '$lib/stores/settings';
 	import { getBudgetForMonth, saveBudget } from '$lib/stores/budget';
+	import { toast } from '$lib/stores/toast';
 	import TransactionList from '$lib/components/TransactionList.svelte';
 	import TransactionForm, { type TransactionFormData } from '$lib/components/TransactionForm.svelte';
 	import CashFlowCard from '$lib/components/CashFlowCard.svelte';
@@ -13,6 +14,8 @@
 	import EditTransactionModal, { type TransactionUpdateData } from '$lib/components/EditTransactionModal.svelte';
 	import HeaderNav from '$lib/components/HeaderNav.svelte';
 	import MonthPicker from '$lib/components/MonthPicker.svelte';
+	import CashFlowCardSkeleton from '$lib/components/CashFlowCardSkeleton.svelte';
+	import TransactionListSkeleton from '$lib/components/TransactionListSkeleton.svelte';
 
 	// State
 	let isLoading = $state(true);
@@ -76,8 +79,10 @@
 			await saveBudget(currentMonth, data);
 			budget = await getBudgetForMonth(currentMonth);
 			showBudgetModal = false;
+			toast.success('Budget saved');
 		} catch (error) {
 			console.error('Failed to save budget:', error);
+			toast.error('Failed to save budget');
 		}
 	}
 
@@ -91,8 +96,10 @@
 			// Reload transactions and available months (in case new month was added)
 			transactions = await getTransactionsByMonth(currentMonth);
 			availableMonths = await getAvailableMonths();
+			toast.success('Transaction added');
 		} catch (error) {
 			console.error('Failed to add transaction:', error);
+			toast.error('Failed to add transaction');
 		}
 	}
 
@@ -112,8 +119,10 @@
 			transactions = await getTransactionsByMonth(currentMonth);
 			availableMonths = await getAvailableMonths();
 			editingTransaction = null;
+			toast.success('Transaction updated');
 		} catch (error) {
 			console.error('Failed to update transaction:', error);
+			toast.error('Failed to update transaction');
 		}
 	}
 
@@ -125,8 +134,10 @@
 				// Reload transactions and available months (in case month is now empty)
 				transactions = await getTransactionsByMonth(currentMonth);
 				availableMonths = await getAvailableMonths();
+				toast.success('Transaction deleted');
 			} catch (error) {
 				console.error('Failed to delete transaction:', error);
+				toast.error('Failed to delete transaction');
 			}
 		}
 	}
@@ -160,8 +171,24 @@
 	<!-- Main Content -->
 	<main class="max-w-4xl mx-auto px-4 py-6 space-y-6">
 		{#if isLoading}
-			<div class="flex items-center justify-center py-12">
-				<div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+			<!-- Skeleton loading states -->
+			<CashFlowCardSkeleton />
+			<div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+				<div class="animate-pulse h-6 w-32 bg-gray-200 rounded mb-4"></div>
+				<div class="space-y-4">
+					<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+						<div class="h-10 bg-gray-200 rounded-lg"></div>
+						<div class="h-10 bg-gray-200 rounded-lg"></div>
+					</div>
+					<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+						<div class="h-10 bg-gray-200 rounded-lg"></div>
+						<div class="h-10 bg-gray-200 rounded-lg"></div>
+					</div>
+				</div>
+			</div>
+			<div>
+				<div class="animate-pulse h-6 w-40 bg-gray-200 rounded mb-3"></div>
+				<TransactionListSkeleton count={4} />
 			</div>
 		{:else}
 			<!-- Cash Flow Summary -->

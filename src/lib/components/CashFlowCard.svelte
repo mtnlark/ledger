@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { Check, AlertTriangle } from 'lucide-svelte';
 	import type { MonthlyBudget } from '$lib/db';
 
 	interface Props {
@@ -89,13 +90,13 @@
 			<div class="flex justify-between items-center">
 				<span class="text-gray-600">Surplus</span>
 				<span
-					class="font-bold text-lg {surplus >= 0 ? 'text-green-600' : 'text-red-600'}"
+					class="font-bold text-lg flex items-center gap-1.5 {surplus >= 0 ? 'text-green-600' : 'text-red-600'}"
 				>
 					{formatCurrency(surplus)}
 					{#if surplus >= 0}
-						<span class="ml-1">✓</span>
+						<Check size={18} strokeWidth={3} />
 					{:else}
-						<span class="ml-1">⚠</span>
+						<AlertTriangle size={18} />
 					{/if}
 				</span>
 			</div>

@@ -28,16 +28,15 @@ export function createTransactionsStore(month: string) {
 
 // Get all transactions for a month
 export async function getTransactionsByMonth(month: string): Promise<Transaction[]> {
-	// Parse month string (e.g., "2025-12") into year and month
-	const [year, monthNum] = month.split('-').map(Number);
-
-	// Get all transactions and filter by month
+	// Get all transactions and filter by month using consistent month-key extraction
+	// This avoids timezone issues where UTC dates might shift to adjacent months locally
 	const allTransactions = await db.transactions.toArray();
 
 	return allTransactions
 		.filter((t) => {
-			const d = new Date(t.date);
-			return d.getFullYear() === year && d.getMonth() + 1 === monthNum;
+			// Use getMonthKey which correctly extracts local year/month
+			const txMonthKey = getMonthKey(new Date(t.date));
+			return txMonthKey === month;
 		})
 		.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 }

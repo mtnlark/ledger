@@ -1,6 +1,8 @@
 <script lang="ts">
 	import type { ChartConfiguration } from 'chart.js/auto';
+	import { PieChart } from 'lucide-svelte';
 	import ChartWrapper from './ChartWrapper.svelte';
+	import EmptyState from './EmptyState.svelte';
 	import type { Transaction, Category } from '$lib/db';
 
 	interface Props {
@@ -91,9 +93,11 @@
 
 	<div class="p-6">
 		{#if transactions.length === 0}
-			<div class="text-center py-8 text-gray-500">
-				<p>No transactions this month</p>
-			</div>
+			<EmptyState
+				icon={PieChart}
+				title="No spending data yet"
+				description="Add some transactions to see your category breakdown"
+			/>
 		{:else}
 			<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
 				<!-- Chart -->

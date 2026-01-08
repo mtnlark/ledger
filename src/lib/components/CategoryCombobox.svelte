@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { ChevronDown, Check } from 'lucide-svelte';
 	import type { Category } from '$lib/db';
 
 	interface Props {
@@ -143,14 +144,7 @@
 		}}
 		class="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-gray-600"
 	>
-		<svg
-			class="w-4 h-4 transition-transform {isOpen ? 'rotate-180' : ''}"
-			fill="none"
-			stroke="currentColor"
-			viewBox="0 0 24 24"
-		>
-			<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-		</svg>
+		<ChevronDown size={16} class="transition-transform {isOpen ? 'rotate-180' : ''}" />
 	</button>
 
 	<!-- Dropdown list -->
@@ -175,13 +169,7 @@
 						<span class="text-lg">{cat.icon}</span>
 						<span class="text-sm">{cat.name}</span>
 						{#if cat.id === value}
-							<svg class="w-4 h-4 ml-auto text-blue-600" fill="currentColor" viewBox="0 0 20 20">
-								<path
-									fill-rule="evenodd"
-									d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-									clip-rule="evenodd"
-								/>
-							</svg>
+							<Check size={16} class="ml-auto text-blue-600" />
 						{/if}
 					</li>
 				{/each}

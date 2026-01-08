@@ -4,8 +4,10 @@
 	import { getUnsettledTransactions, calculateOutstandingBalance, markAsSettled } from '$lib/stores/transactions';
 	import { getAllCategories } from '$lib/stores/categories';
 	import { getSettings } from '$lib/stores/settings';
+	import { toast } from '$lib/stores/toast';
 	import SettlementTracker from '$lib/components/SettlementTracker.svelte';
 	import HeaderNav from '$lib/components/HeaderNav.svelte';
+	import Skeleton from '$lib/components/Skeleton.svelte';
 
 	// State
 	let isLoading = $state(true);
@@ -37,8 +39,10 @@
 			// Reload data
 			unsettledTransactions = await getUnsettledTransactions();
 			outstandingBalance = await calculateOutstandingBalance();
+			toast.success(`Marked ${ids.length} transaction${ids.length === 1 ? '' : 's'} as settled`);
 		} catch (error) {
 			console.error('Failed to mark as settled:', error);
+			toast.error('Failed to mark as settled');
 		}
 	}
 
@@ -58,8 +62,29 @@
 	<!-- Main Content -->
 	<main class="max-w-4xl mx-auto px-4 py-6 space-y-6">
 		{#if isLoading}
-			<div class="flex items-center justify-center py-12">
-				<div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+			<!-- Settlement tracker skeleton -->
+			<div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+				<div class="px-6 py-5 border-b border-gray-100 bg-gradient-to-r from-blue-50 to-indigo-50">
+					<Skeleton class="h-4 mb-2" width="180px" rounded="sm" />
+					<Skeleton class="h-8 mb-1" width="120px" rounded="sm" />
+					<Skeleton class="h-4" width="80px" rounded="sm" />
+				</div>
+				<div class="divide-y divide-gray-100">
+					{#each Array(3) as _}
+						<div class="px-6 py-4 flex items-center gap-4">
+							<Skeleton class="w-5 h-5" rounded="sm" />
+							<Skeleton class="w-10 h-10" rounded="lg" />
+							<div class="flex-1 space-y-2">
+								<Skeleton class="h-4" width="60%" rounded="sm" />
+								<Skeleton class="h-3" width="40%" rounded="sm" />
+							</div>
+							<div class="text-right space-y-1">
+								<Skeleton class="h-5 ml-auto" width="60px" rounded="sm" />
+								<Skeleton class="h-3 ml-auto" width="50px" rounded="sm" />
+							</div>
+						</div>
+					{/each}
+				</div>
 			</div>
 		{:else}
 			<SettlementTracker

@@ -20,16 +20,45 @@ export interface ImportResult {
 }
 
 /**
- * Convert Excel serial date number to JavaScript Date
+ * Convert Excel serial date number to JavaScript Date (local time)
  * Excel dates are number of days since Dec 30, 1899
+ * We use date arithmetic instead of milliseconds to avoid timezone issues
  */
 function excelDateToJS(excelDate: number): Date {
 	// Excel's epoch is Dec 30, 1899
-	// JavaScript's epoch is Jan 1, 1970
-	// There's also a bug in Excel where it thinks 1900 was a leap year
-	const msPerDay = 24 * 60 * 60 * 1000;
-	const excelEpoch = new Date(1899, 11, 30); // Dec 30, 1899
-	return new Date(excelEpoch.getTime() + excelDate * msPerDay);
+	// Use integer days to avoid floating point issues
+	const days = Math.floor(excelDate);
+	// Create date using component arithmetic to ensure local time
+	// Start from a known date and add days
+	const result = new Date(1899, 11, 30 + days);
+	return result;
+}
+
+/**
+ * Parse a date string into a local Date, avoiding UTC interpretation
+ * Handles formats like: "2026-01-01", "1/1/2026", "01/01/2026"
+ */
+function parseDateString(dateStr: string): Date | null {
+	// Try ISO format first (YYYY-MM-DD)
+	const isoMatch = dateStr.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+	if (isoMatch) {
+		const [, year, month, day] = isoMatch;
+		return new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+	}
+
+	// Try US format (M/D/YYYY or MM/DD/YYYY)
+	const usMatch = dateStr.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);
+	if (usMatch) {
+		let [, month, day, year] = usMatch;
+		// Handle 2-digit years
+		let yearNum = parseInt(year);
+		if (yearNum < 100) {
+			yearNum += yearNum < 50 ? 2000 : 1900;
+		}
+		return new Date(yearNum, parseInt(month) - 1, parseInt(day));
+	}
+
+	return null;
 }
 
 /**
@@ -76,16 +105,19 @@ export function parseExpensesSheet(workbook: XLSX.WorkBook): ImportedTransaction
 		// Skip empty rows
 		if (!dateVal || !merchant || !amount) continue;
 
-		// Parse date (could be Excel serial number or string)
-		let date: Date;
+		// Parse date (could be Excel serial number, Date object, or string)
+		let date: Date | null = null;
 		if (typeof dateVal === 'number') {
 			date = excelDateToJS(dateVal);
-		} else {
-			date = new Date(dateVal);
+		} else if (dateVal instanceof Date) {
+			// If XLSX returns a Date object, extract components to avoid timezone issues
+			date = new Date(dateVal.getFullYear(), dateVal.getMonth(), dateVal.getDate());
+		} else if (typeof dateVal === 'string') {
+			date = parseDateString(dateVal);
 		}
 
 		// Skip invalid dates
-		if (isNaN(date.getTime())) continue;
+		if (!date || isNaN(date.getTime())) continue;
 
 		// Parse amount
 		const parsedAmount = typeof amount === 'number' ? amount : parseFloat(String(amount));
@@ -241,4 +273,105 @@ export async function readExcelFile(file: File): Promise<XLSX.WorkBook> {
 		reader.onerror = () => reject(reader.error);
 		reader.readAsArrayBuffer(file);
 	});
+}
+
+/**
+ * Diagnostic function to understand how dates are stored
+ * Returns info about transactions, with special attention to month boundaries
+ */
+export async function diagnoseDates(): Promise<{
+	total: number;
+	samples: Array<{
+		id: number;
+		merchant: string;
+		rawDate: unknown;
+		dateType: string;
+		parsedDate: string;
+		hours: number;
+		isoString: string;
+	}>;
+	monthBoundaryIssues: Array<{
+		id: number;
+		merchant: string;
+		storedDate: string;
+		dayOfMonth: number;
+	}>;
+}> {
+	const transactions = await db.transactions.toArray();
+	const samples = transactions.slice(0, 10).map((t) => {
+		const date = new Date(t.date);
+		return {
+			id: t.id!,
+			merchant: t.merchant,
+			rawDate: t.date,
+			dateType: typeof t.date,
+			parsedDate: date.toString(),
+			hours: date.getHours(),
+			isoString: date.toISOString()
+		};
+	});
+
+	// Find transactions on last day of month (potential off-by-one errors)
+	const monthBoundaryIssues = transactions
+		.filter((t) => {
+			const date = new Date(t.date);
+			const day = date.getDate();
+			// Last days of months that could be off-by-one from 1st of next month
+			return day === 31 || day === 30 || day === 28 || day === 29;
+		})
+		.slice(0, 20)
+		.map((t) => {
+			const date = new Date(t.date);
+			return {
+				id: t.id!,
+				merchant: t.merchant,
+				storedDate: date.toLocaleDateString(),
+				dayOfMonth: date.getDate()
+			};
+		});
+
+	return { total: transactions.length, samples, monthBoundaryIssues };
+}
+
+/**
+ * Fix transaction dates that were incorrectly stored with timezone issues
+ * This shifts dates forward by one day if they appear to be off
+ * Returns the number of transactions fixed
+ */
+export async function fixTransactionDates(): Promise<{ fixed: number; checked: number; details: string[] }> {
+	const transactions = await db.transactions.toArray();
+	let fixed = 0;
+	const details: string[] = [];
+
+	for (const t of transactions) {
+		const date = new Date(t.date);
+		const hours = date.getHours();
+		const minutes = date.getMinutes();
+
+		// Check multiple indicators of timezone issues:
+		// 1. Evening hours (17-23) indicate UTC midnight shifted to local time
+		// 2. Early morning hours (0-7) with non-zero minutes might also indicate issues
+		const isEvening = hours >= 17 && hours <= 23;
+		const isNotMidnight = hours !== 0 || minutes !== 0;
+
+		if (isEvening) {
+			// Create a new date at midnight local time for the NEXT day
+			const fixedDate = new Date(date.getFullYear(), date.getMonth(), date.getDate() + 1);
+			await db.transactions.update(t.id!, {
+				date: fixedDate,
+				updatedAt: new Date()
+			});
+			details.push(`Fixed: ${t.merchant} from ${date.toLocaleDateString()} ${hours}:${minutes} to ${fixedDate.toLocaleDateString()}`);
+			fixed++;
+		} else if (isNotMidnight && fixed === 0 && details.length < 5) {
+			// Log some samples of non-midnight times for diagnosis (only if we haven't fixed anything yet)
+			details.push(`Sample: ${t.merchant} at ${date.toLocaleDateString()} ${hours}:${String(minutes).padStart(2, '0')}`);
+		}
+	}
+
+	if (fixed === 0 && details.length === 0) {
+		details.push('All dates appear to be at midnight local time - no obvious timezone issues detected');
+	}
+
+	return { fixed, checked: transactions.length, details };
 }

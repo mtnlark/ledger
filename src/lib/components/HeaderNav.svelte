@@ -1,5 +1,7 @@
 <script lang="ts">
 	import { page } from '$app/stores';
+	import { Menu, X, ChevronLeft, Home, BarChart3, Users, Settings } from 'lucide-svelte';
+	import type { Component } from 'svelte';
 
 	interface Props {
 		title?: string;
@@ -12,15 +14,15 @@
 
 	interface NavItem {
 		href: string;
-		icon: string;
 		label: string;
+		icon: Component;
 	}
 
 	const navItems: NavItem[] = [
-		{ href: '/', icon: '🏠', label: 'Dashboard' },
-		{ href: '/insights', icon: '📊', label: 'Insights' },
-		{ href: '/shared', icon: '🤝', label: 'Shared' },
-		{ href: '/settings', icon: '⚙️', label: 'Settings' }
+		{ href: '/', label: 'Dashboard', icon: Home },
+		{ href: '/insights', label: 'Insights', icon: BarChart3 },
+		{ href: '/shared', label: 'Shared', icon: Users },
+		{ href: '/settings', label: 'Settings', icon: Settings }
 	];
 
 	function isActive(href: string, pathname: string): boolean {
@@ -46,29 +48,11 @@
 					aria-label="Open menu"
 					aria-expanded={isMenuOpen}
 				>
-					<svg
-						xmlns="http://www.w3.org/2000/svg"
-						class="h-6 w-6"
-						fill="none"
-						viewBox="0 0 24 24"
-						stroke="currentColor"
-					>
-						{#if isMenuOpen}
-							<path
-								stroke-linecap="round"
-								stroke-linejoin="round"
-								stroke-width="2"
-								d="M6 18L18 6M6 6l12 12"
-							/>
-						{:else}
-							<path
-								stroke-linecap="round"
-								stroke-linejoin="round"
-								stroke-width="2"
-								d="M4 6h16M4 12h16M4 18h16"
-							/>
-						{/if}
-					</svg>
+					{#if isMenuOpen}
+						<X size={24} />
+					{:else}
+						<Menu size={24} />
+					{/if}
 				</button>
 
 				<!-- Dropdown menu -->
@@ -91,7 +75,7 @@
 									? 'bg-blue-50 text-blue-700 font-medium'
 									: 'text-gray-700 hover:bg-gray-50'}"
 							>
-								<span class="text-lg">{item.icon}</span>
+								<item.icon size={18} />
 								<span>{item.label}</span>
 							</a>
 						{/each}
@@ -106,18 +90,7 @@
 					class="p-2 hover:bg-gray-100 rounded-lg transition-colors md:hidden"
 					aria-label="Back to dashboard"
 				>
-					<svg
-						xmlns="http://www.w3.org/2000/svg"
-						class="h-5 w-5"
-						viewBox="0 0 20 20"
-						fill="currentColor"
-					>
-						<path
-							fill-rule="evenodd"
-							d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z"
-							clip-rule="evenodd"
-						/>
-					</svg>
+					<ChevronLeft size={20} />
 				</a>
 			{/if}
 

@@ -1,5 +1,7 @@
 <script lang="ts">
+	import { Check, PartyPopper } from 'lucide-svelte';
 	import type { Transaction, Category, Settings } from '$lib/db';
+	import EmptyState from './EmptyState.svelte';
 
 	interface Props {
 		transactions: Transaction[];
@@ -88,16 +90,18 @@
 		{#if outstandingBalance > 0}
 			<p class="text-sm text-gray-500 mt-1">owed to you</p>
 		{:else}
-			<p class="text-sm text-green-600 mt-1">All settled! ✓</p>
+			<p class="text-sm text-green-600 mt-1 inline-flex items-center gap-1">All settled! <Check size={14} strokeWidth={3} /></p>
 		{/if}
 	</div>
 
 	<!-- Transaction list -->
 	<div class="divide-y divide-gray-100">
 		{#if transactions.length === 0}
-			<div class="px-6 py-8 text-center text-gray-500">
-				<p>No unsettled shared expenses</p>
-			</div>
+			<EmptyState
+				icon={PartyPopper}
+				title="All caught up!"
+				description="No shared expenses waiting to be settled"
+			/>
 		{:else}
 			<!-- Select All / Deselect All -->
 			<div class="px-6 py-3 bg-gray-50 flex items-center justify-between">
@@ -139,13 +143,7 @@
 							: 'border-gray-300'}"
 					>
 						{#if selectedIds.has(transaction.id!)}
-							<svg class="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
-								<path
-									fill-rule="evenodd"
-									d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-									clip-rule="evenodd"
-								/>
-							</svg>
+							<Check size={12} class="text-white" strokeWidth={3} />
 						{/if}
 					</div>
 

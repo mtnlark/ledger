@@ -3,6 +3,7 @@
 	import favicon from '$lib/assets/favicon.svg';
 	import BottomNav from '$lib/components/BottomNav.svelte';
 	import PWAInstallPrompt from '$lib/components/PWAInstallPrompt.svelte';
+	import ToastContainer from '$lib/components/ToastContainer.svelte';
 
 	let { children } = $props();
 </script>
@@ -21,3 +22,6 @@
 
 <!-- PWA Install Prompt -->
 <PWAInstallPrompt />
+
+<!-- Toast Notifications -->
+<ToastContainer />

@@ -115,7 +115,7 @@ export const DEFAULT_CATEGORIES: Omit<Category, 'id'>[] = [
 	{ name: 'Household supplies', icon: '🧹', color: '#64748b', isActive: true, sortOrder: 15 },
 	{ name: 'Insurance', icon: '🛡️', color: '#0ea5e9', isActive: true, sortOrder: 16 },
 	{ name: 'Parking & tolls', icon: '🅿️', color: '#78716c', isActive: true, sortOrder: 17 },
-	{ name: 'Pet', icon: '🐕', color: '#d97706', isActive: true, sortOrder: 18 },
+	{ name: 'Pet', icon: '🐈‍⬛', color: '#d97706', isActive: true, sortOrder: 18 },
 	{ name: 'Rent', icon: '🏢', color: '#7c3aed', isActive: true, sortOrder: 19 },
 	{ name: 'Restaurants', icon: '🍽️', color: '#dc2626', isActive: true, sortOrder: 20 },
 	{ name: 'Subscriptions', icon: '📺', color: '#2563eb', isActive: true, sortOrder: 21 },
@@ -145,5 +145,12 @@ export async function initializeDatabase(): Promise<void> {
 	if (!settings) {
 		await db.settings.add(DEFAULT_SETTINGS);
 		console.log('Initialized default settings');
+	}
+
+	// Migrate: Update Pet category icon to black cat if it's still the dog emoji
+	const petCategory = await db.categories.where('name').equals('Pet').first();
+	if (petCategory && petCategory.icon === '🐕') {
+		await db.categories.update(petCategory.id!, { icon: '🐈‍⬛' });
+		console.log('Updated Pet category icon to black cat');
 	}
 }

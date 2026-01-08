@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { format } from 'date-fns';
+	import { ChevronLeft, ChevronRight, ChevronDown } from 'lucide-svelte';
 	import { parseMonthKey, navigateMonth } from '$lib/db';
 
 	interface Props {
@@ -60,13 +61,7 @@
 		class="p-2 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
 		aria-label="Previous month"
 	>
-		<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-			<path
-				fill-rule="evenodd"
-				d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z"
-				clip-rule="evenodd"
-			/>
-		</svg>
+		<ChevronLeft size={20} />
 	</button>
 
 	<!-- Month dropdown -->
@@ -78,14 +73,7 @@
 			aria-haspopup="listbox"
 		>
 			<span>{formatMonth(currentMonth)}</span>
-			<svg
-				class="w-4 h-4 text-gray-400 transition-transform {isOpen ? 'rotate-180' : ''}"
-				fill="none"
-				stroke="currentColor"
-				viewBox="0 0 24 24"
-			>
-				<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-			</svg>
+			<ChevronDown size={16} class="text-gray-400 transition-transform {isOpen ? 'rotate-180' : ''}" />
 		</button>
 
 		{#if isOpen}
@@ -122,12 +110,6 @@
 		class="p-2 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
 		aria-label="Next month"
 	>
-		<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-			<path
-				fill-rule="evenodd"
-				d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z"
-				clip-rule="evenodd"
-			/>
-		</svg>
+		<ChevronRight size={20} />
 	</button>
 </div>

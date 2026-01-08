@@ -1,17 +1,18 @@
 <script lang="ts">
 	import { page } from '$app/stores';
+	import { Home, BarChart3, Users, Settings } from 'lucide-svelte';
 
 	interface NavItem {
 		href: string;
-		icon: string;
 		label: string;
+		icon: typeof Home;
 	}
 
 	const navItems: NavItem[] = [
-		{ href: '/', icon: '🏠', label: 'Home' },
-		{ href: '/insights', icon: '📊', label: 'Insights' },
-		{ href: '/shared', icon: '🤝', label: 'Shared' },
-		{ href: '/settings', icon: '⚙️', label: 'Settings' }
+		{ href: '/', label: 'Home', icon: Home },
+		{ href: '/insights', label: 'Insights', icon: BarChart3 },
+		{ href: '/shared', label: 'Shared', icon: Users },
+		{ href: '/settings', label: 'Settings', icon: Settings }
 	];
 
 	function isActive(href: string, pathname: string): boolean {
@@ -32,8 +33,8 @@
 					? 'text-blue-600'
 					: 'text-gray-500 hover:text-gray-700'}"
 			>
-				<span class="text-xl mb-0.5">{item.icon}</span>
-				<span class="text-xs font-medium">{item.label}</span>
+				<item.icon size={24} strokeWidth={active ? 2.5 : 2} />
+				<span class="text-xs font-medium mt-1">{item.label}</span>
 			</a>
 		{/each}
 	</div>

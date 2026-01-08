@@ -1,24 +1,25 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { Upload, Download, Database, FileSpreadsheet } from 'lucide-svelte';
 	import { initializeDatabase, type Settings, type Category, type Transaction, DEFAULT_SETTINGS } from '$lib/db';
 	import { getSettings, updateSettings } from '$lib/stores/settings';
 	import { getTransactionsByMonth, getAvailableMonths } from '$lib/stores/transactions';
 	import { getAllCategories } from '$lib/stores/categories';
 	import HeaderNav from '$lib/components/HeaderNav.svelte';
-	import { readExcelFile, parseExpensesSheet, importTransactions, type ImportResult } from '$lib/utils/import';
+	import { readExcelFile, parseExpensesSheet, importTransactions, fixTransactionDates, diagnoseDates, type ImportResult } from '$lib/utils/import';
 	import { exportTransactionsToCSV, exportAllDataToJSON, importFromJSON, downloadFile } from '$lib/utils/export';
+	import { Wrench } from 'lucide-svelte';
+	import { toast } from '$lib/stores/toast';
 
 	// State
 	let isLoading = $state(true);
 	let settings = $state<Settings>(DEFAULT_SETTINGS);
 	let isSaving = $state(false);
-	let saveMessage = $state('');
 
 	// Import/Export state
 	let isImporting = $state(false);
 	let isExporting = $state(false);
-	let importMessage = $state('');
-	let importError = $state(false);
+	let isFixingDates = $state(false);
 	let fileInput = $state<HTMLInputElement | null>(null);
 	let jsonFileInput = $state<HTMLInputElement | null>(null);
 
@@ -46,7 +47,6 @@
 
 	async function handleSave() {
 		isSaving = true;
-		saveMessage = '';
 		try {
 			await updateSettings({
 				partnerName,
@@ -54,13 +54,10 @@
 				defaultSplitValue
 			});
 			settings = await getSettings();
-			saveMessage = 'Settings saved!';
-			setTimeout(() => {
-				saveMessage = '';
-			}, 2000);
+			toast.success('Settings saved');
 		} catch (error) {
 			console.error('Failed to save settings:', error);
-			saveMessage = 'Failed to save settings';
+			toast.error('Failed to save settings');
 		} finally {
 			isSaving = false;
 		}
@@ -73,8 +70,6 @@
 		if (!file) return;
 
 		isImporting = true;
-		importMessage = '';
-		importError = false;
 
 		try {
 			const workbook = await readExcelFile(file);
@@ -82,17 +77,14 @@
 			const result = await importTransactions(parsed, { skipDuplicates: true });
 
 			if (result.success) {
-				importMessage = `Successfully imported ${result.imported} transactions. ${result.skipped} skipped (duplicates or missing categories).`;
+				toast.success(`Imported ${result.imported} transactions (${result.skipped} skipped)`);
 			} else {
-				importError = true;
-				importMessage = `Import completed with errors: ${result.imported} imported, ${result.skipped} skipped. Errors: ${result.errors.slice(0, 3).join(', ')}`;
+				toast.warning(`Imported ${result.imported}, skipped ${result.skipped}. ${result.errors.length} errors.`);
 			}
 		} catch (error) {
-			importError = true;
-			importMessage = `Import failed: ${error}`;
+			toast.error(`Import failed: ${error}`);
 		} finally {
 			isImporting = false;
-			// Reset file input
 			if (input) input.value = '';
 		}
 	}
@@ -104,22 +96,18 @@
 		if (!file) return;
 
 		isImporting = true;
-		importMessage = '';
-		importError = false;
 
 		try {
 			const text = await file.text();
 			const result = await importFromJSON(text);
 
 			if (result.success) {
-				importMessage = result.message;
+				toast.success(result.message);
 			} else {
-				importError = true;
-				importMessage = result.message;
+				toast.error(result.message);
 			}
 		} catch (error) {
-			importError = true;
-			importMessage = `Import failed: ${error}`;
+			toast.error(`Import failed: ${error}`);
 		} finally {
 			isImporting = false;
 			if (input) input.value = '';
@@ -143,8 +131,10 @@
 			const csv = await exportTransactionsToCSV(allTransactions, categories);
 			const filename = `budget-tracker-export-${new Date().toISOString().slice(0, 10)}.csv`;
 			downloadFile(csv, filename, 'text/csv');
+			toast.success(`Exported ${allTransactions.length} transactions to CSV`);
 		} catch (error) {
 			console.error('Export failed:', error);
+			toast.error('Export failed');
 		} finally {
 			isExporting = false;
 		}
@@ -157,10 +147,64 @@
 			const json = await exportAllDataToJSON();
 			const filename = `budget-tracker-backup-${new Date().toISOString().slice(0, 10)}.json`;
 			downloadFile(json, filename, 'application/json');
+			toast.success('Backup downloaded');
 		} catch (error) {
 			console.error('Backup failed:', error);
+			toast.error('Backup failed');
 		} finally {
 			isExporting = false;
+		}
+	}
+
+	// Fix transaction dates that were incorrectly stored due to timezone issues
+	async function handleFixDates() {
+		isFixingDates = true;
+		try {
+			const result = await fixTransactionDates();
+			console.log('Fix dates result:', result);
+
+			if (result.fixed > 0) {
+				toast.success(`Fixed ${result.fixed} of ${result.checked} transaction dates`);
+			} else {
+				toast.warning(`Checked ${result.checked} transactions - no evening-hour dates found`);
+			}
+
+			// Log details for debugging
+			if (result.details.length > 0) {
+				console.log('Date fix details:', result.details);
+			}
+		} catch (error) {
+			console.error('Failed to fix dates:', error);
+			toast.error('Failed to fix dates');
+		} finally {
+			isFixingDates = false;
+		}
+	}
+
+	// Diagnose date storage issues
+	async function handleDiagnoseDates() {
+		try {
+			const diagnosis = await diagnoseDates();
+			console.log('=== DATE DIAGNOSIS ===');
+			console.log(`Total transactions: ${diagnosis.total}`);
+			console.log('\n--- First 10 transactions ---');
+			console.table(diagnosis.samples);
+
+			if (diagnosis.monthBoundaryIssues.length > 0) {
+				console.log('\n--- Transactions on month boundaries (potential off-by-one) ---');
+				console.table(diagnosis.monthBoundaryIssues);
+			}
+
+			// Show a summary toast
+			const boundaryCount = diagnosis.monthBoundaryIssues.length;
+			if (boundaryCount > 0) {
+				toast.success(`Found ${boundaryCount} transactions on month boundaries - check console`);
+			} else {
+				toast.success(`Check console for ${diagnosis.total} transactions`);
+			}
+		} catch (error) {
+			console.error('Diagnosis failed:', error);
+			toast.error('Failed to diagnose dates');
 		}
 	}
 
@@ -283,9 +327,6 @@
 						>
 							{isSaving ? 'Saving...' : 'Save Settings'}
 						</button>
-						{#if saveMessage}
-							<span class="text-sm text-green-600 font-medium">{saveMessage}</span>
-						{/if}
 					</div>
 				</div>
 			</div>
@@ -316,9 +357,7 @@
 									for="excel-import"
 									class="inline-flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 font-medium rounded-lg hover:bg-gray-200 cursor-pointer transition-colors"
 								>
-									<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-									</svg>
+									<FileSpreadsheet size={16} />
 									Import from Excel
 								</label>
 								<span class="text-xs text-gray-500">(.xlsx with "Expenses" sheet)</span>
@@ -338,21 +377,12 @@
 									for="json-import"
 									class="inline-flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 font-medium rounded-lg hover:bg-gray-200 cursor-pointer transition-colors"
 								>
-									<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-									</svg>
+									<Upload size={16} />
 									Restore from Backup
 								</label>
 								<span class="text-xs text-gray-500">(.json backup file)</span>
 							</div>
 						</div>
-
-						<!-- Import Status Message -->
-						{#if importMessage}
-							<div class="mt-3 p-3 rounded-lg {importError ? 'bg-red-50 text-red-700 border border-red-200' : 'bg-green-50 text-green-700 border border-green-200'}">
-								<p class="text-sm">{importMessage}</p>
-							</div>
-						{/if}
 
 						{#if isImporting}
 							<div class="mt-3 flex items-center gap-2 text-sm text-gray-600">
@@ -374,9 +404,7 @@
 								disabled={isExporting}
 								class="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
 							>
-								<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-								</svg>
+								<Download size={16} />
 								Export to CSV
 							</button>
 
@@ -385,9 +413,7 @@
 								disabled={isExporting}
 								class="inline-flex items-center gap-2 px-4 py-2 bg-gray-600 text-white font-medium rounded-lg hover:bg-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
 							>
-								<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
-								</svg>
+								<Database size={16} />
 								Full Backup (JSON)
 							</button>
 						</div>
@@ -398,6 +424,43 @@
 								<span>Exporting...</span>
 							</div>
 						{/if}
+					</div>
+
+					<!-- Divider -->
+					<div class="border-t border-gray-100"></div>
+
+					<!-- Maintenance Section -->
+					<div>
+						<h3 class="text-sm font-medium text-gray-900 mb-3">Maintenance</h3>
+						<div class="space-y-3">
+							<div class="flex flex-wrap items-start gap-3">
+								<button
+									onclick={handleFixDates}
+									disabled={isFixingDates}
+									class="inline-flex items-center gap-2 px-4 py-2 bg-amber-100 text-amber-800 font-medium rounded-lg hover:bg-amber-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+								>
+									<Wrench size={16} />
+									{isFixingDates ? 'Fixing...' : 'Fix Transaction Dates'}
+								</button>
+								<button
+									onclick={handleDiagnoseDates}
+									class="inline-flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 font-medium rounded-lg hover:bg-gray-200 transition-colors"
+								>
+									Diagnose Dates
+								</button>
+							</div>
+							<p class="text-xs text-gray-500">
+								Use "Diagnose Dates" to check how dates are stored (see browser console).
+								"Fix Transaction Dates" repairs dates that appear one day off due to timezone issues.
+							</p>
+
+							{#if isFixingDates}
+								<div class="flex items-center gap-2 text-sm text-gray-600">
+									<div class="animate-spin rounded-full h-4 w-4 border-b-2 border-amber-600"></div>
+									<span>Checking and fixing dates...</span>
+								</div>
+							{/if}
+						</div>
 					</div>
 
 					<!-- Info -->
