@@ -16,19 +16,19 @@
 	let isExpanded = $state(defaultExpanded);
 </script>
 
-<div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+<div class="bg-white rounded-xl shadow-md shadow-gray-200/50 overflow-hidden">
 	<!-- Header (always visible, clickable) -->
 	<button
-		class="w-full px-6 py-4 flex items-center justify-between hover:bg-gray-50 transition-colors"
+		class="w-full px-6 py-4 flex items-center justify-between hover:bg-cream/50 transition-colors"
 		onclick={() => (isExpanded = !isExpanded)}
 	>
 		<div class="text-left">
-			<h2 class="text-lg font-semibold text-gray-900">{title}</h2>
+			<h2 class="font-display text-xl font-medium text-charcoal">{title}</h2>
 			{#if description}
-				<p class="text-sm text-gray-500 mt-0.5">{description}</p>
+				<p class="text-sm text-charcoal-muted mt-0.5">{description}</p>
 			{/if}
 		</div>
-		<div class="text-gray-400 ml-4 flex-shrink-0">
+		<div class="text-charcoal-muted ml-4 flex-shrink-0">
 			{#if isExpanded}
 				<ChevronUp size={20} />
 			{:else}
@@ -46,7 +46,7 @@
 
 	<!-- Full content (shown when expanded) -->
 	{#if isExpanded}
-		<div transition:slide={{ duration: 200 }} class="px-6 pb-6 border-t border-gray-100 pt-4">
+		<div transition:slide={{ duration: 200 }} class="px-6 pb-6 border-t border-dashed border-gray-200 pt-4">
 			{@render children()}
 		</div>
 	{/if}

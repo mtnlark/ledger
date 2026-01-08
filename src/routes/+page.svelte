@@ -1,8 +1,8 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { format } from 'date-fns';
+	import { format, startOfDay, parseISO } from 'date-fns';
 	import { initializeDatabase, getMonthKey, parseMonthKey, type Transaction, type Category, type Settings, type MonthlyBudget, DEFAULT_SETTINGS } from '$lib/db';
-	import { addTransaction, updateTransaction, deleteTransaction, getTransactionsByMonth, getAvailableMonths } from '$lib/stores/transactions';
+	import { addTransaction, updateTransaction, deleteTransaction, getTransactionsByMonth, getAllTransactions, getAvailableMonths } from '$lib/stores/transactions';
 	import { getAllCategories } from '$lib/stores/categories';
 	import { getSettings } from '$lib/stores/settings';
 	import { getBudgetForMonth, saveBudget } from '$lib/stores/budget';
@@ -16,17 +16,72 @@
 	import MonthPicker from '$lib/components/MonthPicker.svelte';
 	import CashFlowCardSkeleton from '$lib/components/CashFlowCardSkeleton.svelte';
 	import TransactionListSkeleton from '$lib/components/TransactionListSkeleton.svelte';
+	import TransactionFilters, { type FilterState } from '$lib/components/TransactionFilters.svelte';
+	import QuickAddFAB, { type QuickAddData } from '$lib/components/QuickAddFAB.svelte';
 
 	// State
 	let isLoading = $state(true);
 	let categories = $state<Category[]>([]);
-	let transactions = $state<Transaction[]>([]);
+	let transactions = $state<Transaction[]>([]); // Current month's transactions
+	let allTransactions = $state<Transaction[]>([]); // All transactions (for filtering)
 	let settings = $state<Settings>(DEFAULT_SETTINGS);
 	let budget = $state<MonthlyBudget | null>(null);
 	let showBudgetModal = $state(false);
 	let editingTransaction = $state<Transaction | null>(null);
 	let currentMonth = $state(getMonthKey(new Date()));
 	let availableMonths = $state<string[]>([getMonthKey(new Date())]);
+
+	// Filter state
+	let filters = $state<FilterState>({
+		searchQuery: '',
+		categoryId: null,
+		dateFrom: '',
+		dateTo: ''
+	});
+
+	// Check if we're using date filters (which require all transactions)
+	let hasDateFilters = $derived(filters.dateFrom !== '' || filters.dateTo !== '');
+
+	// Determine which transaction set to filter from
+	let baseTransactions = $derived(hasDateFilters ? allTransactions : transactions);
+
+	// Filtered transactions
+	let filteredTransactions = $derived.by(() => {
+		let result = baseTransactions;
+
+		// Filter by search query (merchant name)
+		if (filters.searchQuery.trim()) {
+			const query = filters.searchQuery.toLowerCase().trim();
+			result = result.filter(t => t.merchant.toLowerCase().includes(query));
+		}
+
+		// Filter by category
+		if (filters.categoryId !== null) {
+			result = result.filter(t => t.categoryId === filters.categoryId);
+		}
+
+		// Filter by date range
+		if (filters.dateFrom) {
+			const fromDate = startOfDay(parseISO(filters.dateFrom));
+			result = result.filter(t => startOfDay(new Date(t.date)) >= fromDate);
+		}
+
+		if (filters.dateTo) {
+			const toDate = startOfDay(parseISO(filters.dateTo));
+			result = result.filter(t => startOfDay(new Date(t.date)) <= toDate);
+		}
+
+		return result;
+	});
+
+	async function handleFilterChange(newFilters: FilterState) {
+		// If date filters are being applied, load all transactions
+		const needsAllTransactions = newFilters.dateFrom !== '' || newFilters.dateTo !== '';
+		if (needsAllTransactions && allTransactions.length === 0) {
+			allTransactions = await getAllTransactions();
+		}
+		filters = newFilters;
+	}
 
 	// Computed
 	let monthDisplay = $derived(format(parseMonthKey(currentMonth), 'MMMM yyyy'));
@@ -96,6 +151,31 @@
 			// Reload transactions and available months (in case new month was added)
 			transactions = await getTransactionsByMonth(currentMonth);
 			availableMonths = await getAvailableMonths();
+			// Also refresh allTransactions if we have it loaded
+			if (allTransactions.length > 0) {
+				allTransactions = await getAllTransactions();
+			}
+			toast.success('Transaction added');
+		} catch (error) {
+			console.error('Failed to add transaction:', error);
+			toast.error('Failed to add transaction');
+		}
+	}
+
+	// Handle quick add (from FAB)
+	async function handleQuickAdd(data: QuickAddData) {
+		try {
+			await addTransaction({
+				...data,
+				isSettled: false
+			});
+			// Reload transactions and available months
+			transactions = await getTransactionsByMonth(currentMonth);
+			availableMonths = await getAvailableMonths();
+			// Also refresh allTransactions if we have it loaded
+			if (allTransactions.length > 0) {
+				allTransactions = await getAllTransactions();
+			}
 			toast.success('Transaction added');
 		} catch (error) {
 			console.error('Failed to add transaction:', error);
@@ -158,7 +238,7 @@
 	<title>Budget Tracker</title>
 </svelte:head>
 
-<div class="min-h-screen bg-gray-50">
+<div class="min-h-screen">
 	<!-- Header with navigation -->
 	<HeaderNav title="Budget Tracker">
 		<MonthPicker
@@ -173,21 +253,21 @@
 		{#if isLoading}
 			<!-- Skeleton loading states -->
 			<CashFlowCardSkeleton />
-			<div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-				<div class="animate-pulse h-6 w-32 bg-gray-200 rounded mb-4"></div>
+			<div class="bg-white rounded-xl shadow-md shadow-gray-200/50 p-6">
+				<div class="animate-pulse h-6 w-32 bg-cream-dark rounded mb-4"></div>
 				<div class="space-y-4">
 					<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-						<div class="h-10 bg-gray-200 rounded-lg"></div>
-						<div class="h-10 bg-gray-200 rounded-lg"></div>
+						<div class="h-10 bg-cream-dark rounded-lg"></div>
+						<div class="h-10 bg-cream-dark rounded-lg"></div>
 					</div>
 					<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-						<div class="h-10 bg-gray-200 rounded-lg"></div>
-						<div class="h-10 bg-gray-200 rounded-lg"></div>
+						<div class="h-10 bg-cream-dark rounded-lg"></div>
+						<div class="h-10 bg-cream-dark rounded-lg"></div>
 					</div>
 				</div>
 			</div>
 			<div>
-				<div class="animate-pulse h-6 w-40 bg-gray-200 rounded mb-3"></div>
+				<div class="animate-pulse h-6 w-40 bg-cream-dark rounded mb-3"></div>
 				<TransactionListSkeleton count={4} />
 			</div>
 		{:else}
@@ -206,11 +286,26 @@
 				onSubmit={handleAddTransaction}
 			/>
 
+			<!-- Transaction Search & Filters -->
+			<TransactionFilters
+				{categories}
+				{filters}
+				onFilterChange={handleFilterChange}
+				resultCount={filteredTransactions.length}
+				totalCount={transactions.length}
+			/>
+
 			<!-- Transaction List -->
 			<div>
-				<h2 class="text-lg font-semibold text-gray-900 mb-3">Recent Transactions</h2>
+				<h2 class="font-display text-xl font-medium text-charcoal mb-4">
+					{#if filters.searchQuery || filters.categoryId !== null || filters.dateFrom || filters.dateTo}
+						Filtered Transactions
+					{:else}
+						Recent Transactions
+					{/if}
+				</h2>
 				<TransactionList
-					{transactions}
+					transactions={filteredTransactions}
 					{categories}
 					{settings}
 					onEdit={handleEdit}
@@ -240,3 +335,12 @@
 	onSave={handleSaveEdit}
 	onClose={() => editingTransaction = null}
 />
+
+<!-- Quick Add FAB -->
+{#if !isLoading}
+	<QuickAddFAB
+		{categories}
+		{settings}
+		onSubmit={handleQuickAdd}
+	/>
+{/if}

@@ -5,6 +5,8 @@ import {
 	updateTransaction,
 	deleteTransaction,
 	getTransactionsByMonth,
+	getTransactionsByDateRange,
+	getAllTransactions,
 	markAsSettled,
 	getUnsettledTransactions,
 	calculateOutstandingBalance
@@ -321,6 +323,144 @@ describe('Transaction Operations', () => {
 		it('returns empty array for month with no transactions', async () => {
 			const october = await getTransactionsByMonth('2025-10');
 			expect(october).toHaveLength(0);
+		});
+	});
+
+	describe('getTransactionsByDateRange', () => {
+		beforeEach(async () => {
+			// Add transactions across multiple months
+			await addTransaction({
+				date: new Date(2025, 9, 15), // October 15
+				merchant: 'October Transaction',
+				amount: 50,
+				categoryId: 1,
+				isShared: false,
+				splitType: 'percentage',
+				splitValue: 0.5,
+				isSettled: false
+			});
+
+			await addTransaction({
+				date: new Date(2025, 10, 15), // November 15
+				merchant: 'November Transaction',
+				amount: 100,
+				categoryId: 1,
+				isShared: false,
+				splitType: 'percentage',
+				splitValue: 0.5,
+				isSettled: false
+			});
+
+			await addTransaction({
+				date: new Date(2025, 11, 15), // December 15
+				merchant: 'December Transaction',
+				amount: 75,
+				categoryId: 1,
+				isShared: false,
+				splitType: 'percentage',
+				splitValue: 0.5,
+				isSettled: false
+			});
+
+			await addTransaction({
+				date: new Date(2026, 0, 15), // January 15
+				merchant: 'January Transaction',
+				amount: 200,
+				categoryId: 1,
+				isShared: false,
+				splitType: 'percentage',
+				splitValue: 0.5,
+				isSettled: false
+			});
+		});
+
+		it('returns transactions within date range', async () => {
+			const fromDate = new Date(2025, 10, 1); // Nov 1
+			const toDate = new Date(2025, 11, 31); // Dec 31
+
+			const transactions = await getTransactionsByDateRange(fromDate, toDate);
+
+			expect(transactions).toHaveLength(2);
+			const merchants = transactions.map((t) => t.merchant);
+			expect(merchants).toContain('November Transaction');
+			expect(merchants).toContain('December Transaction');
+		});
+
+		it('excludes transactions outside date range', async () => {
+			const fromDate = new Date(2025, 10, 1); // Nov 1
+			const toDate = new Date(2025, 11, 31); // Dec 31
+
+			const transactions = await getTransactionsByDateRange(fromDate, toDate);
+			const merchants = transactions.map((t) => t.merchant);
+
+			expect(merchants).not.toContain('October Transaction');
+			expect(merchants).not.toContain('January Transaction');
+		});
+
+		it('includes transactions on boundary dates', async () => {
+			const fromDate = new Date(2025, 10, 15); // Nov 15 (exact date of transaction)
+			const toDate = new Date(2025, 11, 15); // Dec 15 (exact date of transaction)
+
+			const transactions = await getTransactionsByDateRange(fromDate, toDate);
+
+			expect(transactions).toHaveLength(2);
+			const merchants = transactions.map((t) => t.merchant);
+			expect(merchants).toContain('November Transaction');
+			expect(merchants).toContain('December Transaction');
+		});
+
+		it('returns all transactions when range spans all data', async () => {
+			const fromDate = new Date(2025, 0, 1); // Jan 1 2025
+			const toDate = new Date(2026, 11, 31); // Dec 31 2026
+
+			const transactions = await getTransactionsByDateRange(fromDate, toDate);
+
+			expect(transactions).toHaveLength(4);
+		});
+
+		it('returns empty array when no transactions in range', async () => {
+			const fromDate = new Date(2024, 0, 1); // Jan 1 2024
+			const toDate = new Date(2024, 11, 31); // Dec 31 2024
+
+			const transactions = await getTransactionsByDateRange(fromDate, toDate);
+
+			expect(transactions).toHaveLength(0);
+		});
+
+		it('returns transactions sorted by date descending', async () => {
+			const fromDate = new Date(2025, 9, 1); // Oct 1
+			const toDate = new Date(2026, 1, 1); // Feb 1
+
+			const transactions = await getTransactionsByDateRange(fromDate, toDate);
+
+			expect(transactions[0].merchant).toBe('January Transaction');
+			expect(transactions[1].merchant).toBe('December Transaction');
+			expect(transactions[2].merchant).toBe('November Transaction');
+			expect(transactions[3].merchant).toBe('October Transaction');
+		});
+
+		it('works with only fromDate specified (to present)', async () => {
+			const fromDate = new Date(2025, 11, 1); // Dec 1
+
+			const transactions = await getTransactionsByDateRange(fromDate);
+
+			expect(transactions.length).toBeGreaterThanOrEqual(2);
+			const merchants = transactions.map((t) => t.merchant);
+			expect(merchants).toContain('December Transaction');
+			expect(merchants).toContain('January Transaction');
+			expect(merchants).not.toContain('November Transaction');
+		});
+
+		it('works with only toDate specified (from beginning)', async () => {
+			const toDate = new Date(2025, 10, 30); // Nov 30
+
+			const transactions = await getTransactionsByDateRange(undefined, toDate);
+
+			expect(transactions).toHaveLength(2);
+			const merchants = transactions.map((t) => t.merchant);
+			expect(merchants).toContain('October Transaction');
+			expect(merchants).toContain('November Transaction');
+			expect(merchants).not.toContain('December Transaction');
 		});
 	});
 

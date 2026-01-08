@@ -76,19 +76,19 @@
 	<!-- svelte-ignore a11y_click_events_have_key_events -->
 	<!-- svelte-ignore a11y_no_static_element_interactions -->
 	<div
-		class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+		class="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4 backdrop-blur-sm"
 		onclick={handleBackdropClick}
 	>
 		<!-- Modal -->
-		<div class="bg-white rounded-xl shadow-xl max-w-md w-full" onclick={(e) => e.stopPropagation()}>
+		<div class="bg-white rounded-xl shadow-xl shadow-gray-300/50 max-w-md w-full animate-enter" onclick={(e) => e.stopPropagation()}>
 			<!-- Header -->
-			<div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
-				<h2 class="text-lg font-semibold text-gray-900">
+			<div class="px-6 py-4 border-b border-dashed border-gray-200 flex items-center justify-between">
+				<h2 class="font-display text-xl font-medium text-charcoal">
 					Budget for {monthDisplay}
 				</h2>
 				<button
 					onclick={onClose}
-					class="text-gray-400 hover:text-gray-600 p-1 hover:bg-gray-100 rounded-lg transition-colors"
+					class="text-charcoal-muted hover:text-charcoal p-1.5 hover:bg-cream rounded-lg transition-colors"
 					aria-label="Close"
 				>
 					<X size={20} />
@@ -99,11 +99,11 @@
 			<form onsubmit={handleSubmit} class="p-6 space-y-4">
 				<!-- Income -->
 				<div>
-					<label for="income" class="block text-sm font-medium text-gray-700 mb-1">
+					<label for="income" class="block text-sm font-medium text-charcoal-soft mb-1.5">
 						Monthly Income
 					</label>
 					<div class="relative">
-						<span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">$</span>
+						<span class="absolute left-3 top-1/2 -translate-y-1/2 text-charcoal-muted font-mono">$</span>
 						<input
 							type="text"
 							inputmode="decimal"
@@ -111,19 +111,19 @@
 							value={incomeStr}
 							oninput={handleIncomeInput}
 							placeholder="0.00"
-							class="w-full pl-7 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+							class="w-full pl-7 pr-3 py-2.5 bg-cream border border-[rgba(45,42,38,0.15)] rounded-lg focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-colors font-mono placeholder:text-charcoal-muted"
 						/>
 					</div>
-					<p class="mt-1 text-xs text-gray-500">Your total income for this month</p>
+					<p class="mt-1.5 text-xs text-charcoal-muted">Your total income for this month</p>
 				</div>
 
 				<!-- Saved -->
 				<div>
-					<label for="saved" class="block text-sm font-medium text-gray-700 mb-1">
+					<label for="saved" class="block text-sm font-medium text-charcoal-soft mb-1.5">
 						Amount Saved
 					</label>
 					<div class="relative">
-						<span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">$</span>
+						<span class="absolute left-3 top-1/2 -translate-y-1/2 text-charcoal-muted font-mono">$</span>
 						<input
 							type="text"
 							inputmode="decimal"
@@ -131,23 +131,23 @@
 							value={savedStr}
 							oninput={handleSavedInput}
 							placeholder="0.00"
-							class="w-full pl-7 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+							class="w-full pl-7 pr-3 py-2.5 bg-cream border border-[rgba(45,42,38,0.15)] rounded-lg focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-colors font-mono placeholder:text-charcoal-muted"
 						/>
 					</div>
-					<p class="mt-1 text-xs text-gray-500">Amount set aside for savings this month</p>
+					<p class="mt-1.5 text-xs text-charcoal-muted">Amount set aside for savings this month</p>
 				</div>
 
 				<!-- Notes -->
 				<div>
-					<label for="notes" class="block text-sm font-medium text-gray-700 mb-1">
-						Notes <span class="text-gray-400 font-normal">(optional)</span>
+					<label for="notes" class="block text-sm font-medium text-charcoal-soft mb-1.5">
+						Notes <span class="text-charcoal-muted font-normal">(optional)</span>
 					</label>
 					<input
 						type="text"
 						id="notes"
 						bind:value={notes}
 						placeholder="Any notes about this month..."
-						class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+						class="w-full px-3 py-2.5 bg-cream border border-[rgba(45,42,38,0.15)] rounded-lg focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-colors placeholder:text-charcoal-muted"
 					/>
 				</div>
 
@@ -156,10 +156,11 @@
 					{@const income = parseFloat(cleanNumberInput(incomeStr)) || 0}
 					{@const saved = parseFloat(cleanNumberInput(savedStr)) || 0}
 					{@const available = income - saved}
-					<div class="bg-gray-50 rounded-lg p-4 text-sm">
-						<div class="flex justify-between text-gray-600">
-							<span>Available to spend:</span>
-							<span class="font-semibold text-gray-900">
+					<div class="bg-cream-dark rounded-lg p-4 border border-dashed border-gray-200">
+						<div class="flex items-baseline text-charcoal-soft">
+							<span class="text-sm">Available to spend:</span>
+							<span class="ledger-line"></span>
+							<span class="font-mono font-medium text-charcoal text-lg">
 								${available.toLocaleString('en-US', { minimumFractionDigits: 2 })}
 							</span>
 						</div>
@@ -167,17 +168,17 @@
 				{/if}
 
 				<!-- Actions -->
-				<div class="flex gap-3 pt-2">
+				<div class="flex gap-3 pt-3">
 					<button
 						type="submit"
-						class="flex-1 bg-blue-600 text-white py-2.5 px-4 rounded-lg font-medium hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors"
+						class="flex-1 bg-primary-500 text-white py-2.5 px-4 rounded-lg font-medium hover:bg-primary-600 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-primary-500/25 focus:ring-2 focus:ring-primary-500/20 focus:ring-offset-2 transition-all duration-150"
 					>
 						Save Budget
 					</button>
 					<button
 						type="button"
 						onclick={onClose}
-						class="px-4 py-2.5 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50 transition-colors"
+						class="px-4 py-2.5 border border-[rgba(45,42,38,0.15)] text-charcoal-soft rounded-lg font-medium hover:bg-cream transition-colors"
 					>
 						Cancel
 					</button>

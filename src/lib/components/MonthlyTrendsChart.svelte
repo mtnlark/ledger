@@ -12,6 +12,13 @@
 
 	let { monthlyData }: Props = $props();
 
+	// Warm Ledger color palette
+	const COLORS = {
+		belowAverage: '#5B8C5A', // success-500 (sage)
+		normal: '#C45D3A',      // primary-500 (terracotta)
+		aboveAverage: '#C17B7B' // danger-500 (rose)
+	};
+
 	// Convert map to sorted arrays for chart
 	let chartData = $derived.by(() => {
 		const entries = Array.from(monthlyData.entries()).sort((a, b) => a[0].localeCompare(b[0]));
@@ -39,7 +46,7 @@
 					label: 'Monthly Spending',
 					data: chartData.values,
 					backgroundColor: chartData.values.map((v) =>
-						v > average * 1.2 ? '#ef4444' : v < average * 0.8 ? '#22c55e' : '#3b82f6'
+						v > average * 1.2 ? COLORS.aboveAverage : v < average * 0.8 ? COLORS.belowAverage : COLORS.normal
 					),
 					borderRadius: 6,
 					borderSkipped: false
@@ -54,6 +61,11 @@
 					display: false
 				},
 				tooltip: {
+					backgroundColor: '#2D2A26',
+					titleColor: '#FAF8F5',
+					bodyColor: '#FAF8F5',
+					padding: 12,
+					cornerRadius: 8,
 					callbacks: {
 						label: (context) => {
 							const value = context.parsed.y;
@@ -66,13 +78,23 @@
 				y: {
 					beginAtZero: true,
 					ticks: {
+						color: '#8A847C',
+						font: {
+							family: "'DM Mono', monospace"
+						},
 						callback: (value) => `$${Number(value).toLocaleString()}`
 					},
 					grid: {
-						color: '#f3f4f6'
+						color: 'rgba(45, 42, 38, 0.08)'
 					}
 				},
 				x: {
+					ticks: {
+						color: '#5C5751',
+						font: {
+							family: "'DM Sans', system-ui"
+						}
+					},
 					grid: {
 						display: false
 					}
@@ -90,11 +112,11 @@
 	}
 </script>
 
-<div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-	<div class="px-6 py-4 border-b border-gray-100">
-		<h2 class="text-lg font-semibold text-gray-900">Monthly Spending Trends</h2>
-		<p class="text-sm text-gray-500 mt-1">
-			Average: {formatCurrency(average)}/month
+<div class="bg-white rounded-xl shadow-md shadow-gray-200/50 overflow-hidden">
+	<div class="px-6 py-4 border-b border-dashed border-gray-200">
+		<h2 class="font-display text-xl font-medium text-charcoal">Monthly Spending Trends</h2>
+		<p class="text-sm text-charcoal-muted mt-1">
+			Average: <span class="font-mono">{formatCurrency(average)}</span>/month
 		</p>
 	</div>
 
@@ -117,17 +139,17 @@
 			</div>
 
 			<!-- Legend -->
-			<div class="flex justify-center gap-6 mt-4 text-xs text-gray-500">
+			<div class="flex justify-center gap-6 mt-4 text-xs text-charcoal-muted">
 				<div class="flex items-center gap-1.5">
-					<div class="w-3 h-3 rounded bg-green-500"></div>
+					<div class="w-3 h-3 rounded" style="background-color: {COLORS.belowAverage};"></div>
 					<span>Below average</span>
 				</div>
 				<div class="flex items-center gap-1.5">
-					<div class="w-3 h-3 rounded bg-blue-500"></div>
+					<div class="w-3 h-3 rounded" style="background-color: {COLORS.normal};"></div>
 					<span>Normal</span>
 				</div>
 				<div class="flex items-center gap-1.5">
-					<div class="w-3 h-3 rounded bg-red-500"></div>
+					<div class="w-3 h-3 rounded" style="background-color: {COLORS.aboveAverage};"></div>
 					<span>Above average</span>
 				</div>
 			</div>

@@ -7,7 +7,10 @@ import {
 	getCategoryByName,
 	addCategory,
 	updateCategory,
-	toggleCategoryActive
+	toggleCategoryActive,
+	reorderCategories,
+	moveCategoryUp,
+	moveCategoryDown
 } from './categories';
 
 describe('Category Operations', () => {
@@ -179,6 +182,83 @@ describe('Category Operations', () => {
 			await toggleCategoryActive(category.id!);
 			updated = await getCategoryById(category.id!);
 			expect(updated?.isActive).toBe(true);
+		});
+	});
+
+	describe('reorderCategories', () => {
+		it('reorders categories based on provided ID array', async () => {
+			const categories = await getAllCategories();
+			const first = categories[0];
+			const second = categories[1];
+			const third = categories[2];
+
+			// Reverse the order of first three
+			await reorderCategories([third.id!, second.id!, first.id!]);
+
+			const reordered = await getAllCategories();
+			expect(reordered[0].id).toBe(third.id);
+			expect(reordered[1].id).toBe(second.id);
+			expect(reordered[2].id).toBe(first.id);
+		});
+
+		it('maintains sortOrder sequence starting from 1', async () => {
+			const categories = await getAllCategories();
+			const ids = categories.map((c) => c.id!).reverse(); // Reverse all
+
+			await reorderCategories(ids);
+
+			const reordered = await getAllCategories();
+			reordered.forEach((cat, index) => {
+				expect(cat.sortOrder).toBe(index + 1);
+			});
+		});
+	});
+
+	describe('moveCategoryUp', () => {
+		it('moves category up one position', async () => {
+			const categories = await getAllCategories();
+			const second = categories[1];
+			const first = categories[0];
+
+			await moveCategoryUp(second.id!);
+
+			const reordered = await getAllCategories();
+			expect(reordered[0].id).toBe(second.id);
+			expect(reordered[1].id).toBe(first.id);
+		});
+
+		it('does nothing if category is already at top', async () => {
+			const categories = await getAllCategories();
+			const first = categories[0];
+
+			await moveCategoryUp(first.id!);
+
+			const reordered = await getAllCategories();
+			expect(reordered[0].id).toBe(first.id);
+		});
+	});
+
+	describe('moveCategoryDown', () => {
+		it('moves category down one position', async () => {
+			const categories = await getAllCategories();
+			const first = categories[0];
+			const second = categories[1];
+
+			await moveCategoryDown(first.id!);
+
+			const reordered = await getAllCategories();
+			expect(reordered[0].id).toBe(second.id);
+			expect(reordered[1].id).toBe(first.id);
+		});
+
+		it('does nothing if category is already at bottom', async () => {
+			const categories = await getAllCategories();
+			const last = categories[categories.length - 1];
+
+			await moveCategoryDown(last.id!);
+
+			const reordered = await getAllCategories();
+			expect(reordered[reordered.length - 1].id).toBe(last.id);
 		});
 	});
 });

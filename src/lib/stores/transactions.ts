@@ -41,6 +41,34 @@ export async function getTransactionsByMonth(month: string): Promise<Transaction
 		.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 }
 
+// Get transactions within a date range (supports cross-month filtering)
+export async function getTransactionsByDateRange(
+	fromDate?: Date,
+	toDate?: Date
+): Promise<Transaction[]> {
+	const allTransactions = await db.transactions.toArray();
+
+	return allTransactions
+		.filter((t) => {
+			const txDate = new Date(t.date);
+			// Normalize to start of day for comparison
+			const txDay = new Date(txDate.getFullYear(), txDate.getMonth(), txDate.getDate());
+
+			if (fromDate) {
+				const fromDay = new Date(fromDate.getFullYear(), fromDate.getMonth(), fromDate.getDate());
+				if (txDay < fromDay) return false;
+			}
+
+			if (toDate) {
+				const toDay = new Date(toDate.getFullYear(), toDate.getMonth(), toDate.getDate());
+				if (txDay > toDay) return false;
+			}
+
+			return true;
+		})
+		.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+}
+
 // Add a new transaction
 export async function addTransaction(
 	transaction: Omit<Transaction, 'id' | 'partnerShare' | 'createdAt' | 'updatedAt'>

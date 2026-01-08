@@ -1,0 +1,238 @@
+<script lang="ts">
+	import { Plus, X, Check } from 'lucide-svelte';
+	import { scale, fly } from 'svelte/transition';
+	import { getMostCommonCategory } from '$lib/stores/merchants';
+	import MerchantAutocomplete from './MerchantAutocomplete.svelte';
+	import CategoryCombobox from './CategoryCombobox.svelte';
+	import type { Category, Settings } from '$lib/db';
+
+	interface Props {
+		categories: Category[];
+		settings: Settings;
+		onSubmit: (data: QuickAddData) => void;
+	}
+
+	export interface QuickAddData {
+		date: Date;
+		merchant: string;
+		amount: number;
+		categoryId: number;
+		isShared: boolean;
+		splitType: 'percentage' | 'fixed';
+		splitValue: number;
+	}
+
+	let { categories, settings, onSubmit }: Props = $props();
+
+	let isExpanded = $state(false);
+	let merchant = $state('');
+	let amountStr = $state('');
+	let categoryId = $state(0);
+	let isSubmitting = $state(false);
+
+	// Focus management
+	let amountInput = $state<HTMLInputElement | null>(null);
+
+	let amount = $derived(parseFloat(amountStr) || 0);
+	let isValid = $derived(merchant.trim() !== '' && amount > 0 && categoryId > 0);
+
+	function toggle() {
+		if (isExpanded) {
+			close();
+		} else {
+			open();
+		}
+	}
+
+	function open() {
+		isExpanded = true;
+		// Focus amount input after animation
+		setTimeout(() => {
+			amountInput?.focus();
+		}, 100);
+	}
+
+	function close() {
+		isExpanded = false;
+		resetForm();
+	}
+
+	function resetForm() {
+		merchant = '';
+		amountStr = '';
+		categoryId = 0;
+		isSubmitting = false;
+	}
+
+	async function handleMerchantSelect(selectedMerchant: string, suggestedCategoryId: number | null) {
+		merchant = selectedMerchant;
+		if (suggestedCategoryId && categoryId === 0) {
+			categoryId = suggestedCategoryId;
+		}
+	}
+
+	async function handleMerchantInput(value: string) {
+		merchant = value;
+		// Try to auto-fill category when merchant changes (if not already set)
+		if (value.length >= 3 && categoryId === 0) {
+			const commonCategory = await getMostCommonCategory(value);
+			if (commonCategory) {
+				categoryId = commonCategory;
+			}
+		}
+	}
+
+	async function handleSubmit(e: Event) {
+		e.preventDefault();
+		if (!isValid || isSubmitting) return;
+
+		isSubmitting = true;
+
+		try {
+			onSubmit({
+				date: new Date(),
+				merchant: merchant.trim(),
+				amount,
+				categoryId,
+				isShared: false, // Quick add defaults to not shared
+				splitType: settings.defaultSplitType,
+				splitValue: settings.defaultSplitValue
+			});
+
+			close();
+		} finally {
+			isSubmitting = false;
+		}
+	}
+
+	// Handle escape key
+	function handleKeydown(e: KeyboardEvent) {
+		if (e.key === 'Escape' && isExpanded) {
+			close();
+		}
+	}
+</script>
+
+<svelte:window onkeydown={handleKeydown} />
+
+<!-- Backdrop (when expanded) -->
+{#if isExpanded}
+	<button
+		class="fixed inset-0 bg-charcoal/20 backdrop-blur-sm z-40 cursor-default"
+		transition:scale={{ duration: 200 }}
+		onclick={close}
+		aria-label="Close quick add form"
+	></button>
+{/if}
+
+<!-- FAB Container -->
+<div class="fixed bottom-20 right-4 z-50 sm:bottom-6 sm:right-6">
+	{#if isExpanded}
+		<!-- Expanded Form -->
+		<div
+			class="bg-white rounded-2xl shadow-xl shadow-charcoal/15 w-[calc(100vw-2rem)] max-w-sm overflow-hidden"
+			transition:fly={{ y: 20, duration: 200 }}
+		>
+			<form onsubmit={handleSubmit}>
+				<!-- Header -->
+				<div class="px-4 py-3 bg-primary-500 text-white flex items-center justify-between">
+					<h3 class="font-display font-medium">Quick Add</h3>
+					<button
+						type="button"
+						onclick={close}
+						class="p-1 hover:bg-white/20 rounded-lg transition-colors"
+					>
+						<X size={20} />
+					</button>
+				</div>
+
+				<!-- Form Fields -->
+				<div class="p-4 space-y-4">
+					<!-- Amount -->
+					<div>
+						<label for="quick-amount" class="block text-sm font-medium text-charcoal-soft mb-1.5">
+							Amount
+						</label>
+						<div class="relative">
+							<span class="absolute left-3 top-1/2 -translate-y-1/2 text-charcoal-muted font-mono">$</span>
+							<input
+								type="number"
+								id="quick-amount"
+								bind:value={amountStr}
+								bind:this={amountInput}
+								step="0.01"
+								min="0"
+								placeholder="0.00"
+								inputmode="decimal"
+								class="w-full pl-7 pr-3 py-3 bg-cream border border-[rgba(45,42,38,0.15)] rounded-lg focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-colors font-mono text-lg placeholder:text-charcoal-muted"
+							/>
+						</div>
+					</div>
+
+					<!-- Merchant with Autocomplete -->
+					<div>
+						<label for="quick-merchant" class="block text-sm font-medium text-charcoal-soft mb-1.5">
+							Merchant
+						</label>
+						<MerchantAutocomplete
+							value={merchant}
+							{categories}
+							placeholder="Start typing..."
+							onInput={handleMerchantInput}
+							onSelect={handleMerchantSelect}
+							inputId="quick-merchant"
+						/>
+					</div>
+
+					<!-- Category -->
+					<div>
+						<label for="quick-category" class="block text-sm font-medium text-charcoal-soft mb-1.5">
+							Category
+							{#if categoryId > 0}
+								<span class="text-xs text-success-600 font-normal ml-1">(auto-filled)</span>
+							{/if}
+						</label>
+						<CategoryCombobox
+							{categories}
+							value={categoryId}
+							onSelect={(id) => (categoryId = id)}
+						/>
+					</div>
+				</div>
+
+				<!-- Actions -->
+				<div class="px-4 pb-4 flex gap-3">
+					<button
+						type="button"
+						onclick={close}
+						class="flex-1 py-2.5 px-4 border border-[rgba(45,42,38,0.15)] text-charcoal-soft rounded-lg font-medium hover:bg-cream transition-colors"
+					>
+						Cancel
+					</button>
+					<button
+						type="submit"
+						disabled={!isValid || isSubmitting}
+						class="flex-1 bg-primary-500 text-white py-2.5 px-4 rounded-lg font-medium hover:bg-primary-600 focus:ring-2 focus:ring-primary-500/20 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-150 flex items-center justify-center gap-2"
+					>
+						{#if isSubmitting}
+							<div class="animate-spin rounded-full h-4 w-4 border-2 border-white/30 border-t-white"></div>
+						{:else}
+							<Check size={18} />
+						{/if}
+						Add
+					</button>
+				</div>
+			</form>
+		</div>
+	{:else}
+		<!-- Collapsed FAB Button -->
+		<button
+			onclick={toggle}
+			class="w-14 h-14 bg-primary-500 text-white rounded-full shadow-lg shadow-primary-500/30 hover:bg-primary-600 hover:shadow-xl hover:shadow-primary-500/40 hover:scale-105 active:scale-95 transition-all duration-150 flex items-center justify-center"
+			aria-label="Quick add transaction"
+			transition:scale={{ duration: 150 }}
+		>
+			<Plus size={28} strokeWidth={2.5} />
+		</button>
+	{/if}
+</div>

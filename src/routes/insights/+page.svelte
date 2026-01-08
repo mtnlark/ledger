@@ -84,7 +84,7 @@
 	<title>Insights - Budget Tracker</title>
 </svelte:head>
 
-<div class="min-h-screen bg-gray-50">
+<div class="min-h-screen">
 	<!-- Header -->
 	<HeaderNav title="Insights" showBack={true}>
 		<MonthPicker {currentMonth} {availableMonths} onMonthChange={handleMonthChange} />
@@ -95,7 +95,7 @@
 		{#if isLoading}
 			<!-- Loading skeletons -->
 			{#each Array(3) as _}
-				<div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+				<div class="bg-white rounded-xl shadow-md shadow-gray-200/50 overflow-hidden">
 					<div class="px-6 py-4 flex items-center justify-between">
 						<div>
 							<Skeleton class="h-6 mb-2" width="180px" rounded="sm" />
@@ -122,12 +122,12 @@
 					)}
 					<div class="flex items-center justify-between">
 						<div>
-							<p class="text-2xl font-bold text-gray-900">${totalSpent.toLocaleString()}</p>
-							<p class="text-sm text-gray-500">Total spent this month</p>
+							<p class="font-mono text-2xl font-medium text-charcoal">${totalSpent.toLocaleString()}</p>
+							<p class="text-sm text-charcoal-muted">Total spent this month</p>
 						</div>
 						<div class="text-right">
-							<p class="text-lg font-semibold text-gray-900">{transactions.length}</p>
-							<p class="text-sm text-gray-500">transactions</p>
+							<p class="font-mono text-lg font-medium text-charcoal">{transactions.length}</p>
+							<p class="text-sm text-charcoal-muted">transactions</p>
 						</div>
 					</div>
 				{/snippet}
@@ -149,24 +149,24 @@
 							{@const sharedCount = transactions.filter((t) => t.isShared).length}
 							{@const avgTransaction = totalSpent / transactions.length}
 							{@const uniqueCategories = new Set(transactions.map((t) => t.categoryId)).size}
-							<div class="bg-gray-50 rounded-lg p-4">
-								<h3 class="text-sm font-medium text-gray-700 mb-3">Quick Stats</h3>
+							<div class="bg-cream-dark rounded-lg p-4 border border-dashed border-gray-200">
+								<h3 class="text-sm font-medium text-charcoal-soft mb-3">Quick Stats</h3>
 								<div class="grid grid-cols-2 md:grid-cols-4 gap-4">
 									<div class="text-center">
-										<p class="text-xl font-bold text-gray-900">{transactions.length}</p>
-										<p class="text-xs text-gray-500">Transactions</p>
+										<p class="font-mono text-xl font-medium text-charcoal">{transactions.length}</p>
+										<p class="text-xs text-charcoal-muted">Transactions</p>
 									</div>
 									<div class="text-center">
-										<p class="text-xl font-bold text-gray-900">${avgTransaction.toFixed(0)}</p>
-										<p class="text-xs text-gray-500">Avg Transaction</p>
+										<p class="font-mono text-xl font-medium text-charcoal">${avgTransaction.toFixed(0)}</p>
+										<p class="text-xs text-charcoal-muted">Avg Transaction</p>
 									</div>
 									<div class="text-center">
-										<p class="text-xl font-bold text-gray-900">{sharedCount}</p>
-										<p class="text-xs text-gray-500">Shared</p>
+										<p class="font-mono text-xl font-medium text-charcoal">{sharedCount}</p>
+										<p class="text-xs text-charcoal-muted">Shared</p>
 									</div>
 									<div class="text-center">
-										<p class="text-xl font-bold text-gray-900">{uniqueCategories}</p>
-										<p class="text-xs text-gray-500">Categories</p>
+										<p class="font-mono text-xl font-medium text-charcoal">{uniqueCategories}</p>
+										<p class="text-xs text-charcoal-muted">Categories</p>
 									</div>
 								</div>
 							</div>

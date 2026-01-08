@@ -55,7 +55,7 @@
 	<title>Shared Expenses - Budget Tracker</title>
 </svelte:head>
 
-<div class="min-h-screen bg-gray-50">
+<div class="min-h-screen">
 	<!-- Header -->
 	<HeaderNav title="Shared" showBack={true} />
 
@@ -63,8 +63,8 @@
 	<main class="max-w-4xl mx-auto px-4 py-6 space-y-6">
 		{#if isLoading}
 			<!-- Settlement tracker skeleton -->
-			<div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-				<div class="px-6 py-5 border-b border-gray-100 bg-gradient-to-r from-blue-50 to-indigo-50">
+			<div class="bg-white rounded-xl shadow-md shadow-gray-200/50 overflow-hidden">
+				<div class="px-6 py-5 border-b border-dashed border-gray-200 bg-gradient-to-r from-success-50 to-success-100/50">
 					<Skeleton class="h-4 mb-2" width="180px" rounded="sm" />
 					<Skeleton class="h-8 mb-1" width="120px" rounded="sm" />
 					<Skeleton class="h-4" width="80px" rounded="sm" />
@@ -96,9 +96,9 @@
 			/>
 
 			<!-- Quick Tips -->
-			<div class="bg-blue-50 rounded-xl p-5 border border-blue-100">
-				<h3 class="font-medium text-blue-900 mb-2">Tips</h3>
-				<ul class="text-sm text-blue-800 space-y-1">
+			<div class="bg-primary-50 rounded-xl p-5 border border-primary-100">
+				<h3 class="font-medium text-primary-800 mb-2">Tips</h3>
+				<ul class="text-sm text-primary-700 space-y-1">
 					<li>• Select transactions and mark them as settled after Venmo'ing</li>
 					<li>• Use "Select All" to settle everything at once</li>
 					<li>• Settled transactions won't appear in this list</li>

@@ -97,30 +97,31 @@ export function navigateMonth(monthKey: string, delta: number): string {
 }
 
 // Default categories from your spreadsheets
+// Warm Ledger color palette - muted, earthy tones
 export const DEFAULT_CATEGORIES: Omit<Category, 'id'>[] = [
-	{ name: 'Car', icon: '🚗', color: '#6366f1', isActive: true, sortOrder: 1 },
-	{ name: 'Cash withdrawals', icon: '💵', color: '#22c55e', isActive: true, sortOrder: 2 },
-	{ name: 'Clothes & accessories', icon: '👕', color: '#ec4899', isActive: true, sortOrder: 3 },
-	{ name: 'Coffee & snacks', icon: '☕', color: '#f97316', isActive: true, sortOrder: 4 },
-	{ name: 'Donations', icon: '💝', color: '#ef4444', isActive: true, sortOrder: 5 },
-	{ name: 'Electronics', icon: '📱', color: '#3b82f6', isActive: true, sortOrder: 6 },
-	{ name: 'Fitness & wellness', icon: '🏋️', color: '#14b8a6', isActive: true, sortOrder: 7 },
-	{ name: 'Fun & hobbies', icon: '🎮', color: '#a855f7', isActive: true, sortOrder: 8 },
-	{ name: 'Gas', icon: '⛽', color: '#f59e0b', isActive: true, sortOrder: 9 },
-	{ name: 'Gifts', icon: '🎁', color: '#f43f5e', isActive: true, sortOrder: 10 },
-	{ name: 'Groceries', icon: '🛒', color: '#22c55e', isActive: true, sortOrder: 11 },
-	{ name: 'Grooming', icon: '💇', color: '#06b6d4', isActive: true, sortOrder: 12 },
-	{ name: 'Health', icon: '🏥', color: '#ef4444', isActive: true, sortOrder: 13 },
-	{ name: 'Home', icon: '🏠', color: '#8b5cf6', isActive: true, sortOrder: 14 },
-	{ name: 'Household supplies', icon: '🧹', color: '#64748b', isActive: true, sortOrder: 15 },
-	{ name: 'Insurance', icon: '🛡️', color: '#0ea5e9', isActive: true, sortOrder: 16 },
-	{ name: 'Parking & tolls', icon: '🅿️', color: '#78716c', isActive: true, sortOrder: 17 },
-	{ name: 'Pet', icon: '🐈‍⬛', color: '#d97706', isActive: true, sortOrder: 18 },
-	{ name: 'Rent', icon: '🏢', color: '#7c3aed', isActive: true, sortOrder: 19 },
-	{ name: 'Restaurants', icon: '🍽️', color: '#dc2626', isActive: true, sortOrder: 20 },
-	{ name: 'Subscriptions', icon: '📺', color: '#2563eb', isActive: true, sortOrder: 21 },
-	{ name: 'Travel', icon: '✈️', color: '#0891b2', isActive: true, sortOrder: 22 },
-	{ name: 'Utilities', icon: '💡', color: '#eab308', isActive: true, sortOrder: 23 }
+	{ name: 'Car', icon: '🚗', color: '#7C8B99', isActive: true, sortOrder: 1 },        // Slate blue-gray
+	{ name: 'Cash withdrawals', icon: '💵', color: '#6B8E6B', isActive: true, sortOrder: 2 }, // Sage green
+	{ name: 'Clothes & accessories', icon: '👕', color: '#C49BA0', isActive: true, sortOrder: 3 }, // Dusty rose
+	{ name: 'Coffee & snacks', icon: '☕', color: '#A67B5B', isActive: true, sortOrder: 4 }, // Coffee brown
+	{ name: 'Donations', icon: '💝', color: '#D4A59A', isActive: true, sortOrder: 5 },  // Muted coral
+	{ name: 'Electronics', icon: '📱', color: '#6B7B8C', isActive: true, sortOrder: 6 }, // Steel gray
+	{ name: 'Fitness & wellness', icon: '🏋️', color: '#5B8A8A', isActive: true, sortOrder: 7 }, // Dusty teal
+	{ name: 'Fun & hobbies', icon: '🎮', color: '#9B8AA6', isActive: true, sortOrder: 8 }, // Dusty lavender
+	{ name: 'Gas', icon: '⛽', color: '#D4915D', isActive: true, sortOrder: 9 },        // Amber (warning-500)
+	{ name: 'Gifts', icon: '🎁', color: '#C9A9A9', isActive: true, sortOrder: 10 },     // Dusty pink
+	{ name: 'Groceries', icon: '🛒', color: '#5B8C5A', isActive: true, sortOrder: 11 }, // Sage (success-500)
+	{ name: 'Grooming', icon: '💇', color: '#7BA3A3', isActive: true, sortOrder: 12 },  // Muted teal
+	{ name: 'Health', icon: '🏥', color: '#B87070', isActive: true, sortOrder: 13 },    // Muted rust
+	{ name: 'Home', icon: '🏠', color: '#8B7B99', isActive: true, sortOrder: 14 },      // Warm violet
+	{ name: 'Household supplies', icon: '🧹', color: '#8A847C', isActive: true, sortOrder: 15 }, // Warm gray
+	{ name: 'Insurance', icon: '🛡️', color: '#6B8299', isActive: true, sortOrder: 16 }, // Slate blue
+	{ name: 'Parking & tolls', icon: '🅿️', color: '#9C9588', isActive: true, sortOrder: 17 }, // Stone
+	{ name: 'Pet', icon: '🐈‍⬛', color: '#C4956A', isActive: true, sortOrder: 18 },      // Warm tan
+	{ name: 'Rent', icon: '🏢', color: '#7B6B8C', isActive: true, sortOrder: 19 },      // Muted indigo
+	{ name: 'Restaurants', icon: '🍽️', color: '#C45D3A', isActive: true, sortOrder: 20 }, // Terracotta (primary-500)
+	{ name: 'Subscriptions', icon: '📺', color: '#6B8399', isActive: true, sortOrder: 21 }, // Steel blue
+	{ name: 'Travel', icon: '✈️', color: '#5B8B8B', isActive: true, sortOrder: 22 },   // Dusty teal
+	{ name: 'Utilities', icon: '💡', color: '#C9A855', isActive: true, sortOrder: 23 }  // Golden amber
 ];
 
 // Default settings
@@ -152,5 +153,46 @@ export async function initializeDatabase(): Promise<void> {
 	if (petCategory && petCategory.icon === '🐕') {
 		await db.categories.update(petCategory.id!, { icon: '🐈‍⬛' });
 		console.log('Updated Pet category icon to black cat');
+	}
+
+	// Migrate: Update category colors to Warm Ledger palette
+	const warmLedgerColors: Record<string, string> = {
+		'Car': '#7C8B99',
+		'Cash withdrawals': '#6B8E6B',
+		'Clothes & accessories': '#C49BA0',
+		'Coffee & snacks': '#A67B5B',
+		'Donations': '#D4A59A',
+		'Electronics': '#6B7B8C',
+		'Fitness & wellness': '#5B8A8A',
+		'Fun & hobbies': '#9B8AA6',
+		'Gas': '#D4915D',
+		'Gifts': '#C9A9A9',
+		'Groceries': '#5B8C5A',
+		'Grooming': '#7BA3A3',
+		'Health': '#B87070',
+		'Home': '#8B7B99',
+		'Household supplies': '#8A847C',
+		'Insurance': '#6B8299',
+		'Parking & tolls': '#9C9588',
+		'Pet': '#C4956A',
+		'Rent': '#7B6B8C',
+		'Restaurants': '#C45D3A',
+		'Subscriptions': '#6B8399',
+		'Travel': '#5B8B8B',
+		'Utilities': '#C9A855'
+	};
+
+	// Check if migration is needed by looking at a known category color
+	const groceriesCategory = await db.categories.where('name').equals('Groceries').first();
+	if (groceriesCategory && groceriesCategory.color !== '#5B8C5A') {
+		// Update all category colors to warm palette
+		const allCategories = await db.categories.toArray();
+		for (const category of allCategories) {
+			const newColor = warmLedgerColors[category.name];
+			if (newColor && category.color !== newColor) {
+				await db.categories.update(category.id!, { color: newColor });
+			}
+		}
+		console.log('Migrated category colors to Warm Ledger palette');
 	}
 }

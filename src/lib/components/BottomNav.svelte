@@ -23,15 +23,15 @@
 	}
 </script>
 
-<nav class="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-50 safe-area-bottom md:hidden">
+<nav class="fixed bottom-0 left-0 right-0 bg-white border-t border-dashed border-gray-200 z-50 safe-area-bottom md:hidden">
 	<div class="flex justify-around items-center h-16">
 		{#each navItems as item}
 			{@const active = isActive(item.href, $page.url.pathname)}
 			<a
 				href={item.href}
 				class="flex flex-col items-center justify-center w-full h-full transition-colors {active
-					? 'text-blue-600'
-					: 'text-gray-500 hover:text-gray-700'}"
+					? 'text-primary-600'
+					: 'text-charcoal-muted hover:text-charcoal-soft'}"
 			>
 				<item.icon size={24} strokeWidth={active ? 2.5 : 2} />
 				<span class="text-xs font-medium mt-1">{item.label}</span>

@@ -85,10 +85,10 @@
 	}
 </script>
 
-<div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-	<div class="px-6 py-4 border-b border-gray-100">
-		<h2 class="text-lg font-semibold text-gray-900">Spending by Category</h2>
-		<p class="text-sm text-gray-500 mt-1">Total: {formatCurrency(totalSpending)}</p>
+<div class="bg-white rounded-xl shadow-md shadow-gray-200/50 overflow-hidden">
+	<div class="px-6 py-4 border-b border-dashed border-gray-200">
+		<h2 class="font-display text-xl font-medium text-charcoal">Spending by Category</h2>
+		<p class="text-sm text-charcoal-muted mt-1">Total: <span class="font-mono">{formatCurrency(totalSpending)}</span></p>
 	</div>
 
 	<div class="p-6">
@@ -111,16 +111,16 @@
 				<div class="space-y-2 max-h-[300px] overflow-auto">
 					{#each categorySpending as cat (cat.categoryId)}
 						{@const percentage = totalSpending > 0 ? (cat.amount / totalSpending) * 100 : 0}
-						<div class="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 transition-colors">
+						<div class="flex items-center gap-3 p-2 rounded-lg hover:bg-cream/50 transition-colors">
 							<div
 								class="w-3 h-3 rounded-full flex-shrink-0"
 								style="background-color: {cat.color}"
 							></div>
 							<span class="text-lg flex-shrink-0">{cat.icon}</span>
-							<span class="text-sm text-gray-700 flex-1 truncate">{cat.name}</span>
+							<span class="text-sm text-charcoal-soft flex-1 truncate">{cat.name}</span>
 							<div class="text-right flex-shrink-0">
-								<span class="text-sm font-medium text-gray-900">{formatCurrency(cat.amount)}</span>
-								<span class="text-xs text-gray-500 ml-1">({percentage.toFixed(0)}%)</span>
+								<span class="text-sm font-mono font-medium text-charcoal">{formatCurrency(cat.amount)}</span>
+								<span class="text-xs text-charcoal-muted ml-1 font-mono">({percentage.toFixed(0)}%)</span>
 							</div>
 						</div>
 					{/each}

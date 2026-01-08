@@ -53,3 +53,59 @@ export async function toggleCategoryActive(id: number): Promise<void> {
 		await db.categories.update(id, { isActive: !category.isActive });
 	}
 }
+
+// Reorder categories based on an array of IDs
+export async function reorderCategories(orderedIds: number[]): Promise<void> {
+	// Update sortOrder for each category based on its position in the array
+	await db.transaction('rw', db.categories, async () => {
+		for (let i = 0; i < orderedIds.length; i++) {
+			await db.categories.update(orderedIds[i], { sortOrder: i + 1 });
+		}
+	});
+}
+
+// Move a category up one position
+export async function moveCategoryUp(id: number): Promise<void> {
+	const categories = await db.categories.orderBy('sortOrder').toArray();
+	const index = categories.findIndex((c) => c.id === id);
+
+	// Can't move up if already at top
+	if (index <= 0) return;
+
+	const current = categories[index];
+	const above = categories[index - 1];
+
+	// Swap sort orders
+	await db.transaction('rw', db.categories, async () => {
+		await db.categories.update(current.id!, { sortOrder: above.sortOrder });
+		await db.categories.update(above.id!, { sortOrder: current.sortOrder });
+	});
+}
+
+// Move a category down one position
+export async function moveCategoryDown(id: number): Promise<void> {
+	const categories = await db.categories.orderBy('sortOrder').toArray();
+	const index = categories.findIndex((c) => c.id === id);
+
+	// Can't move down if already at bottom
+	if (index < 0 || index >= categories.length - 1) return;
+
+	const current = categories[index];
+	const below = categories[index + 1];
+
+	// Swap sort orders
+	await db.transaction('rw', db.categories, async () => {
+		await db.categories.update(current.id!, { sortOrder: below.sortOrder });
+		await db.categories.update(below.id!, { sortOrder: current.sortOrder });
+	});
+}
+
+// Delete a category
+export async function deleteCategory(id: number): Promise<void> {
+	await db.categories.delete(id);
+}
+
+// Get count of transactions using a category
+export async function getCategoryUsageCount(id: number): Promise<number> {
+	return db.transactions.where('categoryId').equals(id).count();
+}

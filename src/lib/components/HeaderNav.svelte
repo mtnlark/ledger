@@ -37,14 +37,14 @@
 	}
 </script>
 
-<header class="bg-white border-b border-gray-200 sticky top-0 z-20">
+<header class="bg-white border-b border-dashed border-gray-200 sticky top-0 z-20">
 	<div class="max-w-4xl mx-auto px-4 py-4">
 		<div class="flex items-center gap-4">
 			<!-- Hamburger menu (desktop) - LEFT SIDE -->
 			<div class="relative hidden md:block">
 				<button
 					onclick={() => (isMenuOpen = !isMenuOpen)}
-					class="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+					class="p-2 hover:bg-cream rounded-lg transition-colors text-charcoal-soft"
 					aria-label="Open menu"
 					aria-expanded={isMenuOpen}
 				>
@@ -64,7 +64,7 @@
 
 					<!-- Menu -->
 					<nav
-						class="absolute left-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-20"
+						class="absolute left-0 mt-2 w-48 bg-white rounded-xl shadow-lg shadow-gray-200/50 border border-gray-100 py-2 z-20"
 					>
 						{#each navItems as item}
 							{@const active = isActive(item.href, $page.url.pathname)}
@@ -72,8 +72,8 @@
 								href={item.href}
 								onclick={closeMenu}
 								class="flex items-center gap-3 px-4 py-2.5 text-sm transition-colors {active
-									? 'bg-blue-50 text-blue-700 font-medium'
-									: 'text-gray-700 hover:bg-gray-50'}"
+									? 'bg-primary-50 text-primary-700 font-medium'
+									: 'text-charcoal-soft hover:bg-cream'}"
 							>
 								<item.icon size={18} />
 								<span>{item.label}</span>
@@ -87,7 +87,7 @@
 			{#if showBack}
 				<a
 					href="/"
-					class="p-2 hover:bg-gray-100 rounded-lg transition-colors md:hidden"
+					class="p-2 hover:bg-cream rounded-lg transition-colors md:hidden text-charcoal-soft"
 					aria-label="Back to dashboard"
 				>
 					<ChevronLeft size={20} />
@@ -95,7 +95,7 @@
 			{/if}
 
 			<!-- Title -->
-			<h1 class="text-xl font-bold text-gray-900">{title}</h1>
+			<h1 class="font-display text-xl font-medium text-charcoal">{title}</h1>
 
 			<!-- Spacer to push slot content to the right -->
 			<div class="flex-1"></div>

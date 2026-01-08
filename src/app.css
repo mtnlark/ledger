@@ -1,36 +1,154 @@
 @import "tailwindcss";
 
-/* Custom theme configuration for Budget Tracker */
+/* ============================================
+   Warm Ledger Design System
+   ============================================ */
 @theme {
-  /* Primary color - blue */
-  --color-primary-50: oklch(0.97 0.01 250);
-  --color-primary-100: oklch(0.93 0.03 250);
-  --color-primary-200: oklch(0.86 0.06 250);
-  --color-primary-300: oklch(0.76 0.10 250);
-  --color-primary-400: oklch(0.64 0.15 250);
-  --color-primary-500: oklch(0.55 0.20 250);
-  --color-primary-600: oklch(0.47 0.20 250);
-  --color-primary-700: oklch(0.40 0.18 250);
-  --color-primary-800: oklch(0.34 0.14 250);
-  --color-primary-900: oklch(0.28 0.10 250);
+  /* Primary - Terracotta */
+  --color-primary-50: #FDF8F6;
+  --color-primary-100: #F5E8E4;
+  --color-primary-200: #E8D5CE;
+  --color-primary-300: #D4AD9C;
+  --color-primary-400: #C4826A;
+  --color-primary-500: #C45D3A;
+  --color-primary-600: #B5522F;
+  --color-primary-700: #964428;
+  --color-primary-800: #7A3A24;
+  --color-primary-900: #653222;
 
-  /* Success - green for positive surplus */
-  --color-success-500: oklch(0.65 0.20 145);
+  /* Success - Sage Green */
+  --color-success-50: #F4F9F4;
+  --color-success-100: #E8F0E8;
+  --color-success-200: #C8DEC8;
+  --color-success-300: #9DC49D;
+  --color-success-400: #6FA56F;
+  --color-success-500: #5B8C5A;
+  --color-success-600: #477047;
+  --color-success-700: #3A5A3A;
+  --color-success-800: #314831;
+  --color-success-900: #2A3D2A;
 
-  /* Warning - amber for low surplus */
-  --color-warning-500: oklch(0.75 0.18 85);
+  /* Warning - Amber */
+  --color-warning-50: #FDF8F0;
+  --color-warning-100: #F5EBE0;
+  --color-warning-200: #EBD9C4;
+  --color-warning-300: #DEC19D;
+  --color-warning-400: #D4A574;
+  --color-warning-500: #D4915D;
+  --color-warning-600: #B87A4A;
+  --color-warning-700: #96633D;
+  --color-warning-800: #7A5234;
+  --color-warning-900: #65452D;
 
-  /* Danger - red for deficit */
-  --color-danger-500: oklch(0.60 0.22 25);
+  /* Danger - Muted Rose */
+  --color-danger-50: #FDF7F7;
+  --color-danger-100: #F5E8E8;
+  --color-danger-200: #E8D0D0;
+  --color-danger-300: #D4ABAB;
+  --color-danger-400: #C49292;
+  --color-danger-500: #C17B7B;
+  --color-danger-600: #A66262;
+  --color-danger-700: #8A5050;
+  --color-danger-800: #724343;
+  --color-danger-900: #5E3838;
 }
 
-/* Base styles */
+:root {
+  /* Semantic Colors */
+  --color-cream: #FAF8F5;
+  --color-cream-dark: #F5F2ED;
+  --color-white: #FFFFFF;
+  --color-charcoal: #2D2A26;
+  --color-charcoal-soft: #5C5751;
+  --color-charcoal-muted: #8A847C;
+
+  /* Typography */
+  --font-display: 'Fraunces', Georgia, serif;
+  --font-mono: 'DM Mono', 'SF Mono', ui-monospace, monospace;
+  --font-body: 'DM Sans', system-ui, sans-serif;
+
+  /* Animation */
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
 @layer base {
   html {
-    font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-family: var(--font-body);
   }
 
   body {
-    @apply bg-gray-50 text-gray-900;
+    background: var(--color-cream);
+    color: var(--color-charcoal);
+
+    /* Subtle paper texture */
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+    background-blend-mode: soft-light;
+    background-size: 200px;
   }
+
+  /* Tabular figures for financial amounts */
+  .font-mono, [class*="font-mono"] {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+@layer utilities {
+  .font-display {
+    font-family: var(--font-display);
+  }
+
+  .font-mono {
+    font-family: var(--font-mono);
+  }
+
+  .text-charcoal {
+    color: var(--color-charcoal);
+  }
+
+  .text-charcoal-soft {
+    color: var(--color-charcoal-soft);
+  }
+
+  .text-charcoal-muted {
+    color: var(--color-charcoal-muted);
+  }
+
+  .bg-cream {
+    background-color: var(--color-cream);
+  }
+
+  .bg-cream-dark {
+    background-color: var(--color-cream-dark);
+  }
+
+  /* Ledger-style dotted leader line */
+  .ledger-line {
+    flex: 1;
+    border-bottom: 1px dotted rgba(45, 42, 38, 0.2);
+    margin: 0 0.75rem;
+    height: 0.75em;
+  }
+
+  /* Card entrance animation */
+  .animate-enter {
+    animation: enter 0.5s var(--ease-out-expo) forwards;
+  }
+
+  @keyframes enter {
+    from {
+      opacity: 0;
+      transform: translateY(12px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  /* Stagger delays for lists */
+  .stagger-1 { animation-delay: 50ms; }
+  .stagger-2 { animation-delay: 100ms; }
+  .stagger-3 { animation-delay: 150ms; }
+  .stagger-4 { animation-delay: 200ms; }
+  .stagger-5 { animation-delay: 250ms; }
 }
