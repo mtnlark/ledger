@@ -13,8 +13,8 @@ A Tauri desktop application for personal budget tracking with expense splitting,
 - **Target Platform**: macOS (desktop-only, no mobile/PWA)
 
 ### Storage: **Dexie.js + JSON File Persistence**
-- **Dexie**: In-memory IndexedDB wrapper for queries
-- **JSON Files**: Persistent storage in `~/Library/Application Support/com.levcraig.budget-tracker/`
+- **Dexie**: In-memory database for queries (IndexedDB cleared on startup)
+- **JSON Files**: Source of truth in `~/Library/Application Support/app.ledger.desktop/`
   - `data.json`: All app data
   - `backups/`: Timestamped backups (max 10 retained)
 
@@ -245,7 +245,7 @@ Car, Cash withdrawals, Clothes & accessories, Coffee & snacks, Donations, Electr
 
 ## File Storage Location
 
-macOS: `~/Library/Application Support/com.levcraig.budget-tracker/`
+macOS: `~/Library/Application Support/app.ledger.desktop/`
 - `data.json` - Main data file
 - `backups/` - Auto-timestamped backups before each save
 

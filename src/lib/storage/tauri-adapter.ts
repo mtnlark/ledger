@@ -2,7 +2,7 @@
  * Tauri file storage adapter
  *
  * Handles persisting data to JSON files in the app data directory.
- * Uses ~/Library/Application Support/BudgetTracker/ on macOS.
+ * Uses ~/Library/Application Support/app.ledger.desktop/ on macOS.
  */
 
 import { db, DEFAULT_SETTINGS, DEFAULT_CATEGORIES, type Transaction, type Category, type MonthlyBudget, type Settings } from '$lib/db';
