@@ -3,7 +3,7 @@
 	import { format, startOfDay, parseISO } from 'date-fns';
 	import { getMonthKey, parseMonthKey, type Transaction, type Category, type Settings, type MonthlyBudget, DEFAULT_SETTINGS } from '$lib/db';
 	import { initializeStorage } from '$lib/storage';
-	import { addTransaction, updateTransaction, deleteTransaction, getTransactionsByMonth, getAllTransactions, getAvailableMonths } from '$lib/stores/transactions';
+	import { addTransaction, updateTransaction, deleteTransaction, bulkDeleteTransactions, bulkUpdateCategory, getTransactionsByMonth, getAllTransactions, getAvailableMonths } from '$lib/stores/transactions';
 	import { getAllCategories } from '$lib/stores/categories';
 	import { getSettings } from '$lib/stores/settings';
 	import { getBudgetForMonth, saveBudget } from '$lib/stores/budget';
@@ -19,9 +19,11 @@
 	import TransactionListSkeleton from '$lib/components/TransactionListSkeleton.svelte';
 	import TransactionFilters, { type FilterState } from '$lib/components/TransactionFilters.svelte';
 	import QuickAddFAB, { type QuickAddData } from '$lib/components/QuickAddFAB.svelte';
+	import { Square } from 'lucide-svelte';
 
 	// State
 	let isLoading = $state(true);
+	let isSelectionMode = $state(false);
 	let categories = $state<Category[]>([]);
 	let transactions = $state<Transaction[]>([]); // Current month's transactions
 	let allTransactions = $state<Transaction[]>([]); // All transactions (for filtering)
@@ -223,6 +225,55 @@
 		}
 	}
 
+	// Handle bulk delete
+	async function handleBulkDelete(ids: number[]) {
+		if (ids.length === 0) return;
+
+		const message = ids.length === 1
+			? 'Are you sure you want to delete this transaction?'
+			: `Are you sure you want to delete ${ids.length} transactions?`;
+
+		if (confirm(message)) {
+			try {
+				await bulkDeleteTransactions(ids);
+				// Reload transactions and available months
+				transactions = await getTransactionsByMonth(currentMonth);
+				availableMonths = await getAvailableMonths();
+				// Also refresh allTransactions if we have it loaded
+				if (allTransactions.length > 0) {
+					allTransactions = await getAllTransactions();
+				}
+				toast.success(ids.length === 1 ? 'Transaction deleted' : `${ids.length} transactions deleted`);
+			} catch (error) {
+				console.error('Failed to delete transactions:', error);
+				toast.error('Failed to delete transactions');
+			}
+		}
+	}
+
+	// Handle bulk category change
+	async function handleBulkCategoryChange(ids: number[], categoryId: number) {
+		if (ids.length === 0) return;
+
+		try {
+			await bulkUpdateCategory(ids, categoryId);
+			// Reload transactions
+			transactions = await getTransactionsByMonth(currentMonth);
+			// Also refresh allTransactions if we have it loaded
+			if (allTransactions.length > 0) {
+				allTransactions = await getAllTransactions();
+			}
+			const category = categories.find(c => c.id === categoryId);
+			const categoryName = category?.name || 'selected category';
+			toast.success(ids.length === 1
+				? `Category changed to ${categoryName}`
+				: `${ids.length} transactions moved to ${categoryName}`);
+		} catch (error) {
+			console.error('Failed to update categories:', error);
+			toast.error('Failed to update categories');
+		}
+	}
+
 	onMount(() => {
 		loadData();
 	});
@@ -298,19 +349,35 @@
 
 			<!-- Transaction List -->
 			<div>
-				<h2 class="font-display text-xl font-medium text-charcoal mb-4">
-					{#if filters.searchQuery || filters.categoryId !== null || filters.dateFrom || filters.dateTo}
-						Filtered Transactions
-					{:else}
-						Recent Transactions
+				<div class="flex items-center justify-between mb-4">
+					<h2 class="font-display text-xl font-medium text-charcoal">
+						{#if filters.searchQuery || filters.categoryId !== null || filters.dateFrom || filters.dateTo}
+							Filtered Transactions
+						{:else}
+							Recent Transactions
+						{/if}
+					</h2>
+					{#if filteredTransactions.length > 0 && !isSelectionMode}
+						<button
+							type="button"
+							onclick={() => isSelectionMode = true}
+							class="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg transition-colors text-charcoal-muted hover:text-charcoal hover:bg-cream"
+						>
+							<Square size={16} />
+							<span>Select</span>
+						</button>
 					{/if}
-				</h2>
+				</div>
 				<TransactionList
 					transactions={filteredTransactions}
 					{categories}
 					{settings}
 					onEdit={handleEdit}
 					onDelete={handleDelete}
+					onBulkDelete={handleBulkDelete}
+					onBulkCategoryChange={handleBulkCategoryChange}
+					selectionMode={isSelectionMode}
+					onSelectionModeChange={(mode) => isSelectionMode = mode}
 				/>
 			</div>
 		{/if}

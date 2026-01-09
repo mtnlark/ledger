@@ -1,9 +1,10 @@
 <script lang="ts">
 	import { format, isToday, isYesterday, startOfDay } from 'date-fns';
-	import { Pencil, Trash2, Receipt } from 'lucide-svelte';
+	import { Pencil, Trash2, Receipt, CheckSquare, Square, Check } from 'lucide-svelte';
 	import type { Transaction, Category, Settings } from '$lib/db';
 	import { createCategoryHelpers } from '$lib/utils/category-helpers';
 	import EmptyState from './EmptyState.svelte';
+	import BulkActionBar from './BulkActionBar.svelte';
 
 	interface Props {
 		transactions: Transaction[];
@@ -11,9 +12,89 @@
 		settings?: Settings;
 		onEdit?: (transaction: Transaction) => void;
 		onDelete?: (id: number) => void;
+		onBulkDelete?: (ids: number[]) => void;
+		onBulkCategoryChange?: (ids: number[], categoryId: number) => void;
+		selectionMode?: boolean;
+		onSelectionModeChange?: (mode: boolean) => void;
 	}
 
-	let { transactions, categories, settings, onEdit, onDelete }: Props = $props();
+	let { transactions, categories, settings, onEdit, onDelete, onBulkDelete, onBulkCategoryChange, selectionMode = false, onSelectionModeChange }: Props = $props();
+
+	// Selection mode state - use prop if provided, otherwise internal state
+	let internalSelectionMode = $state(false);
+	let isSelectionMode = $derived(onSelectionModeChange ? selectionMode : internalSelectionMode);
+	let selectedIds = $state<Set<number>>(new Set());
+
+	// Derived selection state
+	let hasSelection = $derived(selectedIds.size > 0);
+	let allSelected = $derived(
+		transactions.length > 0 && selectedIds.size === transactions.length
+	);
+	let hasBulkOperations = $derived(!!onBulkDelete || !!onBulkCategoryChange);
+
+	// Selection functions
+	function toggleSelectionMode() {
+		const newMode = !isSelectionMode;
+		if (onSelectionModeChange) {
+			onSelectionModeChange(newMode);
+		} else {
+			internalSelectionMode = newMode;
+		}
+		if (!newMode) {
+			selectedIds = new Set();
+		}
+	}
+
+	function toggleSelection(id: number) {
+		const newSet = new Set(selectedIds);
+		if (newSet.has(id)) {
+			newSet.delete(id);
+		} else {
+			newSet.add(id);
+		}
+		selectedIds = newSet;
+	}
+
+	function selectAll() {
+		selectedIds = new Set(transactions.map((t) => t.id!));
+	}
+
+	function deselectAll() {
+		selectedIds = new Set();
+	}
+
+	function handleBulkDelete() {
+		if (selectedIds.size > 0 && onBulkDelete) {
+			onBulkDelete(Array.from(selectedIds));
+			selectedIds = new Set();
+			if (onSelectionModeChange) {
+				onSelectionModeChange(false);
+			} else {
+				internalSelectionMode = false;
+			}
+		}
+	}
+
+	function handleBulkCategoryChange(categoryId: number) {
+		if (selectedIds.size > 0 && onBulkCategoryChange) {
+			onBulkCategoryChange(Array.from(selectedIds), categoryId);
+			selectedIds = new Set();
+			if (onSelectionModeChange) {
+				onSelectionModeChange(false);
+			} else {
+				internalSelectionMode = false;
+			}
+		}
+	}
+
+	function handleCancelSelection() {
+		selectedIds = new Set();
+		if (onSelectionModeChange) {
+			onSelectionModeChange(false);
+		} else {
+			internalSelectionMode = false;
+		}
+	}
 
 	// Get partner name from settings or use default
 	let partnerName = $derived(settings?.partnerName || 'Partner');
@@ -85,6 +166,34 @@
 			description="Add your first expense to start tracking your budget"
 		/>
 	{:else}
+		<!-- Selection mode controls (only shown when in selection mode) -->
+		{#if isSelectionMode && hasBulkOperations}
+			<div class="flex items-center justify-between">
+				<div class="flex items-center gap-3">
+					<button
+						type="button"
+						onclick={allSelected ? deselectAll : selectAll}
+						class="text-sm text-primary-600 hover:text-primary-700 font-medium"
+					>
+						{allSelected ? 'Deselect All' : 'Select All'}
+					</button>
+					{#if hasSelection}
+						<span class="text-sm text-charcoal-muted">
+							{selectedIds.size} of {transactions.length} selected
+						</span>
+					{/if}
+				</div>
+				<button
+					type="button"
+					onclick={toggleSelectionMode}
+					class="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg transition-colors bg-primary-100 text-primary-700"
+				>
+					<CheckSquare size={16} />
+					<span>Done</span>
+				</button>
+			</div>
+		{/if}
+
 		{#each groupedTransactions as group, groupIndex (group.dateKey)}
 			<!-- Date Header -->
 			<div class="animate-enter" style="animation-delay: {groupIndex * 50}ms;">
@@ -92,9 +201,30 @@
 				<div class="space-y-2">
 					{#each group.transactions as transaction, txIndex (transaction.id)}
 						<div
-							class="bg-white rounded-lg shadow-sm shadow-gray-200/50 p-4 flex items-center gap-4 hover:bg-cream/50 transition-colors border-l-4"
+							class="bg-white rounded-lg shadow-sm shadow-gray-200/50 p-4 flex items-center gap-4 transition-colors border-l-4 {isSelectionMode
+								? 'cursor-pointer'
+								: 'hover:bg-cream/50'} {selectedIds.has(transaction.id!) ? 'bg-primary-50 hover:bg-primary-100' : 'hover:bg-cream/50'}"
 							style="border-left-color: {getCategoryColor(transaction.categoryId)}; animation-delay: {(groupIndex * 50) + (txIndex * 30)}ms;"
+							onclick={isSelectionMode ? () => toggleSelection(transaction.id!) : undefined}
+							onkeydown={isSelectionMode ? (e) => e.key === 'Enter' && toggleSelection(transaction.id!) : undefined}
+							role={isSelectionMode ? 'button' : undefined}
+							tabindex={isSelectionMode ? 0 : undefined}
 						>
+							<!-- Checkbox (selection mode) -->
+							{#if isSelectionMode}
+								<div
+									class="w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 transition-colors {selectedIds.has(
+										transaction.id!
+									)
+										? 'bg-primary-500 border-primary-500'
+										: 'border-gray-300 bg-white'}"
+								>
+									{#if selectedIds.has(transaction.id!)}
+										<Check size={12} class="text-white" strokeWidth={3} />
+									{/if}
+								</div>
+							{/if}
+
 							<!-- Category Icon -->
 							<div class="text-2xl flex-shrink-0">{getCategoryIcon(transaction.categoryId)}</div>
 
@@ -141,8 +271,8 @@
 								{/if}
 							</div>
 
-							<!-- Actions -->
-							{#if onEdit || onDelete}
+							<!-- Actions (hidden in selection mode) -->
+							{#if !isSelectionMode && (onEdit || onDelete)}
 								<div class="flex gap-1 flex-shrink-0">
 									{#if onEdit}
 										<button
@@ -171,3 +301,14 @@
 		{/each}
 	{/if}
 </div>
+
+<!-- Bulk Action Bar (floating at bottom) -->
+{#if isSelectionMode && hasSelection}
+	<BulkActionBar
+		selectedCount={selectedIds.size}
+		{categories}
+		onDelete={handleBulkDelete}
+		onCategoryChange={handleBulkCategoryChange}
+		onCancel={handleCancelSelection}
+	/>
+{/if}

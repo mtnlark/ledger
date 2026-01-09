@@ -4,6 +4,8 @@ import {
 	addTransaction,
 	updateTransaction,
 	deleteTransaction,
+	bulkDeleteTransactions,
+	bulkUpdateCategory,
 	getTransactionsByMonth,
 	getTransactionsByDateRange,
 	getAllTransactions,
@@ -244,6 +246,200 @@ describe('Transaction Operations', () => {
 			await deleteTransaction(id);
 
 			expect(await db.transactions.get(id)).toBeUndefined();
+		});
+	});
+
+	describe('bulkDeleteTransactions', () => {
+		it('deletes multiple transactions at once', async () => {
+			const id1 = await addTransaction({
+				date: new Date('2025-12-15'),
+				merchant: 'Transaction 1',
+				amount: 50,
+				categoryId: 1,
+				isShared: false,
+				splitType: 'percentage',
+				splitValue: 0.5,
+				isSettled: false
+			});
+
+			const id2 = await addTransaction({
+				date: new Date('2025-12-16'),
+				merchant: 'Transaction 2',
+				amount: 75,
+				categoryId: 1,
+				isShared: false,
+				splitType: 'percentage',
+				splitValue: 0.5,
+				isSettled: false
+			});
+
+			const id3 = await addTransaction({
+				date: new Date('2025-12-17'),
+				merchant: 'Transaction 3',
+				amount: 100,
+				categoryId: 1,
+				isShared: false,
+				splitType: 'percentage',
+				splitValue: 0.5,
+				isSettled: false
+			});
+
+			// Delete first two
+			await bulkDeleteTransactions([id1, id2]);
+
+			expect(await db.transactions.get(id1)).toBeUndefined();
+			expect(await db.transactions.get(id2)).toBeUndefined();
+			expect(await db.transactions.get(id3)).toBeDefined();
+		});
+
+		it('handles empty array gracefully', async () => {
+			const id = await addTransaction({
+				date: new Date('2025-12-15'),
+				merchant: 'Test',
+				amount: 50,
+				categoryId: 1,
+				isShared: false,
+				splitType: 'percentage',
+				splitValue: 0.5,
+				isSettled: false
+			});
+
+			await bulkDeleteTransactions([]);
+
+			// Should not throw and original transaction should still exist
+			expect(await db.transactions.get(id)).toBeDefined();
+		});
+
+		it('deletes single transaction when array has one element', async () => {
+			const id = await addTransaction({
+				date: new Date('2025-12-15'),
+				merchant: 'Single',
+				amount: 50,
+				categoryId: 1,
+				isShared: false,
+				splitType: 'percentage',
+				splitValue: 0.5,
+				isSettled: false
+			});
+
+			await bulkDeleteTransactions([id]);
+
+			expect(await db.transactions.get(id)).toBeUndefined();
+		});
+	});
+
+	describe('bulkUpdateCategory', () => {
+		it('updates category for multiple transactions', async () => {
+			const id1 = await addTransaction({
+				date: new Date('2025-12-15'),
+				merchant: 'Transaction 1',
+				amount: 50,
+				categoryId: 1,
+				isShared: false,
+				splitType: 'percentage',
+				splitValue: 0.5,
+				isSettled: false
+			});
+
+			const id2 = await addTransaction({
+				date: new Date('2025-12-16'),
+				merchant: 'Transaction 2',
+				amount: 75,
+				categoryId: 2,
+				isShared: false,
+				splitType: 'percentage',
+				splitValue: 0.5,
+				isSettled: false
+			});
+
+			const id3 = await addTransaction({
+				date: new Date('2025-12-17'),
+				merchant: 'Transaction 3',
+				amount: 100,
+				categoryId: 3,
+				isShared: false,
+				splitType: 'percentage',
+				splitValue: 0.5,
+				isSettled: false
+			});
+
+			// Change first two to category 5
+			await bulkUpdateCategory([id1, id2], 5);
+
+			const t1 = await db.transactions.get(id1);
+			const t2 = await db.transactions.get(id2);
+			const t3 = await db.transactions.get(id3);
+
+			expect(t1?.categoryId).toBe(5);
+			expect(t2?.categoryId).toBe(5);
+			expect(t3?.categoryId).toBe(3); // Unchanged
+		});
+
+		it('updates updatedAt timestamp', async () => {
+			const id = await addTransaction({
+				date: new Date('2025-12-15'),
+				merchant: 'Test',
+				amount: 50,
+				categoryId: 1,
+				isShared: false,
+				splitType: 'percentage',
+				splitValue: 0.5,
+				isSettled: false
+			});
+
+			const original = await db.transactions.get(id);
+			const originalUpdatedAt = original?.updatedAt;
+
+			// Small delay
+			await new Promise((r) => setTimeout(r, 10));
+
+			await bulkUpdateCategory([id], 5);
+
+			const updated = await db.transactions.get(id);
+			expect(updated?.updatedAt.getTime()).toBeGreaterThan(originalUpdatedAt!.getTime());
+		});
+
+		it('handles empty array gracefully', async () => {
+			const id = await addTransaction({
+				date: new Date('2025-12-15'),
+				merchant: 'Test',
+				amount: 50,
+				categoryId: 1,
+				isShared: false,
+				splitType: 'percentage',
+				splitValue: 0.5,
+				isSettled: false
+			});
+
+			await bulkUpdateCategory([], 5);
+
+			// Should not throw and original transaction should be unchanged
+			const transaction = await db.transactions.get(id);
+			expect(transaction?.categoryId).toBe(1);
+		});
+
+		it('preserves other transaction fields', async () => {
+			const id = await addTransaction({
+				date: new Date('2025-12-15'),
+				merchant: 'Important Store',
+				amount: 100,
+				categoryId: 1,
+				isShared: true,
+				splitType: 'percentage',
+				splitValue: 0.5,
+				isSettled: false,
+				notes: 'Test notes'
+			});
+
+			await bulkUpdateCategory([id], 5);
+
+			const transaction = await db.transactions.get(id);
+			expect(transaction?.merchant).toBe('Important Store');
+			expect(transaction?.amount).toBe(100);
+			expect(transaction?.isShared).toBe(true);
+			expect(transaction?.partnerShare).toBe(50);
+			expect(transaction?.notes).toBe('Test notes');
+			expect(transaction?.categoryId).toBe(5);
 		});
 	});
 

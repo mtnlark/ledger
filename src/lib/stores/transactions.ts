@@ -119,6 +119,25 @@ export async function deleteTransaction(id: number): Promise<void> {
 	await persistData();
 }
 
+// Bulk delete transactions
+export async function bulkDeleteTransactions(ids: number[]): Promise<void> {
+	if (ids.length === 0) return;
+	await db.transactions.where('id').anyOf(ids).delete();
+	invalidateTransactionCaches();
+	await persistData();
+}
+
+// Bulk update category for transactions
+export async function bulkUpdateCategory(ids: number[], categoryId: number): Promise<void> {
+	if (ids.length === 0) return;
+	await db.transactions.where('id').anyOf(ids).modify({
+		categoryId,
+		updatedAt: new Date()
+	});
+	invalidateTransactionCaches();
+	await persistData();
+}
+
 // Mark transactions as settled
 export async function markAsSettled(ids: number[]): Promise<void> {
 	const now = new Date();
