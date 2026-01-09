@@ -1,7 +1,8 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { format, startOfDay, parseISO } from 'date-fns';
-	import { initializeDatabase, getMonthKey, parseMonthKey, type Transaction, type Category, type Settings, type MonthlyBudget, DEFAULT_SETTINGS } from '$lib/db';
+	import { getMonthKey, parseMonthKey, type Transaction, type Category, type Settings, type MonthlyBudget, DEFAULT_SETTINGS } from '$lib/db';
+	import { initializeStorage } from '$lib/storage';
 	import { addTransaction, updateTransaction, deleteTransaction, getTransactionsByMonth, getAllTransactions, getAvailableMonths } from '$lib/stores/transactions';
 	import { getAllCategories } from '$lib/stores/categories';
 	import { getSettings } from '$lib/stores/settings';
@@ -99,7 +100,7 @@
 	async function loadData() {
 		isLoading = true;
 		try {
-			await initializeDatabase();
+			await initializeStorage();
 			categories = await getAllCategories();
 			settings = await getSettings();
 			transactions = await getTransactionsByMonth(currentMonth);

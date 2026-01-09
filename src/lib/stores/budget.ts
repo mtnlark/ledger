@@ -1,4 +1,5 @@
 import { db, type MonthlyBudget } from '$lib/db';
+import { persistData } from '$lib/storage';
 
 export interface CashFlowResult {
 	income: number;
@@ -48,6 +49,8 @@ export async function saveBudget(
 			notes: data.notes
 		});
 	}
+
+	await persistData();
 }
 
 /**

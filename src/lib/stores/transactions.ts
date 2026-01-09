@@ -1,6 +1,7 @@
 import { writable, derived } from 'svelte/store';
 import { db, calculatePartnerShare, getMonthKey, type Transaction } from '$lib/db';
 import { liveQuery } from 'dexie';
+import { persistData } from '$lib/storage';
 
 // Current selected month store
 export const currentMonth = writable(getMonthKey(new Date()));
@@ -78,12 +79,15 @@ export async function addTransaction(
 		? calculatePartnerShare(transaction.amount, transaction.splitType, transaction.splitValue)
 		: 0;
 
-	return db.transactions.add({
+	const id = await db.transactions.add({
 		...transaction,
 		partnerShare,
 		createdAt: now,
 		updatedAt: now
 	});
+
+	await persistData();
+	return id;
 }
 
 // Update a transaction
@@ -115,11 +119,14 @@ export async function updateTransaction(
 		partnerShare,
 		updatedAt: new Date()
 	});
+
+	await persistData();
 }
 
 // Delete a transaction
 export async function deleteTransaction(id: number): Promise<void> {
 	await db.transactions.delete(id);
+	await persistData();
 }
 
 // Mark transactions as settled
@@ -130,6 +137,7 @@ export async function markAsSettled(ids: number[]): Promise<void> {
 		settledDate: now,
 		updatedAt: now
 	});
+	await persistData();
 }
 
 // Get unsettled transactions (sorted by date, most recent first)

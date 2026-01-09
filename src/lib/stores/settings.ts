@@ -1,5 +1,6 @@
 import { db, type Settings, DEFAULT_SETTINGS } from '$lib/db';
 import { liveQuery } from 'dexie';
+import { persistData } from '$lib/storage';
 
 // Reactive settings
 export const settings = liveQuery(() => db.settings.get(1));
@@ -13,11 +14,13 @@ export async function getSettings(): Promise<Settings> {
 // Update settings
 export async function updateSettings(updates: Partial<Omit<Settings, 'id'>>): Promise<void> {
 	await db.settings.update(1, updates);
+	await persistData();
 }
 
 // Update partner name
 export async function updatePartnerName(name: string): Promise<void> {
 	await db.settings.update(1, { partnerName: name });
+	await persistData();
 }
 
 // Update default split settings
@@ -26,11 +29,13 @@ export async function updateDefaultSplit(
 	splitValue: number
 ): Promise<void> {
 	await db.settings.update(1, { defaultSplitType: splitType, defaultSplitValue: splitValue });
+	await persistData();
 }
 
 // Update theme
 export async function updateTheme(theme: 'light' | 'dark' | 'system'): Promise<void> {
 	await db.settings.update(1, { theme });
+	await persistData();
 }
 
 // Normalize merchant name for dismissed recurring comparison
@@ -45,6 +50,7 @@ export async function dismissRecurring(merchant: string): Promise<void> {
 	const dismissed = settings.dismissedRecurring ?? [];
 	if (!dismissed.includes(normalized)) {
 		await db.settings.update(1, { dismissedRecurring: [...dismissed, normalized] });
+		await persistData();
 	}
 }
 
@@ -56,6 +62,7 @@ export async function restoreRecurring(merchant: string): Promise<void> {
 	await db.settings.update(1, {
 		dismissedRecurring: dismissed.filter((m) => m !== normalized)
 	});
+	await persistData();
 }
 
 // Get list of dismissed recurring merchants

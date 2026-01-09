@@ -1,5 +1,6 @@
 import { db, type Category } from '$lib/db';
 import { liveQuery } from 'dexie';
+import { persistData } from '$lib/storage';
 
 // Reactive categories list
 export const categories = liveQuery(() => db.categories.orderBy('sortOrder').toArray());
@@ -32,10 +33,13 @@ export async function addCategory(
 	const maxOrder = await db.categories.orderBy('sortOrder').last();
 	const sortOrder = (maxOrder?.sortOrder ?? 0) + 1;
 
-	return db.categories.add({
+	const id = await db.categories.add({
 		...category,
 		sortOrder
 	});
+
+	await persistData();
+	return id;
 }
 
 // Update a category
@@ -44,6 +48,7 @@ export async function updateCategory(
 	updates: Partial<Omit<Category, 'id'>>
 ): Promise<void> {
 	await db.categories.update(id, updates);
+	await persistData();
 }
 
 // Toggle category active status
@@ -51,6 +56,7 @@ export async function toggleCategoryActive(id: number): Promise<void> {
 	const category = await db.categories.get(id);
 	if (category) {
 		await db.categories.update(id, { isActive: !category.isActive });
+		await persistData();
 	}
 }
 
@@ -62,6 +68,7 @@ export async function reorderCategories(orderedIds: number[]): Promise<void> {
 			await db.categories.update(orderedIds[i], { sortOrder: i + 1 });
 		}
 	});
+	await persistData();
 }
 
 // Move a category up one position
@@ -80,6 +87,7 @@ export async function moveCategoryUp(id: number): Promise<void> {
 		await db.categories.update(current.id!, { sortOrder: above.sortOrder });
 		await db.categories.update(above.id!, { sortOrder: current.sortOrder });
 	});
+	await persistData();
 }
 
 // Move a category down one position
@@ -98,11 +106,13 @@ export async function moveCategoryDown(id: number): Promise<void> {
 		await db.categories.update(current.id!, { sortOrder: below.sortOrder });
 		await db.categories.update(below.id!, { sortOrder: current.sortOrder });
 	});
+	await persistData();
 }
 
 // Delete a category
 export async function deleteCategory(id: number): Promise<void> {
 	await db.categories.delete(id);
+	await persistData();
 }
 
 // Get count of transactions using a category

@@ -2,13 +2,13 @@
 	import { onMount } from 'svelte';
 	import { format } from 'date-fns';
 	import {
-		initializeDatabase,
 		getMonthKey,
 		parseMonthKey,
 		type Transaction,
 		type Category,
 		type MonthlyBudget
 	} from '$lib/db';
+	import { initializeStorage } from '$lib/storage';
 	import {
 		getTransactionsByMonth,
 		getAvailableMonths,
@@ -51,7 +51,7 @@
 	async function loadData() {
 		isLoading = true;
 		try {
-			await initializeDatabase();
+			await initializeStorage();
 			categories = await getAllCategories();
 			availableMonths = await getAvailableMonths();
 			allTransactions = await getAllTransactions();

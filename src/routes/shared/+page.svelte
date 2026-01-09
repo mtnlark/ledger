@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { initializeDatabase, type Transaction, type Category, type Settings, DEFAULT_SETTINGS } from '$lib/db';
+	import { type Transaction, type Category, type Settings, DEFAULT_SETTINGS } from '$lib/db';
+	import { initializeStorage } from '$lib/storage';
 	import { getUnsettledTransactions, calculateOutstandingBalance, markAsSettled } from '$lib/stores/transactions';
 	import { getAllCategories } from '$lib/stores/categories';
 	import { getSettings } from '$lib/stores/settings';
@@ -20,7 +21,7 @@
 	async function loadData() {
 		isLoading = true;
 		try {
-			await initializeDatabase();
+			await initializeStorage();
 			categories = await getAllCategories();
 			settings = await getSettings();
 			unsettledTransactions = await getUnsettledTransactions();

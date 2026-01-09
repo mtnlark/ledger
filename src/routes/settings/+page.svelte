@@ -1,7 +1,8 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { Upload, Download, Database, FileSpreadsheet } from 'lucide-svelte';
-	import { initializeDatabase, type Settings, type Category, type Transaction, DEFAULT_SETTINGS } from '$lib/db';
+	import { type Settings, type Category, type Transaction, DEFAULT_SETTINGS } from '$lib/db';
+	import { initializeStorage } from '$lib/storage';
 	import { getSettings, updateSettings } from '$lib/stores/settings';
 	import { getTransactionsByMonth, getAvailableMonths } from '$lib/stores/transactions';
 	import { getAllCategories } from '$lib/stores/categories';
@@ -32,7 +33,7 @@
 	async function loadData() {
 		isLoading = true;
 		try {
-			await initializeDatabase();
+			await initializeStorage();
 			settings = await getSettings();
 			categories = await getAllCategories();
 			// Initialize form state from settings
