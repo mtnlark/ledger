@@ -7,6 +7,7 @@
 	import InsightMetric from './InsightMetric.svelte';
 	import CategoryTrendsChart from './CategoryTrendsChart.svelte';
 	import CategoryComparison from './CategoryComparison.svelte';
+	import CategoryBreakdownChart from '../CategoryBreakdownChart.svelte';
 
 	interface Props {
 		currentMonth: string;
@@ -138,10 +139,13 @@
 
 	{#snippet children()}
 		<div class="space-y-6">
-			<!-- Category Selector -->
+			<!-- Category Breakdown Chart -->
+			<CategoryBreakdownChart {transactions} {categories} />
+
+			<!-- Category Selector for Trends -->
 			<div>
 				<label for="category-select" class="block text-sm font-medium text-gray-700 mb-2">
-					Select Category
+					Explore Category Trends
 				</label>
 				<select
 					id="category-select"

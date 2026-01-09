@@ -1,17 +1,15 @@
 <script lang="ts">
 	import { format } from 'date-fns';
 	import { getMonthKey } from '$lib/db';
-	import type { Transaction, Category } from '$lib/db';
+	import type { Transaction } from '$lib/db';
 	import InsightGroup from './InsightGroup.svelte';
 	import CalendarHeatmap from './CalendarHeatmap.svelte';
-	import YTDStats from './YTDStats.svelte';
 
 	interface Props {
 		transactions: Transaction[];
-		categories: Category[];
 	}
 
-	let { transactions, categories }: Props = $props();
+	let { transactions }: Props = $props();
 
 	let currentYear = new Date().getFullYear();
 
@@ -64,9 +62,79 @@
 		}
 		return recent;
 	});
+
+	// Daily average
+	let dailyAvg = $derived(daysInYearSoFar > 0 ? totalSpent / daysInYearSoFar : 0);
+
+	// Biggest spending month (calculated from transactions)
+	let biggestMonth = $derived.by(() => {
+		const monthlySpending = new Map<string, number>();
+		for (const t of ytdTransactions) {
+			const monthKey = getMonthKey(new Date(t.date));
+			const amount = t.isShared ? t.amount - t.partnerShare : t.amount;
+			monthlySpending.set(monthKey, (monthlySpending.get(monthKey) || 0) + amount);
+		}
+		if (monthlySpending.size === 0) return null;
+		let max = { month: '', amount: 0 };
+		for (const [month, amount] of monthlySpending) {
+			if (amount > max.amount) {
+				max = { month, amount };
+			}
+		}
+		if (!max.month) return null;
+		const [year, monthNum] = max.month.split('-').map(Number);
+		const monthName = new Date(year, monthNum - 1).toLocaleString('default', { month: 'long' });
+		return { label: monthName, amount: max.amount };
+	});
+
+	// Most frequent merchant
+	let topMerchant = $derived.by(() => {
+		const freq = new Map<string, number>();
+		for (const t of ytdTransactions) {
+			freq.set(t.merchant, (freq.get(t.merchant) || 0) + 1);
+		}
+		let max = { merchant: '', count: 0 };
+		for (const [merchant, count] of freq) {
+			if (count > max.count) {
+				max = { merchant, count };
+			}
+		}
+		return max.merchant ? max : null;
+	});
+
+	// Calculate all-time needs vs wants
+	let needsWantsStats = $derived.by(() => {
+		let needs = 0;
+		let wants = 0;
+
+		for (const tx of transactions) {
+			const userAmount = tx.isShared ? tx.amount - tx.partnerShare : tx.amount;
+
+			if (tx.isEssential) {
+				needs += userAmount;
+			} else {
+				wants += userAmount;
+			}
+		}
+
+		const total = needs + wants;
+		const needsPercent = total > 0 ? (needs / total) * 100 : 0;
+		const wantsPercent = total > 0 ? (wants / total) * 100 : 0;
+
+		return { needs, wants, total, needsPercent, wantsPercent };
+	});
+
+	function formatCurrency(amount: number): string {
+		return new Intl.NumberFormat('en-US', {
+			style: 'currency',
+			currency: 'USD',
+			minimumFractionDigits: 0,
+			maximumFractionDigits: 0
+		}).format(amount);
+	}
 </script>
 
-<InsightGroup title="Year-to-Date Summary" description="{currentYear} spending overview">
+<InsightGroup title="Year in Review" description="{currentYear} spending overview">
 	{#snippet preview()}
 		<div class="space-y-3">
 			<div class="flex items-center justify-between">
@@ -106,8 +174,35 @@
 				<CalendarHeatmap {dailySpending} year={currentYear} />
 			</div>
 
-			<!-- YTD Stats -->
-			<YTDStats transactions={ytdTransactions} {categories} />
+			<!-- Quick Stats Row -->
+			<div class="grid grid-cols-3 gap-4">
+				<div class="bg-cream-dark rounded-lg p-3 text-center">
+					<p class="font-mono text-lg font-medium text-charcoal">{formatCurrency(dailyAvg)}</p>
+					<p class="text-xs text-charcoal-muted">Daily Avg</p>
+				</div>
+				{#if biggestMonth}
+					<div class="bg-cream-dark rounded-lg p-3 text-center">
+						<p class="font-mono text-lg font-medium text-charcoal">{biggestMonth.label}</p>
+						<p class="text-xs text-charcoal-muted">Biggest Month</p>
+					</div>
+				{/if}
+				{#if topMerchant}
+					<div class="bg-cream-dark rounded-lg p-3 text-center">
+						<p class="font-mono text-lg font-medium text-charcoal truncate" title={topMerchant.merchant}>{topMerchant.merchant}</p>
+						<p class="text-xs text-charcoal-muted">{topMerchant.count}x visits</p>
+					</div>
+				{/if}
+			</div>
+
+			<!-- Needs vs Wants Summary (compact) -->
+			{#if needsWantsStats.total > 0}
+				<div class="flex items-center justify-between p-4 bg-cream-dark rounded-lg border border-dashed border-gray-200">
+					<span class="text-sm text-charcoal-soft">All-time needs vs wants:</span>
+					<span class="font-mono text-sm text-charcoal">
+						{needsWantsStats.needsPercent.toFixed(0)}% needs / {needsWantsStats.wantsPercent.toFixed(0)}% wants
+					</span>
+				</div>
+			{/if}
 		</div>
 	{/snippet}
 </InsightGroup>
