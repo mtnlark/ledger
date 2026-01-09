@@ -9,7 +9,12 @@ import {
 	getAllTransactions,
 	markAsSettled,
 	getUnsettledTransactions,
-	calculateOutstandingBalance
+	calculateOutstandingBalance,
+	getEarliestTransactionMonth,
+	getMonthlySpendingTrends,
+	getCategoryTrends,
+	getDailySpending,
+	getAvailableMonths
 } from './transactions';
 
 describe('Transaction Operations', () => {
@@ -576,6 +581,382 @@ describe('Transaction Operations', () => {
 				expect(t1?.isSettled).toBe(true);
 				expect(t2?.isSettled).toBe(true);
 			});
+		});
+	});
+
+	describe('getEarliestTransactionMonth', () => {
+		it('returns null when no transactions exist', async () => {
+			const earliest = await getEarliestTransactionMonth();
+			expect(earliest).toBeNull();
+		});
+
+		it('returns month of earliest transaction', async () => {
+			await addTransaction({
+				date: new Date(2025, 11, 15), // December
+				merchant: 'Later',
+				amount: 50,
+				categoryId: 1,
+				isShared: false,
+				splitType: 'percentage',
+				splitValue: 0.5,
+				isSettled: false
+			});
+
+			await addTransaction({
+				date: new Date(2025, 9, 10), // October - earliest
+				merchant: 'First',
+				amount: 25,
+				categoryId: 1,
+				isShared: false,
+				splitType: 'percentage',
+				splitValue: 0.5,
+				isSettled: false
+			});
+
+			await addTransaction({
+				date: new Date(2025, 10, 20), // November
+				merchant: 'Middle',
+				amount: 75,
+				categoryId: 1,
+				isShared: false,
+				splitType: 'percentage',
+				splitValue: 0.5,
+				isSettled: false
+			});
+
+			const earliest = await getEarliestTransactionMonth();
+			expect(earliest).toBe('2025-10');
+		});
+	});
+
+	describe('getMonthlySpendingTrends', () => {
+		beforeEach(async () => {
+			// Add transactions across multiple months
+			await addTransaction({
+				date: new Date(2025, 9, 15), // October
+				merchant: 'Store A',
+				amount: 100,
+				categoryId: 1,
+				isShared: false,
+				splitType: 'percentage',
+				splitValue: 0.5,
+				isSettled: false
+			});
+
+			await addTransaction({
+				date: new Date(2025, 10, 15), // November
+				merchant: 'Store B',
+				amount: 200,
+				categoryId: 1,
+				isShared: false,
+				splitType: 'percentage',
+				splitValue: 0.5,
+				isSettled: false
+			});
+
+			await addTransaction({
+				date: new Date(2025, 10, 20), // November
+				merchant: 'Store C',
+				amount: 50,
+				categoryId: 1,
+				isShared: false,
+				splitType: 'percentage',
+				splitValue: 0.5,
+				isSettled: false
+			});
+
+			// Shared transaction - only your share counts
+			await addTransaction({
+				date: new Date(2025, 11, 15), // December
+				merchant: 'Shared Store',
+				amount: 100,
+				categoryId: 1,
+				isShared: true,
+				splitType: 'percentage',
+				splitValue: 0.5,
+				isSettled: false
+			});
+		});
+
+		it('returns spending totals by month', async () => {
+			const trends = await getMonthlySpendingTrends(['2025-10', '2025-11', '2025-12']);
+
+			expect(trends.get('2025-10')).toBe(100);
+			expect(trends.get('2025-11')).toBe(250); // 200 + 50
+			expect(trends.get('2025-12')).toBe(50); // 100 - 50 partner share
+		});
+
+		it('returns 0 for months with no transactions', async () => {
+			const trends = await getMonthlySpendingTrends(['2025-08', '2025-09']);
+
+			expect(trends.get('2025-08')).toBe(0);
+			expect(trends.get('2025-09')).toBe(0);
+		});
+
+		it('returns empty map for empty months array', async () => {
+			const trends = await getMonthlySpendingTrends([]);
+			expect(trends.size).toBe(0);
+		});
+
+		it('only loads transactions in requested month range', async () => {
+			const trends = await getMonthlySpendingTrends(['2025-11']);
+
+			expect(trends.has('2025-11')).toBe(true);
+			expect(trends.get('2025-11')).toBe(250);
+			expect(trends.has('2025-10')).toBe(false);
+			expect(trends.has('2025-12')).toBe(false);
+		});
+	});
+
+	describe('getCategoryTrends', () => {
+		beforeEach(async () => {
+			// Add transactions with different categories
+			await addTransaction({
+				date: new Date(2025, 10, 15),
+				merchant: 'Grocery Store',
+				amount: 100,
+				categoryId: 11, // Groceries
+				isShared: false,
+				splitType: 'percentage',
+				splitValue: 0.5,
+				isSettled: false
+			});
+
+			await addTransaction({
+				date: new Date(2025, 10, 20),
+				merchant: 'Another Grocery',
+				amount: 75,
+				categoryId: 11, // Groceries
+				isShared: false,
+				splitType: 'percentage',
+				splitValue: 0.5,
+				isSettled: false
+			});
+
+			await addTransaction({
+				date: new Date(2025, 11, 15),
+				merchant: 'Grocery December',
+				amount: 150,
+				categoryId: 11, // Groceries
+				isShared: false,
+				splitType: 'percentage',
+				splitValue: 0.5,
+				isSettled: false
+			});
+
+			await addTransaction({
+				date: new Date(2025, 10, 15),
+				merchant: 'Gas Station',
+				amount: 50,
+				categoryId: 9, // Gas
+				isShared: false,
+				splitType: 'percentage',
+				splitValue: 0.5,
+				isSettled: false
+			});
+		});
+
+		it('returns spending for specific category by month', async () => {
+			const trends = await getCategoryTrends(11, ['2025-10', '2025-11', '2025-12']);
+
+			expect(trends.get('2025-10')).toBe(0); // No groceries in October
+			expect(trends.get('2025-11')).toBe(175); // 100 + 75
+			expect(trends.get('2025-12')).toBe(150);
+		});
+
+		it('returns 0 for months with no matching category', async () => {
+			const trends = await getCategoryTrends(9, ['2025-11', '2025-12']);
+
+			expect(trends.get('2025-11')).toBe(50);
+			expect(trends.get('2025-12')).toBe(0);
+		});
+
+		it('returns empty map for empty months array', async () => {
+			const trends = await getCategoryTrends(11, []);
+			expect(trends.size).toBe(0);
+		});
+	});
+
+	describe('getDailySpending', () => {
+		beforeEach(async () => {
+			// Add transactions on different days in December 2025
+			await addTransaction({
+				date: new Date(2025, 11, 1),
+				merchant: 'Day 1 Store',
+				amount: 50,
+				categoryId: 1,
+				isShared: false,
+				splitType: 'percentage',
+				splitValue: 0.5,
+				isSettled: false
+			});
+
+			await addTransaction({
+				date: new Date(2025, 11, 1),
+				merchant: 'Day 1 Another',
+				amount: 25,
+				categoryId: 1,
+				isShared: false,
+				splitType: 'percentage',
+				splitValue: 0.5,
+				isSettled: false
+			});
+
+			await addTransaction({
+				date: new Date(2025, 11, 15),
+				merchant: 'Day 15 Store',
+				amount: 100,
+				categoryId: 1,
+				isShared: false,
+				splitType: 'percentage',
+				splitValue: 0.5,
+				isSettled: false
+			});
+
+			// Shared transaction
+			await addTransaction({
+				date: new Date(2025, 11, 31),
+				merchant: 'Shared',
+				amount: 80,
+				categoryId: 1,
+				isShared: true,
+				splitType: 'percentage',
+				splitValue: 0.5,
+				isSettled: false
+			});
+		});
+
+		it('returns daily spending amounts', async () => {
+			const daily = await getDailySpending('2025-12');
+
+			expect(daily.find((d) => d.day === 1)?.amount).toBe(75); // 50 + 25
+			expect(daily.find((d) => d.day === 15)?.amount).toBe(100);
+			expect(daily.find((d) => d.day === 31)?.amount).toBe(40); // 80 - 40 partner share
+		});
+
+		it('returns 0 for days with no transactions', async () => {
+			const daily = await getDailySpending('2025-12');
+
+			expect(daily.find((d) => d.day === 2)?.amount).toBe(0);
+			expect(daily.find((d) => d.day === 10)?.amount).toBe(0);
+		});
+
+		it('calculates cumulative totals correctly', async () => {
+			const daily = await getDailySpending('2025-12');
+
+			expect(daily.find((d) => d.day === 1)?.cumulative).toBe(75);
+			expect(daily.find((d) => d.day === 2)?.cumulative).toBe(75); // No new spending
+			expect(daily.find((d) => d.day === 15)?.cumulative).toBe(175); // 75 + 100
+			expect(daily.find((d) => d.day === 31)?.cumulative).toBe(215); // 175 + 40
+		});
+
+		it('returns all days of the month', async () => {
+			const daily = await getDailySpending('2025-12');
+			expect(daily).toHaveLength(31); // December has 31 days
+		});
+
+		it('handles February correctly', async () => {
+			const daily = await getDailySpending('2025-02');
+			expect(daily).toHaveLength(28); // 2025 is not a leap year
+		});
+
+		it('handles leap year February', async () => {
+			const daily = await getDailySpending('2024-02');
+			expect(daily).toHaveLength(29);
+		});
+	});
+
+	describe('getAvailableMonths', () => {
+		it('returns current month when no transactions', async () => {
+			const months = await getAvailableMonths();
+
+			expect(months).toHaveLength(1);
+			// Should be current month
+			const now = new Date();
+			const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+			expect(months[0]).toBe(currentMonth);
+		});
+
+		it('returns all months from earliest transaction to current', async () => {
+			// Add a transaction 3 months ago
+			const now = new Date();
+			const threeMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 3, 15);
+
+			await addTransaction({
+				date: threeMonthsAgo,
+				merchant: 'Old Transaction',
+				amount: 50,
+				categoryId: 1,
+				isShared: false,
+				splitType: 'percentage',
+				splitValue: 0.5,
+				isSettled: false
+			});
+
+			const months = await getAvailableMonths();
+
+			// Should have 4 months: 3 months ago, 2 months ago, last month, current month
+			expect(months.length).toBeGreaterThanOrEqual(4);
+
+			// Verify sorted order
+			for (let i = 1; i < months.length; i++) {
+				expect(months[i] > months[i - 1]).toBe(true);
+			}
+		});
+	});
+
+	describe('isEssential field', () => {
+		it('stores isEssential when adding transaction', async () => {
+			const id = await addTransaction({
+				date: new Date(2025, 11, 15),
+				merchant: 'Essential Store',
+				amount: 100,
+				categoryId: 1,
+				isShared: false,
+				splitType: 'percentage',
+				splitValue: 0.5,
+				isSettled: false,
+				isEssential: true
+			});
+
+			const transaction = await db.transactions.get(id);
+			expect(transaction?.isEssential).toBe(true);
+		});
+
+		it('defaults isEssential to false when not provided', async () => {
+			const id = await addTransaction({
+				date: new Date(2025, 11, 15),
+				merchant: 'Non-Essential Store',
+				amount: 50,
+				categoryId: 1,
+				isShared: false,
+				splitType: 'percentage',
+				splitValue: 0.5,
+				isSettled: false
+			});
+
+			const transaction = await db.transactions.get(id);
+			// Should be false or undefined (falsy)
+			expect(transaction?.isEssential).toBeFalsy();
+		});
+
+		it('can update isEssential field', async () => {
+			const id = await addTransaction({
+				date: new Date(2025, 11, 15),
+				merchant: 'Store',
+				amount: 75,
+				categoryId: 1,
+				isShared: false,
+				splitType: 'percentage',
+				splitValue: 0.5,
+				isSettled: false,
+				isEssential: false
+			});
+
+			await updateTransaction(id, { isEssential: true });
+
+			const transaction = await db.transactions.get(id);
+			expect(transaction?.isEssential).toBe(true);
 		});
 	});
 });
