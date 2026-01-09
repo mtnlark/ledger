@@ -153,7 +153,7 @@ describe('Database Helper Functions', () => {
 
 	describe('DEFAULT_SETTINGS', () => {
 		it('has correct partner name', () => {
-			expect(DEFAULT_SETTINGS.partnerName).toBe('Allee');
+			expect(DEFAULT_SETTINGS.partnerName).toBe('Partner');
 		});
 
 		it('has 50% default split', () => {
@@ -201,7 +201,7 @@ describe('Database Initialization', () => {
 
 		const settings = await db.settings.get(1);
 		expect(settings).toBeDefined();
-		expect(settings?.partnerName).toBe('Allee');
+		expect(settings?.partnerName).toBe('Partner');
 	});
 
 	it('does not duplicate categories on multiple initializations', async () => {

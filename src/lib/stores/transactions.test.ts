@@ -109,11 +109,11 @@ describe('Transaction Operations', () => {
 				splitType: 'fixed',
 				splitValue: 35,
 				isSettled: false,
-				notes: "Allee's meal was $35"
+				notes: "Partner's meal was $35"
 			});
 
 			const transaction = await db.transactions.get(id);
-			expect(transaction?.notes).toBe("Allee's meal was $35");
+			expect(transaction?.notes).toBe("Partner's meal was $35");
 		});
 	});
 

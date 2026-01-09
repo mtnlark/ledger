@@ -130,7 +130,7 @@ export const DEFAULT_CATEGORIES: Omit<Category, 'id'>[] = [
 // Default settings
 export const DEFAULT_SETTINGS: Settings = {
 	id: 1,
-	partnerName: 'Allee',
+	partnerName: 'Partner',
 	defaultSplitType: 'percentage',
 	defaultSplitValue: 0.5,
 	currency: 'USD',
