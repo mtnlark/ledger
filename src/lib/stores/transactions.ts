@@ -190,6 +190,8 @@ export async function splitTransaction(
 			settledDate: parent.settledDate,
 			notes: split.notes,
 			isEssential: parent.isEssential,
+			isSubscription: parent.isSubscription,
+			subscriptionFrequency: parent.subscriptionFrequency,
 			parentTransactionId: id,
 			createdAt: now,
 			updatedAt: now

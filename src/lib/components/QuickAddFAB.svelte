@@ -22,6 +22,7 @@
 		splitType: 'percentage' | 'fixed';
 		splitValue: number;
 		isEssential: boolean;
+		isSubscription: boolean;
 	}
 
 	let { categories, settings, onSubmit }: Props = $props();
@@ -118,7 +119,8 @@
 				isSettled: isShared ? isSettled : false,
 				splitType: settings.defaultSplitType,
 				splitValue: settings.defaultSplitValue,
-				isEssential
+				isEssential,
+				isSubscription: false
 			});
 
 			close();

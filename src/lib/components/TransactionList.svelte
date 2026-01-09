@@ -233,6 +233,13 @@
 							<div class="flex-1 min-w-0">
 								<div class="flex items-center gap-2">
 									<span class="font-medium text-charcoal truncate">{transaction.merchant}</span>
+									{#if transaction.isSubscription}
+										<span
+											class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold uppercase tracking-wide bg-primary-100 text-primary-600"
+										>
+											{transaction.subscriptionFrequency === 'annual' ? 'Annual' : 'Sub'}
+										</span>
+									{/if}
 									{#if transaction.isShared}
 										<span
 											class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold uppercase tracking-wide bg-success-100 text-success-600"

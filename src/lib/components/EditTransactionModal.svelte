@@ -25,6 +25,8 @@
 		splitValue: number;
 		notes?: string;
 		isEssential: boolean;
+		isSubscription: boolean;
+		subscriptionFrequency?: 'monthly' | 'annual';
 	}
 
 	let { isOpen, transaction, categories, settings, onSave, onSplit, onClose }: Props = $props();
@@ -42,6 +44,8 @@
 	let splitValue = $state(0.5);
 	let notes = $state('');
 	let isEssential = $state(false);
+	let isSubscription = $state(false);
+	let subscriptionFrequency = $state<'monthly' | 'annual'>('monthly');
 
 	// Get selected category for essential default display
 	let selectedCategory = $derived(categories.find((c) => c.id === categoryId));
@@ -59,6 +63,8 @@
 			splitValue = transaction.splitValue;
 			notes = transaction.notes ?? '';
 			isEssential = transaction.isEssential ?? false;
+			isSubscription = transaction.isSubscription ?? false;
+			subscriptionFrequency = transaction.subscriptionFrequency ?? 'monthly';
 		}
 	});
 
@@ -115,7 +121,9 @@
 			splitType,
 			splitValue: validatedSplitValue, // Use validated value
 			notes: notes.trim() || undefined,
-			isEssential
+			isEssential,
+			isSubscription,
+			subscriptionFrequency: isSubscription ? subscriptionFrequency : undefined
 		});
 	}
 
@@ -350,12 +358,59 @@
 								class="relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:ring-offset-2 {isEssential ? 'bg-primary-500' : 'bg-gray-200'}"
 								role="switch"
 								aria-checked={isEssential}
+								aria-label="Toggle essential spending"
 							>
 								<span
 									class="pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out {isEssential ? 'translate-x-5' : 'translate-x-0'}"
 								></span>
 							</button>
 						</label>
+					</div>
+
+					<!-- Subscription Toggle -->
+					<div class="border-t border-dashed border-gray-200 pt-4">
+						<label class="flex items-center justify-between cursor-pointer">
+							<div>
+								<span class="text-sm font-medium text-charcoal-soft">Subscription</span>
+								<p class="text-xs text-charcoal-muted mt-0.5">Recurring payment (e.g., streaming, news)</p>
+							</div>
+							<button
+								type="button"
+								onclick={() => (isSubscription = !isSubscription)}
+								class="relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:ring-offset-2 {isSubscription ? 'bg-primary-500' : 'bg-gray-200'}"
+								role="switch"
+								aria-checked={isSubscription}
+								aria-label="Toggle subscription"
+							>
+								<span
+									class="pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out {isSubscription ? 'translate-x-5' : 'translate-x-0'}"
+								></span>
+							</button>
+						</label>
+
+						<!-- Frequency selector (shown when subscription is enabled) -->
+						{#if isSubscription}
+							<div class="mt-3 flex gap-2">
+								<button
+									type="button"
+									onclick={() => (subscriptionFrequency = 'monthly')}
+									class="px-3 py-1.5 text-sm font-medium rounded-lg transition-all duration-150 {subscriptionFrequency === 'monthly'
+										? 'bg-primary-500 text-white shadow-sm'
+										: 'bg-cream text-charcoal-soft border border-[rgba(45,42,38,0.15)] hover:bg-cream-dark'}"
+								>
+									Monthly
+								</button>
+								<button
+									type="button"
+									onclick={() => (subscriptionFrequency = 'annual')}
+									class="px-3 py-1.5 text-sm font-medium rounded-lg transition-all duration-150 {subscriptionFrequency === 'annual'
+										? 'bg-primary-500 text-white shadow-sm'
+										: 'bg-cream text-charcoal-soft border border-[rgba(45,42,38,0.15)] hover:bg-cream-dark'}"
+								>
+									Annual
+								</button>
+							</div>
+						{/if}
 					</div>
 
 					<!-- Split by Category Button -->

@@ -44,7 +44,8 @@ describe('Transaction Operations', () => {
 				splitType: 'percentage',
 				splitValue: 0.5,
 				isSettled: false,
-				isEssential: false
+				isEssential: false,
+				isSubscription: false
 			});
 
 			expect(id).toBeGreaterThan(0);
@@ -66,7 +67,8 @@ describe('Transaction Operations', () => {
 				splitType: 'percentage',
 				splitValue: 0.5,
 				isSettled: false,
-				isEssential: false
+				isEssential: false,
+				isSubscription: false
 			});
 
 			const transaction = await db.transactions.get(id);
@@ -83,7 +85,8 @@ describe('Transaction Operations', () => {
 				splitType: 'fixed',
 				splitValue: 45.50,
 				isSettled: false,
-				isEssential: false
+				isEssential: false,
+				isSubscription: false
 			});
 
 			const transaction = await db.transactions.get(id);
@@ -102,7 +105,8 @@ describe('Transaction Operations', () => {
 				splitType: 'percentage',
 				splitValue: 0.5,
 				isSettled: false,
-				isEssential: false
+				isEssential: false,
+				isSubscription: false
 			});
 
 			const after = new Date();
@@ -124,6 +128,7 @@ describe('Transaction Operations', () => {
 				splitValue: 35,
 				isSettled: false,
 				isEssential: false,
+				isSubscription: false,
 				notes: "Partner's meal was $35"
 			});
 
@@ -143,7 +148,8 @@ describe('Transaction Operations', () => {
 				splitType: 'percentage',
 				splitValue: 0.5,
 				isSettled: false,
-				isEssential: false
+				isEssential: false,
+				isSubscription: false
 			});
 
 			await updateTransaction(id, { merchant: 'Exxon' });
@@ -162,7 +168,8 @@ describe('Transaction Operations', () => {
 				splitType: 'percentage',
 				splitValue: 0.5,
 				isSettled: false,
-				isEssential: false
+				isEssential: false,
+				isSubscription: false
 			});
 
 			// Initially $30 partner share
@@ -186,7 +193,8 @@ describe('Transaction Operations', () => {
 				splitType: 'percentage',
 				splitValue: 0.5,
 				isSettled: false,
-				isEssential: false
+				isEssential: false,
+				isSubscription: false
 			});
 
 			// Change to fixed $25
@@ -206,7 +214,8 @@ describe('Transaction Operations', () => {
 				splitType: 'percentage',
 				splitValue: 0.5,
 				isSettled: false,
-				isEssential: false
+				isEssential: false,
+				isSubscription: false
 			});
 
 			await updateTransaction(id, { isShared: false });
@@ -225,7 +234,8 @@ describe('Transaction Operations', () => {
 				splitType: 'percentage',
 				splitValue: 0.5,
 				isSettled: false,
-				isEssential: false
+				isEssential: false,
+				isSubscription: false
 			});
 
 			const original = await db.transactions.get(id);
@@ -252,7 +262,8 @@ describe('Transaction Operations', () => {
 				splitType: 'percentage',
 				splitValue: 0.5,
 				isSettled: false,
-				isEssential: false
+				isEssential: false,
+				isSubscription: false
 			});
 
 			expect(await db.transactions.get(id)).toBeDefined();
@@ -274,7 +285,8 @@ describe('Transaction Operations', () => {
 				splitType: 'percentage',
 				splitValue: 0.5,
 				isSettled: false,
-				isEssential: false
+				isEssential: false,
+				isSubscription: false
 			});
 
 			const id2 = await addTransaction({
@@ -286,7 +298,8 @@ describe('Transaction Operations', () => {
 				splitType: 'percentage',
 				splitValue: 0.5,
 				isSettled: false,
-				isEssential: false
+				isEssential: false,
+				isSubscription: false
 			});
 
 			const id3 = await addTransaction({
@@ -298,7 +311,8 @@ describe('Transaction Operations', () => {
 				splitType: 'percentage',
 				splitValue: 0.5,
 				isSettled: false,
-				isEssential: false
+				isEssential: false,
+				isSubscription: false
 			});
 
 			// Delete first two
@@ -319,7 +333,8 @@ describe('Transaction Operations', () => {
 				splitType: 'percentage',
 				splitValue: 0.5,
 				isSettled: false,
-				isEssential: false
+				isEssential: false,
+				isSubscription: false
 			});
 
 			await bulkDeleteTransactions([]);
@@ -338,7 +353,8 @@ describe('Transaction Operations', () => {
 				splitType: 'percentage',
 				splitValue: 0.5,
 				isSettled: false,
-				isEssential: false
+				isEssential: false,
+				isSubscription: false
 			});
 
 			await bulkDeleteTransactions([id]);
@@ -358,7 +374,8 @@ describe('Transaction Operations', () => {
 				splitType: 'percentage',
 				splitValue: 0.5,
 				isSettled: false,
-				isEssential: false
+				isEssential: false,
+				isSubscription: false
 			});
 
 			const id2 = await addTransaction({
@@ -370,7 +387,8 @@ describe('Transaction Operations', () => {
 				splitType: 'percentage',
 				splitValue: 0.5,
 				isSettled: false,
-				isEssential: false
+				isEssential: false,
+				isSubscription: false
 			});
 
 			const id3 = await addTransaction({
@@ -382,7 +400,8 @@ describe('Transaction Operations', () => {
 				splitType: 'percentage',
 				splitValue: 0.5,
 				isSettled: false,
-				isEssential: false
+				isEssential: false,
+				isSubscription: false
 			});
 
 			// Change first two to category 5
@@ -407,7 +426,8 @@ describe('Transaction Operations', () => {
 				splitType: 'percentage',
 				splitValue: 0.5,
 				isSettled: false,
-				isEssential: false
+				isEssential: false,
+				isSubscription: false
 			});
 
 			const original = await db.transactions.get(id);
@@ -432,7 +452,8 @@ describe('Transaction Operations', () => {
 				splitType: 'percentage',
 				splitValue: 0.5,
 				isSettled: false,
-				isEssential: false
+				isEssential: false,
+				isSubscription: false
 			});
 
 			await bulkUpdateCategory([], 5);
@@ -453,6 +474,7 @@ describe('Transaction Operations', () => {
 				splitValue: 0.5,
 				isSettled: false,
 				isEssential: false,
+				isSubscription: false,
 				notes: 'Test notes'
 			});
 
@@ -481,7 +503,8 @@ describe('Transaction Operations', () => {
 				splitType: 'percentage',
 				splitValue: 0.5,
 				isSettled: false,
-				isEssential: false
+				isEssential: false,
+				isSubscription: false
 			});
 
 			await addTransaction({
@@ -493,7 +516,8 @@ describe('Transaction Operations', () => {
 				splitType: 'percentage',
 				splitValue: 0.5,
 				isSettled: false,
-				isEssential: false
+				isEssential: false,
+				isSubscription: false
 			});
 
 			await addTransaction({
@@ -505,7 +529,8 @@ describe('Transaction Operations', () => {
 				splitType: 'percentage',
 				splitValue: 0.5,
 				isSettled: false,
-				isEssential: false
+				isEssential: false,
+				isSubscription: false
 			});
 
 			await addTransaction({
@@ -517,7 +542,8 @@ describe('Transaction Operations', () => {
 				splitType: 'percentage',
 				splitValue: 0.5,
 				isSettled: false,
-				isEssential: false
+				isEssential: false,
+				isSubscription: false
 			});
 
 			await addTransaction({
@@ -529,7 +555,8 @@ describe('Transaction Operations', () => {
 				splitType: 'percentage',
 				splitValue: 0.5,
 				isSettled: false,
-				isEssential: false
+				isEssential: false,
+				isSubscription: false
 			});
 		});
 
@@ -569,7 +596,8 @@ describe('Transaction Operations', () => {
 				splitType: 'percentage',
 				splitValue: 0.5,
 				isSettled: false,
-				isEssential: false
+				isEssential: false,
+				isSubscription: false
 			});
 
 			await addTransaction({
@@ -581,7 +609,8 @@ describe('Transaction Operations', () => {
 				splitType: 'percentage',
 				splitValue: 0.5,
 				isSettled: false,
-				isEssential: false
+				isEssential: false,
+				isSubscription: false
 			});
 
 			await addTransaction({
@@ -593,7 +622,8 @@ describe('Transaction Operations', () => {
 				splitType: 'percentage',
 				splitValue: 0.5,
 				isSettled: false,
-				isEssential: false
+				isEssential: false,
+				isSubscription: false
 			});
 
 			await addTransaction({
@@ -605,7 +635,8 @@ describe('Transaction Operations', () => {
 				splitType: 'percentage',
 				splitValue: 0.5,
 				isSettled: false,
-				isEssential: false
+				isEssential: false,
+				isSubscription: false
 			});
 		});
 
@@ -714,7 +745,8 @@ describe('Transaction Operations', () => {
 				splitType: 'percentage',
 				splitValue: 0.5,
 				isSettled: false,
-				isEssential: false
+				isEssential: false,
+				isSubscription: false
 			});
 
 			sharedId2 = await addTransaction({
@@ -726,7 +758,8 @@ describe('Transaction Operations', () => {
 				splitType: 'fixed',
 				splitValue: 30,
 				isSettled: false,
-				isEssential: false
+				isEssential: false,
+				isSubscription: false
 			});
 
 			nonSharedId = await addTransaction({
@@ -738,7 +771,8 @@ describe('Transaction Operations', () => {
 				splitType: 'percentage',
 				splitValue: 0.5,
 				isSettled: false,
-				isEssential: false
+				isEssential: false,
+				isSubscription: false
 			});
 		});
 
@@ -833,7 +867,8 @@ describe('Transaction Operations', () => {
 				splitType: 'percentage',
 				splitValue: 0.5,
 				isSettled: false,
-				isEssential: false
+				isEssential: false,
+				isSubscription: false
 			});
 
 			await addTransaction({
@@ -845,7 +880,8 @@ describe('Transaction Operations', () => {
 				splitType: 'percentage',
 				splitValue: 0.5,
 				isSettled: false,
-				isEssential: false
+				isEssential: false,
+				isSubscription: false
 			});
 
 			await addTransaction({
@@ -857,7 +893,8 @@ describe('Transaction Operations', () => {
 				splitType: 'percentage',
 				splitValue: 0.5,
 				isSettled: false,
-				isEssential: false
+				isEssential: false,
+				isSubscription: false
 			});
 
 			const earliest = await getEarliestTransactionMonth();
@@ -877,7 +914,8 @@ describe('Transaction Operations', () => {
 				splitType: 'percentage',
 				splitValue: 0.5,
 				isSettled: false,
-				isEssential: false
+				isEssential: false,
+				isSubscription: false
 			});
 
 			await addTransaction({
@@ -889,7 +927,8 @@ describe('Transaction Operations', () => {
 				splitType: 'percentage',
 				splitValue: 0.5,
 				isSettled: false,
-				isEssential: false
+				isEssential: false,
+				isSubscription: false
 			});
 
 			await addTransaction({
@@ -901,7 +940,8 @@ describe('Transaction Operations', () => {
 				splitType: 'percentage',
 				splitValue: 0.5,
 				isSettled: false,
-				isEssential: false
+				isEssential: false,
+				isSubscription: false
 			});
 
 			// Shared transaction - only your share counts
@@ -914,7 +954,8 @@ describe('Transaction Operations', () => {
 				splitType: 'percentage',
 				splitValue: 0.5,
 				isSettled: false,
-				isEssential: false
+				isEssential: false,
+				isSubscription: false
 			});
 		});
 
@@ -960,7 +1001,8 @@ describe('Transaction Operations', () => {
 				splitType: 'percentage',
 				splitValue: 0.5,
 				isSettled: false,
-				isEssential: false
+				isEssential: false,
+				isSubscription: false
 			});
 
 			await addTransaction({
@@ -972,7 +1014,8 @@ describe('Transaction Operations', () => {
 				splitType: 'percentage',
 				splitValue: 0.5,
 				isSettled: false,
-				isEssential: false
+				isEssential: false,
+				isSubscription: false
 			});
 
 			await addTransaction({
@@ -984,7 +1027,8 @@ describe('Transaction Operations', () => {
 				splitType: 'percentage',
 				splitValue: 0.5,
 				isSettled: false,
-				isEssential: false
+				isEssential: false,
+				isSubscription: false
 			});
 
 			await addTransaction({
@@ -996,7 +1040,8 @@ describe('Transaction Operations', () => {
 				splitType: 'percentage',
 				splitValue: 0.5,
 				isSettled: false,
-				isEssential: false
+				isEssential: false,
+				isSubscription: false
 			});
 		});
 
@@ -1033,7 +1078,8 @@ describe('Transaction Operations', () => {
 				splitType: 'percentage',
 				splitValue: 0.5,
 				isSettled: false,
-				isEssential: false
+				isEssential: false,
+				isSubscription: false
 			});
 
 			await addTransaction({
@@ -1045,7 +1091,8 @@ describe('Transaction Operations', () => {
 				splitType: 'percentage',
 				splitValue: 0.5,
 				isSettled: false,
-				isEssential: false
+				isEssential: false,
+				isSubscription: false
 			});
 
 			await addTransaction({
@@ -1057,7 +1104,8 @@ describe('Transaction Operations', () => {
 				splitType: 'percentage',
 				splitValue: 0.5,
 				isSettled: false,
-				isEssential: false
+				isEssential: false,
+				isSubscription: false
 			});
 
 			// Shared transaction
@@ -1070,7 +1118,8 @@ describe('Transaction Operations', () => {
 				splitType: 'percentage',
 				splitValue: 0.5,
 				isSettled: false,
-				isEssential: false
+				isEssential: false,
+				isSubscription: false
 			});
 		});
 
@@ -1139,7 +1188,8 @@ describe('Transaction Operations', () => {
 				splitType: 'percentage',
 				splitValue: 0.5,
 				isSettled: false,
-				isEssential: false
+				isEssential: false,
+				isSubscription: false
 			});
 
 			const months = await getAvailableMonths();
@@ -1165,7 +1215,8 @@ describe('Transaction Operations', () => {
 				splitType: 'percentage',
 				splitValue: 0.5,
 				isSettled: false,
-				isEssential: true
+				isEssential: true,
+				isSubscription: false
 			});
 
 			const transaction = await db.transactions.get(id);
@@ -1182,7 +1233,8 @@ describe('Transaction Operations', () => {
 				splitType: 'percentage',
 				splitValue: 0.5,
 				isSettled: false,
-				isEssential: false
+				isEssential: false,
+				isSubscription: false
 			});
 
 			const transaction = await db.transactions.get(id);
@@ -1200,7 +1252,8 @@ describe('Transaction Operations', () => {
 				splitType: 'percentage',
 				splitValue: 0.5,
 				isSettled: false,
-				isEssential: false
+				isEssential: false,
+				isSubscription: false
 			});
 
 			await updateTransaction(id, { isEssential: true });
@@ -1221,7 +1274,8 @@ describe('Transaction Operations', () => {
 				splitType: 'percentage',
 				splitValue: 0.5,
 				isSettled: false,
-				isEssential: false
+				isEssential: false,
+				isSubscription: false
 			});
 
 			const childIds = await splitTransaction(parentId, [
@@ -1253,7 +1307,8 @@ describe('Transaction Operations', () => {
 				splitType: 'percentage',
 				splitValue: 0.5,
 				isSettled: false,
-				isEssential: false
+				isEssential: false,
+				isSubscription: false
 			});
 
 			await splitTransaction(parentId, [
@@ -1275,7 +1330,8 @@ describe('Transaction Operations', () => {
 				splitType: 'percentage',
 				splitValue: 0.5,
 				isSettled: false,
-				isEssential: true
+				isEssential: true,
+				isSubscription: false
 			});
 
 			const childIds = await splitTransaction(parentId, [
@@ -1303,7 +1359,8 @@ describe('Transaction Operations', () => {
 				splitType: 'percentage',
 				splitValue: 0.5,
 				isSettled: false,
-				isEssential: false
+				isEssential: false,
+				isSubscription: false
 			});
 
 			await expect(
@@ -1324,7 +1381,8 @@ describe('Transaction Operations', () => {
 				splitType: 'percentage',
 				splitValue: 0.5,
 				isSettled: false,
-				isEssential: false
+				isEssential: false,
+				isSubscription: false
 			});
 
 			await expect(
@@ -1342,7 +1400,8 @@ describe('Transaction Operations', () => {
 				splitType: 'percentage',
 				splitValue: 0.5,
 				isSettled: false,
-				isEssential: false
+				isEssential: false,
+				isSubscription: false
 			});
 
 			const childIds = await splitTransaction(parentId, [
@@ -1371,7 +1430,8 @@ describe('Transaction Operations', () => {
 				splitType: 'percentage',
 				splitValue: 0.5,
 				isSettled: false,
-				isEssential: false
+				isEssential: false,
+				isSubscription: false
 			});
 
 			await splitTransaction(parentId, [
@@ -1394,7 +1454,8 @@ describe('Transaction Operations', () => {
 				splitType: 'percentage',
 				splitValue: 0.5,
 				isSettled: false,
-				isEssential: false
+				isEssential: false,
+				isSubscription: false
 			});
 
 			const children = await getSplitChildren(id);
@@ -1413,7 +1474,8 @@ describe('Transaction Operations', () => {
 				splitType: 'percentage',
 				splitValue: 0.5,
 				isSettled: false,
-				isEssential: false
+				isEssential: false,
+				isSubscription: false
 			});
 
 			await splitTransaction(parentId, [
@@ -1434,7 +1496,8 @@ describe('Transaction Operations', () => {
 				splitType: 'percentage',
 				splitValue: 0.5,
 				isSettled: false,
-				isEssential: false
+				isEssential: false,
+				isSubscription: false
 			});
 
 			expect(await isSplitParent(id)).toBe(false);
@@ -1452,7 +1515,8 @@ describe('Transaction Operations', () => {
 				splitType: 'percentage',
 				splitValue: 0.5,
 				isSettled: false,
-				isEssential: false
+				isEssential: false,
+				isSubscription: false
 			});
 
 			await splitTransaction(parentId, [
@@ -1477,7 +1541,8 @@ describe('Transaction Operations', () => {
 				splitType: 'percentage',
 				splitValue: 0.5,
 				isSettled: false,
-				isEssential: false
+				isEssential: false,
+				isSubscription: false
 			});
 
 			await splitTransaction(parentId, [

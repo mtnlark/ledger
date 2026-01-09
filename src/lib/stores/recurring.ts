@@ -5,11 +5,21 @@ import { normalizeMerchant } from '$lib/utils/string-helpers';
 export interface DetectedRecurring {
 	merchant: string;
 	categoryId: number;
+	/** Average total amount (before any split) */
 	averageAmount: number;
+	/** Average user's portion (after split if shared) */
+	averageUserAmount: number;
 	frequency: 'monthly';
 	dayOfMonth: number;
 	occurrenceCount: number;
+	/** Whether it's in the Subscriptions category (legacy - use amountType instead) */
 	isSubscription: boolean;
+	/** 'fixed' = low variance (subscriptions, insurance), 'variable' = higher variance (utilities) */
+	amountType: 'fixed' | 'variable';
+	/** Coefficient of variation (0-1+) - how much the amount varies */
+	variance: number;
+	/** Whether this recurring expense is typically shared */
+	isShared: boolean;
 }
 
 // Cache for recurring detection results - invalidated when transactions change
@@ -112,7 +122,9 @@ function detectMonthlyPattern(transactions: Transaction[]): number | null {
 
 /**
  * Detect recurring expenses from transaction history
- * Looks for patterns: same merchant, similar amounts, monthly cadence
+ * Looks for patterns: same merchant, monthly cadence
+ * Allows both fixed amounts (subscriptions, insurance) and variable amounts (utilities)
+ * Excludes transactions already tagged as subscriptions (those are shown separately)
  * Results are cached until invalidated
  */
 export async function detectRecurringExpenses(): Promise<DetectedRecurring[]> {
@@ -138,8 +150,12 @@ export async function detectRecurringExpenses(): Promise<DetectedRecurring[]> {
 	)?.id;
 
 	// Group transactions by normalized merchant name
+	// Exclude transactions already tagged as subscriptions (they're shown in subscriptions section)
 	const merchantGroups = new Map<string, Transaction[]>();
 	for (const tx of allTransactions) {
+		// Skip transactions already tagged as subscriptions
+		if (tx.isSubscription) continue;
+
 		const key = normalizeMerchant(tx.merchant);
 		// Skip dismissed merchants
 		if (dismissedMerchants.includes(key)) continue;
@@ -153,33 +169,53 @@ export async function detectRecurringExpenses(): Promise<DetectedRecurring[]> {
 		// Need at least 2 occurrences to detect a pattern
 		if (transactions.length < 2) continue;
 
-		// Check amount variance (must be within 15%)
-		const amounts = transactions.map((t) => t.amount);
-		const variance = calculateVariance(amounts);
-		if (variance > 0.15) continue;
-
-		// Check for monthly pattern
+		// Check for monthly pattern first
 		const dayOfMonth = detectMonthlyPattern(transactions);
 		if (dayOfMonth === null) continue;
 
+		// Calculate amount variance
+		const amounts = transactions.map((t) => t.amount);
+		const variance = calculateVariance(amounts);
+
+		// Allow up to 50% variance for variable bills (utilities)
+		// 50%+ is too unpredictable to be considered recurring
+		if (variance >= 0.50) continue;
+
+		// Classify as fixed (<15% variance) or variable (15-50% variance)
+		const amountType: 'fixed' | 'variable' = variance <= 0.15 ? 'fixed' : 'variable';
+
 		// Calculate average amount
 		const avgAmount = average(amounts);
+
+		// Calculate user's portion (after split if shared)
+		const userAmounts = transactions.map((t) =>
+			t.isShared ? t.amount - t.partnerShare : t.amount
+		);
+		const avgUserAmount = average(userAmounts);
+
+		// Determine if this is typically shared (majority of transactions are shared)
+		const sharedCount = transactions.filter((t) => t.isShared).length;
+		const isShared = sharedCount > transactions.length / 2;
 
 		// Find most common category
 		const categoryIds = transactions.map((t) => t.categoryId);
 		const categoryId = mode(categoryIds);
 
-		// Check if it's a subscription
+		// Check if it's in the Subscriptions category (legacy field)
 		const isSubscription = categoryId === subscriptionsCategoryId;
 
 		detected.push({
 			merchant: transactions[0].merchant, // Use original casing from first transaction
 			categoryId,
 			averageAmount: Math.round(avgAmount * 100) / 100, // Round to 2 decimal places
+			averageUserAmount: Math.round(avgUserAmount * 100) / 100,
 			frequency: 'monthly',
 			dayOfMonth,
 			occurrenceCount: transactions.length,
-			isSubscription
+			isSubscription,
+			amountType,
+			variance: Math.round(variance * 100) / 100,
+			isShared
 		});
 	}
 

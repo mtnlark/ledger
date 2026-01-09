@@ -198,6 +198,7 @@ export async function importTransactions(
 				isSettled: t.isSettled,
 				settledDate: t.isSettled ? now : undefined,
 				isEssential: false,
+				isSubscription: false,
 				createdAt: now,
 				updatedAt: now
 			});

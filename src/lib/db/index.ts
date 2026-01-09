@@ -15,6 +15,8 @@ export interface Transaction {
 	settledDate?: Date;
 	notes?: string;
 	isEssential: boolean; // Needs vs wants - defaults from category but can be overridden
+	isSubscription: boolean; // Recurring subscription payment
+	subscriptionFrequency?: 'monthly' | 'annual'; // Billing frequency for subscriptions
 	parentTransactionId?: number; // Links split children to their parent transaction
 	isSplitParent?: boolean; // True if this transaction has been split into children
 	createdAt: Date;

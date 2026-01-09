@@ -186,8 +186,8 @@
 			<!-- Predictive Insights -->
 			<PredictiveInsights {currentMonth} {dailySpending} {budget} {allBudgets} />
 
-			<!-- Recurring Expenses -->
-			<RecurringInsights {recurring} {categories} onDismiss={async () => { recurring = await detectRecurringExpenses(); }} />
+			<!-- Recurring Expenses (subscriptions + auto-detected bills) -->
+			<RecurringInsights {recurring} {categories} {allTransactions} onDismiss={async () => { recurring = await detectRecurringExpenses(); }} />
 
 			<!-- Needs vs Wants -->
 			<NeedsWantsInsights {transactions} {categories} {allTransactions} />

@@ -137,6 +137,26 @@ async function migrateTransactionEssential(): Promise<void> {
 }
 
 /**
+ * Migration: Add isSubscription field to transactions (defaults to false)
+ */
+async function migrateTransactionSubscription(): Promise<void> {
+	const allTransactions = await db.transactions.toArray();
+	if (allTransactions.length === 0) return;
+
+	// Check if migration is needed
+	const needsMigration = allTransactions.some((tx) => (tx as { isSubscription?: boolean }).isSubscription === undefined);
+	if (!needsMigration) return;
+
+	// Update transactions missing isSubscription
+	for (const tx of allTransactions) {
+		if ((tx as { isSubscription?: boolean }).isSubscription === undefined) {
+			await db.transactions.update(tx.id!, { isSubscription: false });
+		}
+	}
+	console.log('Migration: Added isSubscription field to transactions');
+}
+
+/**
  * Run all database migrations
  * Each migration is idempotent and checks if it needs to run
  */
@@ -145,4 +165,5 @@ export async function runMigrations(): Promise<void> {
 	await migrateCategoryEssential();
 	await migrateSettingsDismissedRecurring();
 	await migrateTransactionEssential();
+	await migrateTransactionSubscription();
 }

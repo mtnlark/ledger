@@ -246,7 +246,9 @@
 					isSettled: data.isSettled,
 					splitType: data.splitType,
 					splitValue: data.splitValue,
-					isEssential: data.isEssential
+					isEssential: data.isEssential,
+					isSubscription: data.isSubscription,
+					subscriptionFrequency: data.subscriptionFrequency
 				});
 			}
 			// Reload transactions and available months

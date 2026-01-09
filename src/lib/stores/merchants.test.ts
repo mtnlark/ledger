@@ -36,7 +36,8 @@ describe('Merchant Suggestions', () => {
 				splitType: 'percentage',
 				splitValue: 0.5,
 				isSettled: false,
-				isEssential: false
+				isEssential: false,
+				isSubscription: false
 			});
 
 			await addTransaction({
@@ -48,7 +49,8 @@ describe('Merchant Suggestions', () => {
 				splitType: 'percentage',
 				splitValue: 0.5,
 				isSettled: false,
-				isEssential: false
+				isEssential: false,
+				isSubscription: false
 			});
 
 			await addTransaction({
@@ -60,7 +62,8 @@ describe('Merchant Suggestions', () => {
 				splitType: 'percentage',
 				splitValue: 0.5,
 				isSettled: false,
-				isEssential: false
+				isEssential: false,
+				isSubscription: false
 			});
 
 			const index = await buildMerchantIndex();
@@ -82,7 +85,8 @@ describe('Merchant Suggestions', () => {
 				splitType: 'percentage',
 				splitValue: 0.5,
 				isSettled: false,
-				isEssential: false
+				isEssential: false,
+				isSubscription: false
 			});
 
 			await addTransaction({
@@ -94,7 +98,8 @@ describe('Merchant Suggestions', () => {
 				splitType: 'percentage',
 				splitValue: 0.5,
 				isSettled: false,
-				isEssential: false
+				isEssential: false,
+				isSubscription: false
 			});
 
 			const index = await buildMerchantIndex();
@@ -127,7 +132,8 @@ describe('Merchant Suggestions', () => {
 					splitType: 'percentage',
 					splitValue: 0.5,
 					isSettled: false,
-					isEssential: false
+					isEssential: false,
+					isSubscription: false
 				});
 			}
 		});
@@ -161,7 +167,8 @@ describe('Merchant Suggestions', () => {
 				splitType: 'percentage',
 				splitValue: 0.5,
 				isSettled: false,
-				isEssential: false
+				isEssential: false,
+				isSubscription: false
 			});
 
 			const suggestions = await getMerchantSuggestions('w', 2);
@@ -180,7 +187,8 @@ describe('Merchant Suggestions', () => {
 					splitType: 'percentage',
 					splitValue: 0.5,
 					isSettled: false,
-					isEssential: false
+					isEssential: false,
+					isSubscription: false
 				});
 			}
 
@@ -211,7 +219,8 @@ describe('Merchant Suggestions', () => {
 				splitType: 'percentage',
 				splitValue: 0.5,
 				isSettled: false,
-				isEssential: false
+				isEssential: false,
+				isSubscription: false
 			});
 			await addTransaction({
 				date: new Date(2025, 11, 2),
@@ -222,7 +231,8 @@ describe('Merchant Suggestions', () => {
 				splitType: 'percentage',
 				splitValue: 0.5,
 				isSettled: false,
-				isEssential: false
+				isEssential: false,
+				isSubscription: false
 			});
 			await addTransaction({
 				date: new Date(2025, 11, 3),
@@ -233,7 +243,8 @@ describe('Merchant Suggestions', () => {
 				splitType: 'percentage',
 				splitValue: 0.5,
 				isSettled: false,
-				isEssential: false
+				isEssential: false,
+				isSubscription: false
 			});
 			await addTransaction({
 				date: new Date(2025, 11, 4),
@@ -244,7 +255,8 @@ describe('Merchant Suggestions', () => {
 				splitType: 'percentage',
 				splitValue: 0.5,
 				isSettled: false,
-				isEssential: false
+				isEssential: false,
+				isSubscription: false
 			});
 
 			const categoryId = await getMostCommonCategory('Whole Foods');
@@ -266,7 +278,8 @@ describe('Merchant Suggestions', () => {
 				splitType: 'percentage',
 				splitValue: 0.5,
 				isSettled: false,
-				isEssential: false
+				isEssential: false,
+				isSubscription: false
 			});
 
 			const categoryId = await getMostCommonCategory('STARBUCKS');
