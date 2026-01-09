@@ -10,21 +10,15 @@
 
 	let { transactions, categories, allTransactions }: Props = $props();
 
-	// Create a map of category ID to isEssential
-	let categoryEssentialMap = $derived(
-		new Map(categories.map((c) => [c.id!, c.isEssential]))
-	);
-
-	// Calculate needs vs wants for current month
+	// Calculate needs vs wants for current month (uses transaction's isEssential)
 	let currentMonthStats = $derived.by(() => {
 		let needs = 0;
 		let wants = 0;
 
 		for (const tx of transactions) {
 			const userAmount = tx.isShared ? tx.amount - tx.partnerShare : tx.amount;
-			const isEssential = categoryEssentialMap.get(tx.categoryId) ?? false;
 
-			if (isEssential) {
+			if (tx.isEssential) {
 				needs += userAmount;
 			} else {
 				wants += userAmount;
@@ -45,9 +39,8 @@
 
 		for (const tx of allTransactions) {
 			const userAmount = tx.isShared ? tx.amount - tx.partnerShare : tx.amount;
-			const isEssential = categoryEssentialMap.get(tx.categoryId) ?? false;
 
-			if (isEssential) {
+			if (tx.isEssential) {
 				needs += userAmount;
 			} else {
 				wants += userAmount;
@@ -68,8 +61,7 @@
 
 		for (const tx of transactions) {
 			const userAmount = tx.isShared ? tx.amount - tx.partnerShare : tx.amount;
-			const isEssential = categoryEssentialMap.get(tx.categoryId) ?? false;
-			const targetMap = isEssential ? essentialTotals : discretionaryTotals;
+			const targetMap = tx.isEssential ? essentialTotals : discretionaryTotals;
 			targetMap.set(tx.categoryId, (targetMap.get(tx.categoryId) ?? 0) + userAmount);
 		}
 

@@ -21,6 +21,7 @@
 		isSettled: boolean;
 		splitType: 'percentage' | 'fixed';
 		splitValue: number;
+		isEssential: boolean;
 	}
 
 	let { categories, settings, onSubmit }: Props = $props();
@@ -31,7 +32,11 @@
 	let categoryId = $state(0);
 	let isShared = $state(false);
 	let isSettled = $state(false);
+	let isEssential = $state(false);
 	let isSubmitting = $state(false);
+
+	// Get selected category for essential default
+	let selectedCategory = $derived(categories.find((c) => c.id === categoryId));
 
 	// Focus management
 	let amountInput = $state<HTMLInputElement | null>(null);
@@ -66,13 +71,23 @@
 		categoryId = 0;
 		isShared = false;
 		isSettled = false;
+		isEssential = false;
 		isSubmitting = false;
+	}
+
+	// Handle category change - update isEssential to match category default
+	function handleCategoryChange(newCategoryId: number) {
+		categoryId = newCategoryId;
+		const category = categories.find((c) => c.id === newCategoryId);
+		if (category) {
+			isEssential = category.isEssential;
+		}
 	}
 
 	async function handleMerchantSelect(selectedMerchant: string, suggestedCategoryId: number | null) {
 		merchant = selectedMerchant;
 		if (suggestedCategoryId && categoryId === 0) {
-			categoryId = suggestedCategoryId;
+			handleCategoryChange(suggestedCategoryId);
 		}
 	}
 
@@ -82,7 +97,7 @@
 		if (value.length >= 3 && categoryId === 0) {
 			const commonCategory = await getMostCommonCategory(value);
 			if (commonCategory) {
-				categoryId = commonCategory;
+				handleCategoryChange(commonCategory);
 			}
 		}
 	}
@@ -102,7 +117,8 @@
 				isShared,
 				isSettled: isShared ? isSettled : false,
 				splitType: settings.defaultSplitType,
-				splitValue: settings.defaultSplitValue
+				splitValue: settings.defaultSplitValue,
+				isEssential
 			});
 
 			close();
@@ -201,11 +217,34 @@
 						<CategoryCombobox
 							{categories}
 							value={categoryId}
-							onSelect={(id) => (categoryId = id)}
+							onSelect={handleCategoryChange}
 						/>
 					</div>
 
-					<!-- Shared Toggle -->
+					<!-- Essential Toggle -->
+					<div class="flex items-center justify-between">
+						<div>
+							<span class="text-sm font-medium text-charcoal-soft">Essential</span>
+							{#if selectedCategory}
+								<span class="text-xs text-charcoal-muted ml-1">
+									(default: {selectedCategory.isEssential ? 'Need' : 'Want'})
+								</span>
+							{/if}
+						</div>
+						<button
+							type="button"
+							onclick={() => (isEssential = !isEssential)}
+							class="relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:ring-offset-2 {isEssential ? 'bg-primary-500' : 'bg-gray-200'}"
+							role="switch"
+							aria-checked={isEssential}
+						>
+							<span
+								class="pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out {isEssential ? 'translate-x-4' : 'translate-x-0'}"
+							></span>
+						</button>
+					</div>
+
+					<!-- Shared Toggles -->
 					<div class="flex items-center gap-4">
 						<label class="flex items-center gap-2 cursor-pointer">
 							<input

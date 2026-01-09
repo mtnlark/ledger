@@ -14,6 +14,7 @@ export interface Transaction {
 	isSettled: boolean;
 	settledDate?: Date;
 	notes?: string;
+	isEssential: boolean; // Needs vs wants - defaults from category but can be overridden
 	createdAt: Date;
 	updatedAt: Date;
 }
@@ -240,5 +241,17 @@ export async function initializeDatabase(): Promise<void> {
 	if (currentSettings && currentSettings.dismissedRecurring === undefined) {
 		await db.settings.update(1, { dismissedRecurring: [] });
 		console.log('Added dismissedRecurring field to settings');
+	}
+
+	// Migrate: Add isEssential field to transactions based on category
+	const allTransactionsForEssential = await db.transactions.toArray();
+	const categoryEssentialMap = new Map(
+		(await db.categories.toArray()).map((c) => [c.id!, c.isEssential ?? false])
+	);
+	for (const tx of allTransactionsForEssential) {
+		if (tx.isEssential === undefined) {
+			const isEssential = categoryEssentialMap.get(tx.categoryId) ?? false;
+			await db.transactions.update(tx.id!, { isEssential });
+		}
 	}
 }
