@@ -12,6 +12,7 @@
 		settings: Settings;
 		onSave: (id: number, data: TransactionUpdateData) => void;
 		onSplit?: (transaction: Transaction) => void;
+		onCancelSubscription?: (merchant: string) => void;
 		onClose: () => void;
 	}
 
@@ -29,7 +30,10 @@
 		subscriptionFrequency?: 'monthly' | 'annual';
 	}
 
-	let { isOpen, transaction, categories, settings, onSave, onSplit, onClose }: Props = $props();
+	let { isOpen, transaction, categories, settings, onSave, onSplit, onCancelSubscription, onClose }: Props = $props();
+
+	// Confirmation state for subscription cancellation
+	let showCancelConfirm = $state(false);
 
 	// Can only split transactions that aren't already split children
 	let canSplit = $derived(transaction && !transaction.parentTransactionId && onSplit);
@@ -65,6 +69,7 @@
 			isEssential = transaction.isEssential ?? false;
 			isSubscription = transaction.isSubscription ?? false;
 			subscriptionFrequency = transaction.subscriptionFrequency ?? 'monthly';
+			showCancelConfirm = false;
 		}
 	});
 
@@ -410,6 +415,46 @@
 									Annual
 								</button>
 							</div>
+
+							<!-- Cancel Subscription Option -->
+							{#if onCancelSubscription}
+								<div class="mt-3 pt-3 border-t border-dashed border-gray-200">
+									{#if !showCancelConfirm}
+										<button
+											type="button"
+											onclick={() => (showCancelConfirm = true)}
+											class="text-sm text-danger-500 hover:text-danger-600 hover:underline transition-colors"
+										>
+											Cancel this subscription...
+										</button>
+									{:else}
+										<div class="bg-danger-50 border border-danger-100 rounded-lg p-3">
+											<p class="text-sm text-charcoal mb-3">
+												Mark <span class="font-medium">{merchant}</span> as cancelled? It won't count toward your recurring total.
+											</p>
+											<div class="flex gap-2">
+												<button
+													type="button"
+													onclick={() => {
+														onCancelSubscription(merchant);
+														onClose();
+													}}
+													class="px-3 py-1.5 text-sm font-medium bg-danger-500 text-white rounded-lg hover:bg-danger-600 transition-colors"
+												>
+													Yes, Cancel
+												</button>
+												<button
+													type="button"
+													onclick={() => (showCancelConfirm = false)}
+													class="px-3 py-1.5 text-sm font-medium text-charcoal-soft border border-[rgba(45,42,38,0.15)] rounded-lg hover:bg-cream transition-colors"
+												>
+													Never mind
+												</button>
+											</div>
+										</div>
+									{/if}
+								</div>
+							{/if}
 						{/if}
 					</div>
 

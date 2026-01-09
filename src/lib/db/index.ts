@@ -41,6 +41,11 @@ export interface MonthlyBudget {
 	notes?: string;
 }
 
+export interface CancelledSubscription {
+	merchant: string; // Normalized merchant name
+	cancelledDate: string; // ISO date string
+}
+
 export interface Settings {
 	id: number; // Always 1 (singleton)
 	partnerName: string;
@@ -49,6 +54,8 @@ export interface Settings {
 	currency: string;
 	theme: 'light' | 'dark' | 'system';
 	dismissedRecurring: string[]; // Normalized merchant names to hide from recurring detection
+	cancelledSubscriptions: CancelledSubscription[]; // Subscriptions user has marked as cancelled
+	confirmedActiveSubscriptions: string[]; // Normalized merchant names user confirmed are still active (override staleness)
 }
 
 // Database class
@@ -147,7 +154,9 @@ export const DEFAULT_SETTINGS: Settings = {
 	defaultSplitValue: 0.5,
 	currency: 'USD',
 	theme: 'system',
-	dismissedRecurring: []
+	dismissedRecurring: [],
+	cancelledSubscriptions: [],
+	confirmedActiveSubscriptions: []
 };
 
 // Initialize database with defaults and run migrations

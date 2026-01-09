@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { format } from 'date-fns';
-	import { ChevronLeft, ChevronRight, ChevronDown } from 'lucide-svelte';
-	import { parseMonthKey, navigateMonth } from '$lib/db';
+	import { ChevronLeft, ChevronRight, ChevronDown, RotateCcw } from 'lucide-svelte';
+	import { parseMonthKey, navigateMonth, getMonthKey } from '$lib/db';
 
 	interface Props {
 		currentMonth: string;
@@ -10,6 +10,14 @@
 	}
 
 	let { currentMonth, availableMonths, onMonthChange }: Props = $props();
+
+	// Check if we're viewing the actual current month
+	let actualCurrentMonth = getMonthKey(new Date());
+	let isViewingCurrentMonth = $derived(currentMonth === actualCurrentMonth);
+
+	function jumpToCurrentMonth() {
+		onMonthChange(actualCurrentMonth);
+	}
 
 	let isOpen = $state(false);
 
@@ -112,4 +120,16 @@
 	>
 		<ChevronRight size={20} />
 	</button>
+
+	<!-- Jump to current month button -->
+	{#if !isViewingCurrentMonth}
+		<button
+			onclick={jumpToCurrentMonth}
+			class="ml-1 p-2 text-primary-500 hover:bg-primary-50 rounded-lg transition-colors"
+			aria-label="Jump to current month"
+			title="Jump to current month"
+		>
+			<RotateCcw size={18} />
+		</button>
+	{/if}
 </div>

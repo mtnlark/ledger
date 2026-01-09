@@ -6,7 +6,8 @@
 		parseMonthKey,
 		type Transaction,
 		type Category,
-		type MonthlyBudget
+		type MonthlyBudget,
+		type CancelledSubscription
 	} from '$lib/db';
 	import { initializeStorage } from '$lib/storage';
 	import {
@@ -18,6 +19,7 @@
 	} from '$lib/stores/transactions';
 	import { getAllCategories } from '$lib/stores/categories';
 	import { getBudgetForMonth, getAllBudgets } from '$lib/stores/budget';
+	import { getSelectedMonth, setSelectedMonth } from '$lib/stores/selectedMonth';
 	import HeaderNav from '$lib/components/HeaderNav.svelte';
 	import MonthPicker from '$lib/components/MonthPicker.svelte';
 	import CategoryBreakdownChart from '$lib/components/CategoryBreakdownChart.svelte';
@@ -30,6 +32,7 @@
 	import RecurringInsights from '$lib/components/insights/RecurringInsights.svelte';
 	import NeedsWantsInsights from '$lib/components/insights/NeedsWantsInsights.svelte';
 	import { detectRecurringExpenses, type DetectedRecurring } from '$lib/stores/recurring';
+	import { getCancelledSubscriptions, getConfirmedActiveSubscriptions } from '$lib/stores/settings';
 
 	// State
 	let isLoading = $state(true);
@@ -43,6 +46,8 @@
 	let budget = $state<MonthlyBudget | null>(null);
 	let allBudgets = $state<MonthlyBudget[]>([]);
 	let recurring = $state<DetectedRecurring[]>([]);
+	let cancelledSubscriptions = $state<CancelledSubscription[]>([]);
+	let confirmedActiveSubscriptions = $state<string[]>([]);
 
 	// Computed
 	let monthDisplay = $derived(format(parseMonthKey(currentMonth), 'MMMM yyyy'));
@@ -52,11 +57,15 @@
 		isLoading = true;
 		try {
 			await initializeStorage();
+			// Restore selected month from localStorage
+			currentMonth = getSelectedMonth();
 			categories = await getAllCategories();
 			availableMonths = await getAvailableMonths();
 			allTransactions = await getAllTransactions();
 			allBudgets = await getAllBudgets();
 			recurring = await detectRecurringExpenses();
+			cancelledSubscriptions = await getCancelledSubscriptions();
+			confirmedActiveSubscriptions = await getConfirmedActiveSubscriptions();
 			await loadMonthData();
 			// Get trends for all available months
 			monthlyTrends = await getMonthlySpendingTrends(availableMonths);
@@ -65,6 +74,12 @@
 		} finally {
 			isLoading = false;
 		}
+	}
+
+	// Reload subscription-related data when subscriptions change
+	async function handleSubscriptionChange() {
+		cancelledSubscriptions = await getCancelledSubscriptions();
+		confirmedActiveSubscriptions = await getConfirmedActiveSubscriptions();
 	}
 
 	// Load month-specific data
@@ -77,6 +92,7 @@
 	// Handle month change
 	function handleMonthChange(month: string) {
 		currentMonth = month;
+		setSelectedMonth(month);
 		loadMonthData();
 	}
 
@@ -187,7 +203,15 @@
 			<PredictiveInsights {currentMonth} {dailySpending} {budget} {allBudgets} />
 
 			<!-- Recurring Expenses (subscriptions + auto-detected bills) -->
-			<RecurringInsights {recurring} {categories} {allTransactions} onDismiss={async () => { recurring = await detectRecurringExpenses(); }} />
+			<RecurringInsights
+				{recurring}
+				{categories}
+				{allTransactions}
+				{cancelledSubscriptions}
+				{confirmedActiveSubscriptions}
+				onDismiss={async () => { recurring = await detectRecurringExpenses(); }}
+				onSubscriptionChange={handleSubscriptionChange}
+			/>
 
 			<!-- Needs vs Wants -->
 			<NeedsWantsInsights {transactions} {categories} {allTransactions} />

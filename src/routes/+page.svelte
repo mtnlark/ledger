@@ -5,8 +5,9 @@
 	import { initializeStorage } from '$lib/storage';
 	import { addTransaction, updateTransaction, deleteTransaction, bulkDeleteTransactions, bulkUpdateCategory, splitTransaction, getTransactionsByMonth, getAllTransactions, getAvailableMonths } from '$lib/stores/transactions';
 	import { getAllCategories } from '$lib/stores/categories';
-	import { getSettings } from '$lib/stores/settings';
+	import { getSettings, cancelSubscription } from '$lib/stores/settings';
 	import { getBudgetForMonth, saveBudget } from '$lib/stores/budget';
+	import { getSelectedMonth, setSelectedMonth } from '$lib/stores/selectedMonth';
 	import { toast } from '$lib/stores/toast';
 	import TransactionList from '$lib/components/TransactionList.svelte';
 	import TransactionForm, { type TransactionFormData, type SplitTransactionFormData } from '$lib/components/TransactionForm.svelte';
@@ -149,6 +150,8 @@
 		isLoading = true;
 		try {
 			await initializeStorage();
+			// Restore selected month from localStorage
+			currentMonth = getSelectedMonth();
 			categories = await getAllCategories();
 			settings = await getSettings();
 			transactions = await getTransactionsByMonth(currentMonth);
@@ -164,6 +167,7 @@
 	// Handle month change from picker
 	function handleMonthChange(month: string) {
 		currentMonth = month;
+		setSelectedMonth(month);
 		loadMonthData();
 	}
 
@@ -285,6 +289,17 @@
 		} catch (error) {
 			console.error('Failed to update transaction:', error);
 			toast.error('Failed to update transaction');
+		}
+	}
+
+	// Handle cancel subscription
+	async function handleCancelSubscription(merchant: string) {
+		try {
+			await cancelSubscription(merchant);
+			toast.success(`${merchant} marked as cancelled`);
+		} catch (error) {
+			console.error('Failed to cancel subscription:', error);
+			toast.error('Failed to cancel subscription');
 		}
 	}
 
@@ -518,6 +533,7 @@
 	{settings}
 	onSave={handleSaveEdit}
 	onSplit={handleOpenSplit}
+	onCancelSubscription={handleCancelSubscription}
 	onClose={() => editingTransaction = null}
 />
 
