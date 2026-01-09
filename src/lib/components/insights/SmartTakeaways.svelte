@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { TrendingUp, TrendingDown, AlertTriangle, Gauge } from 'lucide-svelte';
+	import { TrendingUp, TrendingDown, AlertTriangle, Gauge, ShoppingBag, Receipt, Store } from 'lucide-svelte';
 	import { getMonthKey, navigateMonth, parseMonthKey } from '$lib/db';
 	import type { Transaction, Category, MonthlyBudget } from '$lib/db';
 
@@ -199,9 +199,79 @@
 		return biggestShift;
 	});
 
+	// Fallback: Top spending category this month
+	let topCategory = $derived.by(() => {
+		const spending = getSpendingByCategory(currentMonthTransactions);
+		if (spending.size === 0) return null;
+
+		let top = { catId: 0, amount: 0 };
+		for (const [catId, amount] of spending) {
+			if (amount > top.amount) {
+				top = { catId, amount };
+			}
+		}
+
+		const cat = categories.find((c) => c.id === top.catId);
+		return cat ? { name: cat.name, icon: cat.icon, amount: top.amount } : null;
+	});
+
+	// Fallback: Spending velocity comparison (daily average this month vs last month)
+	let velocityComparison = $derived.by(() => {
+		const prevTransactions = getTransactionsForMonth(previousMonthKey);
+		if (prevTransactions.length === 0) return null;
+
+		const today = new Date();
+		const currentDay = today.getDate();
+		if (currentDay === 0) return null;
+
+		// Current month: total / days elapsed
+		const currentTotal = currentMonthTransactions.reduce(
+			(sum, t) => sum + (t.isShared ? t.amount - t.partnerShare : t.amount),
+			0
+		);
+		const currentDailyAvg = currentTotal / currentDay;
+
+		// Previous month: total / days in that month
+		const prevMonthDate = parseMonthKey(previousMonthKey);
+		const daysInPrevMonth = new Date(prevMonthDate.getFullYear(), prevMonthDate.getMonth() + 1, 0).getDate();
+		const prevTotal = prevTransactions.reduce(
+			(sum, t) => sum + (t.isShared ? t.amount - t.partnerShare : t.amount),
+			0
+		);
+		const prevDailyAvg = prevTotal / daysInPrevMonth;
+
+		if (prevDailyAvg === 0) return null;
+
+		const percentChange = Math.round(((currentDailyAvg - prevDailyAvg) / prevDailyAvg) * 100);
+
+		// Only show if there's a meaningful difference (>5%)
+		if (Math.abs(percentChange) < 5) return null;
+
+		return { currentDailyAvg, prevDailyAvg, percentChange, isUp: percentChange > 0 };
+	});
+
+	// Fallback: Most frequent merchant this month
+	let topMerchant = $derived.by(() => {
+		if (currentMonthTransactions.length === 0) return null;
+
+		const freq = new Map<string, number>();
+		for (const t of currentMonthTransactions) {
+			freq.set(t.merchant, (freq.get(t.merchant) || 0) + 1);
+		}
+
+		let top = { merchant: '', count: 0 };
+		for (const [merchant, count] of freq) {
+			if (count > top.count) {
+				top = { merchant, count };
+			}
+		}
+
+		return top.count >= 2 ? top : null; // Only show if visited at least twice
+	});
+
 	// Build takeaways list
 	interface Takeaway {
-		type: 'anomaly' | 'pace' | 'shift';
+		type: 'anomaly' | 'pace' | 'shift' | 'topCategory' | 'monthComparison' | 'topMerchant';
 		icon: typeof AlertTriangle;
 		iconColor: string;
 		text: string;
@@ -245,7 +315,36 @@
 			});
 		}
 
-		return items.slice(0, 4); // Max 4 takeaways
+		// Add fallbacks to reach 3 items
+		if (items.length < 3 && velocityComparison) {
+			const verb = velocityComparison.isUp ? 'faster' : 'slower';
+			items.push({
+				type: 'monthComparison',
+				icon: velocityComparison.isUp ? TrendingUp : TrendingDown,
+				iconColor: velocityComparison.isUp ? 'text-warning-500' : 'text-success-500',
+				text: `Spending ${Math.abs(velocityComparison.percentChange)}% ${verb} than last month's pace`
+			});
+		}
+
+		if (items.length < 3 && topCategory) {
+			items.push({
+				type: 'topCategory',
+				icon: ShoppingBag,
+				iconColor: 'text-primary-500',
+				text: `${topCategory.name} leads with $${topCategory.amount.toLocaleString()} this month`
+			});
+		}
+
+		if (items.length < 3 && topMerchant) {
+			items.push({
+				type: 'topMerchant',
+				icon: Store,
+				iconColor: 'text-charcoal-muted',
+				text: `${topMerchant.merchant} visited ${topMerchant.count} times this month`
+			});
+		}
+
+		return items.slice(0, 3); // Always show exactly 3
 	});
 
 	// Check if we have any takeaways to show
