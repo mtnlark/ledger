@@ -146,10 +146,6 @@ export async function repairCategoryIds(): Promise<{
 	const details: string[] = [];
 	let fixed = 0;
 
-	// Debug: Show full category objects
-	console.log('Full categories from DB:', categories);
-	console.log('Sample transactions:', transactions.slice(0, 3));
-
 	// Build lookup maps
 	const categoryById = new Map(categories.map(c => [c.id, c]));
 

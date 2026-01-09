@@ -40,15 +40,11 @@ let persistenceEnabled = false;
 export async function initializeStorage(): Promise<void> {
 	if (initialized) return;
 
-	console.log('[Storage] isTauri:', isTauri(), '__TAURI__ in window:', isBrowser() && '__TAURI__' in window);
-
 	if (isTauri()) {
-		console.log('[Storage] Using Tauri file storage');
 		const { initializeTauriStorage } = await import('./tauri-adapter');
 		await initializeTauriStorage();
 		persistenceEnabled = true;
 	} else {
-		console.log('[Storage] Using IndexedDB storage');
 		// Web mode - just initialize Dexie defaults
 		const { initializeDatabase } = await import('$lib/db');
 		await initializeDatabase();

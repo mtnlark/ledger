@@ -145,27 +145,18 @@ async function pruneOldBackups(): Promise<void> {
  * Loads data from JSON file into Dexie
  */
 export async function initializeTauriStorage(): Promise<void> {
-	console.log('[Tauri] Starting storage initialization...');
 	await ensureDirectories();
 
 	const storedData = await readDataFile();
-	console.log('[Tauri] Read data file:', storedData ? `${storedData.categories?.length} categories, ${storedData.transactions?.length} transactions` : 'null');
 
 	if (storedData) {
 		// Load data from file into Dexie
 		await loadDataIntoDexie(storedData);
-
-		// Verify what's in Dexie now
-		const cats = await db.categories.toArray();
-		console.log('[Tauri] Categories in Dexie after load:', cats.length, cats.slice(0, 2));
-
-		console.log('[Tauri] Loaded data from file storage');
 	} else {
 		// First run - initialize with defaults
 		await initializeDefaults();
 		// Save initial state
 		await saveToFile();
-		console.log('[Tauri] Initialized with default data');
 	}
 }
 
