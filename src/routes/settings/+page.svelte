@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { Upload, Download, Database, FileSpreadsheet } from 'lucide-svelte';
+	import { Upload, Download, Database, FileSpreadsheet, Wrench } from 'lucide-svelte';
 	import { type Settings, type Category, type Transaction, DEFAULT_SETTINGS } from '$lib/db';
 	import { initializeStorage } from '$lib/storage';
 	import { getSettings, updateSettings } from '$lib/stores/settings';
@@ -9,7 +9,7 @@
 	import HeaderNav from '$lib/components/HeaderNav.svelte';
 	import CategoryManager from '$lib/components/CategoryManager.svelte';
 	import { readExcelFile, parseExpensesSheet, importTransactions, type ImportResult } from '$lib/utils/import';
-	import { exportTransactionsToCSV, exportAllDataToJSON, importFromJSON, downloadFile } from '$lib/utils/export';
+	import { exportTransactionsToCSV, exportAllDataToJSON, importFromJSON, downloadFile, repairCategoryIds } from '$lib/utils/export';
 	import { toast } from '$lib/stores/toast';
 
 	// State
@@ -21,6 +21,7 @@
 	// Import/Export state
 	let isImporting = $state(false);
 	let isExporting = $state(false);
+	let isRepairing = $state(false);
 	let fileInput = $state<HTMLInputElement | null>(null);
 	let jsonFileInput = $state<HTMLInputElement | null>(null);
 
@@ -160,6 +161,25 @@
 			toast.error('Backup failed');
 		} finally {
 			isExporting = false;
+		}
+	}
+
+	// Repair category IDs
+	async function handleRepairCategories() {
+		isRepairing = true;
+		try {
+			const result = await repairCategoryIds();
+			console.log('Repair details:', result.details);
+			if (result.fixed > 0) {
+				toast.success(`Fixed ${result.fixed} transactions with invalid category IDs`);
+			} else {
+				toast.info(result.details.join('\n'));
+			}
+		} catch (error) {
+			console.error('Repair failed:', error);
+			toast.error(`Repair failed: ${error}`);
+		} finally {
+			isRepairing = false;
 		}
 	}
 
@@ -391,6 +411,27 @@
 								<span>Exporting...</span>
 							</div>
 						{/if}
+					</div>
+
+					<!-- Divider -->
+					<div class="border-t border-dashed border-gray-200"></div>
+
+					<!-- Repair Section -->
+					<div>
+						<h3 class="text-sm font-medium text-charcoal mb-3">Troubleshooting</h3>
+						<div class="flex flex-wrap gap-3">
+							<button
+								onclick={handleRepairCategories}
+								disabled={isRepairing}
+								class="inline-flex items-center gap-2 px-4 py-2 bg-amber-500 text-white font-medium rounded-lg hover:bg-amber-600 hover:-translate-y-0.5 hover:shadow-lg transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-none"
+							>
+								<Wrench size={16} />
+								{isRepairing ? 'Repairing...' : 'Repair Category IDs'}
+							</button>
+						</div>
+						<p class="mt-2 text-xs text-charcoal-muted">
+							Fix transactions showing "Unknown" category after import
+						</p>
 					</div>
 
 					<!-- Info -->

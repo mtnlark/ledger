@@ -1,4 +1,5 @@
 import { db, type Transaction, type Category, type MonthlyBudget, type Settings } from '$lib/db';
+import { persistData } from '$lib/storage';
 import { format } from 'date-fns';
 
 /**
@@ -89,30 +90,27 @@ export async function importFromJSON(
 			await db.categories.clear();
 			await db.monthlyBudgets.clear();
 
-			// Import categories first (needed for transaction references)
+			// Import categories with their original IDs preserved
 			if (categories && categories.length > 0) {
-				// Remove IDs to let Dexie auto-generate
-				const cleanCategories = categories.map(({ id, ...rest }: Category) => rest);
-				await db.categories.bulkAdd(cleanCategories);
+				await db.categories.bulkPut(categories);
 			}
 
-			// Import budgets
+			// Import budgets with original IDs preserved
 			if (budgets && budgets.length > 0) {
-				const cleanBudgets = budgets.map(({ id, ...rest }: MonthlyBudget) => rest);
-				await db.monthlyBudgets.bulkAdd(cleanBudgets);
+				await db.monthlyBudgets.bulkPut(budgets);
 			}
 
-			// Import transactions
+			// Import transactions with original IDs preserved
 			if (transactions && transactions.length > 0) {
 				// Convert date strings back to Date objects
-				const cleanTransactions = transactions.map(({ id, ...rest }: Transaction) => ({
-					...rest,
-					date: new Date(rest.date),
-					createdAt: new Date(rest.createdAt),
-					updatedAt: new Date(rest.updatedAt),
-					settledDate: rest.settledDate ? new Date(rest.settledDate) : undefined
+				const cleanTransactions = transactions.map((t: Transaction) => ({
+					...t,
+					date: new Date(t.date),
+					createdAt: new Date(t.createdAt),
+					updatedAt: new Date(t.updatedAt),
+					settledDate: t.settledDate ? new Date(t.settledDate) : undefined
 				}));
-				await db.transactions.bulkAdd(cleanTransactions);
+				await db.transactions.bulkPut(cleanTransactions);
 			}
 
 			// Update settings if present
@@ -121,6 +119,9 @@ export async function importFromJSON(
 			}
 		});
 
+		// Persist to file storage (Tauri only)
+		await persistData();
+
 		return {
 			success: true,
 			message: `Imported ${transactions?.length ?? 0} transactions, ${categories?.length ?? 0} categories, ${budgets?.length ?? 0} budgets`
@@ -128,6 +129,92 @@ export async function importFromJSON(
 	} catch (error) {
 		return { success: false, message: `Import failed: ${error}` };
 	}
+}
+
+/**
+ * Diagnose and repair category ID mismatches
+ * Returns info about what was found and fixed
+ */
+export async function repairCategoryIds(): Promise<{
+	checked: number;
+	fixed: number;
+	details: string[]
+}> {
+	const transactions = await db.transactions.toArray();
+	const categories = await db.categories.toArray();
+
+	const details: string[] = [];
+	let fixed = 0;
+
+	// Debug: Show full category objects
+	console.log('Full categories from DB:', categories);
+	console.log('Sample transactions:', transactions.slice(0, 3));
+
+	// Build lookup maps
+	const categoryById = new Map(categories.map(c => [c.id, c]));
+
+	details.push(`Found ${categories.length} categories and ${transactions.length} transactions`);
+
+	// Get all unique categoryIds from transactions
+	const transactionCategoryIds = [...new Set(transactions.map(t => t.categoryId))].sort((a, b) => a - b);
+	const categoryIds = categories.map(c => c.id!).sort((a, b) => a - b);
+
+	details.push(`Category IDs in categories table: ${categoryIds.join(', ')}`);
+	details.push(`Category IDs referenced in transactions: ${transactionCategoryIds.join(', ')}`);
+
+	// Find transactions with invalid categoryIds
+	const invalidTransactions = transactions.filter(t => !categoryById.has(t.categoryId));
+	details.push(`Found ${invalidTransactions.length} transactions with invalid category IDs`);
+
+	if (invalidTransactions.length > 0 && categories.length > 0) {
+		// Try to detect if there's a consistent offset
+		// E.g., categories are 1-23 but transactions reference 24-46
+		const minCatId = Math.min(...categoryIds);
+		const maxCatId = Math.max(...categoryIds);
+		const minTxCatId = Math.min(...transactionCategoryIds);
+		const maxTxCatId = Math.max(...transactionCategoryIds);
+
+		// Check if it's a simple offset (all transaction IDs are higher/lower by same amount)
+		const possibleOffset = minTxCatId - minCatId;
+		const couldBeOffset = transactionCategoryIds.every(txId => {
+			const mappedId = txId - possibleOffset;
+			return categoryById.has(mappedId);
+		});
+
+		if (couldBeOffset && possibleOffset !== 0) {
+			details.push(`Detected ID offset of ${possibleOffset}. Remapping...`);
+
+			for (const t of transactions) {
+				const newCategoryId = t.categoryId - possibleOffset;
+				if (categoryById.has(newCategoryId) && newCategoryId !== t.categoryId) {
+					await db.transactions.update(t.id!, {
+						categoryId: newCategoryId,
+						updatedAt: new Date()
+					});
+					fixed++;
+				}
+			}
+		} else {
+			// No pattern detected, assign to first category
+			const defaultCategory = categories[0];
+			details.push(`No ID pattern detected. Assigning ${invalidTransactions.length} transactions to: ${defaultCategory.name}`);
+
+			for (const t of invalidTransactions) {
+				await db.transactions.update(t.id!, {
+					categoryId: defaultCategory.id!,
+					updatedAt: new Date()
+				});
+				fixed++;
+			}
+		}
+	}
+
+	// Persist changes to file storage (Tauri only)
+	if (fixed > 0) {
+		await persistData();
+	}
+
+	return { checked: transactions.length, fixed, details };
 }
 
 /**
