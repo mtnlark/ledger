@@ -236,12 +236,12 @@
 </script>
 
 <svelte:head>
-	<title>Budget Tracker</title>
+	<title>Ledger</title>
 </svelte:head>
 
 <div class="min-h-screen">
-	<!-- Header with navigation -->
-	<HeaderNav title="Budget Tracker">
+	<!-- Header with month picker -->
+	<HeaderNav title="">
 		<MonthPicker
 			{currentMonth}
 			{availableMonths}

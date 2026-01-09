@@ -53,7 +53,7 @@
 </script>
 
 <svelte:head>
-	<title>Shared Expenses - Budget Tracker</title>
+	<title>Shared Expenses - Ledger</title>
 </svelte:head>
 
 <div class="min-h-screen">

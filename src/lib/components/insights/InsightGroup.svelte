@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import { slide } from 'svelte/transition';
 	import { ChevronDown, ChevronUp } from 'lucide-svelte';
 	import type { Snippet } from 'svelte';
@@ -13,14 +14,29 @@
 
 	let { title, description, defaultExpanded = false, preview, children }: Props = $props();
 
+	// Create a storage key based on title
+	const storageKey = `ledger-insight-${title.toLowerCase().replace(/\s+/g, '-')}`;
+
 	let isExpanded = $state(defaultExpanded);
+
+	onMount(() => {
+		const stored = localStorage.getItem(storageKey);
+		if (stored !== null) {
+			isExpanded = stored === 'true';
+		}
+	});
+
+	function toggleExpanded() {
+		isExpanded = !isExpanded;
+		localStorage.setItem(storageKey, String(isExpanded));
+	}
 </script>
 
 <div class="bg-white rounded-xl shadow-md shadow-gray-200/50 overflow-hidden">
 	<!-- Header (always visible, clickable) -->
 	<button
 		class="w-full px-6 py-4 flex items-center justify-between hover:bg-cream/50 transition-colors"
-		onclick={() => (isExpanded = !isExpanded)}
+		onclick={toggleExpanded}
 	>
 		<div class="text-left">
 			<h2 class="font-display text-xl font-medium text-charcoal">{title}</h2>

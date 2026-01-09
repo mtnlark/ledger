@@ -8,6 +8,8 @@
 	import MerchantAutocomplete from './MerchantAutocomplete.svelte';
 	import { getMostCommonCategory } from '$lib/stores/merchants';
 
+	const STORAGE_KEY = 'ledger-addform-expanded';
+
 	interface Props {
 		categories: Category[];
 		settings: Settings;
@@ -35,8 +37,17 @@
 	let isExpanded = $state(false);
 
 	onMount(() => {
+		const stored = localStorage.getItem(STORAGE_KEY);
+		if (stored !== null) {
+			isExpanded = stored === 'true';
+		}
 		setTimeout(() => mounted = true, 100);
 	});
+
+	function toggleExpanded() {
+		isExpanded = !isExpanded;
+		localStorage.setItem(STORAGE_KEY, String(isExpanded));
+	}
 
 	// Form state
 	let dateStr = $state(format(new Date(), 'yyyy-MM-dd'));
@@ -142,7 +153,7 @@
 	<!-- Collapsible Header -->
 	<button
 		type="button"
-		onclick={() => (isExpanded = !isExpanded)}
+		onclick={toggleExpanded}
 		class="w-full px-6 py-4 flex items-center justify-between hover:bg-cream/50 transition-colors"
 	>
 		<div class="flex items-center gap-3">

@@ -1,6 +1,6 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
-  "productName": "Budget Tracker",
+  "productName": "Ledger",
   "version": "0.1.0",
   "identifier": "com.levcraig.budget-tracker",
   "build": {
@@ -13,7 +13,7 @@
     "withGlobalTauri": true,
     "windows": [
       {
-        "title": "Budget Tracker",
+        "title": "Ledger",
         "width": 1200,
         "height": 800,
         "resizable": true,

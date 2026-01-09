@@ -189,7 +189,7 @@
 </script>
 
 <svelte:head>
-	<title>Settings - Budget Tracker</title>
+	<title>Settings - Ledger</title>
 </svelte:head>
 
 <div class="min-h-screen">
@@ -451,8 +451,8 @@
 				</div>
 				<div class="p-6">
 					<p class="text-sm text-charcoal-soft">
-						Budget Tracker is a local-first PWA for personal budget tracking with expense splitting.
-						All data is stored in your browser using IndexedDB.
+						Ledger is a local-first app for personal budget tracking with expense splitting.
+						All data is stored locally on your device.
 					</p>
 				</div>
 			</div>

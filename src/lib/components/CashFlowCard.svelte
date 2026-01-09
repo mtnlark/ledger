@@ -4,6 +4,8 @@
 	import { Check, AlertTriangle, ChevronDown, ChevronUp } from 'lucide-svelte';
 	import type { MonthlyBudget } from '$lib/db';
 
+	const STORAGE_KEY = 'ledger-cashflow-expanded';
+
 	interface Props {
 		budget: MonthlyBudget | null;
 		totalSpent: number;
@@ -19,8 +21,17 @@
 	let isExpanded = $state(defaultExpanded);
 
 	onMount(() => {
+		const stored = localStorage.getItem(STORAGE_KEY);
+		if (stored !== null) {
+			isExpanded = stored === 'true';
+		}
 		setTimeout(() => mounted = true, 50);
 	});
+
+	function toggleExpanded() {
+		isExpanded = !isExpanded;
+		localStorage.setItem(STORAGE_KEY, String(isExpanded));
+	}
 
 	// Computed values
 	let income = $derived(budget?.income ?? 0);
@@ -47,7 +58,7 @@
 	<div class="px-6 py-4 flex items-center justify-between">
 		<button
 			class="flex items-center gap-4 hover:opacity-80 transition-opacity text-left"
-			onclick={() => isExpanded = !isExpanded}
+			onclick={toggleExpanded}
 		>
 			<h2 class="font-display text-2xl font-medium text-charcoal">{monthDisplay}</h2>
 			{#if !isExpanded && budget}
@@ -77,7 +88,7 @@
 				</button>
 			{/if}
 			<button
-				onclick={() => isExpanded = !isExpanded}
+				onclick={toggleExpanded}
 				class="text-charcoal-muted hover:text-charcoal transition-colors p-1"
 			>
 				{#if isExpanded}

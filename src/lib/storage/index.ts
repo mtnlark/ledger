@@ -1,23 +1,11 @@
 /**
- * Storage abstraction layer
+ * Storage layer for Tauri desktop app
  *
- * In Tauri: Persists data to JSON files in app data directory
- * In browser: Uses IndexedDB via Dexie (existing behavior)
- *
- * This layer wraps database operations to add file persistence in Tauri mode.
+ * Uses Dexie (IndexedDB) as an in-memory database with
+ * JSON file persistence in the app data directory.
  */
 
-import { db, type Transaction, type Category, type MonthlyBudget, type Settings, DEFAULT_SETTINGS, DEFAULT_CATEGORIES } from '$lib/db';
-
-// Check if running in browser (works in both SvelteKit and test environments)
-function isBrowser(): boolean {
-	return typeof window !== 'undefined';
-}
-
-// Check if running in Tauri
-export function isTauri(): boolean {
-	return isBrowser() && '__TAURI__' in window;
-}
+import { db, type Transaction, type Category, type MonthlyBudget, type Settings, DEFAULT_SETTINGS } from '$lib/db';
 
 // Data structure for file storage
 export interface StoredData {
@@ -31,11 +19,16 @@ export interface StoredData {
 
 // Track if storage has been initialized
 let initialized = false;
-let persistenceEnabled = false;
+
+// Check if running in Tauri (has __TAURI__ global)
+function isTauri(): boolean {
+	return typeof window !== 'undefined' && '__TAURI__' in window;
+}
 
 /**
  * Initialize storage - call this on app startup
- * In Tauri mode, loads data from file into Dexie
+ * In Tauri: Loads data from JSON file into Dexie
+ * In tests: Just initializes Dexie with defaults
  */
 export async function initializeStorage(): Promise<void> {
 	if (initialized) return;
@@ -43,9 +36,8 @@ export async function initializeStorage(): Promise<void> {
 	if (isTauri()) {
 		const { initializeTauriStorage } = await import('./tauri-adapter');
 		await initializeTauriStorage();
-		persistenceEnabled = true;
 	} else {
-		// Web mode - just initialize Dexie defaults
+		// Test/non-Tauri environment - just initialize Dexie defaults
 		const { initializeDatabase } = await import('$lib/db');
 		await initializeDatabase();
 	}
@@ -54,21 +46,21 @@ export async function initializeStorage(): Promise<void> {
 }
 
 /**
- * Persist current database state to file (Tauri only)
- * Called after any data modification
+ * Persist current database state to JSON file
+ * Called after any data modification (no-op in tests)
  */
 export async function persistData(): Promise<void> {
-	if (!persistenceEnabled) return;
+	if (!isTauri()) return;
 
 	const { saveToFile } = await import('./tauri-adapter');
 	await saveToFile();
 }
 
 /**
- * Create a backup of current data (Tauri only)
+ * Create a backup of current data (no-op in tests)
  */
 export async function createBackup(): Promise<void> {
-	if (!persistenceEnabled) return;
+	if (!isTauri()) return;
 
 	const { createBackup } = await import('./tauri-adapter');
 	await createBackup();

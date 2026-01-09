@@ -1,89 +1,20 @@
 <script lang="ts">
-	import { page } from '$app/stores';
-	import { Menu, X, ChevronLeft, Home, BarChart3, Users, Settings } from 'lucide-svelte';
-	import type { Component } from 'svelte';
+	import { ChevronLeft } from 'lucide-svelte';
+	import type { Snippet } from 'svelte';
 
 	interface Props {
 		title?: string;
 		showBack?: boolean;
+		children?: Snippet;
 	}
 
-	let { title = 'Budget Tracker', showBack = false }: Props = $props();
-
-	let isMenuOpen = $state(false);
-
-	interface NavItem {
-		href: string;
-		label: string;
-		icon: Component;
-	}
-
-	const navItems: NavItem[] = [
-		{ href: '/', label: 'Dashboard', icon: Home },
-		{ href: '/insights', label: 'Insights', icon: BarChart3 },
-		{ href: '/shared', label: 'Shared', icon: Users },
-		{ href: '/settings', label: 'Settings', icon: Settings }
-	];
-
-	function isActive(href: string, pathname: string): boolean {
-		if (href === '/') {
-			return pathname === '/';
-		}
-		return pathname.startsWith(href);
-	}
-
-	function closeMenu() {
-		isMenuOpen = false;
-	}
+	let { title = 'Ledger', showBack = false, children }: Props = $props();
 </script>
 
 <header class="bg-white border-b border-dashed border-gray-200 sticky top-0 z-20">
 	<div class="max-w-4xl mx-auto px-4 py-4">
 		<div class="flex items-center gap-4">
-			<!-- Hamburger menu (desktop) - LEFT SIDE -->
-			<div class="relative hidden md:block">
-				<button
-					onclick={() => (isMenuOpen = !isMenuOpen)}
-					class="p-2 hover:bg-cream rounded-lg transition-colors text-charcoal-soft"
-					aria-label="Open menu"
-					aria-expanded={isMenuOpen}
-				>
-					{#if isMenuOpen}
-						<X size={24} />
-					{:else}
-						<Menu size={24} />
-					{/if}
-				</button>
-
-				<!-- Dropdown menu -->
-				{#if isMenuOpen}
-					<!-- Backdrop -->
-					<!-- svelte-ignore a11y_click_events_have_key_events -->
-					<!-- svelte-ignore a11y_no_static_element_interactions -->
-					<div class="fixed inset-0 z-10" onclick={closeMenu}></div>
-
-					<!-- Menu -->
-					<nav
-						class="absolute left-0 mt-2 w-48 bg-white rounded-xl shadow-lg shadow-gray-200/50 border border-gray-100 py-2 z-20"
-					>
-						{#each navItems as item}
-							{@const active = isActive(item.href, $page.url.pathname)}
-							<a
-								href={item.href}
-								onclick={closeMenu}
-								class="flex items-center gap-3 px-4 py-2.5 text-sm transition-colors {active
-									? 'bg-primary-50 text-primary-700 font-medium'
-									: 'text-charcoal-soft hover:bg-cream'}"
-							>
-								<item.icon size={18} />
-								<span>{item.label}</span>
-							</a>
-						{/each}
-					</nav>
-				{/if}
-			</div>
-
-			<!-- Back button (mobile only when showBack, desktop handled by hamburger) -->
+			<!-- Back button (mobile only when showBack) -->
 			{#if showBack}
 				<a
 					href="/"
@@ -101,7 +32,9 @@
 			<div class="flex-1"></div>
 
 			<!-- Slot for additional header content (like month navigation) -->
-			<slot />
+			{#if children}
+				{@render children()}
+			{/if}
 		</div>
 	</div>
 </header>

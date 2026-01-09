@@ -19,7 +19,6 @@
 		"tauri:build": "tauri build"
 	},
 	"devDependencies": {
-		"@sveltejs/adapter-auto": "^7.0.0",
 		"@sveltejs/adapter-static": "^3.0.10",
 		"@sveltejs/kit": "^2.49.1",
 		"@sveltejs/vite-plugin-svelte": "^6.2.1",
@@ -28,7 +27,6 @@
 		"@tauri-apps/cli": "^2.9.6",
 		"@testing-library/jest-dom": "^6.9.1",
 		"@testing-library/svelte": "^5.3.1",
-		"@vite-pwa/sveltekit": "^1.1.0",
 		"autoprefixer": "^10.4.23",
 		"fake-indexeddb": "^6.2.5",
 		"jsdom": "^27.4.0",
@@ -38,8 +36,7 @@
 		"tailwindcss": "^4.1.18",
 		"typescript": "^5.9.3",
 		"vite": "^7.2.6",
-		"vitest": "^4.0.16",
-		"workbox-window": "^7.4.0"
+		"vitest": "^4.0.16"
 	},
 	"dependencies": {
 		"@tauri-apps/plugin-fs": "^2.4.5",

@@ -86,7 +86,7 @@
 </script>
 
 <svelte:head>
-	<title>Insights - Budget Tracker</title>
+	<title>Insights - Ledger</title>
 </svelte:head>
 
 <div class="min-h-screen">
