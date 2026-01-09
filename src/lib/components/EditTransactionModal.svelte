@@ -34,9 +34,19 @@
 
 	// Confirmation state for subscription cancellation
 	let showCancelConfirm = $state(false);
+	let futureDateConfirmed = $state(false);
 
 	// Can only split transactions that aren't already split children
 	let canSplit = $derived(transaction && !transaction.parentTransactionId && onSplit);
+
+	// Future date detection
+	let isFutureDate = $derived.by(() => {
+		if (!dateStr) return false;
+		const selected = parseLocalDate(dateStr);
+		const today = new Date();
+		today.setHours(0, 0, 0, 0);
+		return selected > today;
+	});
 
 	// Form state - initialized from transaction when modal opens
 	let dateStr = $state('');
@@ -70,7 +80,14 @@
 			isSubscription = transaction.isSubscription ?? false;
 			subscriptionFrequency = transaction.subscriptionFrequency ?? 'monthly';
 			showCancelConfirm = false;
+			futureDateConfirmed = false;
 		}
+	});
+
+	// Reset future date confirmation when date changes
+	$effect(() => {
+		dateStr;
+		futureDateConfirmed = false;
 	});
 
 	// Computed values
@@ -114,6 +131,11 @@
 		e.preventDefault();
 
 		if (!transaction?.id || !merchant.trim() || amount <= 0 || !categoryId) {
+			return;
+		}
+
+		// Block if future date not confirmed
+		if (isFutureDate && !futureDateConfirmed) {
 			return;
 		}
 
@@ -188,8 +210,20 @@
 								type="date"
 								id="edit-date"
 								bind:value={dateStr}
-								class="w-full px-3 py-2.5 bg-cream border border-[rgba(45,42,38,0.15)] rounded-lg focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-colors"
+								class="w-full px-3 py-2.5 bg-cream border rounded-lg focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-colors {isFutureDate && !futureDateConfirmed ? 'border-warning-500' : 'border-[rgba(45,42,38,0.15)]'}"
 							/>
+							{#if isFutureDate && !futureDateConfirmed}
+								<div class="mt-2 p-2 bg-warning-50 border border-warning-200 rounded-lg">
+									<p class="text-xs text-warning-700 mb-2">This date is in the future. Are you sure?</p>
+									<button
+										type="button"
+										onclick={() => (futureDateConfirmed = true)}
+										class="text-xs font-medium text-warning-700 hover:text-warning-800 underline"
+									>
+										Yes, use future date
+									</button>
+								</div>
+							{/if}
 						</div>
 						<div>
 							<label for="edit-merchant" class="block text-sm font-medium text-charcoal-soft mb-1.5">Merchant</label>
@@ -480,7 +514,7 @@
 				<div class="flex gap-3 px-6 py-4 border-t border-dashed border-gray-200 bg-cream-dark rounded-b-xl">
 					<button
 						type="submit"
-						disabled={!merchant.trim() || amount <= 0 || !categoryId}
+						disabled={!merchant.trim() || amount <= 0 || !categoryId || (isFutureDate && !futureDateConfirmed)}
 						class="flex-1 bg-primary-500 text-white py-2.5 px-4 rounded-lg font-medium hover:bg-primary-600 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-primary-500/25 focus:ring-2 focus:ring-primary-500/20 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-none transition-all duration-150"
 					>
 						Save Changes

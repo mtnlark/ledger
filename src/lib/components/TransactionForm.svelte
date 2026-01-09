@@ -84,6 +84,16 @@
 	let isEssential = $state(false);
 	let isSubscription = $state(false);
 	let subscriptionFrequency = $state<'monthly' | 'annual'>('monthly');
+	let futureDateConfirmed = $state(false);
+
+	// Future date detection
+	let isFutureDate = $derived.by(() => {
+		if (!dateStr) return false;
+		const selected = parseLocalDate(dateStr);
+		const today = new Date();
+		today.setHours(0, 0, 0, 0);
+		return selected > today;
+	});
 
 	// Split mode state
 	let isSplitMode = $state(false);
@@ -142,6 +152,12 @@
 		}
 	});
 
+	// Reset future date confirmation when date changes
+	$effect(() => {
+		dateStr;
+		futureDateConfirmed = false;
+	});
+
 	// Split mode functions
 	function enableSplitMode() {
 		isSplitMode = true;
@@ -177,6 +193,11 @@
 		e.preventDefault();
 
 		if (!merchant.trim() || amount <= 0) {
+			return;
+		}
+
+		// Block if future date not confirmed
+		if (isFutureDate && !futureDateConfirmed) {
 			return;
 		}
 
@@ -233,6 +254,7 @@
 		subscriptionFrequency = 'monthly';
 		isSplitMode = false;
 		splitLines = [];
+		futureDateConfirmed = false;
 	}
 
 	function formatCurrency(value: number): string {
@@ -306,8 +328,20 @@
 					type="date"
 					id="date"
 					bind:value={dateStr}
-					class="w-full px-3 py-2.5 bg-cream border border-[rgba(45,42,38,0.15)] rounded-lg focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-colors"
+					class="w-full px-3 py-2.5 bg-cream border rounded-lg focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-colors {isFutureDate && !futureDateConfirmed ? 'border-warning-500' : 'border-[rgba(45,42,38,0.15)]'}"
 				/>
+				{#if isFutureDate && !futureDateConfirmed}
+					<div class="mt-2 p-2 bg-warning-50 border border-warning-200 rounded-lg">
+						<p class="text-xs text-warning-700 mb-2">This date is in the future. Are you sure?</p>
+						<button
+							type="button"
+							onclick={() => (futureDateConfirmed = true)}
+							class="text-xs font-medium text-warning-700 hover:text-warning-800 underline"
+						>
+							Yes, use future date
+						</button>
+					</div>
+				{/if}
 			</div>
 			<div>
 				<label for="merchant" class="block text-sm font-medium text-charcoal-soft mb-1.5">
@@ -645,7 +679,7 @@
 			<div class="flex gap-3 pt-3">
 				<button
 					type="submit"
-					disabled={!merchant.trim() || amount <= 0 || (isSplitMode ? !isSplitValid : !categoryId)}
+					disabled={!merchant.trim() || amount <= 0 || (isSplitMode ? !isSplitValid : !categoryId) || (isFutureDate && !futureDateConfirmed)}
 					class="flex-1 bg-primary-500 text-white py-2.5 px-4 rounded-lg font-medium hover:bg-primary-600 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-primary-500/25 focus:ring-2 focus:ring-primary-500/20 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-none transition-all duration-150"
 				>
 					{isSplitMode ? `Add ${splitLines.length} Transactions` : 'Add Transaction'}
