@@ -32,11 +32,9 @@
 		return spending;
 	});
 
-	// Get sorted categories by spending
+	// Get all categories sorted alphabetically
 	let sortedCategories = $derived(
-		categories
-			.filter((c) => categorySpending.has(c.id!))
-			.sort((a, b) => (categorySpending.get(b.id!) || 0) - (categorySpending.get(a.id!) || 0))
+		[...categories].sort((a, b) => a.name.localeCompare(b.name))
 	);
 
 	// Set default selected category
@@ -151,8 +149,9 @@
 					class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
 				>
 					{#each sortedCategories as cat}
+						{@const spent = categorySpending.get(cat.id!) || 0}
 						<option value={cat.id}>
-							{cat.icon} {cat.name} (${(categorySpending.get(cat.id!) || 0).toLocaleString()})
+							{cat.icon} {cat.name}{spent > 0 ? ` ($${spent.toLocaleString()})` : ''}
 						</option>
 					{/each}
 				</select>

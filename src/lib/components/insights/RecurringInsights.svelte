@@ -155,9 +155,17 @@
 	// Monthly equivalent of active subscriptions
 	let totalSubMonthly = $derived(monthlySubCost + annualSubCost / 12);
 
-	// Calculate detected recurring totals (user's portion only)
+	// Calculate detected recurring totals (user's portion only, converted to monthly)
 	let totalDetectedMonthly = $derived(
-		recurring.reduce((sum, r) => sum + r.averageUserAmount, 0)
+		recurring.reduce((sum, r) => {
+			// Convert to monthly equivalent based on frequency
+			if (r.frequency === 'semi-annual') {
+				return sum + r.averageUserAmount / 6;
+			} else if (r.frequency === 'annual') {
+				return sum + r.averageUserAmount / 12;
+			}
+			return sum + r.averageUserAmount;
+		}, 0)
 	);
 
 	// Grand total monthly (active only)
@@ -415,6 +423,8 @@
 
 						<div class="space-y-2">
 							{#each recurring as item (item.merchant)}
+								{@const freqLabel = item.frequency === 'monthly' ? '/mo' : item.frequency === 'semi-annual' ? '/6mo' : '/yr'}
+								{@const freqDesc = item.frequency === 'monthly' ? 'monthly' : item.frequency === 'semi-annual' ? 'every 6 months' : 'annually'}
 								<div class="flex items-center gap-3 py-2 px-3 bg-cream/50 rounded-lg group">
 									<span class="text-lg">{getCategoryIcon(item.categoryId)}</span>
 									<div class="flex-1 min-w-0">
@@ -422,7 +432,7 @@
 										<p class="text-xs text-charcoal-muted">
 											{getCategoryName(item.categoryId)}
 											<span class="mx-1">·</span>
-											~{formatDayOfMonth(item.dayOfMonth)} of month
+											{freqDesc}
 											{#if item.amountType === 'variable'}
 												<span class="mx-1">·</span>
 												<span class="text-warning-600">varies</span>
@@ -431,7 +441,7 @@
 									</div>
 									<div class="text-right flex-shrink-0">
 										<p class="font-mono text-sm font-medium text-charcoal">
-											~{formatCurrencyDecimal(item.averageUserAmount)}/mo
+											~{formatCurrencyDecimal(item.averageUserAmount)}{freqLabel}
 										</p>
 										{#if item.isShared}
 											<p class="text-xs text-success-600">Shared</p>

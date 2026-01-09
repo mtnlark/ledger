@@ -9,7 +9,7 @@ export interface DetectedRecurring {
 	averageAmount: number;
 	/** Average user's portion (after split if shared) */
 	averageUserAmount: number;
-	frequency: 'monthly';
+	frequency: RecurringFrequency;
 	dayOfMonth: number;
 	occurrenceCount: number;
 	/** Whether it's in the Subscriptions category (legacy - use amountType instead) */
@@ -86,11 +86,18 @@ function mode<T>(arr: T[]): T {
 	return modeValue;
 }
 
+export type RecurringFrequency = 'monthly' | 'semi-annual' | 'annual';
+
+interface PatternResult {
+	frequency: RecurringFrequency;
+	dayOfMonth: number;
+}
+
 /**
- * Check if transactions follow a monthly pattern
- * Returns the day of month if pattern detected, null otherwise
+ * Check if transactions follow a recurring pattern (monthly, semi-annual, or annual)
+ * Returns the frequency and day of month if pattern detected, null otherwise
  */
-function detectMonthlyPattern(transactions: Transaction[]): number | null {
+function detectRecurringPattern(transactions: Transaction[]): PatternResult | null {
 	if (transactions.length < 2) return null;
 
 	// Sort by date
@@ -109,15 +116,28 @@ function detectMonthlyPattern(transactions: Transaction[]): number | null {
 		intervals.push(days);
 	}
 
-	// Check if average interval is monthly (25-35 days)
 	const avgInterval = average(intervals);
-	if (avgInterval < 25 || avgInterval > 35) {
-		return null; // Not a monthly pattern
-	}
 
 	// Find the most common day of month
 	const daysOfMonth = sorted.map((t) => new Date(t.date).getDate());
-	return mode(daysOfMonth);
+	const dayOfMonth = mode(daysOfMonth);
+
+	// Check for monthly pattern (25-35 days)
+	if (avgInterval >= 25 && avgInterval <= 35) {
+		return { frequency: 'monthly', dayOfMonth };
+	}
+
+	// Check for semi-annual pattern (160-200 days, ~6 months)
+	if (avgInterval >= 160 && avgInterval <= 200) {
+		return { frequency: 'semi-annual', dayOfMonth };
+	}
+
+	// Check for annual pattern (350-380 days, ~12 months)
+	if (avgInterval >= 350 && avgInterval <= 380) {
+		return { frequency: 'annual', dayOfMonth };
+	}
+
+	return null; // No recognized pattern
 }
 
 /**
@@ -140,6 +160,9 @@ export async function detectRecurringExpenses(): Promise<DetectedRecurring[]> {
 		return [];
 	}
 
+	// Filter out split parent transactions (they've been replaced by children)
+	const activeTransactions = allTransactions.filter((tx) => !tx.isSplitParent);
+
 	// Get dismissed merchants to filter out
 	const dismissedMerchants = await getDismissedRecurring();
 
@@ -152,7 +175,7 @@ export async function detectRecurringExpenses(): Promise<DetectedRecurring[]> {
 	// Group transactions by normalized merchant name
 	// Exclude transactions already tagged as subscriptions (they're shown in subscriptions section)
 	const merchantGroups = new Map<string, Transaction[]>();
-	for (const tx of allTransactions) {
+	for (const tx of activeTransactions) {
 		// Skip transactions already tagged as subscriptions
 		if (tx.isSubscription) continue;
 
@@ -169,9 +192,9 @@ export async function detectRecurringExpenses(): Promise<DetectedRecurring[]> {
 		// Need at least 2 occurrences to detect a pattern
 		if (transactions.length < 2) continue;
 
-		// Check for monthly pattern first
-		const dayOfMonth = detectMonthlyPattern(transactions);
-		if (dayOfMonth === null) continue;
+		// Check for recurring pattern (monthly, semi-annual, or annual)
+		const pattern = detectRecurringPattern(transactions);
+		if (pattern === null) continue;
 
 		// Calculate amount variance
 		const amounts = transactions.map((t) => t.amount);
@@ -209,8 +232,8 @@ export async function detectRecurringExpenses(): Promise<DetectedRecurring[]> {
 			categoryId,
 			averageAmount: Math.round(avgAmount * 100) / 100, // Round to 2 decimal places
 			averageUserAmount: Math.round(avgUserAmount * 100) / 100,
-			frequency: 'monthly',
-			dayOfMonth,
+			frequency: pattern.frequency,
+			dayOfMonth: pattern.dayOfMonth,
 			occurrenceCount: transactions.length,
 			isSubscription,
 			amountType,

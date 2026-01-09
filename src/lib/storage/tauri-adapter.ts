@@ -142,10 +142,14 @@ async function pruneOldBackups(): Promise<void> {
 
 /**
  * Initialize storage from file on app startup
- * Loads data from JSON file into Dexie
+ * Clears any stale IndexedDB data and loads fresh from JSON file
  */
 export async function initializeTauriStorage(): Promise<void> {
 	await ensureDirectories();
+
+	// Clear any stale IndexedDB data first - JSON file is our source of truth
+	await db.delete();
+	await db.open();
 
 	const storedData = await readDataFile();
 
