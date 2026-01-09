@@ -1,0 +1,52 @@
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background circle with cream color -->
+  <circle cx="256" cy="256" r="240" fill="#FAF8F5"/>
+
+  <!-- Subtle border -->
+  <circle cx="256" cy="256" r="240" fill="none" stroke="#E8D5CE" stroke-width="4"/>
+
+  <!-- Stylized serif "L" in terracotta - hand-crafted path approximating Fraunces -->
+  <path fill="#C45D3A" d="
+    M 168 120
+    Q 168 112, 176 112
+    L 220 112
+    Q 228 112, 228 120
+    L 228 340
+    L 336 340
+    Q 344 340, 344 348
+    L 344 392
+    Q 344 400, 336 400
+    L 176 400
+    Q 168 400, 168 392
+    Z
+  "/>
+
+  <!-- Decorative serifs -->
+  <path fill="#C45D3A" d="
+    M 156 112
+    Q 152 112, 152 116
+    L 152 128
+    Q 152 132, 156 132
+    L 168 132
+    L 168 112
+    Z
+  "/>
+  <path fill="#C45D3A" d="
+    M 228 112
+    L 228 132
+    L 240 132
+    Q 244 132, 244 128
+    L 244 116
+    Q 244 112, 240 112
+    Z
+  "/>
+  <path fill="#C45D3A" d="
+    M 344 340
+    L 344 328
+    Q 344 324, 348 324
+    L 360 324
+    Q 364 324, 364 328
+    L 364 340
+    Z
+  "/>
+</svg>
