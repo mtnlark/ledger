@@ -2,21 +2,21 @@
 	import { page } from '$app/stores';
 	import { onMount } from 'svelte';
 	import { Home, BarChart3, Users, Settings, ChevronLeft, ChevronRight } from 'lucide-svelte';
-	import type { Component } from 'svelte';
+	import type { ComponentType } from 'svelte';
 
 	const STORAGE_KEY = 'ledger-sidebar-expanded';
 
 	interface NavItem {
 		href: string;
 		label: string;
-		icon: Component;
+		icon: ComponentType;
 	}
 
 	const navItems: NavItem[] = [
-		{ href: '/', label: 'Dashboard', icon: Home },
-		{ href: '/insights', label: 'Insights', icon: BarChart3 },
-		{ href: '/shared', label: 'Shared', icon: Users },
-		{ href: '/settings', label: 'Settings', icon: Settings }
+		{ href: '/', label: 'Dashboard', icon: Home as ComponentType },
+		{ href: '/insights', label: 'Insights', icon: BarChart3 as ComponentType },
+		{ href: '/shared', label: 'Shared', icon: Users as ComponentType },
+		{ href: '/settings', label: 'Settings', icon: Settings as ComponentType }
 	];
 
 	let isExpanded = $state(false);

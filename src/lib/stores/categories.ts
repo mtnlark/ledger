@@ -36,7 +36,7 @@ export async function addCategory(
 	const id = await db.categories.add({
 		...category,
 		sortOrder
-	});
+	}) as number;
 
 	await persistData();
 	return id;

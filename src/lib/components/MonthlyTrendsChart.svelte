@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { format } from 'date-fns';
 	import type { ChartConfiguration } from 'chart.js/auto';
+	import type { ComponentType } from 'svelte';
 	import { TrendingUp } from 'lucide-svelte';
 	import ChartWrapper from './ChartWrapper.svelte';
 	import EmptyState from './EmptyState.svelte';
@@ -37,7 +38,7 @@
 	);
 
 	// Chart configuration
-	let chartConfig = $derived<ChartConfiguration>({
+	let chartConfig = $derived<ChartConfiguration<'bar'>>({
 		type: 'bar',
 		data: {
 			labels: chartData.labels,
@@ -68,7 +69,7 @@
 					cornerRadius: 8,
 					callbacks: {
 						label: (context) => {
-							const value = context.parsed.y;
+							const value = context.parsed.y ?? 0;
 							return `$${value.toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
 						}
 					}
@@ -123,13 +124,13 @@
 	<div class="p-6">
 		{#if chartData.values.length === 0}
 			<EmptyState
-				icon={TrendingUp}
+				icon={TrendingUp as ComponentType}
 				title="No trend data yet"
 				description="Track expenses over multiple months to see spending patterns"
 			/>
 		{:else if chartData.values.length === 1}
 			<EmptyState
-				icon={TrendingUp}
+				icon={TrendingUp as ComponentType}
 				title={formatCurrency(chartData.values[0])}
 				description={`${chartData.labels[0]} — Add more months to see trends`}
 			/>

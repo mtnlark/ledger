@@ -1,16 +1,16 @@
 <script lang="ts">
-	import type { Component } from 'svelte';
+	import type { ComponentType } from 'svelte';
 	import { Receipt, Users, BarChart3, FileText } from 'lucide-svelte';
 
 	interface Props {
-		icon?: Component;
+		icon?: ComponentType;
 		title: string;
 		description?: string;
 		actionLabel?: string;
 		onAction?: () => void;
 	}
 
-	let { icon: Icon = Receipt, title, description, actionLabel, onAction }: Props = $props();
+	let { icon: Icon = Receipt as ComponentType, title, description, actionLabel, onAction }: Props = $props();
 </script>
 
 <div class="flex flex-col items-center justify-center py-12 px-6 text-center">

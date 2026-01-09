@@ -97,7 +97,8 @@ describe('Category Operations', () => {
 				name: 'New Category',
 				icon: '🆕',
 				color: '#ff0000',
-				isActive: true
+				isActive: true,
+				isEssential: false
 			});
 
 			expect(id).toBeGreaterThan(0);
@@ -114,7 +115,8 @@ describe('Category Operations', () => {
 				name: 'Test Category',
 				icon: '🧪',
 				color: '#123456',
-				isActive: false
+				isActive: false,
+				isEssential: false
 			});
 
 			const category = await db.categories.get(id);

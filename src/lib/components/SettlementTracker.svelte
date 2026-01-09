@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import type { ComponentType } from 'svelte';
 	import { Check, PartyPopper } from 'lucide-svelte';
 	import type { Transaction, Category, Settings } from '$lib/db';
 	import { createCategoryHelpers } from '$lib/utils/category-helpers';
@@ -104,7 +105,7 @@
 	<div class="divide-y divide-gray-100">
 		{#if transactions.length === 0}
 			<EmptyState
-				icon={PartyPopper}
+				icon={PartyPopper as ComponentType}
 				title="All caught up!"
 				description="No shared expenses waiting to be settled"
 			/>

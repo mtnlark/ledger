@@ -76,7 +76,7 @@ export async function addTransaction(
 		partnerShare,
 		createdAt: now,
 		updatedAt: now
-	});
+	}) as number;
 
 	invalidateTransactionCaches();
 	await persistData();

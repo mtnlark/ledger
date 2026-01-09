@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { format, isToday, isYesterday, startOfDay } from 'date-fns';
+	import type { ComponentType } from 'svelte';
 	import { Pencil, Trash2, Receipt, CheckSquare, Square, Check } from 'lucide-svelte';
 	import type { Transaction, Category, Settings } from '$lib/db';
 	import { createCategoryHelpers } from '$lib/utils/category-helpers';
@@ -161,7 +162,7 @@
 <div class="space-y-5">
 	{#if transactions.length === 0}
 		<EmptyState
-			icon={Receipt}
+			icon={Receipt as ComponentType}
 			title="No transactions yet"
 			description="Add your first expense to start tracking your budget"
 		/>

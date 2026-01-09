@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { ChartConfiguration } from 'chart.js/auto';
+	import type { ComponentType } from 'svelte';
 	import { PieChart } from 'lucide-svelte';
 	import ChartWrapper from './ChartWrapper.svelte';
 	import EmptyState from './EmptyState.svelte';
@@ -42,7 +43,7 @@
 	let totalSpending = $derived(categorySpending.reduce((sum, c) => sum + c.amount, 0));
 
 	// Chart configuration
-	let chartConfig = $derived<ChartConfiguration>({
+	let chartConfig = $derived<ChartConfiguration<'doughnut'>>({
 		type: 'doughnut',
 		data: {
 			labels: categorySpending.map((c) => `${c.icon} ${c.name}`),
@@ -94,7 +95,7 @@
 	<div class="p-6">
 		{#if transactions.length === 0}
 			<EmptyState
-				icon={PieChart}
+				icon={PieChart as ComponentType}
 				title="No spending data yet"
 				description="Add some transactions to see your category breakdown"
 			/>

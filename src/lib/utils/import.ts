@@ -68,11 +68,12 @@ export function parseExpensesSheet(workbook: XLSX.WorkBook): ImportedTransaction
 		let date: Date | null = null;
 		if (typeof dateVal === 'number') {
 			date = excelDateToJS(dateVal);
-		} else if (dateVal instanceof Date) {
-			// If XLSX returns a Date object, extract components to avoid timezone issues
-			date = new Date(dateVal.getFullYear(), dateVal.getMonth(), dateVal.getDate());
 		} else if (typeof dateVal === 'string') {
 			date = parseDateString(dateVal);
+		} else if (dateVal && typeof (dateVal as Date).getFullYear === 'function') {
+			// If XLSX returns a Date object, extract components to avoid timezone issues
+			const d = dateVal as Date;
+			date = new Date(d.getFullYear(), d.getMonth(), d.getDate());
 		}
 
 		// Skip invalid dates
@@ -196,6 +197,7 @@ export async function importTransactions(
 				partnerShare: t.partnerShare,
 				isSettled: t.isSettled,
 				settledDate: t.isSettled ? now : undefined,
+				isEssential: false,
 				createdAt: now,
 				updatedAt: now
 			});

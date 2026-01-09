@@ -29,7 +29,8 @@ describe('Recurring Expense Detection', () => {
 				isShared: false,
 				isSettled: false,
 				splitType: 'percentage',
-				splitValue: 0.5
+				splitValue: 0.5,
+				isEssential: false
 			});
 
 			const recurring = await detectRecurringExpenses();
@@ -46,7 +47,8 @@ describe('Recurring Expense Detection', () => {
 				isShared: false,
 				isSettled: false,
 				splitType: 'percentage',
-				splitValue: 0.5
+				splitValue: 0.5,
+				isEssential: false
 			});
 			await addTransaction({
 				date: new Date(2025, 1, 15),
@@ -56,7 +58,8 @@ describe('Recurring Expense Detection', () => {
 				isShared: false,
 				isSettled: false,
 				splitType: 'percentage',
-				splitValue: 0.5
+				splitValue: 0.5,
+				isEssential: false
 			});
 
 			const recurring = await detectRecurringExpenses();
@@ -77,7 +80,8 @@ describe('Recurring Expense Detection', () => {
 				isShared: false,
 				isSettled: false,
 				splitType: 'percentage',
-				splitValue: 0.5
+				splitValue: 0.5,
+				isEssential: false
 			});
 			await addTransaction({
 				date: new Date(2025, 1, 1),
@@ -87,7 +91,8 @@ describe('Recurring Expense Detection', () => {
 				isShared: false,
 				isSettled: false,
 				splitType: 'percentage',
-				splitValue: 0.5
+				splitValue: 0.5,
+				isEssential: false
 			});
 			await addTransaction({
 				date: new Date(2025, 2, 1),
@@ -97,7 +102,8 @@ describe('Recurring Expense Detection', () => {
 				isShared: false,
 				isSettled: false,
 				splitType: 'percentage',
-				splitValue: 0.5
+				splitValue: 0.5,
+				isEssential: false
 			});
 
 			const recurring = await detectRecurringExpenses();
@@ -117,7 +123,8 @@ describe('Recurring Expense Detection', () => {
 				isShared: false,
 				isSettled: false,
 				splitType: 'percentage',
-				splitValue: 0.5
+				splitValue: 0.5,
+				isEssential: false
 			});
 			await addTransaction({
 				date: new Date(2025, 1, 10),
@@ -127,7 +134,8 @@ describe('Recurring Expense Detection', () => {
 				isShared: false,
 				isSettled: false,
 				splitType: 'percentage',
-				splitValue: 0.5
+				splitValue: 0.5,
+				isEssential: false
 			});
 
 			const recurring = await detectRecurringExpenses();
@@ -145,7 +153,8 @@ describe('Recurring Expense Detection', () => {
 				isShared: false,
 				isSettled: false,
 				splitType: 'percentage',
-				splitValue: 0.5
+				splitValue: 0.5,
+				isEssential: false
 			});
 			await addTransaction({
 				date: new Date(2025, 1, 20),
@@ -155,7 +164,8 @@ describe('Recurring Expense Detection', () => {
 				isShared: false,
 				isSettled: false,
 				splitType: 'percentage',
-				splitValue: 0.5
+				splitValue: 0.5,
+				isEssential: false
 			});
 
 			const recurring = await detectRecurringExpenses();
@@ -173,7 +183,8 @@ describe('Recurring Expense Detection', () => {
 				isShared: false,
 				isSettled: false,
 				splitType: 'percentage',
-				splitValue: 0.5
+				splitValue: 0.5,
+				isEssential: false
 			});
 			await addTransaction({
 				date: new Date(2025, 1, 15),
@@ -183,7 +194,8 @@ describe('Recurring Expense Detection', () => {
 				isShared: false,
 				isSettled: false,
 				splitType: 'percentage',
-				splitValue: 0.5
+				splitValue: 0.5,
+				isEssential: false
 			});
 
 			const recurring = await detectRecurringExpenses();
@@ -200,7 +212,8 @@ describe('Recurring Expense Detection', () => {
 				isShared: false,
 				isSettled: false,
 				splitType: 'percentage',
-				splitValue: 0.5
+				splitValue: 0.5,
+				isEssential: false
 			});
 			await addTransaction({
 				date: new Date(2025, 0, 15),
@@ -210,7 +223,8 @@ describe('Recurring Expense Detection', () => {
 				isShared: false,
 				isSettled: false,
 				splitType: 'percentage',
-				splitValue: 0.5
+				splitValue: 0.5,
+				isEssential: false
 			});
 
 			const recurring = await detectRecurringExpenses();
@@ -227,7 +241,8 @@ describe('Recurring Expense Detection', () => {
 				isShared: false,
 				isSettled: false,
 				splitType: 'percentage',
-				splitValue: 0.5
+				splitValue: 0.5,
+				isEssential: false
 			});
 			await addTransaction({
 				date: new Date(2025, 1, 15),
@@ -237,7 +252,8 @@ describe('Recurring Expense Detection', () => {
 				isShared: false,
 				isSettled: false,
 				splitType: 'percentage',
-				splitValue: 0.5
+				splitValue: 0.5,
+				isEssential: false
 			});
 
 			// Spotify
@@ -249,7 +265,8 @@ describe('Recurring Expense Detection', () => {
 				isShared: false,
 				isSettled: false,
 				splitType: 'percentage',
-				splitValue: 0.5
+				splitValue: 0.5,
+				isEssential: false
 			});
 			await addTransaction({
 				date: new Date(2025, 1, 10),
@@ -259,7 +276,8 @@ describe('Recurring Expense Detection', () => {
 				isShared: false,
 				isSettled: false,
 				splitType: 'percentage',
-				splitValue: 0.5
+				splitValue: 0.5,
+				isEssential: false
 			});
 
 			const recurring = await detectRecurringExpenses();
@@ -279,7 +297,8 @@ describe('Recurring Expense Detection', () => {
 				isShared: false,
 				isSettled: false,
 				splitType: 'percentage',
-				splitValue: 0.5
+				splitValue: 0.5,
+				isEssential: false
 			});
 			await addTransaction({
 				date: new Date(2025, 1, 15),
@@ -289,7 +308,8 @@ describe('Recurring Expense Detection', () => {
 				isShared: false,
 				isSettled: false,
 				splitType: 'percentage',
-				splitValue: 0.5
+				splitValue: 0.5,
+				isEssential: false
 			});
 
 			const recurring = await detectRecurringExpenses();
@@ -306,7 +326,8 @@ describe('Recurring Expense Detection', () => {
 				isShared: false,
 				isSettled: false,
 				splitType: 'percentage',
-				splitValue: 0.5
+				splitValue: 0.5,
+				isEssential: false
 			});
 			await addTransaction({
 				date: new Date(2025, 1, 15),
@@ -316,7 +337,8 @@ describe('Recurring Expense Detection', () => {
 				isShared: false,
 				isSettled: false,
 				splitType: 'percentage',
-				splitValue: 0.5
+				splitValue: 0.5,
+				isEssential: false
 			});
 			await addTransaction({
 				date: new Date(2025, 2, 15),
@@ -326,7 +348,8 @@ describe('Recurring Expense Detection', () => {
 				isShared: false,
 				isSettled: false,
 				splitType: 'percentage',
-				splitValue: 0.5
+				splitValue: 0.5,
+				isEssential: false
 			});
 
 			const recurring = await detectRecurringExpenses();
@@ -344,7 +367,8 @@ describe('Recurring Expense Detection', () => {
 				isShared: false,
 				isSettled: false,
 				splitType: 'percentage',
-				splitValue: 0.5
+				splitValue: 0.5,
+				isEssential: false
 			});
 			await addTransaction({
 				date: new Date(2025, 1, 1),
@@ -354,7 +378,8 @@ describe('Recurring Expense Detection', () => {
 				isShared: false,
 				isSettled: false,
 				splitType: 'percentage',
-				splitValue: 0.5
+				splitValue: 0.5,
+				isEssential: false
 			});
 
 			// Cheap recurring
@@ -366,7 +391,8 @@ describe('Recurring Expense Detection', () => {
 				isShared: false,
 				isSettled: false,
 				splitType: 'percentage',
-				splitValue: 0.5
+				splitValue: 0.5,
+				isEssential: false
 			});
 			await addTransaction({
 				date: new Date(2025, 1, 15),
@@ -376,7 +402,8 @@ describe('Recurring Expense Detection', () => {
 				isShared: false,
 				isSettled: false,
 				splitType: 'percentage',
-				splitValue: 0.5
+				splitValue: 0.5,
+				isEssential: false
 			});
 
 			const recurring = await detectRecurringExpenses();
