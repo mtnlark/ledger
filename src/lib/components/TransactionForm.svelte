@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { format } from 'date-fns';
+	import { ChevronDown, Plus } from 'lucide-svelte';
+	import { slide } from 'svelte/transition';
 	import type { Category, Settings } from '$lib/db';
 	import CategoryCombobox from './CategoryCombobox.svelte';
 	import MerchantAutocomplete from './MerchantAutocomplete.svelte';
@@ -30,6 +32,8 @@
 
 	// Animation state
 	let mounted = $state(false);
+	let isExpanded = $state(false);
+
 	onMount(() => {
 		setTimeout(() => mounted = true, 100);
 	});
@@ -131,14 +135,32 @@
 	}
 </script>
 
-<form
-	onsubmit={handleSubmit}
-	class="bg-white rounded-xl shadow-md shadow-gray-200/50 p-6 transition-all duration-500 {mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-3'}"
+<div
+	class="bg-white rounded-xl shadow-md shadow-gray-200/50 overflow-hidden transition-all duration-500 {mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-3'}"
 	style="transition-timing-function: cubic-bezier(0.16, 1, 0.3, 1);"
 >
-	<h2 class="font-display text-xl font-medium text-charcoal mb-5">Add Transaction</h2>
+	<!-- Collapsible Header -->
+	<button
+		type="button"
+		onclick={() => (isExpanded = !isExpanded)}
+		class="w-full px-6 py-4 flex items-center justify-between hover:bg-cream/50 transition-colors"
+	>
+		<div class="flex items-center gap-3">
+			<div class="w-8 h-8 rounded-lg bg-primary-100 flex items-center justify-center">
+				<Plus size={18} class="text-primary-600" />
+			</div>
+			<h2 class="font-display text-xl font-medium text-charcoal">Add Transaction</h2>
+		</div>
+		<ChevronDown
+			size={20}
+			class="text-charcoal-muted transition-transform duration-200 {isExpanded ? 'rotate-180' : ''}"
+		/>
+	</button>
 
-	<div class="space-y-4">
+	<!-- Collapsible Content -->
+	{#if isExpanded}
+		<form onsubmit={handleSubmit} transition:slide={{ duration: 200 }}>
+			<div class="px-6 pb-6 space-y-4">
 		<!-- Date & Merchant Row -->
 		<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
 			<div>
@@ -339,24 +361,26 @@
 			</label>
 		</div>
 
-		<!-- Actions -->
-		<div class="flex gap-3 pt-3">
-			<button
-				type="submit"
-				disabled={!merchant.trim() || amount <= 0 || !categoryId}
-				class="flex-1 bg-primary-500 text-white py-2.5 px-4 rounded-lg font-medium hover:bg-primary-600 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-primary-500/25 focus:ring-2 focus:ring-primary-500/20 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-none transition-all duration-150"
-			>
-				Add Transaction
-			</button>
-			{#if onCancel}
+			<!-- Actions -->
+			<div class="flex gap-3 pt-3">
 				<button
-					type="button"
-					onclick={onCancel}
-					class="px-4 py-2.5 border border-[rgba(45,42,38,0.15)] text-charcoal-soft rounded-lg font-medium hover:bg-cream transition-colors"
+					type="submit"
+					disabled={!merchant.trim() || amount <= 0 || !categoryId}
+					class="flex-1 bg-primary-500 text-white py-2.5 px-4 rounded-lg font-medium hover:bg-primary-600 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-primary-500/25 focus:ring-2 focus:ring-primary-500/20 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-none transition-all duration-150"
 				>
-					Cancel
+					Add Transaction
 				</button>
-			{/if}
-		</div>
-	</div>
-</form>
+				{#if onCancel}
+					<button
+						type="button"
+						onclick={onCancel}
+						class="px-4 py-2.5 border border-[rgba(45,42,38,0.15)] text-charcoal-soft rounded-lg font-medium hover:bg-cream transition-colors"
+					>
+						Cancel
+					</button>
+				{/if}
+			</div>
+			</div>
+		</form>
+	{/if}
+</div>
