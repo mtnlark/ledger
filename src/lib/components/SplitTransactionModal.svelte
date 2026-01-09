@@ -1,0 +1,253 @@
+<script lang="ts">
+	import { X, Plus, Trash2 } from 'lucide-svelte';
+	import type { Category, Transaction } from '$lib/db';
+	import { createCategoryHelpers } from '$lib/utils/category-helpers';
+
+	interface Props {
+		isOpen: boolean;
+		transaction: Transaction | null;
+		categories: Category[];
+		onSplit: (id: number, splits: { categoryId: number; amount: number }[]) => void;
+		onClose: () => void;
+	}
+
+	interface SplitLine {
+		categoryId: number;
+		amount: number;
+	}
+
+	let { isOpen, transaction, categories, onSplit, onClose }: Props = $props();
+
+	// Create category helpers
+	let categoryHelpers = $derived(createCategoryHelpers(categories));
+	let getCategoryName = $derived(categoryHelpers.getName);
+	let getCategoryIcon = $derived(categoryHelpers.getIcon);
+
+	// Get active categories for dropdown
+	let activeCategories = $derived(categories.filter((c) => c.isActive));
+
+	// Split lines state
+	let lines = $state<SplitLine[]>([]);
+
+	// Reset when modal opens with a transaction
+	$effect(() => {
+		if (isOpen && transaction) {
+			// Initialize with original transaction as first line
+			lines = [{ categoryId: transaction.categoryId, amount: transaction.amount }];
+		}
+	});
+
+	// Computed values
+	let total = $derived(lines.reduce((sum, l) => sum + (l.amount || 0), 0));
+	let remaining = $derived(transaction ? transaction.amount - total : 0);
+	let isValid = $derived(
+		lines.length >= 2 &&
+			transaction !== null &&
+			Math.abs(remaining) < 0.01 &&
+			lines.every((l) => l.categoryId > 0 && l.amount > 0)
+	);
+
+	function addLine() {
+		// Add new line with remaining amount (if positive)
+		const newAmount = remaining > 0 ? Math.round(remaining * 100) / 100 : 0;
+		lines = [...lines, { categoryId: 0, amount: newAmount }];
+	}
+
+	function removeLine(index: number) {
+		if (lines.length > 1) {
+			lines = lines.filter((_, i) => i !== index);
+		}
+	}
+
+	function updateLine(index: number, field: 'categoryId' | 'amount', value: number) {
+		lines = lines.map((line, i) => (i === index ? { ...line, [field]: value } : line));
+	}
+
+	function handleSubmit(e: Event) {
+		e.preventDefault();
+
+		if (!isValid || !transaction?.id) return;
+
+		onSplit(transaction.id, lines);
+	}
+
+	function formatCurrency(value: number): string {
+		return new Intl.NumberFormat('en-US', {
+			style: 'currency',
+			currency: 'USD'
+		}).format(value);
+	}
+</script>
+
+{#if isOpen && transaction}
+	<!-- Backdrop -->
+	<div
+		class="fixed inset-0 bg-black/40 z-50 backdrop-blur-sm"
+		onclick={onClose}
+		onkeydown={(e) => e.key === 'Escape' && onClose()}
+		role="button"
+		tabindex="-1"
+		aria-label="Close modal"
+	></div>
+
+	<!-- Modal -->
+	<div class="fixed inset-0 z-50 flex items-center justify-center p-4">
+		<div
+			class="bg-white rounded-xl shadow-xl shadow-gray-300/50 w-full max-w-lg max-h-[90vh] overflow-y-auto animate-enter"
+			onclick={(e) => e.stopPropagation()}
+			role="dialog"
+			aria-modal="true"
+			aria-labelledby="split-modal-title"
+		>
+			<form onsubmit={handleSubmit}>
+				<!-- Header -->
+				<div
+					class="flex items-center justify-between px-6 py-4 border-b border-dashed border-gray-200"
+				>
+					<h2 id="split-modal-title" class="font-display text-xl font-medium text-charcoal">
+						Split by Category
+					</h2>
+					<button
+						type="button"
+						onclick={onClose}
+						class="p-2 text-charcoal-muted hover:text-charcoal hover:bg-cream rounded-lg transition-colors"
+						aria-label="Close"
+					>
+						<X size={20} />
+					</button>
+				</div>
+
+				<!-- Body -->
+				<div class="p-6 space-y-4">
+					<!-- Original Transaction Summary -->
+					<div class="bg-cream rounded-lg p-4">
+						<div class="text-sm text-charcoal-muted mb-1">Original Transaction</div>
+						<div class="flex items-center justify-between">
+							<div class="flex items-center gap-2">
+								<span class="text-xl">{getCategoryIcon(transaction.categoryId)}</span>
+								<span class="font-medium text-charcoal">{transaction.merchant}</span>
+							</div>
+							<span class="font-mono font-medium text-charcoal"
+								>{formatCurrency(transaction.amount)}</span
+							>
+						</div>
+					</div>
+
+					<!-- Split Lines -->
+					<div class="space-y-3">
+						<div class="text-sm font-medium text-charcoal-soft">Split into categories</div>
+
+						{#each lines as line, index (index)}
+							<div class="flex items-center gap-2">
+								<!-- Category Select -->
+								<select
+									value={line.categoryId}
+									onchange={(e) =>
+										updateLine(index, 'categoryId', parseInt(e.currentTarget.value))}
+									class="flex-1 px-3 py-2 bg-cream border border-[rgba(45,42,38,0.15)] rounded-lg focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-colors"
+								>
+									<option value={0}>Select category...</option>
+									{#each activeCategories as cat (cat.id)}
+										<option value={cat.id}>{cat.icon} {cat.name}</option>
+									{/each}
+								</select>
+
+								<!-- Amount Input -->
+								<div class="relative w-28">
+									<span
+										class="absolute left-2 top-1/2 -translate-y-1/2 text-charcoal-muted font-mono text-sm"
+										>$</span
+									>
+									<input
+										type="number"
+										value={line.amount}
+										oninput={(e) =>
+											updateLine(index, 'amount', parseFloat(e.currentTarget.value) || 0)}
+										step="0.01"
+										min="0"
+										class="w-full pl-6 pr-2 py-2 bg-cream border border-[rgba(45,42,38,0.15)] rounded-lg focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-colors font-mono text-sm"
+									/>
+								</div>
+
+								<!-- Remove Button -->
+								<button
+									type="button"
+									onclick={() => removeLine(index)}
+									disabled={lines.length <= 1}
+									class="p-2 text-charcoal-muted hover:text-danger-500 hover:bg-danger-50 rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+									aria-label="Remove line"
+								>
+									<Trash2 size={16} />
+								</button>
+							</div>
+						{/each}
+
+						<!-- Add Line Button -->
+						<button
+							type="button"
+							onclick={addLine}
+							class="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium text-primary-600 hover:text-primary-700 hover:bg-primary-50 border border-dashed border-primary-300 rounded-lg transition-colors"
+						>
+							<Plus size={16} />
+							<span>Add Line</span>
+						</button>
+					</div>
+
+					<!-- Validation Summary -->
+					<div
+						class="p-3 rounded-lg {Math.abs(remaining) < 0.01
+							? 'bg-success-50 border border-success-200'
+							: 'bg-warning-50 border border-warning-200'}"
+					>
+						<div class="flex justify-between text-sm">
+							<span class="text-charcoal-soft">Total:</span>
+							<span class="font-mono font-medium text-charcoal">{formatCurrency(total)}</span>
+						</div>
+						<div class="flex justify-between text-sm mt-1">
+							<span class="text-charcoal-soft">Remaining:</span>
+							<span
+								class="font-mono font-medium {Math.abs(remaining) < 0.01
+									? 'text-success-600'
+									: remaining > 0
+										? 'text-warning-600'
+										: 'text-danger-600'}"
+							>
+								{formatCurrency(remaining)}
+							</span>
+						</div>
+						{#if Math.abs(remaining) >= 0.01}
+							<p class="text-xs mt-2 {remaining > 0 ? 'text-warning-600' : 'text-danger-600'}">
+								{remaining > 0
+									? 'Add more lines or adjust amounts to use the remaining balance'
+									: 'Total exceeds original amount'}
+							</p>
+						{/if}
+						{#if lines.length < 2}
+							<p class="text-xs mt-2 text-warning-600">Add at least 2 lines to split</p>
+						{/if}
+					</div>
+				</div>
+
+				<!-- Footer -->
+				<div
+					class="flex gap-3 px-6 py-4 border-t border-dashed border-gray-200 bg-cream-dark rounded-b-xl"
+				>
+					<button
+						type="submit"
+						disabled={!isValid}
+						class="flex-1 bg-primary-500 text-white py-2.5 px-4 rounded-lg font-medium hover:bg-primary-600 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-primary-500/25 focus:ring-2 focus:ring-primary-500/20 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-none transition-all duration-150"
+					>
+						Split into {lines.length} Transactions
+					</button>
+					<button
+						type="button"
+						onclick={onClose}
+						class="px-4 py-2.5 border border-[rgba(45,42,38,0.15)] text-charcoal-soft rounded-lg font-medium hover:bg-cream transition-colors"
+					>
+						Cancel
+					</button>
+				</div>
+			</form>
+		</div>
+	</div>
+{/if}

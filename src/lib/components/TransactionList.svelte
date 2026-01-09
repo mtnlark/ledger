@@ -276,7 +276,7 @@
 								<div class="flex gap-1 flex-shrink-0">
 									{#if onEdit}
 										<button
-											onclick={() => onEdit?.(transaction)}
+											onclick={(e) => { e.stopPropagation(); onEdit?.(transaction); }}
 											class="p-2 text-charcoal-muted hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors"
 											aria-label="Edit transaction"
 										>
@@ -285,7 +285,7 @@
 									{/if}
 									{#if onDelete}
 										<button
-											onclick={() => onDelete?.(transaction.id!)}
+											onclick={(e) => { e.stopPropagation(); onDelete?.(transaction.id!); }}
 											class="p-2 text-charcoal-muted hover:text-danger-500 hover:bg-danger-50 rounded-lg transition-colors"
 											aria-label="Delete transaction"
 										>

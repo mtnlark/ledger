@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { format } from 'date-fns';
-	import { X } from 'lucide-svelte';
+	import { X, Scissors } from 'lucide-svelte';
 	import type { Category, Settings, Transaction } from '$lib/db';
 	import { parseLocalDate } from '$lib/utils/date-helpers';
 	import CategoryCombobox from './CategoryCombobox.svelte';
@@ -11,6 +11,7 @@
 		categories: Category[];
 		settings: Settings;
 		onSave: (id: number, data: TransactionUpdateData) => void;
+		onSplit?: (transaction: Transaction) => void;
 		onClose: () => void;
 	}
 
@@ -26,7 +27,10 @@
 		isEssential: boolean;
 	}
 
-	let { isOpen, transaction, categories, settings, onSave, onClose }: Props = $props();
+	let { isOpen, transaction, categories, settings, onSave, onSplit, onClose }: Props = $props();
+
+	// Can only split transactions that aren't already split children
+	let canSplit = $derived(transaction && !transaction.parentTransactionId && onSplit);
 
 	// Form state - initialized from transaction when modal opens
 	let dateStr = $state('');
@@ -353,6 +357,23 @@
 							</button>
 						</label>
 					</div>
+
+					<!-- Split by Category Button -->
+					{#if canSplit}
+						<div class="border-t border-dashed border-gray-200 pt-4">
+							<button
+								type="button"
+								onclick={() => transaction && onSplit?.(transaction)}
+								class="w-full flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium text-charcoal-soft hover:text-charcoal border border-[rgba(45,42,38,0.15)] hover:bg-cream rounded-lg transition-colors"
+							>
+								<Scissors size={16} />
+								<span>Split by Category</span>
+							</button>
+							<p class="text-xs text-charcoal-muted mt-2 text-center">
+								Split this transaction into multiple categories
+							</p>
+						</div>
+					{/if}
 				</div>
 
 				<!-- Footer -->

@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { format } from 'date-fns';
-	import { ChevronDown, Plus } from 'lucide-svelte';
+	import { ChevronDown, Plus, Scissors, Trash2 } from 'lucide-svelte';
 	import { slide } from 'svelte/transition';
 	import type { Category, Settings } from '$lib/db';
 	import { parseLocalDate } from '$lib/utils/date-helpers';
@@ -15,6 +15,7 @@
 		categories: Category[];
 		settings: Settings;
 		onSubmit: (data: TransactionFormData) => void;
+		onSplitSubmit?: (data: SplitTransactionFormData) => void;
 		onCancel?: () => void;
 	}
 
@@ -31,7 +32,23 @@
 		isEssential: boolean;
 	}
 
-	let { categories, settings, onSubmit, onCancel }: Props = $props();
+	export interface SplitTransactionFormData {
+		date: Date;
+		merchant: string;
+		isShared: boolean;
+		isSettled: boolean;
+		splitType: 'percentage' | 'fixed';
+		splitValue: number;
+		isEssential: boolean;
+		splits: { categoryId: number; amount: number }[];
+	}
+
+	interface SplitLine {
+		categoryId: number;
+		amount: number;
+	}
+
+	let { categories, settings, onSubmit, onSplitSubmit, onCancel }: Props = $props();
 
 	// Animation state
 	let mounted = $state(false);
@@ -61,6 +78,13 @@
 	let splitValue = $state(settings.defaultSplitValue);
 	let notes = $state('');
 	let isEssential = $state(false);
+
+	// Split mode state
+	let isSplitMode = $state(false);
+	let splitLines = $state<SplitLine[]>([]);
+
+	// Get active categories for dropdowns
+	let activeCategories = $derived(categories.filter((c) => c.isActive));
 
 	// Get selected category for essential default
 	let selectedCategory = $derived(categories.find((c) => c.id === categoryId));
@@ -92,6 +116,16 @@
 	);
 	let yourShare = $derived(amount - partnerShare);
 
+	// Split mode computed values
+	let splitTotal = $derived(splitLines.reduce((sum, l) => sum + (l.amount || 0), 0));
+	let splitRemaining = $derived(amount - splitTotal);
+	let isSplitValid = $derived(
+		splitLines.length >= 2 &&
+		amount > 0 &&
+		Math.abs(splitRemaining) < 0.01 &&
+		splitLines.every((l) => l.categoryId > 0 && l.amount > 0)
+	);
+
 	// Auto-correct invalid split values when switching types or when amount changes
 	$effect(() => {
 		if (isShared && splitType === 'fixed' && amount > 0 && splitValue > amount) {
@@ -102,25 +136,78 @@
 		}
 	});
 
+	// Split mode functions
+	function enableSplitMode() {
+		isSplitMode = true;
+		// Initialize with one line containing full amount (if we have a category selected) or empty
+		if (categoryId > 0) {
+			splitLines = [{ categoryId, amount }];
+		} else {
+			splitLines = [{ categoryId: 0, amount }];
+		}
+	}
+
+	function disableSplitMode() {
+		isSplitMode = false;
+		splitLines = [];
+	}
+
+	function addSplitLine() {
+		const newAmount = splitRemaining > 0 ? Math.round(splitRemaining * 100) / 100 : 0;
+		splitLines = [...splitLines, { categoryId: 0, amount: newAmount }];
+	}
+
+	function removeSplitLine(index: number) {
+		if (splitLines.length > 1) {
+			splitLines = splitLines.filter((_, i) => i !== index);
+		}
+	}
+
+	function updateSplitLine(index: number, field: 'categoryId' | 'amount', value: number) {
+		splitLines = splitLines.map((line, i) => (i === index ? { ...line, [field]: value } : line));
+	}
+
 	function handleSubmit(e: Event) {
 		e.preventDefault();
 
-		if (!merchant.trim() || amount <= 0 || !categoryId) {
+		if (!merchant.trim() || amount <= 0) {
 			return;
 		}
 
-		onSubmit({
-			date: parseLocalDate(dateStr),
-			merchant: merchant.trim(),
-			amount,
-			categoryId,
-			isShared,
-			isSettled: isShared ? isSettled : false,
-			splitType,
-			splitValue: validatedSplitValue, // Use validated value
-			notes: notes.trim() || undefined,
-			isEssential
-		});
+		// Handle split mode submission
+		if (isSplitMode) {
+			if (!isSplitValid || !onSplitSubmit) {
+				return;
+			}
+
+			onSplitSubmit({
+				date: parseLocalDate(dateStr),
+				merchant: merchant.trim(),
+				isShared,
+				isSettled: isShared ? isSettled : false,
+				splitType,
+				splitValue: validatedSplitValue,
+				isEssential,
+				splits: splitLines
+			});
+		} else {
+			if (!categoryId) {
+				return;
+			}
+
+			onSubmit({
+				date: parseLocalDate(dateStr),
+				merchant: merchant.trim(),
+				amount,
+				categoryId,
+				isShared,
+				isSettled: isShared ? isSettled : false,
+				splitType,
+				splitValue: validatedSplitValue,
+				notes: notes.trim() || undefined,
+				isEssential
+			});
+		}
 
 		// Reset form
 		merchant = '';
@@ -132,6 +219,8 @@
 		splitValue = settings.defaultSplitValue;
 		notes = '';
 		isEssential = false;
+		isSplitMode = false;
+		splitLines = [];
 	}
 
 	function formatCurrency(value: number): string {
@@ -243,15 +332,104 @@
 					/>
 				</div>
 			</div>
-			<div>
-				<label for="category" class="block text-sm font-medium text-charcoal-soft mb-1.5">Category</label>
-				<CategoryCombobox
-					{categories}
-					value={categoryId}
-					onSelect={handleCategoryChange}
-				/>
-			</div>
+			{#if !isSplitMode}
+				<div>
+					<label for="category" class="block text-sm font-medium text-charcoal-soft mb-1.5">Category</label>
+					<CategoryCombobox
+						{categories}
+						value={categoryId}
+						onSelect={handleCategoryChange}
+					/>
+				</div>
+			{/if}
 		</div>
+
+		<!-- Split by Category Section -->
+		{#if isSplitMode}
+			<div class="border border-primary-200 bg-primary-50/50 rounded-lg p-4 space-y-3" transition:slide={{ duration: 200 }}>
+				<div class="flex items-center justify-between">
+					<span class="text-sm font-medium text-charcoal-soft">Split into categories</span>
+					<button
+						type="button"
+						onclick={disableSplitMode}
+						class="text-xs text-charcoal-muted hover:text-charcoal"
+					>
+						Cancel split
+					</button>
+				</div>
+
+				{#each splitLines as line, index (index)}
+					<div class="flex items-center gap-2">
+						<select
+							value={line.categoryId}
+							onchange={(e) => updateSplitLine(index, 'categoryId', parseInt(e.currentTarget.value))}
+							class="flex-1 px-3 py-2 bg-white border border-[rgba(45,42,38,0.15)] rounded-lg focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-colors text-sm"
+						>
+							<option value={0}>Select category...</option>
+							{#each activeCategories as cat (cat.id)}
+								<option value={cat.id}>{cat.icon} {cat.name}</option>
+							{/each}
+						</select>
+						<div class="relative w-24">
+							<span class="absolute left-2 top-1/2 -translate-y-1/2 text-charcoal-muted font-mono text-sm">$</span>
+							<input
+								type="number"
+								value={line.amount}
+								oninput={(e) => updateSplitLine(index, 'amount', parseFloat(e.currentTarget.value) || 0)}
+								step="0.01"
+								min="0"
+								class="w-full pl-5 pr-2 py-2 bg-white border border-[rgba(45,42,38,0.15)] rounded-lg focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-colors font-mono text-sm"
+							/>
+						</div>
+						<button
+							type="button"
+							onclick={() => removeSplitLine(index)}
+							disabled={splitLines.length <= 1}
+							class="p-1.5 text-charcoal-muted hover:text-danger-500 hover:bg-danger-50 rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+							aria-label="Remove line"
+						>
+							<Trash2 size={14} />
+						</button>
+					</div>
+				{/each}
+
+				<button
+					type="button"
+					onclick={addSplitLine}
+					class="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 text-sm font-medium text-primary-600 hover:text-primary-700 hover:bg-primary-100 border border-dashed border-primary-300 rounded-lg transition-colors"
+				>
+					<Plus size={14} />
+					<span>Add Line</span>
+				</button>
+
+				<!-- Validation Summary -->
+				<div class="p-2 rounded-lg text-sm {Math.abs(splitRemaining) < 0.01 ? 'bg-success-50 border border-success-200' : 'bg-warning-50 border border-warning-200'}">
+					<div class="flex justify-between">
+						<span class="text-charcoal-soft">Total:</span>
+						<span class="font-mono font-medium text-charcoal">{formatCurrency(splitTotal)}</span>
+					</div>
+					<div class="flex justify-between">
+						<span class="text-charcoal-soft">Remaining:</span>
+						<span class="font-mono font-medium {Math.abs(splitRemaining) < 0.01 ? 'text-success-600' : splitRemaining > 0 ? 'text-warning-600' : 'text-danger-600'}">
+							{formatCurrency(splitRemaining)}
+						</span>
+					</div>
+					{#if splitLines.length < 2}
+						<p class="text-xs text-warning-600 mt-1">Add at least 2 lines to split</p>
+					{/if}
+				</div>
+			</div>
+		{:else if onSplitSubmit && amount > 0}
+			<!-- Split by Category Button (shown when not in split mode) -->
+			<button
+				type="button"
+				onclick={enableSplitMode}
+				class="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium text-charcoal-soft hover:text-charcoal border border-[rgba(45,42,38,0.15)] hover:bg-cream rounded-lg transition-colors"
+			>
+				<Scissors size={16} />
+				<span>Split by Category</span>
+			</button>
+		{/if}
 
 		<!-- Shared Toggle -->
 		<div class="border-t border-dashed border-gray-200 pt-4">
@@ -408,10 +586,10 @@
 			<div class="flex gap-3 pt-3">
 				<button
 					type="submit"
-					disabled={!merchant.trim() || amount <= 0 || !categoryId}
+					disabled={!merchant.trim() || amount <= 0 || (isSplitMode ? !isSplitValid : !categoryId)}
 					class="flex-1 bg-primary-500 text-white py-2.5 px-4 rounded-lg font-medium hover:bg-primary-600 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-primary-500/25 focus:ring-2 focus:ring-primary-500/20 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-none transition-all duration-150"
 				>
-					Add Transaction
+					{isSplitMode ? `Add ${splitLines.length} Transactions` : 'Add Transaction'}
 				</button>
 				{#if onCancel}
 					<button

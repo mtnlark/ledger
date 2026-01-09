@@ -3,16 +3,18 @@
 	import { format, startOfDay, parseISO } from 'date-fns';
 	import { getMonthKey, parseMonthKey, type Transaction, type Category, type Settings, type MonthlyBudget, DEFAULT_SETTINGS } from '$lib/db';
 	import { initializeStorage } from '$lib/storage';
-	import { addTransaction, updateTransaction, deleteTransaction, bulkDeleteTransactions, bulkUpdateCategory, getTransactionsByMonth, getAllTransactions, getAvailableMonths } from '$lib/stores/transactions';
+	import { addTransaction, updateTransaction, deleteTransaction, bulkDeleteTransactions, bulkUpdateCategory, splitTransaction, getTransactionsByMonth, getAllTransactions, getAvailableMonths } from '$lib/stores/transactions';
 	import { getAllCategories } from '$lib/stores/categories';
 	import { getSettings } from '$lib/stores/settings';
 	import { getBudgetForMonth, saveBudget } from '$lib/stores/budget';
 	import { toast } from '$lib/stores/toast';
 	import TransactionList from '$lib/components/TransactionList.svelte';
-	import TransactionForm, { type TransactionFormData } from '$lib/components/TransactionForm.svelte';
+	import TransactionForm, { type TransactionFormData, type SplitTransactionFormData } from '$lib/components/TransactionForm.svelte';
 	import CashFlowCard from '$lib/components/CashFlowCard.svelte';
 	import BudgetModal from '$lib/components/BudgetModal.svelte';
 	import EditTransactionModal, { type TransactionUpdateData } from '$lib/components/EditTransactionModal.svelte';
+	import SplitTransactionModal from '$lib/components/SplitTransactionModal.svelte';
+	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
 	import HeaderNav from '$lib/components/HeaderNav.svelte';
 	import MonthPicker from '$lib/components/MonthPicker.svelte';
 	import CashFlowCardSkeleton from '$lib/components/CashFlowCardSkeleton.svelte';
@@ -31,8 +33,52 @@
 	let budget = $state<MonthlyBudget | null>(null);
 	let showBudgetModal = $state(false);
 	let editingTransaction = $state<Transaction | null>(null);
+	let splittingTransaction = $state<Transaction | null>(null);
 	let currentMonth = $state(getMonthKey(new Date()));
 	let availableMonths = $state<string[]>([getMonthKey(new Date())]);
+
+	// Confirm dialog state
+	let confirmDialog = $state<{
+		isOpen: boolean;
+		title: string;
+		message: string;
+		confirmText: string;
+		variant: 'danger' | 'warning' | 'default';
+		onConfirm: () => void;
+	}>({
+		isOpen: false,
+		title: '',
+		message: '',
+		confirmText: 'Confirm',
+		variant: 'default',
+		onConfirm: () => {}
+	});
+
+	function showConfirmDialog(options: {
+		title: string;
+		message: string;
+		confirmText?: string;
+		variant?: 'danger' | 'warning' | 'default';
+		onConfirm: () => void;
+	}) {
+		confirmDialog = {
+			isOpen: true,
+			title: options.title,
+			message: options.message,
+			confirmText: options.confirmText || 'Confirm',
+			variant: options.variant || 'default',
+			onConfirm: options.onConfirm
+		};
+	}
+
+	function closeConfirmDialog() {
+		confirmDialog = { ...confirmDialog, isOpen: false };
+	}
+
+	function handleConfirm() {
+		confirmDialog.onConfirm();
+		closeConfirmDialog();
+	}
 
 	// Filter state
 	let filters = $state<FilterState>({
@@ -186,6 +232,37 @@
 		}
 	}
 
+	// Handle split transaction submission from form (creates multiple transactions)
+	async function handleSplitSubmit(data: SplitTransactionFormData) {
+		try {
+			// Create each split as a separate transaction
+			for (const split of data.splits) {
+				await addTransaction({
+					date: data.date,
+					merchant: data.merchant,
+					amount: split.amount,
+					categoryId: split.categoryId,
+					isShared: data.isShared,
+					isSettled: data.isSettled,
+					splitType: data.splitType,
+					splitValue: data.splitValue,
+					isEssential: data.isEssential
+				});
+			}
+			// Reload transactions and available months
+			transactions = await getTransactionsByMonth(currentMonth);
+			availableMonths = await getAvailableMonths();
+			// Also refresh allTransactions if we have it loaded
+			if (allTransactions.length > 0) {
+				allTransactions = await getAllTransactions();
+			}
+			toast.success(`${data.splits.length} transactions added`);
+		} catch (error) {
+			console.error('Failed to add split transactions:', error);
+			toast.error('Failed to add transactions');
+		}
+	}
+
 	// Handle edit - open modal
 	function handleEdit(transaction: Transaction) {
 		editingTransaction = transaction;
@@ -210,45 +287,57 @@
 	}
 
 	// Handle delete
-	async function handleDelete(id: number) {
-		if (confirm('Are you sure you want to delete this transaction?')) {
-			try {
-				await deleteTransaction(id);
-				// Reload transactions and available months (in case month is now empty)
-				transactions = await getTransactionsByMonth(currentMonth);
-				availableMonths = await getAvailableMonths();
-				toast.success('Transaction deleted');
-			} catch (error) {
-				console.error('Failed to delete transaction:', error);
-				toast.error('Failed to delete transaction');
+	function handleDelete(id: number) {
+		showConfirmDialog({
+			title: 'Delete Transaction',
+			message: 'Are you sure you want to delete this transaction?',
+			confirmText: 'Delete',
+			variant: 'danger',
+			onConfirm: async () => {
+				try {
+					await deleteTransaction(id);
+					// Reload transactions and available months (in case month is now empty)
+					transactions = await getTransactionsByMonth(currentMonth);
+					availableMonths = await getAvailableMonths();
+					toast.success('Transaction deleted');
+				} catch (error) {
+					console.error('Failed to delete transaction:', error);
+					toast.error('Failed to delete transaction');
+				}
 			}
-		}
+		});
 	}
 
 	// Handle bulk delete
-	async function handleBulkDelete(ids: number[]) {
+	function handleBulkDelete(ids: number[]) {
 		if (ids.length === 0) return;
 
 		const message = ids.length === 1
 			? 'Are you sure you want to delete this transaction?'
 			: `Are you sure you want to delete ${ids.length} transactions?`;
 
-		if (confirm(message)) {
-			try {
-				await bulkDeleteTransactions(ids);
-				// Reload transactions and available months
-				transactions = await getTransactionsByMonth(currentMonth);
-				availableMonths = await getAvailableMonths();
-				// Also refresh allTransactions if we have it loaded
-				if (allTransactions.length > 0) {
-					allTransactions = await getAllTransactions();
+		showConfirmDialog({
+			title: ids.length === 1 ? 'Delete Transaction' : 'Delete Transactions',
+			message,
+			confirmText: 'Delete',
+			variant: 'danger',
+			onConfirm: async () => {
+				try {
+					await bulkDeleteTransactions(ids);
+					// Reload transactions and available months
+					transactions = await getTransactionsByMonth(currentMonth);
+					availableMonths = await getAvailableMonths();
+					// Also refresh allTransactions if we have it loaded
+					if (allTransactions.length > 0) {
+						allTransactions = await getAllTransactions();
+					}
+					toast.success(ids.length === 1 ? 'Transaction deleted' : `${ids.length} transactions deleted`);
+				} catch (error) {
+					console.error('Failed to delete transactions:', error);
+					toast.error('Failed to delete transactions');
 				}
-				toast.success(ids.length === 1 ? 'Transaction deleted' : `${ids.length} transactions deleted`);
-			} catch (error) {
-				console.error('Failed to delete transactions:', error);
-				toast.error('Failed to delete transactions');
 			}
-		}
+		});
 	}
 
 	// Handle bulk category change
@@ -271,6 +360,30 @@
 		} catch (error) {
 			console.error('Failed to update categories:', error);
 			toast.error('Failed to update categories');
+		}
+	}
+
+	// Handle opening split modal from edit modal
+	function handleOpenSplit(transaction: Transaction) {
+		editingTransaction = null; // Close edit modal
+		splittingTransaction = transaction; // Open split modal
+	}
+
+	// Handle split transaction
+	async function handleSplitTransaction(id: number, splits: { categoryId: number; amount: number }[]) {
+		try {
+			await splitTransaction(id, splits);
+			// Reload transactions
+			transactions = await getTransactionsByMonth(currentMonth);
+			// Also refresh allTransactions if we have it loaded
+			if (allTransactions.length > 0) {
+				allTransactions = await getAllTransactions();
+			}
+			splittingTransaction = null;
+			toast.success(`Transaction split into ${splits.length} parts`);
+		} catch (error) {
+			console.error('Failed to split transaction:', error);
+			toast.error(error instanceof Error ? error.message : 'Failed to split transaction');
 		}
 	}
 
@@ -336,6 +449,7 @@
 				{categories}
 				{settings}
 				onSubmit={handleAddTransaction}
+				onSplitSubmit={handleSplitSubmit}
 			/>
 
 			<!-- Transaction Search & Filters -->
@@ -401,7 +515,28 @@
 	{categories}
 	{settings}
 	onSave={handleSaveEdit}
+	onSplit={handleOpenSplit}
 	onClose={() => editingTransaction = null}
+/>
+
+<!-- Split Transaction Modal -->
+<SplitTransactionModal
+	isOpen={splittingTransaction !== null}
+	transaction={splittingTransaction}
+	{categories}
+	onSplit={handleSplitTransaction}
+	onClose={() => splittingTransaction = null}
+/>
+
+<!-- Confirm Dialog -->
+<ConfirmDialog
+	isOpen={confirmDialog.isOpen}
+	title={confirmDialog.title}
+	message={confirmDialog.message}
+	confirmText={confirmDialog.confirmText}
+	variant={confirmDialog.variant}
+	onConfirm={handleConfirm}
+	onCancel={closeConfirmDialog}
 />
 
 <!-- Quick Add FAB -->

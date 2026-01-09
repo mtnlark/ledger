@@ -28,16 +28,20 @@ export function createTransactionsStore(month: string) {
 }
 
 // Get all transactions for a month using indexed date range query
+// Filters out split parent transactions (they've been replaced by children)
 export async function getTransactionsByMonth(month: string): Promise<Transaction[]> {
 	const { start, end } = getMonthDateRange(month);
-	return db.transactions
+	const transactions = await db.transactions
 		.where('date')
 		.between(start, end, true, true)
+		.filter((t) => !t.isSplitParent)
 		.reverse()
 		.sortBy('date');
+	return transactions;
 }
 
 // Get transactions within a date range using indexed query
+// Filters out split parent transactions (they've been replaced by children)
 export async function getTransactionsByDateRange(
 	fromDate?: Date,
 	toDate?: Date
@@ -53,6 +57,7 @@ export async function getTransactionsByDateRange(
 	return db.transactions
 		.where('date')
 		.between(start, end, true, true)
+		.filter((t) => !t.isSplitParent)
 		.reverse()
 		.sortBy('date');
 }
@@ -136,6 +141,82 @@ export async function bulkUpdateCategory(ids: number[], categoryId: number): Pro
 	});
 	invalidateTransactionCaches();
 	await persistData();
+}
+
+// Split a transaction into multiple category-based parts
+export async function splitTransaction(
+	id: number,
+	splits: { categoryId: number; amount: number; notes?: string }[]
+): Promise<number[]> {
+	if (splits.length < 2) {
+		throw new Error('Must have at least 2 split lines');
+	}
+
+	const parent = await db.transactions.get(id);
+	if (!parent) {
+		throw new Error('Transaction not found');
+	}
+
+	// Validate total equals parent amount (within rounding tolerance)
+	const total = splits.reduce((sum, s) => sum + s.amount, 0);
+	if (Math.abs(total - parent.amount) > 0.01) {
+		throw new Error('Split amounts must equal original transaction amount');
+	}
+
+	// Cannot split a transaction that is already a child
+	if (parent.parentTransactionId) {
+		throw new Error('Cannot split a transaction that is already part of a split');
+	}
+
+	const now = new Date();
+	const childIds: number[] = [];
+
+	// Create child transactions
+	for (const split of splits) {
+		const partnerShare = parent.isShared
+			? calculatePartnerShare(split.amount, parent.splitType, parent.splitValue)
+			: 0;
+
+		const childId = await db.transactions.add({
+			date: parent.date,
+			merchant: parent.merchant,
+			amount: split.amount,
+			categoryId: split.categoryId,
+			isShared: parent.isShared,
+			splitType: parent.splitType,
+			splitValue: parent.splitValue,
+			partnerShare,
+			isSettled: parent.isSettled,
+			settledDate: parent.settledDate,
+			notes: split.notes,
+			isEssential: parent.isEssential,
+			parentTransactionId: id,
+			createdAt: now,
+			updatedAt: now
+		});
+		childIds.push(childId as number);
+	}
+
+	// Mark the parent as split so it's hidden from normal queries
+	await db.transactions.update(id, {
+		isSplitParent: true,
+		updatedAt: now
+	});
+
+	invalidateTransactionCaches();
+	await persistData();
+	return childIds;
+}
+
+// Get child transactions for a split parent
+export async function getSplitChildren(parentId: number): Promise<Transaction[]> {
+	return db.transactions.where('parentTransactionId').equals(parentId).toArray();
+}
+
+// Check if a transaction has been split (has children)
+export async function isSplitParent(id: number): Promise<boolean> {
+	const children = await db.transactions.where('parentTransactionId').equals(id).count();
+	return children > 0;
 }
 
 // Mark transactions as settled
@@ -241,8 +322,9 @@ export async function getAvailableMonths(): Promise<string[]> {
 }
 
 // Get all transactions (for YTD calculations)
+// Filters out split parent transactions (they've been replaced by children)
 export async function getAllTransactions(): Promise<Transaction[]> {
-	return db.transactions.toArray();
+	return db.transactions.filter((t) => !t.isSplitParent).toArray();
 }
 
 // Get spending by category across multiple months

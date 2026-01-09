@@ -15,6 +15,8 @@ export interface Transaction {
 	settledDate?: Date;
 	notes?: string;
 	isEssential: boolean; // Needs vs wants - defaults from category but can be overridden
+	parentTransactionId?: number; // Links split children to their parent transaction
+	isSplitParent?: boolean; // True if this transaction has been split into children
 	createdAt: Date;
 	updatedAt: Date;
 }
@@ -59,6 +61,14 @@ class BudgetTrackerDB extends Dexie {
 
 		this.version(1).stores({
 			transactions: '++id, date, merchant, categoryId, isShared, isSettled, [date+merchant+amount]',
+			categories: '++id, name, isActive, sortOrder',
+			monthlyBudgets: '++id, &month',
+			settings: 'id'
+		});
+
+		// Version 2: Add parentTransactionId index for split transactions
+		this.version(2).stores({
+			transactions: '++id, date, merchant, categoryId, isShared, isSettled, parentTransactionId, [date+merchant+amount]',
 			categories: '++id, name, isActive, sortOrder',
 			monthlyBudgets: '++id, &month',
 			settings: 'id'
