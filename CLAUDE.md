@@ -65,9 +65,11 @@ budget-tracker/
 ├── src/
 │   ├── app.html              # HTML template
 │   ├── app.css               # Tailwind + design system
+│   ├── app.d.ts              # TypeScript definitions
 │   ├── lib/
 │   │   ├── db/
-│   │   │   └── index.ts      # Dexie schema & defaults
+│   │   │   ├── index.ts      # Dexie schema & defaults
+│   │   │   └── migrations.ts # Database migration logic
 │   │   ├── storage/
 │   │   │   ├── index.ts      # Storage abstraction layer
 │   │   │   └── tauri-adapter.ts  # File persistence
@@ -77,33 +79,78 @@ budget-tracker/
 │   │   │   ├── settings.ts
 │   │   │   ├── budget.ts
 │   │   │   ├── merchants.ts
-│   │   │   └── recurring.ts
+│   │   │   ├── recurring.ts
+│   │   │   ├── selectedMonth.ts  # UI state for month selection
+│   │   │   └── toast.ts          # Toast notification system
 │   │   ├── components/
-│   │   │   ├── SideNav.svelte        # Collapsible sidebar
-│   │   │   ├── HeaderNav.svelte      # Page headers
+│   │   │   ├── SideNav.svelte         # Collapsible sidebar
+│   │   │   ├── HeaderNav.svelte       # Page headers
 │   │   │   ├── TransactionForm.svelte
 │   │   │   ├── TransactionList.svelte
+│   │   │   ├── TransactionFilters.svelte
+│   │   │   ├── EditTransactionModal.svelte
+│   │   │   ├── SplitTransactionModal.svelte
 │   │   │   ├── CashFlowCard.svelte
 │   │   │   ├── SettlementTracker.svelte
-│   │   │   └── insights/             # Insight components
-│   │   └── utils/
-│   │       ├── import.ts     # Excel import
-│   │       └── export.ts     # CSV/JSON export
-│   └── routes/
-│       ├── +layout.svelte    # App shell with SideNav
-│       ├── +page.svelte      # Dashboard
-│       ├── insights/+page.svelte
-│       ├── shared/+page.svelte
-│       └── settings/+page.svelte
+│   │   │   ├── QuickAddFAB.svelte
+│   │   │   ├── BulkActionBar.svelte
+│   │   │   ├── BudgetModal.svelte
+│   │   │   ├── CategoryManager.svelte
+│   │   │   ├── CategoryCombobox.svelte
+│   │   │   ├── CategoryEditModal.svelte
+│   │   │   ├── CategoryBreakdownChart.svelte
+│   │   │   ├── MonthlyTrendsChart.svelte
+│   │   │   ├── MonthPicker.svelte
+│   │   │   ├── MerchantAutocomplete.svelte
+│   │   │   ├── ConfirmDialog.svelte
+│   │   │   ├── ToastContainer.svelte
+│   │   │   ├── EmptyState.svelte
+│   │   │   ├── Skeleton.svelte
+│   │   │   ├── ChartWrapper.svelte
+│   │   │   └── insights/              # Insight components
+│   │   │       ├── InsightGroup.svelte
+│   │   │       ├── InsightMetric.svelte
+│   │   │       ├── SmartTakeaways.svelte
+│   │   │       ├── SpendingThisMonth.svelte
+│   │   │       ├── YTDSummary.svelte
+│   │   │       ├── YTDStats.svelte
+│   │   │       ├── NeedsWantsInsights.svelte
+│   │   │       ├── RecurringInsights.svelte
+│   │   │       ├── CategoryDeepDives.svelte
+│   │   │       ├── CategoryComparison.svelte
+│   │   │       ├── CategoryTrendsChart.svelte
+│   │   │       ├── SavingsRateChart.svelte
+│   │   │       └── CalendarHeatmap.svelte
+│   │   ├── utils/
+│   │   │   ├── import.ts          # Excel import
+│   │   │   ├── export.ts          # CSV/JSON export
+│   │   │   ├── category-helpers.ts
+│   │   │   ├── date-helpers.ts
+│   │   │   └── string-helpers.ts
+│   │   └── assets/
+│   │       └── favicon.svg
+│   ├── routes/
+│   │   ├── +layout.svelte    # App shell with SideNav
+│   │   ├── +layout.ts
+│   │   ├── +page.svelte      # Dashboard
+│   │   ├── insights/+page.svelte
+│   │   ├── shared/+page.svelte
+│   │   └── settings/+page.svelte
+│   └── tests/
+│       └── setup.ts          # Vitest test setup
 ├── src-tauri/
 │   ├── src/
 │   │   ├── main.rs
 │   │   └── lib.rs            # Tauri plugins setup
+│   ├── capabilities/
+│   │   └── default.json      # Capability configuration
 │   ├── icons/                # App icons (all sizes)
 │   ├── tauri.conf.json       # Tauri configuration
 │   └── Cargo.toml
-└── static/
-    └── (empty - no PWA assets)
+├── static/
+│   └── robots.txt
+├── vite.config.ts
+└── vitest.config.ts
 ```
 
 ---
@@ -123,7 +170,11 @@ interface Transaction {
   partnerShare: number;
   isSettled: boolean;
   settledDate?: Date;
-  isEssential: boolean;  // Needs vs wants
+  isEssential: boolean;           // Needs vs wants
+  isSubscription: boolean;        // Recurring subscription payment
+  subscriptionFrequency?: 'monthly' | 'annual';
+  parentTransactionId?: number;   // Links split children to parent
+  isSplitParent?: boolean;        // True if split into children
   notes?: string;
   createdAt: Date;
   updatedAt: Date;
@@ -147,6 +198,11 @@ interface MonthlyBudget {
   notes?: string;
 }
 
+interface CancelledSubscription {
+  merchant: string;        // Normalized merchant name
+  cancelledDate: string;   // ISO date string
+}
+
 interface Settings {
   id: 1;                   // Singleton
   partnerName: string;
@@ -154,7 +210,9 @@ interface Settings {
   defaultSplitValue: number;
   currency: string;
   theme: 'light' | 'dark' | 'system';
-  dismissedRecurring: string[];
+  dismissedRecurring: string[];           // Hidden from recurring detection
+  cancelledSubscriptions: CancelledSubscription[];
+  confirmedActiveSubscriptions: string[]; // Override staleness detection
 }
 ```
 
@@ -176,17 +234,23 @@ Sidebar state persists to localStorage (`ledger-sidebar-expanded`).
 
 ### Dashboard
 - Cash flow summary (income, saved, available, spent, surplus)
-- Collapsible "Add Transaction" form
+- Collapsible "Add Transaction" form with merchant autocomplete
 - Transaction list with search/filters
 - Quick-add FAB for fast entry
+- Edit/split transaction modals
+- Bulk action toolbar for multi-select operations
+- Month picker for navigating between months
 
 ### Insights
-- Category breakdown chart
+- Smart takeaways with AI-generated highlights
+- Category breakdown chart (pie/donut)
 - Monthly spending trends
 - Needs vs wants analysis
-- Year-to-date summary
-- Recurring expense detection
-- Category deep dives
+- Year-to-date summary and statistics
+- Recurring expense detection with subscription tracking
+- Category deep dives and comparisons
+- Savings rate visualization
+- Calendar heatmap of daily spending
 
 ### Shared Expenses
 - Outstanding balance with partner
@@ -199,6 +263,11 @@ Sidebar state persists to localStorage (`ledger-sidebar-expanded`).
 - Category management (add/edit/reorder)
 - Excel import / JSON export
 - Data repair tools
+
+### Subscriptions
+- Mark transactions as subscriptions (monthly/annual)
+- Track cancelled subscriptions
+- Confirm active subscriptions to override staleness detection
 
 ---
 
@@ -237,9 +306,9 @@ npm run test
 
 ---
 
-## Categories (24 total)
+## Categories (23 default)
 
-Car, Cash withdrawals, Clothes & accessories, Coffee & snacks, Donations, Electronics, Fitness & wellness, Fun & hobbies, Gas, Gifts, Groceries, Grooming, Health, Home, Household supplies, Insurance, Parking & tolls, Pet, Rent, Restaurants, Subscriptions, Travel, Utilities, Other
+Car, Cash withdrawals, Clothes & accessories, Coffee & snacks, Donations, Electronics, Fitness & wellness, Fun & hobbies, Gas, Gifts, Groceries, Grooming, Health, Home, Household supplies, Insurance, Parking & tolls, Pet, Rent, Restaurants, Subscriptions, Travel, Utilities
 
 ---
 
