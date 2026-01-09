@@ -13,10 +13,36 @@ export interface MerchantSuggestion {
 	mostCommonCategoryId: number;
 }
 
+// Cache for merchant index - invalidated when transactions change
+let cachedMerchantIndex: Map<string, MerchantEntry> | null = null;
+let cacheVersion = 0;
+
+/**
+ * Invalidate the merchant index cache
+ * Call this when transactions are added, updated, or deleted
+ */
+export function invalidateMerchantCache(): void {
+	cachedMerchantIndex = null;
+	cacheVersion++;
+}
+
+/**
+ * Get the current cache version (for testing/debugging)
+ */
+export function getMerchantCacheVersion(): number {
+	return cacheVersion;
+}
+
 /**
  * Build an index of all merchants with their usage statistics
+ * Uses cached result if available
  */
 export async function buildMerchantIndex(): Promise<Map<string, MerchantEntry>> {
+	// Return cached index if available
+	if (cachedMerchantIndex !== null) {
+		return cachedMerchantIndex;
+	}
+
 	const transactions = await db.transactions.toArray();
 	const index = new Map<string, MerchantEntry>();
 
@@ -44,6 +70,8 @@ export async function buildMerchantIndex(): Promise<Map<string, MerchantEntry>> 
 		}
 	}
 
+	// Cache the result
+	cachedMerchantIndex = index;
 	return index;
 }
 

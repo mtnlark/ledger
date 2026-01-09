@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { RefreshCw, X } from 'lucide-svelte';
 	import type { Category } from '$lib/db';
+	import { createCategoryHelpers } from '$lib/utils/category-helpers';
 	import InsightGroup from './InsightGroup.svelte';
 	import type { DetectedRecurring } from '$lib/stores/recurring';
 	import { dismissRecurring } from '$lib/stores/settings';
@@ -12,6 +13,11 @@
 	}
 
 	let { recurring, categories, onDismiss }: Props = $props();
+
+	// Create category helpers bound to current categories
+	let categoryHelpers = $derived(createCategoryHelpers(categories));
+	let getCategoryIcon = $derived(categoryHelpers.getIcon);
+	let getCategoryColor = $derived(categoryHelpers.getColor);
 
 	async function handleDismiss(merchant: string) {
 		await dismissRecurring(merchant);
@@ -33,16 +39,6 @@
 			currency: 'USD',
 			minimumFractionDigits: 2
 		}).format(amount);
-	}
-
-	function getCategoryIcon(categoryId: number): string {
-		const cat = categories.find((c) => c.id === categoryId);
-		return cat?.icon ?? '📝';
-	}
-
-	function getCategoryColor(categoryId: number): string {
-		const cat = categories.find((c) => c.id === categoryId);
-		return cat?.color ?? '#8A847C';
 	}
 
 	function formatDayOfMonth(day: number): string {

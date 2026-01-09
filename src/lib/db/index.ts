@@ -138,120 +138,23 @@ export const DEFAULT_SETTINGS: Settings = {
 	dismissedRecurring: []
 };
 
-// Initialize database with defaults
+// Initialize database with defaults and run migrations
 export async function initializeDatabase(): Promise<void> {
+	// Seed default categories if empty
 	const categoryCount = await db.categories.count();
 	if (categoryCount === 0) {
 		await db.categories.bulkAdd(DEFAULT_CATEGORIES as Category[]);
 		console.log('Seeded default categories');
 	}
 
+	// Seed default settings if empty
 	const settings = await db.settings.get(1);
 	if (!settings) {
 		await db.settings.add(DEFAULT_SETTINGS);
 		console.log('Initialized default settings');
 	}
 
-	// Migrate: Update Pet category icon to black cat if it's still the dog emoji
-	const petCategory = await db.categories.where('name').equals('Pet').first();
-	if (petCategory && petCategory.icon === '🐕') {
-		await db.categories.update(petCategory.id!, { icon: '🐈‍⬛' });
-		console.log('Updated Pet category icon to black cat');
-	}
-
-	// Migrate: Update category colors to Warm Ledger palette
-	const warmLedgerColors: Record<string, string> = {
-		'Car': '#7C8B99',
-		'Cash withdrawals': '#6B8E6B',
-		'Clothes & accessories': '#C49BA0',
-		'Coffee & snacks': '#A67B5B',
-		'Donations': '#D4A59A',
-		'Electronics': '#6B7B8C',
-		'Fitness & wellness': '#5B8A8A',
-		'Fun & hobbies': '#9B8AA6',
-		'Gas': '#D4915D',
-		'Gifts': '#C9A9A9',
-		'Groceries': '#5B8C5A',
-		'Grooming': '#7BA3A3',
-		'Health': '#B87070',
-		'Home': '#8B7B99',
-		'Household supplies': '#8A847C',
-		'Insurance': '#6B8299',
-		'Parking & tolls': '#9C9588',
-		'Pet': '#C4956A',
-		'Rent': '#7B6B8C',
-		'Restaurants': '#C45D3A',
-		'Subscriptions': '#6B8399',
-		'Travel': '#5B8B8B',
-		'Utilities': '#C9A855'
-	};
-
-	// Check if migration is needed by looking at a known category color
-	const groceriesCategory = await db.categories.where('name').equals('Groceries').first();
-	if (groceriesCategory && groceriesCategory.color !== '#5B8C5A') {
-		// Update all category colors to warm palette
-		const allCategories = await db.categories.toArray();
-		for (const category of allCategories) {
-			const newColor = warmLedgerColors[category.name];
-			if (newColor && category.color !== newColor) {
-				await db.categories.update(category.id!, { color: newColor });
-			}
-		}
-		console.log('Migrated category colors to Warm Ledger palette');
-	}
-
-	// Migrate: Add isEssential field to categories
-	const essentialCategories: Record<string, boolean> = {
-		'Car': true,
-		'Cash withdrawals': false,
-		'Clothes & accessories': false,
-		'Coffee & snacks': false,
-		'Donations': false,
-		'Electronics': false,
-		'Fitness & wellness': false,
-		'Fun & hobbies': false,
-		'Gas': true,
-		'Gifts': false,
-		'Groceries': true,
-		'Grooming': false,
-		'Health': true,
-		'Home': false,
-		'Household supplies': true,
-		'Insurance': true,
-		'Parking & tolls': true,
-		'Pet': true,
-		'Rent': true,
-		'Restaurants': false,
-		'Subscriptions': false,
-		'Travel': false,
-		'Utilities': true
-	};
-
-	// Check if any category is missing isEssential field
-	const allCategoriesForEssential = await db.categories.toArray();
-	for (const category of allCategoriesForEssential) {
-		if (category.isEssential === undefined) {
-			const isEssential = essentialCategories[category.name] ?? false;
-			await db.categories.update(category.id!, { isEssential });
-		}
-	}
-
-	// Migrate: Add dismissedRecurring field to settings
-	const currentSettings = await db.settings.get(1);
-	if (currentSettings && currentSettings.dismissedRecurring === undefined) {
-		await db.settings.update(1, { dismissedRecurring: [] });
-		console.log('Added dismissedRecurring field to settings');
-	}
-
-	// Migrate: Add isEssential field to transactions based on category
-	const allTransactionsForEssential = await db.transactions.toArray();
-	const categoryEssentialMap = new Map(
-		(await db.categories.toArray()).map((c) => [c.id!, c.isEssential ?? false])
-	);
-	for (const tx of allTransactionsForEssential) {
-		if (tx.isEssential === undefined) {
-			const isEssential = categoryEssentialMap.get(tx.categoryId) ?? false;
-			await db.transactions.update(tx.id!, { isEssential });
-		}
-	}
+	// Run all migrations (each is idempotent)
+	const { runMigrations } = await import('./migrations');
+	await runMigrations();
 }

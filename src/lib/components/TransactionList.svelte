@@ -2,6 +2,7 @@
 	import { format, isToday, isYesterday, startOfDay } from 'date-fns';
 	import { Pencil, Trash2, Receipt } from 'lucide-svelte';
 	import type { Transaction, Category, Settings } from '$lib/db';
+	import { createCategoryHelpers } from '$lib/utils/category-helpers';
 	import EmptyState from './EmptyState.svelte';
 
 	interface Props {
@@ -16,6 +17,12 @@
 
 	// Get partner name from settings or use default
 	let partnerName = $derived(settings?.partnerName || 'Partner');
+
+	// Create category helpers bound to current categories
+	let categoryHelpers = $derived(createCategoryHelpers(categories));
+	let getCategoryName = $derived(categoryHelpers.getName);
+	let getCategoryIcon = $derived(categoryHelpers.getIcon);
+	let getCategoryColor = $derived(categoryHelpers.getColor);
 
 	// Group transactions by date
 	interface DateGroup {
@@ -61,21 +68,6 @@
 
 		return result;
 	});
-
-	function getCategoryName(categoryId: number): string {
-		const cat = categories.find((c) => c.id === categoryId);
-		return cat?.name ?? 'Unknown';
-	}
-
-	function getCategoryIcon(categoryId: number): string {
-		const cat = categories.find((c) => c.id === categoryId);
-		return cat?.icon ?? '📝';
-	}
-
-	function getCategoryColor(categoryId: number): string {
-		const cat = categories.find((c) => c.id === categoryId);
-		return cat?.color ?? '#8A847C';
-	}
 
 	function formatCurrency(amount: number): string {
 		return new Intl.NumberFormat('en-US', {

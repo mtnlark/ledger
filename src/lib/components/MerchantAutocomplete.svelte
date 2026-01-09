@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { getMerchantSuggestions, type MerchantSuggestion } from '$lib/stores/merchants';
 	import type { Category } from '$lib/db';
+	import { createCategoryHelpers } from '$lib/utils/category-helpers';
 
 	interface Props {
 		value: string;
@@ -21,6 +22,9 @@
 		class: className = '',
 		inputId = 'merchant'
 	}: Props = $props();
+
+	// Create category helpers bound to current categories
+	let categoryHelpers = $derived(createCategoryHelpers(categories));
 
 	let suggestions = $state<MerchantSuggestion[]>([]);
 	let showSuggestions = $state(false);
@@ -101,9 +105,9 @@
 		}, 150);
 	}
 
-	function getCategoryName(categoryId: number): string {
-		const cat = categories.find((c) => c.id === categoryId);
-		return cat ? `${cat.icon} ${cat.name}` : '';
+	function getCategoryLabel(categoryId: number): string {
+		const { icon, name } = categoryHelpers.getDisplay(categoryId);
+		return name !== 'Unknown' ? `${icon} ${name}` : '';
 	}
 </script>
 
@@ -144,7 +148,7 @@
 					</div>
 					{#if suggestion.mostCommonCategoryId && categories.length > 0}
 						<div class="text-xs text-charcoal-muted mt-0.5">
-							Usually: {getCategoryName(suggestion.mostCommonCategoryId)}
+							Usually: {getCategoryLabel(suggestion.mostCommonCategoryId)}
 						</div>
 					{/if}
 				</li>

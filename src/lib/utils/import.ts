@@ -1,6 +1,7 @@
 import * as XLSX from 'xlsx';
 import { db, type Transaction, type Category } from '$lib/db';
 import { getAllCategories, getCategoryByName } from '$lib/stores/categories';
+import { excelDateToJS, parseDateString } from '$lib/utils/date-helpers';
 
 export interface ImportedTransaction {
 	date: Date;
@@ -17,48 +18,6 @@ export interface ImportResult {
 	imported: number;
 	skipped: number;
 	errors: string[];
-}
-
-/**
- * Convert Excel serial date number to JavaScript Date (local time)
- * Excel dates are number of days since Dec 30, 1899
- * We use date arithmetic instead of milliseconds to avoid timezone issues
- */
-function excelDateToJS(excelDate: number): Date {
-	// Excel's epoch is Dec 30, 1899
-	// Use integer days to avoid floating point issues
-	const days = Math.floor(excelDate);
-	// Create date using component arithmetic to ensure local time
-	// Start from a known date and add days
-	const result = new Date(1899, 11, 30 + days);
-	return result;
-}
-
-/**
- * Parse a date string into a local Date, avoiding UTC interpretation
- * Handles formats like: "2026-01-01", "1/1/2026", "01/01/2026"
- */
-function parseDateString(dateStr: string): Date | null {
-	// Try ISO format first (YYYY-MM-DD)
-	const isoMatch = dateStr.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
-	if (isoMatch) {
-		const [, year, month, day] = isoMatch;
-		return new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
-	}
-
-	// Try US format (M/D/YYYY or MM/DD/YYYY)
-	const usMatch = dateStr.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);
-	if (usMatch) {
-		let [, month, day, year] = usMatch;
-		// Handle 2-digit years
-		let yearNum = parseInt(year);
-		if (yearNum < 100) {
-			yearNum += yearNum < 50 ? 2000 : 1900;
-		}
-		return new Date(yearNum, parseInt(month) - 1, parseInt(day));
-	}
-
-	return null;
 }
 
 /**

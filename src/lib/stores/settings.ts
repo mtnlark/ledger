@@ -1,6 +1,8 @@
 import { db, type Settings, DEFAULT_SETTINGS } from '$lib/db';
 import { liveQuery } from 'dexie';
 import { persistData } from '$lib/storage';
+import { invalidateRecurringCache } from './recurring';
+import { normalizeMerchant } from '$lib/utils/string-helpers';
 
 // Reactive settings
 export const settings = liveQuery(() => db.settings.get(1));
@@ -38,11 +40,6 @@ export async function updateTheme(theme: 'light' | 'dark' | 'system'): Promise<v
 	await persistData();
 }
 
-// Normalize merchant name for dismissed recurring comparison
-function normalizeMerchant(name: string): string {
-	return name.toLowerCase().trim();
-}
-
 // Dismiss a recurring expense (hide from detection)
 export async function dismissRecurring(merchant: string): Promise<void> {
 	const settings = await getSettings();
@@ -50,6 +47,7 @@ export async function dismissRecurring(merchant: string): Promise<void> {
 	const dismissed = settings.dismissedRecurring ?? [];
 	if (!dismissed.includes(normalized)) {
 		await db.settings.update(1, { dismissedRecurring: [...dismissed, normalized] });
+		invalidateRecurringCache();
 		await persistData();
 	}
 }
@@ -62,6 +60,7 @@ export async function restoreRecurring(merchant: string): Promise<void> {
 	await db.settings.update(1, {
 		dismissedRecurring: dismissed.filter((m) => m !== normalized)
 	});
+	invalidateRecurringCache();
 	await persistData();
 }
 

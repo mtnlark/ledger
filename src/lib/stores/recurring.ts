@@ -1,5 +1,6 @@
 import { db, type Transaction } from '$lib/db';
 import { getDismissedRecurring } from './settings';
+import { normalizeMerchant } from '$lib/utils/string-helpers';
 
 export interface DetectedRecurring {
 	merchant: string;
@@ -11,11 +12,24 @@ export interface DetectedRecurring {
 	isSubscription: boolean;
 }
 
+// Cache for recurring detection results - invalidated when transactions change
+let cachedRecurringExpenses: DetectedRecurring[] | null = null;
+let cacheVersion = 0;
+
 /**
- * Normalize merchant name for comparison (lowercase, trimmed)
+ * Invalidate the recurring detection cache
+ * Call this when transactions are added, updated, or deleted
  */
-function normalizeMerchant(name: string): string {
-	return name.toLowerCase().trim();
+export function invalidateRecurringCache(): void {
+	cachedRecurringExpenses = null;
+	cacheVersion++;
+}
+
+/**
+ * Get the current cache version (for testing/debugging)
+ */
+export function getRecurringCacheVersion(): number {
+	return cacheVersion;
 }
 
 /**
@@ -99,11 +113,18 @@ function detectMonthlyPattern(transactions: Transaction[]): number | null {
 /**
  * Detect recurring expenses from transaction history
  * Looks for patterns: same merchant, similar amounts, monthly cadence
+ * Results are cached until invalidated
  */
 export async function detectRecurringExpenses(): Promise<DetectedRecurring[]> {
+	// Return cached results if available
+	if (cachedRecurringExpenses !== null) {
+		return cachedRecurringExpenses;
+	}
+
 	const allTransactions = await db.transactions.toArray();
 
 	if (allTransactions.length === 0) {
+		cachedRecurringExpenses = [];
 		return [];
 	}
 
@@ -165,6 +186,8 @@ export async function detectRecurringExpenses(): Promise<DetectedRecurring[]> {
 	// Sort by average amount descending (highest recurring expenses first)
 	detected.sort((a, b) => b.averageAmount - a.averageAmount);
 
+	// Cache the results
+	cachedRecurringExpenses = detected;
 	return detected;
 }
 

@@ -4,6 +4,7 @@
 	import { ChevronDown, Plus } from 'lucide-svelte';
 	import { slide } from 'svelte/transition';
 	import type { Category, Settings } from '$lib/db';
+	import { parseLocalDate } from '$lib/utils/date-helpers';
 	import CategoryCombobox from './CategoryCombobox.svelte';
 	import MerchantAutocomplete from './MerchantAutocomplete.svelte';
 	import { getMostCommonCategory } from '$lib/stores/merchants';
@@ -66,16 +67,40 @@
 
 	// Computed values
 	let amount = $derived(parseFloat(amountStr) || 0);
+
+	// Validate and clamp split value based on type and amount
+	let validatedSplitValue = $derived.by(() => {
+		if (splitType === 'percentage') {
+			return Math.min(1, Math.max(0, splitValue));
+		} else {
+			return Math.min(amount, Math.max(0, splitValue));
+		}
+	});
+
+	// Check if current input is invalid (for showing warning)
+	let splitValueInvalid = $derived.by(() => {
+		if (!isShared) return false;
+		if (splitType === 'percentage') {
+			return splitValue < 0 || splitValue > 1;
+		} else {
+			return splitValue < 0 || splitValue > amount;
+		}
+	});
+
 	let partnerShare = $derived(
-		isShared ? (splitType === 'percentage' ? amount * splitValue : splitValue) : 0
+		isShared ? (splitType === 'percentage' ? amount * validatedSplitValue : validatedSplitValue) : 0
 	);
 	let yourShare = $derived(amount - partnerShare);
 
-	// Parse date string to local date (avoids UTC timezone issues)
-	function parseDateString(dateStr: string): Date {
-		const [year, month, day] = dateStr.split('-').map(Number);
-		return new Date(year, month - 1, day);
-	}
+	// Auto-correct invalid split values when switching types or when amount changes
+	$effect(() => {
+		if (isShared && splitType === 'fixed' && amount > 0 && splitValue > amount) {
+			splitValue = amount;
+		}
+		if (isShared && splitType === 'percentage' && splitValue > 1) {
+			splitValue = 1;
+		}
+	});
 
 	function handleSubmit(e: Event) {
 		e.preventDefault();
@@ -85,14 +110,14 @@
 		}
 
 		onSubmit({
-			date: parseDateString(dateStr),
+			date: parseLocalDate(dateStr),
 			merchant: merchant.trim(),
 			amount,
 			categoryId,
 			isShared,
 			isSettled: isShared ? isSettled : false,
 			splitType,
-			splitValue,
+			splitValue: validatedSplitValue, // Use validated value
 			notes: notes.trim() || undefined,
 			isEssential
 		});
@@ -288,6 +313,9 @@
 						<div>
 							<label for="splitFixed" class="block text-sm text-charcoal-soft mb-1">
 								{settings.partnerName}'s exact share
+								{#if amount > 0}
+									<span class="text-charcoal-muted">(max {formatCurrency(amount)})</span>
+								{/if}
 							</label>
 							<div class="relative">
 								<span class="absolute left-3 top-1/2 -translate-y-1/2 text-charcoal-muted font-mono">$</span>
@@ -295,12 +323,16 @@
 									type="number"
 									id="splitFixed"
 									bind:value={splitValue}
+									onblur={() => { if (splitValue > amount) splitValue = amount; if (splitValue < 0) splitValue = 0; }}
 									step="0.01"
 									min="0"
 									max={amount}
-									class="w-full pl-7 pr-3 py-2 bg-white border border-[rgba(45,42,38,0.15)] rounded-lg focus:ring-2 focus:ring-success-500/20 focus:border-success-500 transition-colors font-mono"
+									class="w-full pl-7 pr-3 py-2 bg-white border rounded-lg focus:ring-2 transition-colors font-mono {splitValueInvalid ? 'border-warning-500 focus:ring-warning-500/20 focus:border-warning-500' : 'border-[rgba(45,42,38,0.15)] focus:ring-success-500/20 focus:border-success-500'}"
 								/>
 							</div>
+							{#if splitValueInvalid}
+								<p class="text-xs text-warning-600 mt-1">Value will be clamped to {formatCurrency(validatedSplitValue)}</p>
+							{/if}
 						</div>
 					{/if}
 

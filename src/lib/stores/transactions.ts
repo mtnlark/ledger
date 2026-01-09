@@ -2,72 +2,59 @@ import { writable, derived } from 'svelte/store';
 import { db, calculatePartnerShare, getMonthKey, type Transaction } from '$lib/db';
 import { liveQuery } from 'dexie';
 import { persistData } from '$lib/storage';
+import { invalidateMerchantCache } from './merchants';
+import { invalidateRecurringCache } from './recurring';
+import { getMonthDateRange } from '$lib/utils/date-helpers';
+
+// Helper to invalidate all caches that depend on transaction data
+function invalidateTransactionCaches(): void {
+	invalidateMerchantCache();
+	invalidateRecurringCache();
+}
 
 // Current selected month store
 export const currentMonth = writable(getMonthKey(new Date()));
 
 // Reactive transactions for current month
 export function createTransactionsStore(month: string) {
+	const { start, end } = getMonthDateRange(month);
 	return liveQuery(() =>
 		db.transactions
 			.where('date')
-			.between(
-				new Date(`${month}-01`),
-				new Date(
-					new Date(`${month}-01`).getFullYear(),
-					new Date(`${month}-01`).getMonth() + 1,
-					0,
-					23,
-					59,
-					59
-				)
-			)
+			.between(start, end, true, true)
 			.reverse()
 			.sortBy('date')
 	);
 }
 
-// Get all transactions for a month
+// Get all transactions for a month using indexed date range query
 export async function getTransactionsByMonth(month: string): Promise<Transaction[]> {
-	// Get all transactions and filter by month using consistent month-key extraction
-	// This avoids timezone issues where UTC dates might shift to adjacent months locally
-	const allTransactions = await db.transactions.toArray();
-
-	return allTransactions
-		.filter((t) => {
-			// Use getMonthKey which correctly extracts local year/month
-			const txMonthKey = getMonthKey(new Date(t.date));
-			return txMonthKey === month;
-		})
-		.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+	const { start, end } = getMonthDateRange(month);
+	return db.transactions
+		.where('date')
+		.between(start, end, true, true)
+		.reverse()
+		.sortBy('date');
 }
 
-// Get transactions within a date range (supports cross-month filtering)
+// Get transactions within a date range using indexed query
 export async function getTransactionsByDateRange(
 	fromDate?: Date,
 	toDate?: Date
 ): Promise<Transaction[]> {
-	const allTransactions = await db.transactions.toArray();
+	// Normalize dates to start/end of day for inclusive range
+	const start = fromDate
+		? new Date(fromDate.getFullYear(), fromDate.getMonth(), fromDate.getDate())
+		: new Date(0); // Unix epoch if no start
+	const end = toDate
+		? new Date(toDate.getFullYear(), toDate.getMonth(), toDate.getDate(), 23, 59, 59, 999)
+		: new Date(9999, 11, 31); // Far future if no end
 
-	return allTransactions
-		.filter((t) => {
-			const txDate = new Date(t.date);
-			// Normalize to start of day for comparison
-			const txDay = new Date(txDate.getFullYear(), txDate.getMonth(), txDate.getDate());
-
-			if (fromDate) {
-				const fromDay = new Date(fromDate.getFullYear(), fromDate.getMonth(), fromDate.getDate());
-				if (txDay < fromDay) return false;
-			}
-
-			if (toDate) {
-				const toDay = new Date(toDate.getFullYear(), toDate.getMonth(), toDate.getDate());
-				if (txDay > toDay) return false;
-			}
-
-			return true;
-		})
-		.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+	return db.transactions
+		.where('date')
+		.between(start, end, true, true)
+		.reverse()
+		.sortBy('date');
 }
 
 // Add a new transaction
@@ -86,6 +73,7 @@ export async function addTransaction(
 		updatedAt: now
 	});
 
+	invalidateTransactionCaches();
 	await persistData();
 	return id;
 }
@@ -120,12 +108,14 @@ export async function updateTransaction(
 		updatedAt: new Date()
 	});
 
+	invalidateTransactionCaches();
 	await persistData();
 }
 
 // Delete a transaction
 export async function deleteTransaction(id: number): Promise<void> {
 	await db.transactions.delete(id);
+	invalidateTransactionCaches();
 	await persistData();
 }
 
@@ -137,16 +127,17 @@ export async function markAsSettled(ids: number[]): Promise<void> {
 		settledDate: now,
 		updatedAt: now
 	});
+	invalidateTransactionCaches();
 	await persistData();
 }
 
 // Get unsettled transactions (sorted by date, most recent first)
+// Note: IndexedDB doesn't support boolean index keys, so we use filter
 export async function getUnsettledTransactions(): Promise<Transaction[]> {
-	// Filter for shared transactions that haven't been settled
-	const allTransactions = await db.transactions.toArray();
-	return allTransactions
+	return db.transactions
 		.filter((t) => t.isShared && !t.isSettled)
-		.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+		.reverse()
+		.sortBy('date');
 }
 
 // Calculate outstanding balance (what partner owes)
@@ -157,32 +148,40 @@ export async function calculateOutstandingBalance(): Promise<number> {
 
 // Get the earliest month that has transactions (for month picker)
 export async function getEarliestTransactionMonth(): Promise<string | null> {
-	const allTransactions = await db.transactions.toArray();
-	if (allTransactions.length === 0) return null;
-
-	// Find the earliest date
-	const earliest = allTransactions.reduce((min, t) => {
-		const date = new Date(t.date);
-		return date < min ? date : min;
-	}, new Date(allTransactions[0].date));
-
-	return getMonthKey(earliest);
+	// Use date index to get earliest transaction directly
+	const earliest = await db.transactions.orderBy('date').first();
+	if (!earliest) return null;
+	return getMonthKey(new Date(earliest.date));
 }
 
 // Get spending totals by month for trends chart
 export async function getMonthlySpendingTrends(months: string[]): Promise<Map<string, number>> {
-	const allTransactions = await db.transactions.toArray();
 	const spending = new Map<string, number>();
+	if (months.length === 0) return spending;
 
 	// Initialize all months with 0
 	for (const month of months) {
 		spending.set(month, 0);
 	}
 
+	// Sort months to find date range
+	const sortedMonths = [...months].sort();
+	const firstMonth = sortedMonths[0];
+	const lastMonth = sortedMonths[sortedMonths.length - 1];
+
+	// Get date range that covers all requested months
+	const { start } = getMonthDateRange(firstMonth);
+	const { end } = getMonthDateRange(lastMonth);
+
+	// Only load transactions within the requested date range
+	const transactions = await db.transactions
+		.where('date')
+		.between(start, end, true, true)
+		.toArray();
+
 	// Sum spending for each month
-	for (const t of allTransactions) {
-		const date = new Date(t.date);
-		const monthKey = getMonthKey(date);
+	for (const t of transactions) {
+		const monthKey = getMonthKey(new Date(t.date));
 
 		if (spending.has(monthKey)) {
 			// For shared transactions, only count your portion
@@ -232,18 +231,35 @@ export async function getCategoryTrends(
 	categoryId: number,
 	months: string[]
 ): Promise<Map<string, number>> {
-	const allTransactions = await db.transactions.toArray();
 	const spending = new Map<string, number>();
+	if (months.length === 0) return spending;
 
 	// Initialize all months with 0
 	for (const month of months) {
 		spending.set(month, 0);
 	}
 
-	// Sum spending for the category in each month
-	for (const t of allTransactions) {
-		if (t.categoryId !== categoryId) continue;
+	// Sort months to find date range
+	const sortedMonths = [...months].sort();
+	const firstMonth = sortedMonths[0];
+	const lastMonth = sortedMonths[sortedMonths.length - 1];
 
+	// Get date range that covers all requested months
+	const { start } = getMonthDateRange(firstMonth);
+	const { end } = getMonthDateRange(lastMonth);
+
+	// Use categoryId index and filter by date range
+	const transactions = await db.transactions
+		.where('categoryId')
+		.equals(categoryId)
+		.filter((t) => {
+			const date = new Date(t.date);
+			return date >= start && date <= end;
+		})
+		.toArray();
+
+	// Sum spending for each month
+	for (const t of transactions) {
 		const monthKey = getMonthKey(new Date(t.date));
 		if (spending.has(monthKey)) {
 			const amount = t.isShared ? t.amount - t.partnerShare : t.amount;

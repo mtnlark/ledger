@@ -2,6 +2,7 @@
 	import { onMount } from 'svelte';
 	import { Check, PartyPopper } from 'lucide-svelte';
 	import type { Transaction, Category, Settings } from '$lib/db';
+	import { createCategoryHelpers } from '$lib/utils/category-helpers';
 	import EmptyState from './EmptyState.svelte';
 
 	interface Props {
@@ -23,21 +24,11 @@
 	// Track selected transactions for batch settlement
 	let selectedIds = $state<Set<number>>(new Set());
 
-	// Get category by ID
-	function getCategoryName(categoryId: number): string {
-		const category = categories.find((c) => c.id === categoryId);
-		return category?.name ?? 'Unknown';
-	}
-
-	function getCategoryIcon(categoryId: number): string {
-		const category = categories.find((c) => c.id === categoryId);
-		return category?.icon ?? '📦';
-	}
-
-	function getCategoryColor(categoryId: number): string {
-		const category = categories.find((c) => c.id === categoryId);
-		return category?.color ?? '#8A847C';
-	}
+	// Create category helpers bound to current categories
+	let categoryHelpers = $derived(createCategoryHelpers(categories));
+	let getCategoryName = $derived(categoryHelpers.getName);
+	let getCategoryIcon = $derived(categoryHelpers.getIcon);
+	let getCategoryColor = $derived(categoryHelpers.getColor);
 
 	function formatCurrency(amount: number): string {
 		return new Intl.NumberFormat('en-US', {
