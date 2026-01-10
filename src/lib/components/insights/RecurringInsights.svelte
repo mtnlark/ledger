@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { RefreshCw, X, Calendar, Zap, AlertCircle, ChevronDown, RotateCcw } from 'lucide-svelte';
+	import { RefreshCw, X, Calendar, Zap, AlertCircle } from 'lucide-svelte';
 	import type { Category, Transaction, CancelledSubscription } from '$lib/db';
 	import { createCategoryHelpers } from '$lib/utils/category-helpers';
 	import InsightGroup from './InsightGroup.svelte';
@@ -7,7 +7,6 @@
 	import {
 		dismissRecurring,
 		cancelSubscription,
-		reactivateSubscription,
 		confirmSubscriptionActive
 	} from '$lib/stores/settings';
 	import { normalizeMerchant } from '$lib/utils/string-helpers';
@@ -22,21 +21,15 @@
 		onSubscriptionChange?: () => void;
 	}
 
-	let {
-		recurring,
-		categories,
-		allTransactions,
-		cancelledSubscriptions,
-		confirmedActiveSubscriptions,
-		onDismiss,
-		onSubscriptionChange
-	}: Props = $props();
+	// Keep props as object for reactive access in $derived computations
+	const props = $props<Props>();
 
-	// UI state
-	let showCancelled = $state(false);
+	// Destructure callbacks (non-reactive)
+	const { onDismiss, onSubscriptionChange } = props;
 
-	// Create category helpers bound to current categories
-	let categoryHelpers = $derived(createCategoryHelpers(categories));
+
+	// Create category helpers bound to current categories (access via props for reactivity)
+	let categoryHelpers = $derived(createCategoryHelpers(props.categories));
 	let getCategoryIcon = $derived(categoryHelpers.getIcon);
 	let getCategoryName = $derived(categoryHelpers.getName);
 
@@ -59,9 +52,9 @@
 
 	// Get unique subscriptions from transactions (most recent for each merchant)
 	let allSubscriptions = $derived.by(() => {
-		const subTransactions = allTransactions.filter((t) => t.isSubscription);
+		const subTransactions = props.allTransactions.filter((t) => t.isSubscription);
 
-		// Group by merchant to get unique subscriptions
+		// Group by merchant to get unique subscriptions (keep most recent)
 		const byMerchant = new Map<string, Transaction>();
 		for (const tx of subTransactions) {
 			const existing = byMerchant.get(tx.merchant);
@@ -73,14 +66,23 @@
 		return Array.from(byMerchant.values());
 	});
 
-	// Normalize cancelled merchant names for lookup
-	let cancelledMerchantSet = $derived(
-		new Set(cancelledSubscriptions.map((c) => c.merchant))
+	// Create a map of cancelled merchants to their cancellation dates
+	let cancelledMerchantMap = $derived(
+		new Map(props.cancelledSubscriptions.map((c) => [c.merchant, new Date(c.cancelledDate)]))
 	);
+
+	// Helper to check if a subscription is cancelled (and not resubscribed after cancellation)
+	function isCancelled(merchant: string, createdAt: Date): boolean {
+		const normalized = normalizeMerchant(merchant);
+		const cancelledDate = cancelledMerchantMap.get(normalized);
+		if (!cancelledDate) return false;
+		// If the transaction was added after the cancellation, it's a resubscription
+		return createdAt <= cancelledDate;
+	}
 
 	// Normalize confirmed active merchant names for lookup
 	let confirmedActiveSet = $derived(
-		new Set(confirmedActiveSubscriptions)
+		new Set(props.confirmedActiveSubscriptions)
 	);
 
 	// Classify subscriptions
@@ -88,10 +90,14 @@
 		return allSubscriptions
 			.filter((sub) => {
 				const normalized = normalizeMerchant(sub.merchant);
-				// Not cancelled
-				if (cancelledMerchantSet.has(normalized)) return false;
+				const subDate = new Date(sub.date);
+				// Use createdAt (when user added the transaction) to compare against cancellation
+				// This handles the case where user adds a new subscription with a past charge date
+				const createdAt = new Date(sub.createdAt);
+				// Check if cancelled (but allow resubscriptions added after cancellation)
+				if (isCancelled(sub.merchant, createdAt)) return false;
 				// Either confirmed active OR not stale
-				const stale = isStale(new Date(sub.date), sub.subscriptionFrequency);
+				const stale = isStale(subDate, sub.subscriptionFrequency);
 				return confirmedActiveSet.has(normalized) || !stale;
 			})
 			.sort((a, b) => {
@@ -106,25 +112,13 @@
 		return allSubscriptions
 			.filter((sub) => {
 				const normalized = normalizeMerchant(sub.merchant);
-				// Not cancelled
-				if (cancelledMerchantSet.has(normalized)) return false;
+				const subDate = new Date(sub.date);
+				const createdAt = new Date(sub.createdAt);
+				// Not cancelled (or resubscribed after cancellation)
+				if (isCancelled(sub.merchant, createdAt)) return false;
 				// Not confirmed active AND is stale
 				if (confirmedActiveSet.has(normalized)) return false;
-				return isStale(new Date(sub.date), sub.subscriptionFrequency);
-			})
-			.sort((a, b) => b.amount - a.amount);
-	});
-
-	let cancelledSubscriptionsList = $derived.by(() => {
-		return allSubscriptions
-			.filter((sub) => {
-				const normalized = normalizeMerchant(sub.merchant);
-				return cancelledMerchantSet.has(normalized);
-			})
-			.map((sub) => {
-				const normalized = normalizeMerchant(sub.merchant);
-				const cancelledInfo = cancelledSubscriptions.find((c) => c.merchant === normalized);
-				return { ...sub, cancelledDate: cancelledInfo?.cancelledDate };
+				return isStale(subDate, sub.subscriptionFrequency);
 			})
 			.sort((a, b) => b.amount - a.amount);
 	});
@@ -157,7 +151,7 @@
 
 	// Calculate detected recurring totals (user's portion only, converted to monthly)
 	let totalDetectedMonthly = $derived(
-		recurring.reduce((sum, r) => {
+		props.recurring.reduce((sum, r) => {
 			// Convert to monthly equivalent based on frequency
 			if (r.frequency === 'semi-annual') {
 				return sum + r.averageUserAmount / 6;
@@ -173,7 +167,7 @@
 
 	// Has any data?
 	let hasData = $derived(
-		allSubscriptions.length > 0 || recurring.length > 0
+		allSubscriptions.length > 0 || props.recurring.length > 0
 	);
 
 	// Action handlers
@@ -184,11 +178,6 @@
 
 	async function handleCancelSubscription(merchant: string) {
 		await cancelSubscription(merchant);
-		onSubscriptionChange?.();
-	}
-
-	async function handleReactivateSubscription(merchant: string) {
-		await reactivateSubscription(merchant);
 		onSubscriptionChange?.();
 	}
 
@@ -243,11 +232,6 @@
 		}
 	}
 
-	function formatCancelledDate(isoDate: string | undefined): string {
-		if (!isoDate) return '';
-		const date = new Date(isoDate);
-		return date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
-	}
 </script>
 
 <InsightGroup title="Recurring Expenses" description="Subscriptions and recurring bills">
@@ -264,7 +248,7 @@
 				</div>
 				<div class="text-charcoal-muted">|</div>
 				<div class="text-sm text-charcoal-muted">
-					{activeSubscriptions.length} sub{activeSubscriptions.length !== 1 ? 's' : ''}, {recurring.length} bill{recurring.length !== 1 ? 's' : ''}
+					{activeSubscriptions.length} sub{activeSubscriptions.length !== 1 ? 's' : ''}, {props.recurring.length} bill{props.recurring.length !== 1 ? 's' : ''}
 					{#if possiblyInactiveSubscriptions.length > 0}
 						<span class="text-warning-600 ml-1">({possiblyInactiveSubscriptions.length} inactive?)</span>
 					{/if}
@@ -413,16 +397,16 @@
 				{/if}
 
 				<!-- Detected Recurring Bills Section -->
-				{#if recurring.length > 0}
+				{#if props.recurring.length > 0}
 					<div>
 						<h4 class="text-sm font-medium text-charcoal-muted mb-3 flex items-center gap-2">
 							<Zap size={14} />
 							Detected Bills
-							<span class="text-xs font-normal">({recurring.length})</span>
+							<span class="text-xs font-normal">({props.recurring.length})</span>
 						</h4>
 
 						<div class="space-y-2">
-							{#each recurring as item (item.merchant)}
+							{#each props.recurring as item (item.merchant)}
 								{@const freqLabel = item.frequency === 'monthly' ? '/mo' : item.frequency === 'semi-annual' ? '/6mo' : '/yr'}
 								{@const freqDesc = item.frequency === 'monthly' ? 'monthly' : item.frequency === 'semi-annual' ? 'every 6 months' : 'annually'}
 								<div class="flex items-center gap-3 py-2 px-3 bg-cream/50 rounded-lg group">
@@ -465,54 +449,6 @@
 					</div>
 				{/if}
 
-				<!-- Cancelled Subscriptions (Collapsed) -->
-				{#if cancelledSubscriptionsList.length > 0}
-					<div>
-						<button
-							onclick={() => (showCancelled = !showCancelled)}
-							class="w-full text-sm font-medium text-charcoal-muted flex items-center gap-2 py-2 hover:text-charcoal transition-colors"
-						>
-							<ChevronDown
-								size={14}
-								class="transition-transform {showCancelled ? 'rotate-180' : ''}"
-							/>
-							Cancelled
-							<span class="text-xs font-normal">({cancelledSubscriptionsList.length})</span>
-						</button>
-
-						{#if showCancelled}
-							<div class="space-y-2 mt-2">
-								{#each cancelledSubscriptionsList as sub}
-									{@const userAmount = sub.isShared ? sub.amount - sub.partnerShare : sub.amount}
-									<div class="flex items-center gap-3 py-2 px-3 bg-gray-50 rounded-lg opacity-60">
-										<span class="text-lg grayscale">{getCategoryIcon(sub.categoryId)}</span>
-										<div class="flex-1 min-w-0">
-											<p class="text-sm font-medium text-charcoal-muted truncate line-through">
-												{sub.merchant}
-											</p>
-											<p class="text-xs text-charcoal-muted">
-												Cancelled {formatCancelledDate(sub.cancelledDate)}
-											</p>
-										</div>
-										<div class="text-right flex-shrink-0">
-											<p class="font-mono text-sm text-charcoal-muted">
-												{formatCurrencyDecimal(userAmount)}{sub.subscriptionFrequency === 'annual' ? '/yr' : '/mo'}
-											</p>
-										</div>
-										<button
-											onclick={() => handleReactivateSubscription(sub.merchant)}
-											class="p-1.5 text-charcoal-muted hover:text-success-600 hover:bg-success-50 rounded-lg transition-colors flex-shrink-0"
-											aria-label="Reactivate subscription"
-											title="Reactivate"
-										>
-											<RotateCcw size={14} />
-										</button>
-									</div>
-								{/each}
-							</div>
-						{/if}
-					</div>
-				{/if}
 			</div>
 		{/if}
 	{/snippet}
