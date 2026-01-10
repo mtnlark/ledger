@@ -6,12 +6,30 @@
 	import ChartWrapper from './ChartWrapper.svelte';
 	import EmptyState from './EmptyState.svelte';
 	import { parseMonthKey } from '$lib/db';
+	import { getChartTheme, type ChartTheme } from '$lib/utils/chart-theme';
 
 	interface Props {
 		monthlyData: Map<string, number>;
 	}
 
 	let { monthlyData }: Props = $props();
+
+	// Theme state that reacts to dark mode changes
+	let theme = $state<ChartTheme>(getChartTheme());
+
+	// Watch for theme changes via MutationObserver
+	$effect(() => {
+		if (typeof document === 'undefined') return;
+
+		const observer = new MutationObserver(() => {
+			theme = getChartTheme();
+		});
+		observer.observe(document.documentElement, {
+			attributes: true,
+			attributeFilter: ['class']
+		});
+		return () => observer.disconnect();
+	});
 
 	// Warm Ledger color palette
 	const COLORS = {
@@ -62,9 +80,9 @@
 					display: false
 				},
 				tooltip: {
-					backgroundColor: '#2D2A26',
-					titleColor: '#FAF8F5',
-					bodyColor: '#FAF8F5',
+					backgroundColor: theme.tooltipBg,
+					titleColor: theme.tooltipText,
+					bodyColor: theme.tooltipText,
 					padding: 12,
 					cornerRadius: 8,
 					callbacks: {
@@ -79,19 +97,19 @@
 				y: {
 					beginAtZero: true,
 					ticks: {
-						color: '#8A847C',
+						color: theme.mutedTextColor,
 						font: {
 							family: "'DM Mono', monospace"
 						},
 						callback: (value) => `$${Number(value).toLocaleString()}`
 					},
 					grid: {
-						color: 'rgba(45, 42, 38, 0.08)'
+						color: theme.gridColor
 					}
 				},
 				x: {
 					ticks: {
-						color: '#5C5751',
+						color: theme.textColor,
 						font: {
 							family: "'DM Sans', system-ui"
 						}

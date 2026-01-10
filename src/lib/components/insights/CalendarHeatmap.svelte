@@ -52,10 +52,10 @@
 	// Color classes for each intensity level
 	const intensityColors = [
 		'bg-surface-alt', // 0 - no spending
-		'bg-green-200', // 1 - low
-		'bg-green-300', // 2 - medium-low
-		'bg-green-400', // 3 - medium-high
-		'bg-green-600' // 4 - high
+		'bg-success-200', // 1 - low
+		'bg-success-300', // 2 - medium-low
+		'bg-success-400', // 3 - medium-high
+		'bg-success-600' // 4 - high
 	];
 
 	// Build data for each month
@@ -137,7 +137,7 @@
 								{:else}
 									<!-- Past/today with spending data -->
 									<div
-										class="{intensityColors[day.intensity]} rounded-sm cursor-pointer hover:ring-1 hover:ring-charcoal-muted {isToday(day.date) ? 'ring-2 ring-blue-400' : ''}"
+										class="{intensityColors[day.intensity]} rounded-sm cursor-pointer hover:ring-1 hover:ring-charcoal-muted {isToday(day.date) ? 'ring-2 ring-primary-400' : ''}"
 										style="width: {cellSize}px; height: {cellSize}px;"
 										title="{format(day.date, 'MMM d, yyyy')}: ${day.amount.toLocaleString()}"
 									></div>

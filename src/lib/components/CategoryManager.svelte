@@ -69,14 +69,14 @@
 
 <div class="space-y-4">
 	<!-- Category List -->
-	<div class="divide-y divide-gray-100">
+	<div class="divide-y divide-theme">
 		{#each categories as category, index (category.id)}
 			<div
-				class="flex items-center gap-3 py-3 px-2 hover:bg-cream/50 rounded-lg transition-colors {!category.isActive ? 'opacity-50' : ''}"
+				class="flex items-center gap-3 py-3 px-2 hover:bg-surface-hover rounded-lg transition-colors {!category.isActive ? 'opacity-50' : ''}"
 			>
 				<!-- Icon & Color Preview -->
 				<div
-					class="w-10 h-10 rounded-lg flex items-center justify-center text-lg"
+					class="w-10 h-10 rounded-lg flex items-center justify-center text-lg category-icon-box"
 					style="background-color: {category.color}20; border: 2px solid {category.color}"
 				>
 					{category.icon}
@@ -103,7 +103,7 @@
 					<button
 						onclick={() => handleMoveUp(category.id!)}
 						disabled={index === 0}
-						class="p-2 text-charcoal-muted hover:text-charcoal hover:bg-cream rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+						class="p-2 text-charcoal-muted hover:text-charcoal hover:bg-surface-hover rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
 						aria-label="Move up"
 					>
 						<ChevronUp size={18} />
@@ -113,7 +113,7 @@
 					<button
 						onclick={() => handleMoveDown(category.id!)}
 						disabled={index === categories.length - 1}
-						class="p-2 text-charcoal-muted hover:text-charcoal hover:bg-cream rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+						class="p-2 text-charcoal-muted hover:text-charcoal hover:bg-surface-hover rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
 						aria-label="Move down"
 					>
 						<ChevronDown size={18} />
@@ -122,7 +122,7 @@
 					<!-- Toggle Active -->
 					<button
 						onclick={() => handleToggleActive(category.id!)}
-						class="p-2 text-charcoal-muted hover:text-charcoal hover:bg-cream rounded-lg transition-colors"
+						class="p-2 text-charcoal-muted hover:text-charcoal hover:bg-surface-hover rounded-lg transition-colors"
 						aria-label={category.isActive ? 'Deactivate category' : 'Activate category'}
 					>
 						{#if category.isActive}
@@ -148,7 +148,7 @@
 	<!-- Add New Category Button -->
 	<button
 		onclick={openAddModal}
-		class="w-full py-3 px-4 border-2 border-dashed border-gray-300 rounded-lg text-charcoal-muted hover:border-primary-400 hover:text-primary-600 hover:bg-primary-50/50 transition-colors flex items-center justify-center gap-2 font-medium"
+		class="w-full py-3 px-4 border-2 border-dashed border-[var(--color-border-dashed)] rounded-lg text-charcoal-muted hover:border-primary-400 hover:text-primary-600 hover:bg-primary-50/50 transition-colors flex items-center justify-center gap-2 font-medium"
 	>
 		<Plus size={20} />
 		Add New Category

@@ -12,28 +12,28 @@
 
 	const colorMap: Record<ToastType, { bg: string; border: string; text: string; icon: string }> = {
 		success: {
-			bg: 'bg-green-50',
-			border: 'border-green-200',
-			text: 'text-green-800',
-			icon: 'text-green-500'
+			bg: 'bg-success-50',
+			border: 'border-success-200',
+			text: 'text-success-800',
+			icon: 'text-success-500'
 		},
 		error: {
-			bg: 'bg-red-50',
-			border: 'border-red-200',
-			text: 'text-red-800',
-			icon: 'text-red-500'
+			bg: 'bg-danger-50',
+			border: 'border-danger-200',
+			text: 'text-danger-800',
+			icon: 'text-danger-500'
 		},
 		info: {
-			bg: 'bg-blue-50',
-			border: 'border-blue-200',
-			text: 'text-blue-800',
-			icon: 'text-blue-500'
+			bg: 'bg-primary-50',
+			border: 'border-primary-200',
+			text: 'text-primary-800',
+			icon: 'text-primary-500'
 		},
 		warning: {
-			bg: 'bg-amber-50',
-			border: 'border-amber-200',
-			text: 'text-amber-800',
-			icon: 'text-amber-500'
+			bg: 'bg-warning-50',
+			border: 'border-warning-200',
+			text: 'text-warning-800',
+			icon: 'text-warning-500'
 		}
 	};
 </script>

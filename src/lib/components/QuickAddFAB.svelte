@@ -188,7 +188,7 @@
 								min="0"
 								placeholder="0.00"
 								inputmode="decimal"
-								class="w-full pl-7 pr-3 py-3 bg-cream border border-[rgba(45,42,38,0.15)] rounded-lg focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-colors font-mono text-lg placeholder:text-charcoal-muted"
+								class="w-full pl-7 pr-3 py-3 bg-surface-alt border border-theme rounded-lg focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-colors font-mono text-lg placeholder:text-charcoal-muted"
 							/>
 						</div>
 					</div>
@@ -236,7 +236,7 @@
 						<button
 							type="button"
 							onclick={() => (isEssential = !isEssential)}
-							class="relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:ring-offset-2 {isEssential ? 'bg-primary-500' : 'bg-gray-200'}"
+							class="relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:ring-offset-2 {isEssential ? 'bg-primary-500' : 'bg-[var(--color-border-dashed)]'}"
 							role="switch"
 							aria-checked={isEssential}
 						>
@@ -252,7 +252,7 @@
 							<input
 								type="checkbox"
 								bind:checked={isShared}
-								class="w-4 h-4 text-success-500 border-gray-300 rounded focus:ring-success-500/20"
+								class="w-4 h-4 text-success-500 border-[var(--color-border)] rounded focus:ring-success-500/20"
 							/>
 							<span class="text-sm text-charcoal-soft">Shared with {settings.partnerName}</span>
 						</label>
@@ -261,7 +261,7 @@
 								<input
 									type="checkbox"
 									bind:checked={isSettled}
-									class="w-4 h-4 text-success-500 border-gray-300 rounded focus:ring-success-500/20"
+									class="w-4 h-4 text-success-500 border-[var(--color-border)] rounded focus:ring-success-500/20"
 								/>
 								<span class="text-sm text-charcoal-soft">Already settled</span>
 							</label>
@@ -274,7 +274,7 @@
 					<button
 						type="button"
 						onclick={close}
-						class="flex-1 py-2.5 px-4 border border-[rgba(45,42,38,0.15)] text-charcoal-soft rounded-lg font-medium hover:bg-surface-hover transition-colors"
+						class="flex-1 py-2.5 px-4 border border-theme text-charcoal-soft rounded-lg font-medium hover:bg-surface-hover transition-colors"
 					>
 						Cancel
 					</button>

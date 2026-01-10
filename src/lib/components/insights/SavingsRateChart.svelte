@@ -4,12 +4,30 @@
 	import ChartWrapper from '../ChartWrapper.svelte';
 	import { parseMonthKey } from '$lib/db';
 	import type { MonthlyBudget } from '$lib/db';
+	import { getChartTheme, type ChartTheme } from '$lib/utils/chart-theme';
 
 	interface Props {
 		budgets: MonthlyBudget[];
 	}
 
 	let { budgets }: Props = $props();
+
+	// Theme state that reacts to dark mode changes
+	let theme = $state<ChartTheme>(getChartTheme());
+
+	// Watch for theme changes via MutationObserver
+	$effect(() => {
+		if (typeof document === 'undefined') return;
+
+		const observer = new MutationObserver(() => {
+			theme = getChartTheme();
+		});
+		observer.observe(document.documentElement, {
+			attributes: true,
+			attributeFilter: ['class']
+		});
+		return () => observer.disconnect();
+	});
 
 	// Calculate savings rate for each budget
 	let savingsData = $derived.by(() => {
@@ -64,9 +82,15 @@
 			plugins: {
 				legend: {
 					position: 'top',
-					labels: { boxWidth: 12 }
+					labels: {
+						boxWidth: 12,
+						color: theme.textColor
+					}
 				},
 				tooltip: {
+					backgroundColor: theme.tooltipBg,
+					titleColor: theme.tooltipText,
+					bodyColor: theme.tooltipText,
 					callbacks: {
 						label: (ctx) => {
 							const idx = ctx.dataIndex;
@@ -89,10 +113,17 @@
 					min: 0,
 					max: Math.max(50, ...savingsData.map((d) => d.rate * 100 + 10)),
 					ticks: {
+						color: theme.mutedTextColor,
 						callback: (value) => `${value}%`
+					},
+					grid: {
+						color: theme.gridColor
 					}
 				},
 				x: {
+					ticks: {
+						color: theme.textColor
+					},
 					grid: { display: false }
 				}
 			}

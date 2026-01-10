@@ -5,6 +5,7 @@
 	import ChartWrapper from './ChartWrapper.svelte';
 	import EmptyState from './EmptyState.svelte';
 	import type { Transaction, Category } from '$lib/db';
+	import { getChartTheme, type ChartTheme } from '$lib/utils/chart-theme';
 
 	interface Props {
 		transactions: Transaction[];
@@ -12,6 +13,23 @@
 	}
 
 	let { transactions, categories }: Props = $props();
+
+	// Theme state that reacts to dark mode changes
+	let theme = $state<ChartTheme>(getChartTheme());
+
+	// Watch for theme changes via MutationObserver
+	$effect(() => {
+		if (typeof document === 'undefined') return;
+
+		const observer = new MutationObserver(() => {
+			theme = getChartTheme();
+		});
+		observer.observe(document.documentElement, {
+			attributes: true,
+			attributeFilter: ['class']
+		});
+		return () => observer.disconnect();
+	});
 
 	// Calculate spending by category
 	let categorySpending = $derived.by(() => {
@@ -52,7 +70,7 @@
 					data: categorySpending.map((c) => c.amount),
 					backgroundColor: categorySpending.map((c) => c.color),
 					borderWidth: 2,
-					borderColor: '#ffffff'
+					borderColor: theme.surfaceColor
 				}
 			]
 		},

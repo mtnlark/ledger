@@ -111,7 +111,7 @@
 							value={incomeStr}
 							oninput={handleIncomeInput}
 							placeholder="0.00"
-							class="w-full pl-7 pr-3 py-2.5 bg-cream border border-[rgba(45,42,38,0.15)] rounded-lg focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-colors font-mono placeholder:text-charcoal-muted"
+							class="w-full pl-7 pr-3 py-2.5 bg-surface-alt border border-theme rounded-lg focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-colors font-mono placeholder:text-charcoal-muted"
 						/>
 					</div>
 					<p class="mt-1.5 text-xs text-charcoal-muted">Your total income for this month</p>
@@ -131,7 +131,7 @@
 							value={savedStr}
 							oninput={handleSavedInput}
 							placeholder="0.00"
-							class="w-full pl-7 pr-3 py-2.5 bg-cream border border-[rgba(45,42,38,0.15)] rounded-lg focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-colors font-mono placeholder:text-charcoal-muted"
+							class="w-full pl-7 pr-3 py-2.5 bg-surface-alt border border-theme rounded-lg focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-colors font-mono placeholder:text-charcoal-muted"
 						/>
 					</div>
 					<p class="mt-1.5 text-xs text-charcoal-muted">Amount set aside for savings this month</p>
@@ -147,7 +147,7 @@
 						id="notes"
 						bind:value={notes}
 						placeholder="Any notes about this month..."
-						class="w-full px-3 py-2.5 bg-cream border border-[rgba(45,42,38,0.15)] rounded-lg focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-colors placeholder:text-charcoal-muted"
+						class="w-full px-3 py-2.5 bg-surface-alt border border-theme rounded-lg focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-colors placeholder:text-charcoal-muted"
 					/>
 				</div>
 
@@ -178,7 +178,7 @@
 					<button
 						type="button"
 						onclick={onClose}
-						class="px-4 py-2.5 border border-[rgba(45,42,38,0.15)] text-charcoal-soft rounded-lg font-medium hover:bg-surface-hover transition-colors"
+						class="px-4 py-2.5 border border-theme text-charcoal-soft rounded-lg font-medium hover:bg-surface-hover transition-colors"
 					>
 						Cancel
 					</button>

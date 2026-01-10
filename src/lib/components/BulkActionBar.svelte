@@ -77,7 +77,7 @@
 					<button
 						type="button"
 						onclick={toggleCategoryDropdown}
-						class="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-charcoal-soft bg-cream border border-[rgba(45,42,38,0.15)] rounded-lg hover:bg-surface-hover-dark transition-colors"
+						class="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-charcoal-soft bg-surface-alt border border-theme rounded-lg hover:bg-surface-hover transition-colors"
 					>
 						<FolderInput size={16} />
 						<span>Change Category</span>

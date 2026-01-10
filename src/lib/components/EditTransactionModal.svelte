@@ -210,7 +210,7 @@
 								type="date"
 								id="edit-date"
 								bind:value={dateStr}
-								class="w-full px-3 py-2.5 bg-cream border rounded-lg focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-colors {isFutureDate && !futureDateConfirmed ? 'border-warning-500' : 'border-[rgba(45,42,38,0.15)]'}"
+								class="w-full px-3 py-2.5 bg-surface-alt border rounded-lg focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-colors {isFutureDate && !futureDateConfirmed ? 'border-warning-500' : 'border-theme'}"
 							/>
 							{#if isFutureDate && !futureDateConfirmed}
 								<div class="mt-2 p-2 bg-warning-50 border border-warning-200 rounded-lg">
@@ -232,7 +232,7 @@
 								id="edit-merchant"
 								bind:value={merchant}
 								placeholder="e.g., Shell, Amazon, MOM's"
-								class="w-full px-3 py-2.5 bg-cream border border-[rgba(45,42,38,0.15)] rounded-lg focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-colors placeholder:text-charcoal-muted"
+								class="w-full px-3 py-2.5 bg-surface-alt border border-theme rounded-lg focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-colors placeholder:text-charcoal-muted"
 							/>
 						</div>
 					</div>
@@ -250,7 +250,7 @@
 									step="0.01"
 									min="0"
 									placeholder="0.00"
-									class="w-full pl-7 pr-3 py-2.5 bg-cream border border-[rgba(45,42,38,0.15)] rounded-lg focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-colors font-mono placeholder:text-charcoal-muted"
+									class="w-full pl-7 pr-3 py-2.5 bg-surface-alt border border-theme rounded-lg focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-colors font-mono placeholder:text-charcoal-muted"
 								/>
 							</div>
 						</div>
@@ -270,7 +270,7 @@
 							<input
 								type="checkbox"
 								bind:checked={isShared}
-								class="w-5 h-5 text-success-500 border-gray-300 rounded focus:ring-success-500/20"
+								class="w-5 h-5 text-success-500 border-[var(--color-border)] rounded focus:ring-success-500/20"
 							/>
 							<span class="text-sm font-medium text-charcoal-soft">
 								Shared with {settings.partnerName}
@@ -288,7 +288,7 @@
 										class="px-3 py-1.5 text-sm font-medium rounded-lg transition-all duration-150 {splitType ===
 										'percentage'
 											? 'bg-success-500 text-white shadow-sm'
-											: 'bg-surface text-charcoal-soft border border-[rgba(45,42,38,0.15)] hover:bg-surface-hover'}"
+											: 'bg-surface text-charcoal-soft border border-theme hover:bg-surface-hover'}"
 									>
 										% Percentage
 									</button>
@@ -298,7 +298,7 @@
 										class="px-3 py-1.5 text-sm font-medium rounded-lg transition-all duration-150 {splitType ===
 										'fixed'
 											? 'bg-success-500 text-white shadow-sm'
-											: 'bg-surface text-charcoal-soft border border-[rgba(45,42,38,0.15)] hover:bg-surface-hover'}"
+											: 'bg-surface text-charcoal-soft border border-theme hover:bg-surface-hover'}"
 									>
 										$ Fixed Amount
 									</button>
@@ -338,7 +338,7 @@
 												step="0.01"
 												min="0"
 												max={amount}
-												class="w-full pl-7 pr-3 py-2 bg-surface border rounded-lg focus:ring-2 transition-colors font-mono {splitValueInvalid ? 'border-warning-500 focus:ring-warning-500/20 focus:border-warning-500' : 'border-[rgba(45,42,38,0.15)] focus:ring-success-500/20 focus:border-success-500'}"
+												class="w-full pl-7 pr-3 py-2 bg-surface border rounded-lg focus:ring-2 transition-colors font-mono {splitValueInvalid ? 'border-warning-500 focus:ring-warning-500/20 focus:border-warning-500' : 'border-theme focus:ring-success-500/20 focus:border-success-500'}"
 											/>
 										</div>
 										{#if splitValueInvalid}
@@ -374,7 +374,7 @@
 							id="edit-notes"
 							bind:value={notes}
 							placeholder="Any additional notes..."
-							class="w-full px-3 py-2.5 bg-cream border border-[rgba(45,42,38,0.15)] rounded-lg focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-colors placeholder:text-charcoal-muted"
+							class="w-full px-3 py-2.5 bg-surface-alt border border-theme rounded-lg focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-colors placeholder:text-charcoal-muted"
 						/>
 					</div>
 
@@ -394,7 +394,7 @@
 							<button
 								type="button"
 								onclick={() => (isEssential = !isEssential)}
-								class="relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:ring-offset-2 {isEssential ? 'bg-primary-500' : 'bg-gray-200'}"
+								class="relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:ring-offset-2 {isEssential ? 'bg-primary-500' : 'bg-[var(--color-border-dashed)]'}"
 								role="switch"
 								aria-checked={isEssential}
 								aria-label="Toggle essential spending"
@@ -416,7 +416,7 @@
 							<button
 								type="button"
 								onclick={() => (isSubscription = !isSubscription)}
-								class="relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:ring-offset-2 {isSubscription ? 'bg-primary-500' : 'bg-gray-200'}"
+								class="relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:ring-offset-2 {isSubscription ? 'bg-primary-500' : 'bg-[var(--color-border-dashed)]'}"
 								role="switch"
 								aria-checked={isSubscription}
 								aria-label="Toggle subscription"
@@ -435,7 +435,7 @@
 									onclick={() => (subscriptionFrequency = 'monthly')}
 									class="px-3 py-1.5 text-sm font-medium rounded-lg transition-all duration-150 {subscriptionFrequency === 'monthly'
 										? 'bg-primary-500 text-white shadow-sm'
-										: 'bg-cream text-charcoal-soft border border-[rgba(45,42,38,0.15)] hover:bg-surface-hover-dark'}"
+										: 'bg-surface-alt text-charcoal-soft border border-theme hover:bg-surface-hover'}"
 								>
 									Monthly
 								</button>
@@ -444,7 +444,7 @@
 									onclick={() => (subscriptionFrequency = 'annual')}
 									class="px-3 py-1.5 text-sm font-medium rounded-lg transition-all duration-150 {subscriptionFrequency === 'annual'
 										? 'bg-primary-500 text-white shadow-sm'
-										: 'bg-cream text-charcoal-soft border border-[rgba(45,42,38,0.15)] hover:bg-surface-hover-dark'}"
+										: 'bg-surface-alt text-charcoal-soft border border-theme hover:bg-surface-hover'}"
 								>
 									Annual
 								</button>
@@ -480,7 +480,7 @@
 												<button
 													type="button"
 													onclick={() => (showCancelConfirm = false)}
-													class="px-3 py-1.5 text-sm font-medium text-charcoal-soft border border-[rgba(45,42,38,0.15)] rounded-lg hover:bg-surface-hover transition-colors"
+													class="px-3 py-1.5 text-sm font-medium text-charcoal-soft border border-theme rounded-lg hover:bg-surface-hover transition-colors"
 												>
 													Never mind
 												</button>
@@ -498,7 +498,7 @@
 							<button
 								type="button"
 								onclick={() => transaction && onSplit?.(transaction)}
-								class="w-full flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium text-charcoal-soft hover:text-charcoal border border-[rgba(45,42,38,0.15)] hover:bg-surface-hover rounded-lg transition-colors"
+								class="w-full flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium text-charcoal-soft hover:text-charcoal border border-theme hover:bg-surface-hover rounded-lg transition-colors"
 							>
 								<Scissors size={16} />
 								<span>Split by Category</span>
@@ -522,7 +522,7 @@
 					<button
 						type="button"
 						onclick={handleClose}
-						class="px-4 py-2.5 border border-[rgba(45,42,38,0.15)] text-charcoal-soft rounded-lg font-medium hover:bg-surface-hover transition-colors"
+						class="px-4 py-2.5 border border-theme text-charcoal-soft rounded-lg font-medium hover:bg-surface-hover transition-colors"
 					>
 						Cancel
 					</button>

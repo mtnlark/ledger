@@ -131,7 +131,7 @@
 		aria-expanded={isOpen}
 		aria-haspopup="listbox"
 		aria-autocomplete="list"
-		class="w-full px-3 py-2 border border-[var(--color-border)] rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+		class="w-full px-3 py-2 border border-[var(--color-border)] rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
 	/>
 
 	<!-- Dropdown arrow -->
@@ -161,7 +161,7 @@
 						role="option"
 						aria-selected={cat.id === value}
 						class="px-3 py-2 cursor-pointer flex items-center gap-2 {index === highlightedIndex
-							? 'bg-blue-50 text-blue-900'
+							? 'bg-primary-50 text-primary-900'
 							: 'hover:bg-surface-hover'} {cat.id === value ? 'font-medium' : ''}"
 						onmouseenter={() => (highlightedIndex = index)}
 						onmousedown={() => selectCategory(cat)}
@@ -169,7 +169,7 @@
 						<span class="text-lg">{cat.icon}</span>
 						<span class="text-sm">{cat.name}</span>
 						{#if cat.id === value}
-							<Check size={16} class="ml-auto text-blue-600" />
+							<Check size={16} class="ml-auto text-primary-600" />
 						{/if}
 					</li>
 				{/each}

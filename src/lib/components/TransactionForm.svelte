@@ -328,7 +328,7 @@
 					type="date"
 					id="date"
 					bind:value={dateStr}
-					class="w-full px-3 py-2.5 bg-cream border rounded-lg focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-colors {isFutureDate && !futureDateConfirmed ? 'border-warning-500' : 'border-[rgba(45,42,38,0.15)]'}"
+					class="w-full px-3 py-2.5 bg-surface-alt border rounded-lg focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-colors {isFutureDate && !futureDateConfirmed ? 'border-warning-500' : 'border-theme'}"
 				/>
 				{#if isFutureDate && !futureDateConfirmed}
 					<div class="mt-2 p-2 bg-warning-50 border border-warning-200 rounded-lg">
@@ -374,7 +374,7 @@
 						step="0.01"
 						min="0"
 						placeholder="0.00"
-						class="w-full pl-7 pr-3 py-2.5 bg-cream border border-[rgba(45,42,38,0.15)] rounded-lg focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-colors font-mono placeholder:text-charcoal-muted"
+						class="w-full pl-7 pr-3 py-2.5 bg-surface-alt border border-theme rounded-lg focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-colors font-mono placeholder:text-charcoal-muted"
 					/>
 				</div>
 			</div>
@@ -470,7 +470,7 @@
 			<button
 				type="button"
 				onclick={enableSplitMode}
-				class="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium text-charcoal-soft hover:text-charcoal border border-[rgba(45,42,38,0.15)] hover:bg-cream rounded-lg transition-colors"
+				class="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium text-charcoal-soft hover:text-charcoal border border-theme hover:bg-surface-alt rounded-lg transition-colors"
 			>
 				<Scissors size={16} />
 				<span>Split by Category</span>
@@ -483,7 +483,7 @@
 				<input
 					type="checkbox"
 					bind:checked={isShared}
-					class="w-5 h-5 text-success-500 border-gray-300 rounded focus:ring-success-500/20"
+					class="w-5 h-5 text-success-500 border-[var(--color-border)] rounded focus:ring-success-500/20"
 				/>
 				<span class="text-sm font-medium text-charcoal-soft">
 					Shared with {settings.partnerName}
@@ -579,7 +579,7 @@
 						<input
 							type="checkbox"
 							bind:checked={isSettled}
-							class="w-4 h-4 text-success-500 border-gray-300 rounded focus:ring-success-500/20"
+							class="w-4 h-4 text-success-500 border-[var(--color-border)] rounded focus:ring-success-500/20"
 						/>
 						<span class="text-sm text-charcoal-soft">Already settled</span>
 					</label>
@@ -597,7 +597,7 @@
 				id="notes"
 				bind:value={notes}
 				placeholder="Any additional notes..."
-				class="w-full px-3 py-2.5 bg-cream border border-[rgba(45,42,38,0.15)] rounded-lg focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-colors placeholder:text-charcoal-muted"
+				class="w-full px-3 py-2.5 bg-surface-alt border border-theme rounded-lg focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-colors placeholder:text-charcoal-muted"
 			/>
 		</div>
 
@@ -658,7 +658,7 @@
 						onclick={() => (subscriptionFrequency = 'monthly')}
 						class="px-3 py-1.5 text-sm font-medium rounded-lg transition-all duration-150 {subscriptionFrequency === 'monthly'
 							? 'bg-primary-500 text-white shadow-sm'
-							: 'bg-cream text-charcoal-soft border border-[rgba(45,42,38,0.15)] hover:bg-cream-dark'}"
+							: 'bg-surface-alt text-charcoal-soft border border-theme hover:bg-surface-hover'}"
 					>
 						Monthly
 					</button>
@@ -667,7 +667,7 @@
 						onclick={() => (subscriptionFrequency = 'annual')}
 						class="px-3 py-1.5 text-sm font-medium rounded-lg transition-all duration-150 {subscriptionFrequency === 'annual'
 							? 'bg-primary-500 text-white shadow-sm'
-							: 'bg-cream text-charcoal-soft border border-[rgba(45,42,38,0.15)] hover:bg-cream-dark'}"
+							: 'bg-surface-alt text-charcoal-soft border border-theme hover:bg-surface-hover'}"
 					>
 						Annual
 					</button>
@@ -688,7 +688,7 @@
 					<button
 						type="button"
 						onclick={onCancel}
-						class="px-4 py-2.5 border border-[rgba(45,42,38,0.15)] text-charcoal-soft rounded-lg font-medium hover:bg-cream transition-colors"
+						class="px-4 py-2.5 border border-theme text-charcoal-soft rounded-lg font-medium hover:bg-surface-alt transition-colors"
 					>
 						Cancel
 					</button>

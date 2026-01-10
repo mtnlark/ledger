@@ -202,7 +202,7 @@
 				<div class="space-y-2">
 					{#each group.transactions as transaction, txIndex (transaction.id)}
 						<div
-							class="bg-surface rounded-lg shadow-sm shadow-gray-200/50 p-4 flex items-center gap-4 transition-colors border-l-4 {isSelectionMode
+							class="bg-surface rounded-lg shadow-sm shadow-theme p-4 flex items-center gap-4 transition-colors border-l-4 {isSelectionMode
 								? 'cursor-pointer'
 								: 'hover:bg-surface-hover/50'} {selectedIds.has(transaction.id!) ? 'bg-primary-50 hover:bg-primary-100' : 'hover:bg-surface-hover/50'}"
 							style="border-left-color: {getCategoryColor(transaction.categoryId)}; animation-delay: {(groupIndex * 50) + (txIndex * 30)}ms;"
@@ -218,7 +218,7 @@
 										transaction.id!
 									)
 										? 'bg-primary-500 border-primary-500'
-										: 'border-gray-300 bg-surface'}"
+										: 'border-[var(--color-border)] bg-surface'}"
 								>
 									{#if selectedIds.has(transaction.id!)}
 										<Check size={12} class="text-white" strokeWidth={3} />

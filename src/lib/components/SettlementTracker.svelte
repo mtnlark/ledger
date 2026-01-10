@@ -102,7 +102,7 @@
 	</div>
 
 	<!-- Transaction list -->
-	<div class="divide-y divide-gray-100">
+	<div class="divide-y divide-theme">
 		{#if transactions.length === 0}
 			<EmptyState
 				icon={PartyPopper as ComponentType}
@@ -148,7 +148,7 @@
 							transaction.id!
 						)
 							? 'bg-success-500 border-success-500'
-							: 'border-gray-300'}"
+							: 'border-[var(--color-border)]'}"
 					>
 						{#if selectedIds.has(transaction.id!)}
 							<Check size={12} class="text-white" strokeWidth={3} />

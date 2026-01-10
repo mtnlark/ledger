@@ -232,7 +232,7 @@
 							id="partnerName"
 							bind:value={partnerName}
 							placeholder="e.g., Alex"
-							class="w-full px-3 py-2.5 bg-cream border border-[rgba(45,42,38,0.15)] rounded-lg focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-colors placeholder:text-charcoal-muted"
+							class="w-full px-3 py-2.5 bg-surface-alt border border-theme rounded-lg focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-colors placeholder:text-charcoal-muted"
 						/>
 						<p class="mt-1.5 text-xs text-charcoal-muted">
 							Used when displaying shared expenses (e.g., "Outstanding balance with {partnerName || 'Partner'}")
@@ -282,7 +282,7 @@
 									step="0.01"
 									min="0"
 									max="1"
-									class="w-full px-3 py-2.5 bg-cream border border-[rgba(45,42,38,0.15)] rounded-lg focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-colors font-mono"
+									class="w-full px-3 py-2.5 bg-surface-alt border border-theme rounded-lg focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-colors font-mono"
 								/>
 								<p class="mt-1.5 text-xs text-charcoal-muted">
 									Enter as decimal (0.5 = 50%). Partner pays <span class="font-mono">{Math.round(defaultSplitValue * 100)}%</span> of shared expenses.
@@ -295,7 +295,7 @@
 									bind:value={defaultSplitValue}
 									step="0.01"
 									min="0"
-									class="w-full pl-7 pr-3 py-2.5 bg-cream border border-[rgba(45,42,38,0.15)] rounded-lg focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-colors font-mono"
+									class="w-full pl-7 pr-3 py-2.5 bg-surface-alt border border-theme rounded-lg focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-colors font-mono"
 								/>
 								<p class="mt-1.5 text-xs text-charcoal-muted">
 									Default amount partner pays for shared expenses.
@@ -383,7 +383,7 @@
 								/>
 								<label
 									for="excel-import"
-									class="inline-flex items-center gap-2 px-4 py-2 bg-cream-dark text-charcoal-soft font-medium rounded-lg hover:bg-cream cursor-pointer transition-colors border border-[rgba(45,42,38,0.1)]"
+									class="inline-flex items-center gap-2 px-4 py-2 bg-surface-alt text-charcoal-soft font-medium rounded-lg hover:bg-surface-hover cursor-pointer transition-colors border border-theme"
 								>
 									<FileSpreadsheet size={16} />
 									Import from Excel
@@ -403,7 +403,7 @@
 								/>
 								<label
 									for="json-import"
-									class="inline-flex items-center gap-2 px-4 py-2 bg-cream-dark text-charcoal-soft font-medium rounded-lg hover:bg-cream cursor-pointer transition-colors border border-[rgba(45,42,38,0.1)]"
+									class="inline-flex items-center gap-2 px-4 py-2 bg-surface-alt text-charcoal-soft font-medium rounded-lg hover:bg-surface-hover cursor-pointer transition-colors border border-theme"
 								>
 									<Upload size={16} />
 									Restore from Backup
@@ -455,7 +455,7 @@
 					</div>
 
 					<!-- Info -->
-					<div class="bg-primary-50 rounded-lg p-4 border border-primary-100">
+					<div class="bg-primary-50 rounded-lg p-4 border border-primary-200">
 						<p class="text-sm text-primary-800">
 							<strong>Note:</strong> Your data is stored locally on your device. Automatic backups are created
 							before each save. Use Full Backup to export a portable copy.

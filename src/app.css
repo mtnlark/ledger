@@ -96,7 +96,7 @@
   --color-surface-alt: #1F1D1A;
   --color-border: rgba(250, 248, 245, 0.1);
   --color-border-dashed: rgba(250, 248, 245, 0.15);
-  --color-text: #F5F2ED;
+  --color-text: #EDE8E1;  /* Warmer cream instead of pure white */
   --color-text-soft: #BDB7AD;
   --color-text-muted: #8A847C;
   --color-shadow: rgba(0, 0, 0, 0.4);
@@ -105,6 +105,10 @@
   /* Override accent color tints for dark surfaces */
   --color-primary-50: #2D231E;
   --color-primary-100: #3D2E26;
+  --color-primary-200: #5A4438;  /* Visible border on dark backgrounds */
+  --color-primary-700: #E0B5A5;  /* Light muted text for dark backgrounds */
+  --color-primary-800: #EDD5CA;  /* Light text for dark backgrounds */
+  --color-primary-900: #F5E8E2;  /* Lightest text for dark backgrounds */
   --color-success-50: #1E2A1E;
   --color-success-100: #283828;
   --color-warning-50: #2A231A;
@@ -137,6 +141,34 @@
   /* Tabular figures for financial amounts */
   .font-mono, [class*="font-mono"] {
     font-variant-numeric: tabular-nums;
+  }
+
+  /* Theme-aware checkbox and radio styling */
+  input[type="checkbox"],
+  input[type="radio"] {
+    accent-color: var(--color-primary-500, #C45D3A);
+  }
+
+  /* Checkbox with success color */
+  input[type="checkbox"].text-success-500 {
+    accent-color: var(--color-success-500, #5B8C5A);
+  }
+
+  /* Softer focus ring for inputs in dark mode */
+  .dark input:focus,
+  .dark select:focus,
+  .dark textarea:focus {
+    --tw-ring-color: rgba(196, 93, 58, 0.15) !important;
+    --tw-ring-opacity: 0.15 !important;
+    outline: none !important;
+    box-shadow: 0 0 0 2px rgba(196, 93, 58, 0.25), 0 0 0 4px rgba(196, 93, 58, 0.1) !important;
+  }
+
+  .dark input:focus-visible,
+  .dark select:focus-visible,
+  .dark textarea:focus-visible {
+    outline: 2px solid rgba(196, 93, 58, 0.4) !important;
+    outline-offset: 1px;
   }
 }
 
@@ -203,6 +235,28 @@
     border-bottom: 1px dotted var(--color-ledger-line);
     margin: 0 0.75rem;
     height: 0.75em;
+  }
+
+  /* Toggle switch off state - theme aware */
+  .toggle-off {
+    background-color: var(--color-border-dashed);
+  }
+
+  /* Semantic dividers */
+  .divide-theme > :not([hidden]) ~ :not([hidden]) {
+    --tw-divide-opacity: 1;
+    border-color: var(--color-border) !important;
+  }
+
+  /* Softer category icon borders in dark mode - desaturate slightly */
+  .dark .category-icon-box {
+    filter: saturate(0.75) brightness(0.9);
+  }
+
+  /* Subtler dividers in dark mode */
+  .dark .divide-theme > :not([hidden]) ~ :not([hidden]),
+  .dark .divide-y > :not([hidden]) ~ :not([hidden]) {
+    border-color: rgba(250, 248, 245, 0.06) !important;
   }
 
   /* Card entrance animation */
