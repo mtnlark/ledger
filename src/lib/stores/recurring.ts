@@ -166,11 +166,8 @@ export async function detectRecurringExpenses(): Promise<DetectedRecurring[]> {
 	// Get dismissed merchants to filter out
 	const dismissedMerchants = await getDismissedRecurring();
 
-	// Get categories to check for "Subscriptions"
-	const categories = await db.categories.toArray();
-	const subscriptionsCategoryId = categories.find(
-		(c) => c.name === 'Subscriptions'
-	)?.id;
+	// Note: Subscriptions category was removed in favor of isSubscription tag on transactions
+	// The isSubscription field on DetectedRecurring is now always false (legacy field)
 
 	// Group transactions by normalized merchant name
 	// Exclude transactions already tagged as subscriptions (they're shown in subscriptions section)
@@ -224,8 +221,8 @@ export async function detectRecurringExpenses(): Promise<DetectedRecurring[]> {
 		const categoryIds = transactions.map((t) => t.categoryId);
 		const categoryId = mode(categoryIds);
 
-		// Check if it's in the Subscriptions category (legacy field)
-		const isSubscription = categoryId === subscriptionsCategoryId;
+		// Legacy field - always false since Subscriptions category was removed
+		const isSubscription = false;
 
 		detected.push({
 			merchant: transactions[0].merchant, // Use original casing from first transaction

@@ -160,9 +160,8 @@ export const DEFAULT_CATEGORIES: Omit<Category, 'id'>[] = [
 	{ name: 'Pet', icon: '🐈‍⬛', color: '#C4956A', isActive: true, sortOrder: 18, isEssential: true },
 	{ name: 'Rent', icon: '🏢', color: '#7B6B8C', isActive: true, sortOrder: 19, isEssential: true },
 	{ name: 'Restaurants', icon: '🍽️', color: '#C45D3A', isActive: true, sortOrder: 20, isEssential: false },
-	{ name: 'Subscriptions', icon: '📺', color: '#6B8399', isActive: true, sortOrder: 21, isEssential: false },
-	{ name: 'Travel', icon: '✈️', color: '#5B8B8B', isActive: true, sortOrder: 22, isEssential: false },
-	{ name: 'Utilities', icon: '💡', color: '#C9A855', isActive: true, sortOrder: 23, isEssential: true }
+	{ name: 'Travel', icon: '✈️', color: '#5B8B8B', isActive: true, sortOrder: 21, isEssential: false },
+	{ name: 'Utilities', icon: '💡', color: '#C9A855', isActive: true, sortOrder: 22, isEssential: true }
 ];
 
 // Derived lookup maps for migrations (single source of truth)

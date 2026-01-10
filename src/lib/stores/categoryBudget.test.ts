@@ -237,8 +237,8 @@ describe('CategoryBudget Operations', () => {
 		it('returns suggestions for all active categories', async () => {
 			const suggestions = await generateAllSuggestions('2024-06');
 
-			// Should have entries for all 23 default categories
-			expect(suggestions.size).toBe(23);
+			// Should have entries for all 22 default categories
+			expect(suggestions.size).toBe(22);
 		});
 
 		it('returns 0 for categories with no spending', async () => {

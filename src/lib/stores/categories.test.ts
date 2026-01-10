@@ -25,9 +25,9 @@ describe('Category Operations', () => {
 	});
 
 	describe('getAllCategories', () => {
-		it('returns all 23 default categories', async () => {
+		it('returns all 22 default categories', async () => {
 			const categories = await getAllCategories();
-			expect(categories).toHaveLength(23);
+			expect(categories).toHaveLength(22);
 		});
 
 		it('returns categories sorted by sortOrder', async () => {
@@ -45,12 +45,12 @@ describe('Category Operations', () => {
 			await updateCategory(categories[0].id!, { isActive: false });
 
 			const active = await getActiveCategories();
-			expect(active).toHaveLength(22);
+			expect(active).toHaveLength(21);
 		});
 
 		it('returns all categories when all are active', async () => {
 			const active = await getActiveCategories();
-			expect(active).toHaveLength(23);
+			expect(active).toHaveLength(22);
 		});
 	});
 
@@ -107,7 +107,7 @@ describe('Category Operations', () => {
 			expect(newCount).toBe(initialCount + 1);
 
 			const category = await db.categories.get(id);
-			expect(category?.sortOrder).toBe(24); // After the 23 defaults
+			expect(category?.sortOrder).toBe(23); // After the 22 defaults
 		});
 
 		it('sets provided properties', async () => {

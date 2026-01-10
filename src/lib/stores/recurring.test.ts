@@ -302,41 +302,6 @@ describe('Recurring Expense Detection', () => {
 			expect(recurring).toHaveLength(2);
 		});
 
-		it('marks subscriptions category correctly', async () => {
-			// Get the Subscriptions category ID
-			const categories = await db.categories.toArray();
-			const subscriptionsCat = categories.find(c => c.name === 'Subscriptions');
-
-			await addTransaction({
-				date: new Date(2025, 0, 15),
-				merchant: 'Netflix',
-				amount: 15.99,
-				categoryId: subscriptionsCat?.id ?? 1,
-				isShared: false,
-				isSettled: false,
-				splitType: 'percentage',
-				splitValue: 0.5,
-				isEssential: false,
-				isSubscription: false
-			});
-			await addTransaction({
-				date: new Date(2025, 1, 15),
-				merchant: 'Netflix',
-				amount: 15.99,
-				categoryId: subscriptionsCat?.id ?? 1,
-				isShared: false,
-				isSettled: false,
-				splitType: 'percentage',
-				splitValue: 0.5,
-				isEssential: false,
-				isSubscription: false
-			});
-
-			const recurring = await detectRecurringExpenses();
-			expect(recurring).toHaveLength(1);
-			expect(recurring[0].isSubscription).toBe(true);
-		});
-
 		it('uses most common category when transactions have different categories', async () => {
 			await addTransaction({
 				date: new Date(2025, 0, 15),

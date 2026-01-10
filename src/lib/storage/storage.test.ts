@@ -34,7 +34,7 @@ describe('Storage Layer', () => {
 			const categories = await db.categories.toArray();
 			const settings = await db.settings.get(1);
 
-			expect(categories.length).toBe(23); // Default categories
+			expect(categories.length).toBe(22); // Default categories
 			expect(settings).toBeDefined();
 			expect(settings?.partnerName).toBe('Partner');
 		});
@@ -132,7 +132,7 @@ describe('Storage Layer', () => {
 
 			const data = await getAllData();
 
-			expect(data.categories.length).toBe(23);
+			expect(data.categories.length).toBe(22);
 			expect(data.categories.some((c) => c.name === 'Groceries')).toBe(true);
 			expect(data.categories.some((c) => c.name === 'Restaurants')).toBe(true);
 		});

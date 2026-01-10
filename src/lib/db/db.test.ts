@@ -111,8 +111,8 @@ describe('Database Helper Functions', () => {
 	});
 
 	describe('DEFAULT_CATEGORIES', () => {
-		it('contains exactly 23 categories', () => {
-			expect(DEFAULT_CATEGORIES).toHaveLength(23);
+		it('contains exactly 22 categories', () => {
+			expect(DEFAULT_CATEGORIES).toHaveLength(22);
 		});
 
 		it('has unique category names', () => {
@@ -126,7 +126,6 @@ describe('Database Helper Functions', () => {
 			expect(names).toContain('Groceries');
 			expect(names).toContain('Gas');
 			expect(names).toContain('Restaurants');
-			expect(names).toContain('Subscriptions');
 			expect(names).toContain('Fitness & wellness');
 		});
 
@@ -191,7 +190,7 @@ describe('Database Initialization', () => {
 
 		await initializeDatabase();
 
-		expect(await db.categories.count()).toBe(23);
+		expect(await db.categories.count()).toBe(22);
 	});
 
 	it('seeds settings on first initialization', async () => {
@@ -209,7 +208,7 @@ describe('Database Initialization', () => {
 		await initializeDatabase();
 		await initializeDatabase();
 
-		expect(await db.categories.count()).toBe(23);
+		expect(await db.categories.count()).toBe(22);
 	});
 
 	it('does not duplicate settings on multiple initializations', async () => {
