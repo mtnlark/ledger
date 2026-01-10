@@ -314,6 +314,23 @@
 								{formatCurrency(totalSpent)}
 							</p>
 						</div>
+						{#if totalBudgeted > 0}
+							<div class="border-l border-theme pl-8">
+								<span class="text-sm text-charcoal-muted">Budget Status</span>
+								<p
+									class="font-mono text-xl font-medium {budgetedSpent <= totalBudgeted
+										? 'text-success-600'
+										: 'text-danger-500'}"
+								>
+									{formatCurrency(Math.abs(totalBudgeted - budgetedSpent))}
+									<span class="text-sm font-sans font-normal {budgetedSpent <= totalBudgeted
+										? 'text-success-600'
+										: 'text-danger-500'}">
+										{budgetedSpent <= totalBudgeted ? 'under' : 'over'}
+									</span>
+								</p>
+							</div>
+						{/if}
 					</div>
 
 					{#if totalBudgeted > 0}
