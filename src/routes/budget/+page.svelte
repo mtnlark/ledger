@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { afterNavigate } from '$app/navigation';
-	import { getMonthKey, type Category, type CategoryBudget } from '$lib/db';
+	import { getMonthKey, navigateMonth, type Category, type CategoryBudget } from '$lib/db';
 	import { initializeStorage } from '$lib/storage';
 	import { getAllCategories } from '$lib/stores/categories';
 	import {
@@ -8,11 +8,13 @@
 		saveCategoryBudget,
 		deleteCategoryBudget,
 		generateAllSuggestions,
-		getAllCategorySpending
+		getAllCategorySpending,
+		copyBudgetsFromMonth
 	} from '$lib/stores/categoryBudget';
 	import { getSelectedMonth, setSelectedMonth } from '$lib/stores/selectedMonth';
 	import { getAvailableMonths } from '$lib/stores/transactions';
 	import { toast } from '$lib/stores/toast';
+	import { Sparkles, Copy } from 'lucide-svelte';
 	import HeaderNav from '$lib/components/HeaderNav.svelte';
 	import MonthPicker from '$lib/components/MonthPicker.svelte';
 	import CategoryBudgetList from '$lib/components/CategoryBudgetList.svelte';
@@ -35,6 +37,19 @@
 	let budgetedSpent = $derived(
 		Array.from(budgets.keys()).reduce((sum, categoryId) => sum + (spending.get(categoryId) || 0), 0)
 	);
+
+	// Check if there are suggestions to apply (categories with suggestions but no budget)
+	let hasSuggestionsToApply = $derived.by(() => {
+		for (const [categoryId, amount] of suggestions) {
+			if (amount > 0 && !budgets.has(categoryId)) {
+				return true;
+			}
+		}
+		return false;
+	});
+
+	// Get previous month for "Copy from Last Month"
+	let previousMonth = $derived(navigateMonth(currentMonth, -1));
 
 	// Load data
 	async function loadData() {
@@ -97,6 +112,45 @@
 		} catch (error) {
 			console.error('Failed to delete budget:', error);
 			toast.error('Failed to delete budget');
+		}
+	}
+
+	async function handleSuggestAll() {
+		try {
+			let applied = 0;
+			for (const [categoryId, amount] of suggestions) {
+				// Only apply to categories without existing budgets
+				if (amount > 0 && !budgets.has(categoryId)) {
+					await saveCategoryBudget(categoryId, currentMonth, amount);
+					applied++;
+				}
+			}
+			await loadMonthData();
+			if (applied > 0) {
+				toast.success(`Applied ${applied} budget suggestion${applied === 1 ? '' : 's'}`);
+			} else {
+				toast.info('No suggestions to apply');
+			}
+		} catch (error) {
+			console.error('Failed to apply suggestions:', error);
+			toast.error('Failed to apply suggestions');
+		}
+	}
+
+	async function handleCopyFromLastMonth() {
+		try {
+			const previousBudgets = await getCategoryBudgetsForMonth(previousMonth);
+			if (previousBudgets.length === 0) {
+				toast.info('No budgets to copy from last month');
+				return;
+			}
+
+			await copyBudgetsFromMonth(previousMonth, currentMonth);
+			await loadMonthData();
+			toast.success('Copied budgets from last month');
+		} catch (error) {
+			console.error('Failed to copy budgets:', error);
+			toast.error('Failed to copy budgets');
 		}
 	}
 
@@ -208,6 +262,30 @@
 							</div>
 						</div>
 					{/if}
+				</div>
+
+				<!-- Quick Actions -->
+				<div class="flex flex-wrap gap-3">
+					<button
+						onclick={handleSuggestAll}
+						disabled={!hasSuggestionsToApply}
+						class="inline-flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm
+							transition-colors disabled:opacity-50 disabled:cursor-not-allowed
+							{hasSuggestionsToApply
+								? 'bg-primary-50 text-primary-700 hover:bg-primary-100'
+								: 'bg-surface-alt text-charcoal-muted'}"
+					>
+						<Sparkles size={16} />
+						Suggest All
+					</button>
+					<button
+						onclick={handleCopyFromLastMonth}
+						class="inline-flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm
+							bg-surface-alt text-charcoal-soft hover:bg-surface-hover transition-colors"
+					>
+						<Copy size={16} />
+						Copy from Last Month
+					</button>
 				</div>
 
 				<!-- Category Budgets List -->
