@@ -1,66 +1,21 @@
 /**
  * Database migrations for the Ledger app
  * Each migration is idempotent - safe to run multiple times
+ *
+ * Optimized to use bulk operations for better performance with large datasets.
  */
 
-import { db } from './index';
-
-// Warm Ledger color palette for categories
-const CATEGORY_COLORS: Record<string, string> = {
-	'Car': '#7C8B99',
-	'Cash withdrawals': '#6B8E6B',
-	'Clothes & accessories': '#C49BA0',
-	'Coffee & snacks': '#A67B5B',
-	'Donations': '#D4A59A',
-	'Electronics': '#6B7B8C',
-	'Fitness & wellness': '#5B8A8A',
-	'Fun & hobbies': '#9B8AA6',
-	'Gas': '#D4915D',
-	'Gifts': '#C9A9A9',
-	'Groceries': '#5B8C5A',
-	'Grooming': '#7BA3A3',
-	'Health': '#B87070',
-	'Home': '#8B7B99',
-	'Household supplies': '#8A847C',
-	'Insurance': '#6B8299',
-	'Parking & tolls': '#9C9588',
-	'Pet': '#C4956A',
-	'Rent': '#7B6B8C',
-	'Restaurants': '#C45D3A',
-	'Subscriptions': '#6B8399',
-	'Travel': '#5B8B8B',
-	'Utilities': '#C9A855'
-};
-
-// Essential (needs) vs non-essential (wants) categories
-const CATEGORY_ESSENTIAL: Record<string, boolean> = {
-	'Car': true,
-	'Cash withdrawals': false,
-	'Clothes & accessories': false,
-	'Coffee & snacks': false,
-	'Donations': false,
-	'Electronics': false,
-	'Fitness & wellness': false,
-	'Fun & hobbies': false,
-	'Gas': true,
-	'Gifts': false,
-	'Groceries': true,
-	'Grooming': false,
-	'Health': true,
-	'Home': false,
-	'Household supplies': true,
-	'Insurance': true,
-	'Parking & tolls': true,
-	'Pet': true,
-	'Rent': true,
-	'Restaurants': false,
-	'Subscriptions': false,
-	'Travel': false,
-	'Utilities': true
-};
+import {
+	db,
+	type Category,
+	type Transaction,
+	CATEGORY_COLORS,
+	CATEGORY_ESSENTIAL
+} from './index';
 
 /**
  * Migration: Update category colors to Warm Ledger palette
+ * Uses bulk update for efficiency
  */
 async function migrateCategoryColors(): Promise<void> {
 	// Check if migration is needed by looking at a known category color
@@ -70,31 +25,38 @@ async function migrateCategoryColors(): Promise<void> {
 	}
 
 	const allCategories = await db.categories.toArray();
+	const updates: Category[] = [];
+
 	for (const category of allCategories) {
 		const newColor = CATEGORY_COLORS[category.name];
 		if (newColor && category.color !== newColor) {
-			await db.categories.update(category.id!, { color: newColor });
+			updates.push({ ...category, color: newColor });
 		}
 	}
-	console.log('Migration: Updated category colors to Warm Ledger palette');
+
+	if (updates.length > 0) {
+		await db.categories.bulkPut(updates);
+		console.log('Migration: Updated category colors to Warm Ledger palette');
+	}
 }
 
 /**
  * Migration: Add isEssential field to categories
+ * Uses bulk update for efficiency
  */
 async function migrateCategoryEssential(): Promise<void> {
 	const allCategories = await db.categories.toArray();
-	let migrated = false;
+	const updates: Category[] = [];
 
 	for (const category of allCategories) {
 		if (category.isEssential === undefined) {
 			const isEssential = CATEGORY_ESSENTIAL[category.name] ?? false;
-			await db.categories.update(category.id!, { isEssential });
-			migrated = true;
+			updates.push({ ...category, isEssential });
 		}
 	}
 
-	if (migrated) {
+	if (updates.length > 0) {
+		await db.categories.bulkPut(updates);
 		console.log('Migration: Added isEssential field to categories');
 	}
 }
@@ -112,48 +74,55 @@ async function migrateSettingsDismissedRecurring(): Promise<void> {
 
 /**
  * Migration: Add isEssential field to transactions based on their category
+ * Uses bulk update for efficiency with large datasets
  */
 async function migrateTransactionEssential(): Promise<void> {
 	const allTransactions = await db.transactions.toArray();
 	if (allTransactions.length === 0) return;
 
 	// Check if migration is needed
-	const needsMigration = allTransactions.some((tx) => tx.isEssential === undefined);
-	if (!needsMigration) return;
+	const transactionsNeedingMigration = allTransactions.filter(
+		(tx) => tx.isEssential === undefined
+	);
+	if (transactionsNeedingMigration.length === 0) return;
 
 	// Build category essential lookup
 	const categoryEssentialMap = new Map(
 		(await db.categories.toArray()).map((c) => [c.id!, c.isEssential ?? false])
 	);
 
-	// Update transactions missing isEssential
-	for (const tx of allTransactions) {
-		if (tx.isEssential === undefined) {
-			const isEssential = categoryEssentialMap.get(tx.categoryId) ?? false;
-			await db.transactions.update(tx.id!, { isEssential });
-		}
-	}
-	console.log('Migration: Added isEssential field to transactions');
+	// Prepare bulk updates
+	const updates: Transaction[] = transactionsNeedingMigration.map((tx) => ({
+		...tx,
+		isEssential: categoryEssentialMap.get(tx.categoryId) ?? false
+	}));
+
+	await db.transactions.bulkPut(updates);
+	console.log(`Migration: Added isEssential field to ${updates.length} transactions`);
 }
 
 /**
  * Migration: Add isSubscription field to transactions (defaults to false)
+ * Uses bulk update for efficiency with large datasets
  */
 async function migrateTransactionSubscription(): Promise<void> {
 	const allTransactions = await db.transactions.toArray();
 	if (allTransactions.length === 0) return;
 
-	// Check if migration is needed
-	const needsMigration = allTransactions.some((tx) => (tx as { isSubscription?: boolean }).isSubscription === undefined);
-	if (!needsMigration) return;
+	// Check if migration is needed - filter transactions missing isSubscription
+	const transactionsNeedingMigration = allTransactions.filter(
+		(tx) => (tx as { isSubscription?: boolean }).isSubscription === undefined
+	);
+	if (transactionsNeedingMigration.length === 0) return;
 
-	// Update transactions missing isSubscription
-	for (const tx of allTransactions) {
-		if ((tx as { isSubscription?: boolean }).isSubscription === undefined) {
-			await db.transactions.update(tx.id!, { isSubscription: false });
-		}
-	}
-	console.log('Migration: Added isSubscription field to transactions');
+	// Prepare bulk updates
+	const updates: Transaction[] = transactionsNeedingMigration.map((tx) => ({
+		...tx,
+		isSubscription: false
+	}));
+
+	await db.transactions.bulkPut(updates);
+	console.log(`Migration: Added isSubscription field to ${updates.length} transactions`);
 }
 
 /**

@@ -5,53 +5,75 @@
  * Uses ~/Library/Application Support/app.ledger.desktop/ on macOS.
  */
 
-import { db, DEFAULT_SETTINGS, DEFAULT_CATEGORIES, type Transaction, type Category, type MonthlyBudget, type Settings } from '$lib/db';
+import {
+	db,
+	DEFAULT_SETTINGS,
+	DEFAULT_CATEGORIES,
+	type Category
+} from '$lib/db';
 import type { StoredData } from './index';
 
-// Tauri API imports - dynamically loaded only in Tauri environment
+// Tauri API modules - loaded once during initialization
 let fs: typeof import('@tauri-apps/plugin-fs');
 let path: typeof import('@tauri-apps/api/path');
+
+// Cached paths - resolved once during initialization
+let cachedAppDataDir: string;
+let cachedBackupsDir: string;
+let cachedDataPath: string;
+
+// Track if APIs have been initialized
+let apisInitialized = false;
 
 const DATA_FILE = 'data.json';
 const BACKUPS_DIR = 'backups';
 const MAX_BACKUPS = 10;
 
+// Backup debouncing - track last backup time
+let lastBackupTime = 0;
+const BACKUP_DEBOUNCE_MS = 60000; // 1 minute
+
 /**
- * Load Tauri APIs
+ * Load Tauri APIs and cache paths - called once during initialization
  */
-async function loadTauriApis(): Promise<void> {
-	if (!fs) {
-		fs = await import('@tauri-apps/plugin-fs');
-	}
-	if (!path) {
-		path = await import('@tauri-apps/api/path');
-	}
+async function initializeApis(): Promise<void> {
+	if (apisInitialized) return;
+
+	// Load API modules
+	fs = await import('@tauri-apps/plugin-fs');
+	path = await import('@tauri-apps/api/path');
+
+	// Cache commonly used paths
+	cachedAppDataDir = await path.appDataDir();
+	cachedBackupsDir = await path.join(cachedAppDataDir, BACKUPS_DIR);
+	cachedDataPath = await path.join(cachedAppDataDir, DATA_FILE);
+
+	apisInitialized = true;
 }
 
 /**
- * Get the app data directory path
+ * Ensure APIs are initialized before use
  */
-async function getAppDataDir(): Promise<string> {
-	await loadTauriApis();
-	return await path.appDataDir();
+function ensureInitialized(): void {
+	if (!apisInitialized) {
+		throw new Error('Tauri APIs not initialized. Call initializeTauriStorage() first.');
+	}
 }
 
 /**
  * Ensure the app data directory and backups subdirectory exist
  */
 async function ensureDirectories(): Promise<void> {
-	await loadTauriApis();
-	const appDataDir = await getAppDataDir();
+	ensureInitialized();
 
 	// Create app data dir if needed
-	if (!(await fs.exists(appDataDir))) {
-		await fs.mkdir(appDataDir, { recursive: true });
+	if (!(await fs.exists(cachedAppDataDir))) {
+		await fs.mkdir(cachedAppDataDir, { recursive: true });
 	}
 
 	// Create backups dir if needed
-	const backupsDir = await path.join(appDataDir, BACKUPS_DIR);
-	if (!(await fs.exists(backupsDir))) {
-		await fs.mkdir(backupsDir, { recursive: true });
+	if (!(await fs.exists(cachedBackupsDir))) {
+		await fs.mkdir(cachedBackupsDir, { recursive: true });
 	}
 }
 
@@ -59,16 +81,14 @@ async function ensureDirectories(): Promise<void> {
  * Read data from JSON file
  */
 async function readDataFile(): Promise<StoredData | null> {
-	await loadTauriApis();
-	const appDataDir = await getAppDataDir();
-	const dataPath = await path.join(appDataDir, DATA_FILE);
+	ensureInitialized();
 
-	if (!(await fs.exists(dataPath))) {
+	if (!(await fs.exists(cachedDataPath))) {
 		return null;
 	}
 
 	try {
-		const content = await fs.readTextFile(dataPath);
+		const content = await fs.readTextFile(cachedDataPath);
 		return JSON.parse(content) as StoredData;
 	} catch (error) {
 		console.error('Failed to read data file:', error);
@@ -80,36 +100,35 @@ async function readDataFile(): Promise<StoredData | null> {
  * Write data to JSON file
  */
 async function writeDataFile(data: StoredData): Promise<void> {
-	await loadTauriApis();
-	const appDataDir = await getAppDataDir();
-	const dataPath = await path.join(appDataDir, DATA_FILE);
-
+	ensureInitialized();
 	const content = JSON.stringify(data, null, 2);
-	await fs.writeTextFile(dataPath, content);
+	await fs.writeTextFile(cachedDataPath, content);
 }
 
 /**
- * Create a timestamped backup
+ * Create a timestamped backup (debounced to max 1 per minute)
  */
 export async function createBackup(): Promise<void> {
-	await loadTauriApis();
-	await ensureDirectories();
+	ensureInitialized();
 
-	const appDataDir = await getAppDataDir();
-	const dataPath = await path.join(appDataDir, DATA_FILE);
-
-	// Only backup if data file exists
-	if (!(await fs.exists(dataPath))) {
+	// Debounce backups - don't create more than one per minute
+	const now = Date.now();
+	if (now - lastBackupTime < BACKUP_DEBOUNCE_MS) {
 		return;
 	}
 
-	const content = await fs.readTextFile(dataPath);
+	// Only backup if data file exists
+	if (!(await fs.exists(cachedDataPath))) {
+		return;
+	}
+
+	const content = await fs.readTextFile(cachedDataPath);
 	const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
 	const backupName = `data-${timestamp}.json`;
-	const backupsDir = await path.join(appDataDir, BACKUPS_DIR);
-	const backupPath = await path.join(backupsDir, backupName);
+	const backupPath = await path.join(cachedBackupsDir, backupName);
 
 	await fs.writeTextFile(backupPath, content);
+	lastBackupTime = now;
 
 	// Clean up old backups
 	await pruneOldBackups();
@@ -119,14 +138,12 @@ export async function createBackup(): Promise<void> {
  * Remove old backups, keeping only the most recent MAX_BACKUPS
  */
 async function pruneOldBackups(): Promise<void> {
-	await loadTauriApis();
-	const appDataDir = await getAppDataDir();
-	const backupsDir = await path.join(appDataDir, BACKUPS_DIR);
+	ensureInitialized();
 
-	const entries = await fs.readDir(backupsDir);
+	const entries = await fs.readDir(cachedBackupsDir);
 	const backupFiles = entries
-		.filter(e => e.isFile && e.name?.startsWith('data-') && e.name?.endsWith('.json'))
-		.map(e => e.name!)
+		.filter((e) => e.isFile && e.name?.startsWith('data-') && e.name?.endsWith('.json'))
+		.map((e) => e.name!)
 		.sort()
 		.reverse(); // Most recent first
 
@@ -134,7 +151,7 @@ async function pruneOldBackups(): Promise<void> {
 	if (backupFiles.length > MAX_BACKUPS) {
 		const toDelete = backupFiles.slice(MAX_BACKUPS);
 		for (const filename of toDelete) {
-			const filepath = await path.join(backupsDir, filename);
+			const filepath = await path.join(cachedBackupsDir, filename);
 			await fs.remove(filepath);
 		}
 	}
@@ -145,11 +162,18 @@ async function pruneOldBackups(): Promise<void> {
  * Clears any stale IndexedDB data and loads fresh from JSON file
  */
 export async function initializeTauriStorage(): Promise<void> {
+	// Load APIs and cache paths first
+	await initializeApis();
 	await ensureDirectories();
 
 	// Clear any stale IndexedDB data first - JSON file is our source of truth
-	await db.delete();
-	await db.open();
+	try {
+		await db.delete();
+		await db.open();
+	} catch (error) {
+		console.error('Failed to reset IndexedDB:', error);
+		throw new Error(`Failed to initialize database: ${error}`);
+	}
 
 	const storedData = await readDataFile();
 
@@ -168,44 +192,48 @@ export async function initializeTauriStorage(): Promise<void> {
  * Load stored data into Dexie database
  */
 async function loadDataIntoDexie(data: StoredData): Promise<void> {
-	await db.transaction('rw', [db.transactions, db.categories, db.monthlyBudgets, db.settings], async () => {
-		// Clear existing data
-		await db.transactions.clear();
-		await db.categories.clear();
-		await db.monthlyBudgets.clear();
+	await db.transaction(
+		'rw',
+		[db.transactions, db.categories, db.monthlyBudgets, db.settings],
+		async () => {
+			// Clear existing data
+			await db.transactions.clear();
+			await db.categories.clear();
+			await db.monthlyBudgets.clear();
 
-		// Load categories
-		if (data.categories && data.categories.length > 0) {
-			await db.categories.bulkPut(data.categories);
-		} else {
-			// Seed with defaults
-			await db.categories.bulkAdd(DEFAULT_CATEGORIES as Category[]);
-		}
+			// Load categories
+			if (data.categories && data.categories.length > 0) {
+				await db.categories.bulkPut(data.categories);
+			} else {
+				// Seed with defaults
+				await db.categories.bulkAdd(DEFAULT_CATEGORIES as Category[]);
+			}
 
-		// Load monthly budgets
-		if (data.monthlyBudgets && data.monthlyBudgets.length > 0) {
-			await db.monthlyBudgets.bulkPut(data.monthlyBudgets);
-		}
+			// Load monthly budgets
+			if (data.monthlyBudgets && data.monthlyBudgets.length > 0) {
+				await db.monthlyBudgets.bulkPut(data.monthlyBudgets);
+			}
 
-		// Load transactions (convert date strings to Date objects)
-		if (data.transactions && data.transactions.length > 0) {
-			const transactions = data.transactions.map(t => ({
-				...t,
-				date: new Date(t.date),
-				createdAt: new Date(t.createdAt),
-				updatedAt: new Date(t.updatedAt),
-				settledDate: t.settledDate ? new Date(t.settledDate) : undefined
-			}));
-			await db.transactions.bulkPut(transactions);
-		}
+			// Load transactions (convert date strings to Date objects)
+			if (data.transactions && data.transactions.length > 0) {
+				const transactions = data.transactions.map((t) => ({
+					...t,
+					date: new Date(t.date),
+					createdAt: new Date(t.createdAt),
+					updatedAt: new Date(t.updatedAt),
+					settledDate: t.settledDate ? new Date(t.settledDate) : undefined
+				}));
+				await db.transactions.bulkPut(transactions);
+			}
 
-		// Load settings
-		if (data.settings) {
-			await db.settings.put({ ...data.settings, id: 1 });
-		} else {
-			await db.settings.put(DEFAULT_SETTINGS);
+			// Load settings
+			if (data.settings) {
+				await db.settings.put({ ...data.settings, id: 1 });
+			} else {
+				await db.settings.put(DEFAULT_SETTINGS);
+			}
 		}
-	});
+	);
 }
 
 /**
@@ -228,7 +256,9 @@ async function initializeDefaults(): Promise<void> {
  * Called after every data modification
  */
 export async function saveToFile(): Promise<void> {
-	// Create backup before saving
+	ensureInitialized();
+
+	// Create backup before saving (debounced)
 	await createBackup();
 
 	// Get all data from Dexie
@@ -249,4 +279,11 @@ export async function saveToFile(): Promise<void> {
 	};
 
 	await writeDataFile(data);
+}
+
+/**
+ * Reset backup debounce timer (for testing)
+ */
+export function resetBackupDebounce(): void {
+	lastBackupTime = 0;
 }

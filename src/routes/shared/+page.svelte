@@ -117,7 +117,7 @@
 			<div class="bg-primary-50 rounded-xl p-5 border border-primary-200">
 				<h3 class="font-medium text-primary-800 mb-2">Tips</h3>
 				<ul class="text-sm text-primary-800 space-y-1">
-					<li>• Select transactions and mark them as settled after Venmo'ing</li>
+					<li>• Select transactions and mark them as settled after repayment</li>
 					<li>• Use "Select All" to settle everything at once</li>
 					<li>• Settled transactions won't appear in this list</li>
 				</ul>

@@ -38,10 +38,32 @@
 		[...categories].sort((a, b) => a.name.localeCompare(b.name))
 	);
 
-	// Set default selected category
+	// Track if user has manually selected a category
+	let hasUserSelected = $state(false);
+	let lastMonth = $state(currentMonth);
+
+	// Reset user selection when month changes
 	$effect(() => {
-		if (selectedCategoryId === null && sortedCategories.length > 0) {
-			selectedCategoryId = sortedCategories[0].id!;
+		if (currentMonth !== lastMonth) {
+			hasUserSelected = false;
+			lastMonth = currentMonth;
+		}
+	});
+
+	// Set default selected category to the most anomalous (topChange) if available
+	$effect(() => {
+		// Only auto-select if user hasn't manually chosen
+		if (!hasUserSelected && sortedCategories.length > 0) {
+			if (topChange) {
+				// Default to the most anomalous category
+				const anomalousCat = categories.find((c) => c.name === topChange.name);
+				if (anomalousCat?.id && selectedCategoryId !== anomalousCat.id) {
+					selectedCategoryId = anomalousCat.id;
+				}
+			} else if (selectedCategoryId === null) {
+				// Fallback to first category if no trend data yet
+				selectedCategoryId = sortedCategories[0].id!;
+			}
 		}
 	});
 
@@ -150,6 +172,7 @@
 				<select
 					id="category-select"
 					bind:value={selectedCategoryId}
+					onchange={() => hasUserSelected = true}
 					class="w-full px-3 py-2 bg-surface border border-[var(--color-border)] rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-charcoal"
 				>
 					{#each sortedCategories as cat}

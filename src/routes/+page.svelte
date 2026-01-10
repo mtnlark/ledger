@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
 	import { afterNavigate } from '$app/navigation';
 	import { format, startOfDay, parseISO } from 'date-fns';
 	import { getMonthKey, parseMonthKey, type Transaction, type Category, type Settings, type MonthlyBudget, DEFAULT_SETTINGS } from '$lib/db';
@@ -145,6 +144,13 @@
 			return sum + t.amount;
 		}, 0)
 	);
+
+	// Initial data load - runs once on mount
+	$effect(() => {
+		loadData();
+		// Empty dependency array equivalent - this effect runs once
+		return () => {};
+	});
 
 	// Load data
 	async function loadData() {
@@ -405,25 +411,15 @@
 		}
 	}
 
-	// Reload data when navigating to this page (handles in-app navigation)
-	// This ensures categories/settings changes from Settings page are picked up
-	afterNavigate(() => {
-		loadData();
-	});
-
-	onMount(() => {
-		// Reload data when page becomes visible (e.g., switching browser tabs)
-		function handleVisibilityChange() {
-			if (document.visibilityState === 'visible' && !isLoading) {
-				loadData();
-			}
+	// Refresh categories/settings when navigating back to this page
+	// This ensures changes made on Settings page are picked up without full reload
+	afterNavigate(async () => {
+		// Only refresh if already loaded (not during initial mount)
+		if (!isLoading) {
+			// Lightweight refresh - just categories and settings
+			categories = await getAllCategories();
+			settings = await getSettings();
 		}
-
-		document.addEventListener('visibilitychange', handleVisibilityChange);
-
-		return () => {
-			document.removeEventListener('visibilitychange', handleVisibilityChange);
-		};
 	});
 
 	function formatCurrency(amount: number): string {

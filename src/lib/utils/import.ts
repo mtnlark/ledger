@@ -1,7 +1,8 @@
 import * as XLSX from 'xlsx';
-import { db, type Transaction, type Category } from '$lib/db';
+import { db } from '$lib/db';
 import { getAllCategories, getCategoryByName } from '$lib/stores/categories';
 import { excelDateToJS, parseDateString } from '$lib/utils/date-helpers';
+import { persistData } from '$lib/storage';
 
 export interface ImportedTransaction {
 	date: Date;
@@ -209,6 +210,11 @@ export async function importTransactions(
 		}
 	}
 
+	// Persist imported data to file storage (Tauri only)
+	if (imported > 0) {
+		await persistData();
+	}
+
 	return {
 		success: errors.length === 0,
 		imported,
@@ -235,105 +241,4 @@ export async function readExcelFile(file: File): Promise<XLSX.WorkBook> {
 		reader.onerror = () => reject(reader.error);
 		reader.readAsArrayBuffer(file);
 	});
-}
-
-/**
- * Diagnostic function to understand how dates are stored
- * Returns info about transactions, with special attention to month boundaries
- */
-export async function diagnoseDates(): Promise<{
-	total: number;
-	samples: Array<{
-		id: number;
-		merchant: string;
-		rawDate: unknown;
-		dateType: string;
-		parsedDate: string;
-		hours: number;
-		isoString: string;
-	}>;
-	monthBoundaryIssues: Array<{
-		id: number;
-		merchant: string;
-		storedDate: string;
-		dayOfMonth: number;
-	}>;
-}> {
-	const transactions = await db.transactions.toArray();
-	const samples = transactions.slice(0, 10).map((t) => {
-		const date = new Date(t.date);
-		return {
-			id: t.id!,
-			merchant: t.merchant,
-			rawDate: t.date,
-			dateType: typeof t.date,
-			parsedDate: date.toString(),
-			hours: date.getHours(),
-			isoString: date.toISOString()
-		};
-	});
-
-	// Find transactions on last day of month (potential off-by-one errors)
-	const monthBoundaryIssues = transactions
-		.filter((t) => {
-			const date = new Date(t.date);
-			const day = date.getDate();
-			// Last days of months that could be off-by-one from 1st of next month
-			return day === 31 || day === 30 || day === 28 || day === 29;
-		})
-		.slice(0, 20)
-		.map((t) => {
-			const date = new Date(t.date);
-			return {
-				id: t.id!,
-				merchant: t.merchant,
-				storedDate: date.toLocaleDateString(),
-				dayOfMonth: date.getDate()
-			};
-		});
-
-	return { total: transactions.length, samples, monthBoundaryIssues };
-}
-
-/**
- * Fix transaction dates that were incorrectly stored with timezone issues
- * This shifts dates forward by one day if they appear to be off
- * Returns the number of transactions fixed
- */
-export async function fixTransactionDates(): Promise<{ fixed: number; checked: number; details: string[] }> {
-	const transactions = await db.transactions.toArray();
-	let fixed = 0;
-	const details: string[] = [];
-
-	for (const t of transactions) {
-		const date = new Date(t.date);
-		const hours = date.getHours();
-		const minutes = date.getMinutes();
-
-		// Check multiple indicators of timezone issues:
-		// 1. Evening hours (17-23) indicate UTC midnight shifted to local time
-		// 2. Early morning hours (0-7) with non-zero minutes might also indicate issues
-		const isEvening = hours >= 17 && hours <= 23;
-		const isNotMidnight = hours !== 0 || minutes !== 0;
-
-		if (isEvening) {
-			// Create a new date at midnight local time for the NEXT day
-			const fixedDate = new Date(date.getFullYear(), date.getMonth(), date.getDate() + 1);
-			await db.transactions.update(t.id!, {
-				date: fixedDate,
-				updatedAt: new Date()
-			});
-			details.push(`Fixed: ${t.merchant} from ${date.toLocaleDateString()} ${hours}:${minutes} to ${fixedDate.toLocaleDateString()}`);
-			fixed++;
-		} else if (isNotMidnight && fixed === 0 && details.length < 5) {
-			// Log some samples of non-midnight times for diagnosis (only if we haven't fixed anything yet)
-			details.push(`Sample: ${t.merchant} at ${date.toLocaleDateString()} ${hours}:${String(minutes).padStart(2, '0')}`);
-		}
-	}
-
-	if (fixed === 0 && details.length === 0) {
-		details.push('All dates appear to be at midnight local time - no obvious timezone issues detected');
-	}
-
-	return { fixed, checked: transactions.length, details };
 }

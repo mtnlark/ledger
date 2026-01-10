@@ -1,4 +1,3 @@
-import { writable, derived } from 'svelte/store';
 import { db, calculatePartnerShare, getMonthKey, type Transaction } from '$lib/db';
 import { liveQuery } from 'dexie';
 import { persistData } from '$lib/storage';
@@ -11,9 +10,6 @@ function invalidateTransactionCaches(): void {
 	invalidateMerchantCache();
 	invalidateRecurringCache();
 }
-
-// Current selected month store
-export const currentMonth = writable(getMonthKey(new Date()));
 
 // Reactive transactions for current month
 export function createTransactionsStore(month: string) {

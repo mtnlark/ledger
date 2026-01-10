@@ -5,7 +5,14 @@
  * JSON file persistence in the app data directory.
  */
 
-import { db, type Transaction, type Category, type MonthlyBudget, type Settings, DEFAULT_SETTINGS } from '$lib/db';
+import {
+	db,
+	type Transaction,
+	type Category,
+	type MonthlyBudget,
+	type Settings,
+	DEFAULT_SETTINGS
+} from '$lib/db';
 
 // Data structure for file storage
 export interface StoredData {
@@ -26,23 +33,61 @@ function isTauri(): boolean {
 }
 
 /**
+ * Storage initialization error with context
+ */
+export class StorageInitError extends Error {
+	constructor(
+		message: string,
+		public readonly cause?: unknown
+	) {
+		super(message);
+		this.name = 'StorageInitError';
+	}
+}
+
+/**
  * Initialize storage - call this on app startup
  * In Tauri: Loads data from JSON file into Dexie
  * In tests: Just initializes Dexie with defaults
+ *
+ * @throws StorageInitError if initialization fails
  */
 export async function initializeStorage(): Promise<void> {
 	if (initialized) return;
 
-	if (isTauri()) {
-		const { initializeTauriStorage } = await import('./tauri-adapter');
-		await initializeTauriStorage();
-	} else {
-		// Test/non-Tauri environment - just initialize Dexie defaults
-		const { initializeDatabase } = await import('$lib/db');
-		await initializeDatabase();
-	}
+	try {
+		if (isTauri()) {
+			const { initializeTauriStorage } = await import('./tauri-adapter');
+			await initializeTauriStorage();
+		} else {
+			// Test/non-Tauri environment - just initialize Dexie defaults
+			const { initializeDatabase } = await import('$lib/db');
+			await initializeDatabase();
+		}
 
-	initialized = true;
+		initialized = true;
+	} catch (error) {
+		// Reset flag so retry is possible
+		initialized = false;
+
+		// Wrap and rethrow with context
+		const message = error instanceof Error ? error.message : String(error);
+		throw new StorageInitError(`Failed to initialize storage: ${message}`, error);
+	}
+}
+
+/**
+ * Check if storage has been initialized
+ */
+export function isStorageInitialized(): boolean {
+	return initialized;
+}
+
+/**
+ * Reset initialization state (for testing or error recovery)
+ */
+export function resetStorageState(): void {
+	initialized = false;
 }
 
 /**
@@ -101,35 +146,39 @@ export async function getAllData(): Promise<StoredData> {
  * Replace all data (useful for import/restore)
  */
 export async function replaceAllData(data: StoredData): Promise<void> {
-	await db.transaction('rw', [db.transactions, db.categories, db.monthlyBudgets, db.settings], async () => {
-		await db.transactions.clear();
-		await db.categories.clear();
-		await db.monthlyBudgets.clear();
+	await db.transaction(
+		'rw',
+		[db.transactions, db.categories, db.monthlyBudgets, db.settings],
+		async () => {
+			await db.transactions.clear();
+			await db.categories.clear();
+			await db.monthlyBudgets.clear();
 
-		if (data.categories.length > 0) {
-			await db.categories.bulkPut(data.categories);
-		}
+			if (data.categories.length > 0) {
+				await db.categories.bulkPut(data.categories);
+			}
 
-		if (data.monthlyBudgets.length > 0) {
-			await db.monthlyBudgets.bulkPut(data.monthlyBudgets);
-		}
+			if (data.monthlyBudgets.length > 0) {
+				await db.monthlyBudgets.bulkPut(data.monthlyBudgets);
+			}
 
-		if (data.transactions.length > 0) {
-			// Convert date strings back to Date objects
-			const transactions = data.transactions.map(t => ({
-				...t,
-				date: new Date(t.date),
-				createdAt: new Date(t.createdAt),
-				updatedAt: new Date(t.updatedAt),
-				settledDate: t.settledDate ? new Date(t.settledDate) : undefined
-			}));
-			await db.transactions.bulkPut(transactions);
-		}
+			if (data.transactions.length > 0) {
+				// Convert date strings back to Date objects
+				const transactions = data.transactions.map((t) => ({
+					...t,
+					date: new Date(t.date),
+					createdAt: new Date(t.createdAt),
+					updatedAt: new Date(t.updatedAt),
+					settledDate: t.settledDate ? new Date(t.settledDate) : undefined
+				}));
+				await db.transactions.bulkPut(transactions);
+			}
 
-		if (data.settings) {
-			await db.settings.put({ ...data.settings, id: 1 });
+			if (data.settings) {
+				await db.settings.put({ ...data.settings, id: 1 });
+			}
 		}
-	});
+	);
 
 	await persistData();
 }

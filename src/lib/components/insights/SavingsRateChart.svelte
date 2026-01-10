@@ -72,7 +72,8 @@
 					borderColor: '#94a3b8',
 					borderDash: [5, 5],
 					fill: false,
-					pointRadius: 0
+					pointRadius: 0,
+					pointStyle: 'line'
 				}
 			]
 		},
@@ -84,7 +85,9 @@
 					position: 'top',
 					labels: {
 						boxWidth: 12,
-						color: theme.textColor
+						color: theme.textColor,
+						usePointStyle: true,
+						pointStyle: 'rect'
 					}
 				},
 				tooltip: {

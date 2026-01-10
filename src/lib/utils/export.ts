@@ -1,4 +1,4 @@
-import { db, type Transaction, type Category, type MonthlyBudget, type Settings } from '$lib/db';
+import { db, type Transaction, type Category } from '$lib/db';
 import { persistData } from '$lib/storage';
 import { format } from 'date-fns';
 
@@ -129,88 +129,6 @@ export async function importFromJSON(
 	} catch (error) {
 		return { success: false, message: `Import failed: ${error}` };
 	}
-}
-
-/**
- * Diagnose and repair category ID mismatches
- * Returns info about what was found and fixed
- */
-export async function repairCategoryIds(): Promise<{
-	checked: number;
-	fixed: number;
-	details: string[]
-}> {
-	const transactions = await db.transactions.toArray();
-	const categories = await db.categories.toArray();
-
-	const details: string[] = [];
-	let fixed = 0;
-
-	// Build lookup maps
-	const categoryById = new Map(categories.map(c => [c.id, c]));
-
-	details.push(`Found ${categories.length} categories and ${transactions.length} transactions`);
-
-	// Get all unique categoryIds from transactions
-	const transactionCategoryIds = [...new Set(transactions.map(t => t.categoryId))].sort((a, b) => a - b);
-	const categoryIds = categories.map(c => c.id!).sort((a, b) => a - b);
-
-	details.push(`Category IDs in categories table: ${categoryIds.join(', ')}`);
-	details.push(`Category IDs referenced in transactions: ${transactionCategoryIds.join(', ')}`);
-
-	// Find transactions with invalid categoryIds
-	const invalidTransactions = transactions.filter(t => !categoryById.has(t.categoryId));
-	details.push(`Found ${invalidTransactions.length} transactions with invalid category IDs`);
-
-	if (invalidTransactions.length > 0 && categories.length > 0) {
-		// Try to detect if there's a consistent offset
-		// E.g., categories are 1-23 but transactions reference 24-46
-		const minCatId = Math.min(...categoryIds);
-		const maxCatId = Math.max(...categoryIds);
-		const minTxCatId = Math.min(...transactionCategoryIds);
-		const maxTxCatId = Math.max(...transactionCategoryIds);
-
-		// Check if it's a simple offset (all transaction IDs are higher/lower by same amount)
-		const possibleOffset = minTxCatId - minCatId;
-		const couldBeOffset = transactionCategoryIds.every(txId => {
-			const mappedId = txId - possibleOffset;
-			return categoryById.has(mappedId);
-		});
-
-		if (couldBeOffset && possibleOffset !== 0) {
-			details.push(`Detected ID offset of ${possibleOffset}. Remapping...`);
-
-			for (const t of transactions) {
-				const newCategoryId = t.categoryId - possibleOffset;
-				if (categoryById.has(newCategoryId) && newCategoryId !== t.categoryId) {
-					await db.transactions.update(t.id!, {
-						categoryId: newCategoryId,
-						updatedAt: new Date()
-					});
-					fixed++;
-				}
-			}
-		} else {
-			// No pattern detected, assign to first category
-			const defaultCategory = categories[0];
-			details.push(`No ID pattern detected. Assigning ${invalidTransactions.length} transactions to: ${defaultCategory.name}`);
-
-			for (const t of invalidTransactions) {
-				await db.transactions.update(t.id!, {
-					categoryId: defaultCategory.id!,
-					updatedAt: new Date()
-				});
-				fixed++;
-			}
-		}
-	}
-
-	// Persist changes to file storage (Tauri only)
-	if (fixed > 0) {
-		await persistData();
-	}
-
-	return { checked: transactions.length, fixed, details };
 }
 
 /**

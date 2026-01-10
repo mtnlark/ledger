@@ -154,6 +154,23 @@
     accent-color: var(--color-success-500, #5B8C5A);
   }
 
+  /* Terracotta focus ring for inputs (light mode) */
+  input:focus,
+  select:focus,
+  textarea:focus {
+    --tw-ring-color: rgba(196, 93, 58, 0.2) !important;
+    --tw-ring-opacity: 0.2 !important;
+    outline: none !important;
+    box-shadow: 0 0 0 2px rgba(196, 93, 58, 0.15), 0 0 0 4px rgba(196, 93, 58, 0.08) !important;
+  }
+
+  input:focus-visible,
+  select:focus-visible,
+  textarea:focus-visible {
+    outline: 2px solid rgba(196, 93, 58, 0.35) !important;
+    outline-offset: 1px;
+  }
+
   /* Softer focus ring for inputs in dark mode */
   .dark input:focus,
   .dark select:focus,

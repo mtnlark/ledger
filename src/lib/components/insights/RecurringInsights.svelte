@@ -3,6 +3,7 @@
 	import type { Category, Transaction, CancelledSubscription } from '$lib/db';
 	import { createCategoryHelpers } from '$lib/utils/category-helpers';
 	import InsightGroup from './InsightGroup.svelte';
+	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
 	import type { DetectedRecurring } from '$lib/stores/recurring';
 	import {
 		dismissRecurring,
@@ -32,6 +33,33 @@
 	let categoryHelpers = $derived(createCategoryHelpers(props.categories));
 	let getCategoryIcon = $derived(categoryHelpers.getIcon);
 	let getCategoryName = $derived(categoryHelpers.getName);
+
+	// Confirm dialog state for dismissing recurring bills
+	let confirmDialog = $state({
+		isOpen: false,
+		merchantName: '',
+		onConfirm: () => {}
+	});
+
+	function showDismissConfirmDialog(merchant: string) {
+		confirmDialog = {
+			isOpen: true,
+			merchantName: merchant,
+			onConfirm: async () => {
+				await dismissRecurring(merchant);
+				onDismiss?.();
+			}
+		};
+	}
+
+	function closeConfirmDialog() {
+		confirmDialog = { ...confirmDialog, isOpen: false };
+	}
+
+	function handleConfirm() {
+		confirmDialog.onConfirm();
+		closeConfirmDialog();
+	}
 
 	// Staleness thresholds
 	const MONTHLY_STALE_DAYS = 60; // 2 months
@@ -170,10 +198,9 @@
 		allSubscriptions.length > 0 || props.recurring.length > 0
 	);
 
-	// Action handlers
-	async function handleDismiss(merchant: string) {
-		await dismissRecurring(merchant);
-		onDismiss?.();
+	// Action handlers - handleDismiss now shows confirmation dialog
+	function handleDismiss(merchant: string) {
+		showDismissConfirmDialog(merchant);
 	}
 
 	async function handleCancelSubscription(merchant: string) {
@@ -453,3 +480,14 @@
 		{/if}
 	{/snippet}
 </InsightGroup>
+
+<!-- Confirm Dialog for dismissing recurring bills -->
+<ConfirmDialog
+	isOpen={confirmDialog.isOpen}
+	title="Remove Recurring Bill"
+	message={`Are you sure you want to remove "${confirmDialog.merchantName}" from recurring expenses? This bill will no longer appear in your recurring list.`}
+	confirmText="Remove"
+	variant="warning"
+	onConfirm={handleConfirm}
+	onCancel={closeConfirmDialog}
+/>

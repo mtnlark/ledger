@@ -146,6 +146,15 @@ export const DEFAULT_CATEGORIES: Omit<Category, 'id'>[] = [
 	{ name: 'Utilities', icon: '💡', color: '#C9A855', isActive: true, sortOrder: 23, isEssential: true }
 ];
 
+// Derived lookup maps for migrations (single source of truth)
+export const CATEGORY_COLORS: Record<string, string> = Object.fromEntries(
+	DEFAULT_CATEGORIES.map((c) => [c.name, c.color!])
+);
+
+export const CATEGORY_ESSENTIAL: Record<string, boolean> = Object.fromEntries(
+	DEFAULT_CATEGORIES.map((c) => [c.name, c.isEssential])
+);
+
 // Default settings
 export const DEFAULT_SETTINGS: Settings = {
 	id: 1,
