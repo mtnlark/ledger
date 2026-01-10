@@ -10,6 +10,7 @@ import {
 	type Transaction,
 	type Category,
 	type MonthlyBudget,
+	type CategoryBudget,
 	type Settings,
 	DEFAULT_SETTINGS
 } from '$lib/db';
@@ -21,6 +22,7 @@ export interface StoredData {
 	transactions: Transaction[];
 	categories: Category[];
 	monthlyBudgets: MonthlyBudget[];
+	categoryBudgets: CategoryBudget[];
 	settings: Settings;
 }
 
@@ -125,10 +127,11 @@ export async function withPersistence<T>(operation: () => Promise<T>): Promise<T
  * Get all current data (useful for export/backup)
  */
 export async function getAllData(): Promise<StoredData> {
-	const [transactions, categories, monthlyBudgets, settings] = await Promise.all([
+	const [transactions, categories, monthlyBudgets, categoryBudgets, settings] = await Promise.all([
 		db.transactions.toArray(),
 		db.categories.toArray(),
 		db.monthlyBudgets.toArray(),
+		db.categoryBudgets.toArray(),
 		db.settings.get(1)
 	]);
 
@@ -138,6 +141,7 @@ export async function getAllData(): Promise<StoredData> {
 		transactions,
 		categories,
 		monthlyBudgets,
+		categoryBudgets,
 		settings: settings ?? DEFAULT_SETTINGS
 	};
 }
@@ -148,11 +152,12 @@ export async function getAllData(): Promise<StoredData> {
 export async function replaceAllData(data: StoredData): Promise<void> {
 	await db.transaction(
 		'rw',
-		[db.transactions, db.categories, db.monthlyBudgets, db.settings],
+		[db.transactions, db.categories, db.monthlyBudgets, db.categoryBudgets, db.settings],
 		async () => {
 			await db.transactions.clear();
 			await db.categories.clear();
 			await db.monthlyBudgets.clear();
+			await db.categoryBudgets.clear();
 
 			if (data.categories.length > 0) {
 				await db.categories.bulkPut(data.categories);
@@ -160,6 +165,16 @@ export async function replaceAllData(data: StoredData): Promise<void> {
 
 			if (data.monthlyBudgets.length > 0) {
 				await db.monthlyBudgets.bulkPut(data.monthlyBudgets);
+			}
+
+			if (data.categoryBudgets && data.categoryBudgets.length > 0) {
+				// Convert date strings back to Date objects
+				const categoryBudgets = data.categoryBudgets.map((cb) => ({
+					...cb,
+					createdAt: new Date(cb.createdAt),
+					updatedAt: new Date(cb.updatedAt)
+				}));
+				await db.categoryBudgets.bulkPut(categoryBudgets);
 			}
 
 			if (data.transactions.length > 0) {

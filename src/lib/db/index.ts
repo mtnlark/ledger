@@ -41,6 +41,15 @@ export interface MonthlyBudget {
 	notes?: string;
 }
 
+export interface CategoryBudget {
+	id?: number;
+	month: string; // "YYYY-MM" format
+	categoryId: number; // References Category.id
+	budgetAmount: number; // Target spending limit
+	createdAt: Date;
+	updatedAt: Date;
+}
+
 export interface CancelledSubscription {
 	merchant: string; // Normalized merchant name
 	cancelledDate: string; // ISO date string
@@ -63,6 +72,7 @@ class BudgetTrackerDB extends Dexie {
 	transactions!: EntityTable<Transaction, 'id'>;
 	categories!: EntityTable<Category, 'id'>;
 	monthlyBudgets!: EntityTable<MonthlyBudget, 'id'>;
+	categoryBudgets!: EntityTable<CategoryBudget, 'id'>;
 	settings!: EntityTable<Settings, 'id'>;
 
 	constructor() {
@@ -80,6 +90,15 @@ class BudgetTrackerDB extends Dexie {
 			transactions: '++id, date, merchant, categoryId, isShared, isSettled, parentTransactionId, [date+merchant+amount]',
 			categories: '++id, name, isActive, sortOrder',
 			monthlyBudgets: '++id, &month',
+			settings: 'id'
+		});
+
+		// Version 3: Add categoryBudgets table for per-category budget tracking
+		this.version(3).stores({
+			transactions: '++id, date, merchant, categoryId, isShared, isSettled, parentTransactionId, [date+merchant+amount]',
+			categories: '++id, name, isActive, sortOrder',
+			monthlyBudgets: '++id, &month',
+			categoryBudgets: '++id, month, categoryId, [month+categoryId]',
 			settings: 'id'
 		});
 	}

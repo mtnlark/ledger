@@ -123,6 +123,7 @@ describe('Storage Layer', () => {
 			expect(Array.isArray(data.transactions)).toBe(true);
 			expect(Array.isArray(data.categories)).toBe(true);
 			expect(Array.isArray(data.monthlyBudgets)).toBe(true);
+			expect(Array.isArray(data.categoryBudgets)).toBe(true);
 			expect(data.settings).toBeDefined();
 		});
 
@@ -198,6 +199,7 @@ describe('Storage Layer', () => {
 					{ id: 1, name: 'Custom Category', icon: '🎯', color: '#FF0000', isActive: true, sortOrder: 1, isEssential: false }
 				],
 				monthlyBudgets: [],
+				categoryBudgets: [],
 				settings: DEFAULT_SETTINGS
 			};
 
@@ -235,6 +237,7 @@ describe('Storage Layer', () => {
 				],
 				categories: DEFAULT_CATEGORIES as Category[],
 				monthlyBudgets: [],
+				categoryBudgets: [],
 				settings: DEFAULT_SETTINGS
 			};
 
@@ -262,6 +265,7 @@ describe('Storage Layer', () => {
 					{ id: 1, month: '2024-06', income: 6000, savedAmount: 1500 },
 					{ id: 2, month: '2024-07', income: 6500, savedAmount: 2000 }
 				],
+				categoryBudgets: [],
 				settings: DEFAULT_SETTINGS
 			};
 
@@ -282,6 +286,7 @@ describe('Storage Layer', () => {
 				transactions: [],
 				categories: DEFAULT_CATEGORIES as Category[],
 				monthlyBudgets: [],
+				categoryBudgets: [],
 				settings: {
 					...DEFAULT_SETTINGS,
 					partnerName: 'Alex',
@@ -305,6 +310,7 @@ describe('Storage Layer', () => {
 				transactions: [],
 				categories: [],
 				monthlyBudgets: [],
+				categoryBudgets: [],
 				settings: DEFAULT_SETTINGS
 			};
 
@@ -313,6 +319,7 @@ describe('Storage Layer', () => {
 			expect(await db.transactions.count()).toBe(0);
 			expect(await db.categories.count()).toBe(0);
 			expect(await db.monthlyBudgets.count()).toBe(0);
+			expect(await db.categoryBudgets.count()).toBe(0);
 		});
 
 		it('handles settledDate conversion', async () => {
@@ -343,6 +350,7 @@ describe('Storage Layer', () => {
 				],
 				categories: DEFAULT_CATEGORIES as Category[],
 				monthlyBudgets: [],
+				categoryBudgets: [],
 				settings: DEFAULT_SETTINGS
 			};
 
@@ -350,6 +358,46 @@ describe('Storage Layer', () => {
 
 			const transactions = await db.transactions.toArray();
 			expect(transactions[0].settledDate instanceof Date).toBe(true);
+		});
+
+		it('replaces category budgets with date conversion', async () => {
+			await initializeDatabase();
+
+			const testDate = '2024-06-15T00:00:00.000Z';
+			const newData: StoredData = {
+				version: '1.0',
+				exportedAt: new Date().toISOString(),
+				transactions: [],
+				categories: DEFAULT_CATEGORIES as Category[],
+				monthlyBudgets: [],
+				categoryBudgets: [
+					{
+						id: 1,
+						month: '2024-06',
+						categoryId: 11, // Groceries
+						budgetAmount: 500,
+						createdAt: new Date(testDate),
+						updatedAt: new Date(testDate)
+					},
+					{
+						id: 2,
+						month: '2024-06',
+						categoryId: 20, // Restaurants
+						budgetAmount: 300,
+						createdAt: new Date(testDate),
+						updatedAt: new Date(testDate)
+					}
+				],
+				settings: DEFAULT_SETTINGS
+			};
+
+			await replaceAllData(newData);
+
+			const categoryBudgets = await db.categoryBudgets.toArray();
+			expect(categoryBudgets.length).toBe(2);
+			expect(categoryBudgets[0].budgetAmount).toBe(500);
+			expect(categoryBudgets[0].createdAt instanceof Date).toBe(true);
+			expect(categoryBudgets[0].updatedAt instanceof Date).toBe(true);
 		});
 	});
 

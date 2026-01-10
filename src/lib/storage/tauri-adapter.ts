@@ -194,12 +194,13 @@ export async function initializeTauriStorage(): Promise<void> {
 async function loadDataIntoDexie(data: StoredData): Promise<void> {
 	await db.transaction(
 		'rw',
-		[db.transactions, db.categories, db.monthlyBudgets, db.settings],
+		[db.transactions, db.categories, db.monthlyBudgets, db.categoryBudgets, db.settings],
 		async () => {
 			// Clear existing data
 			await db.transactions.clear();
 			await db.categories.clear();
 			await db.monthlyBudgets.clear();
+			await db.categoryBudgets.clear();
 
 			// Load categories
 			if (data.categories && data.categories.length > 0) {
@@ -212,6 +213,16 @@ async function loadDataIntoDexie(data: StoredData): Promise<void> {
 			// Load monthly budgets
 			if (data.monthlyBudgets && data.monthlyBudgets.length > 0) {
 				await db.monthlyBudgets.bulkPut(data.monthlyBudgets);
+			}
+
+			// Load category budgets (convert date strings to Date objects)
+			if (data.categoryBudgets && data.categoryBudgets.length > 0) {
+				const categoryBudgets = data.categoryBudgets.map((cb) => ({
+					...cb,
+					createdAt: new Date(cb.createdAt),
+					updatedAt: new Date(cb.updatedAt)
+				}));
+				await db.categoryBudgets.bulkPut(categoryBudgets);
 			}
 
 			// Load transactions (convert date strings to Date objects)
@@ -262,10 +273,11 @@ export async function saveToFile(): Promise<void> {
 	await createBackup();
 
 	// Get all data from Dexie
-	const [transactions, categories, monthlyBudgets, settings] = await Promise.all([
+	const [transactions, categories, monthlyBudgets, categoryBudgets, settings] = await Promise.all([
 		db.transactions.toArray(),
 		db.categories.toArray(),
 		db.monthlyBudgets.toArray(),
+		db.categoryBudgets.toArray(),
 		db.settings.get(1)
 	]);
 
@@ -275,6 +287,7 @@ export async function saveToFile(): Promise<void> {
 		transactions,
 		categories,
 		monthlyBudgets,
+		categoryBudgets,
 		settings: settings ?? DEFAULT_SETTINGS
 	};
 
