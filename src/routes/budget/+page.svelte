@@ -39,6 +39,7 @@
 	let budgetedSpent = $derived(
 		Array.from(budgets.keys()).reduce((sum, categoryId) => sum + (spending.get(categoryId) || 0), 0)
 	);
+	let unbudgetedSpent = $derived(totalSpent - budgetedSpent);
 
 	// Calculate remaining to spend from monthly budget (income - saved - spent)
 	let income = $derived(monthlyBudget?.income ?? 0);
@@ -299,20 +300,15 @@
 							</div>
 						{/if}
 						<div>
-							<span class="text-sm text-charcoal-muted">Budgeted Spent</span>
-							<p
-								class="font-mono text-xl font-medium {budgetedSpent > totalBudgeted
-									? 'text-danger-500'
-									: 'text-charcoal'}"
-							>
-								{formatCurrency(budgetedSpent)}
-							</p>
-						</div>
-						<div>
 							<span class="text-sm text-charcoal-muted">Total Spent</span>
-							<p class="font-mono text-xl font-medium text-charcoal-soft">
+							<p class="font-mono text-xl font-medium text-charcoal">
 								{formatCurrency(totalSpent)}
 							</p>
+							{#if unbudgetedSpent > 0}
+								<p class="text-xs text-charcoal-muted mt-0.5">
+									incl. {formatCurrency(unbudgetedSpent)} unbudgeted
+								</p>
+							{/if}
 						</div>
 						{#if totalBudgeted > 0}
 							<div class="border-l border-theme pl-8">
