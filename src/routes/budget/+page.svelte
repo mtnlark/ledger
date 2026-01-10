@@ -15,7 +15,7 @@
 	import { getSelectedMonth, setSelectedMonth } from '$lib/stores/selectedMonth';
 	import { getAvailableMonths } from '$lib/stores/transactions';
 	import { toast } from '$lib/stores/toast';
-	import { Sparkles, Copy } from 'lucide-svelte';
+	import { Sparkles, Copy, AlertTriangle } from 'lucide-svelte';
 	import HeaderNav from '$lib/components/HeaderNav.svelte';
 	import MonthPicker from '$lib/components/MonthPicker.svelte';
 	import CategoryBudgetList from '$lib/components/CategoryBudgetList.svelte';
@@ -58,6 +58,52 @@
 
 	// Get previous month for "Copy from Last Month"
 	let previousMonth = $derived(navigateMonth(currentMonth, -1));
+
+	// Calculate budget alerts
+	const APPROACHING_THRESHOLD = 5; // Show "approaching" alert when within $5 of budget
+	let budgetAlerts = $derived.by(() => {
+		const alerts: Array<{
+			type: 'over' | 'approaching';
+			categoryName: string;
+			categoryIcon: string;
+			amount: number; // Over amount or remaining amount
+		}> = [];
+
+		for (const [categoryId, budget] of budgets) {
+			const spent = spending.get(categoryId) || 0;
+			const category = categories.find((c) => c.id === categoryId);
+			if (!category) continue;
+
+			const remaining = budget.budgetAmount - spent;
+
+			if (remaining < 0) {
+				// Over budget
+				alerts.push({
+					type: 'over',
+					categoryName: category.name,
+					categoryIcon: category.icon || '📦',
+					amount: Math.abs(remaining)
+				});
+			} else if (remaining <= APPROACHING_THRESHOLD && remaining >= 0) {
+				// Approaching budget (within $5)
+				alerts.push({
+					type: 'approaching',
+					categoryName: category.name,
+					categoryIcon: category.icon || '📦',
+					amount: remaining
+				});
+			}
+		}
+
+		// Sort: over budget first, then approaching
+		alerts.sort((a, b) => {
+			if (a.type === 'over' && b.type !== 'over') return -1;
+			if (a.type !== 'over' && b.type === 'over') return 1;
+			return a.categoryName.localeCompare(b.categoryName);
+		});
+
+		return alerts;
+	});
 
 	// Load data
 	async function loadData() {
@@ -294,6 +340,33 @@
 						</div>
 					{/if}
 				</div>
+
+				<!-- Budget Alerts (only shown when there are alerts) -->
+				{#if budgetAlerts.length > 0}
+					<div class="bg-surface rounded-xl shadow-md shadow-theme p-5 border-l-4 border-warning-500">
+						<div class="flex items-center gap-2 mb-3">
+							<AlertTriangle size={18} class="text-warning-600" />
+							<h3 class="font-medium text-charcoal">Budget Alerts</h3>
+						</div>
+						<ul class="space-y-2">
+							{#each budgetAlerts as alert}
+								<li class="flex items-center gap-3 text-sm">
+									<span class="text-lg">{alert.categoryIcon}</span>
+									{#if alert.type === 'over'}
+										<span class="text-danger-600">
+											You're <span class="font-mono font-medium">{formatCurrency(alert.amount)}</span> over budget for {alert.categoryName}
+										</span>
+									{:else}
+										<span class="text-warning-700">
+											You're approaching your budget for {alert.categoryName}
+											<span class="text-charcoal-muted">({formatCurrency(alert.amount)} left)</span>
+										</span>
+									{/if}
+								</li>
+							{/each}
+						</ul>
+					</div>
+				{/if}
 
 				<!-- Quick Actions -->
 				<div class="flex flex-wrap gap-3">

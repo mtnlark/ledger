@@ -59,13 +59,9 @@
 			}
 		}
 
-		// Sort with budgets by % spent (highest first)
-		withBudgets.sort((a, b) => b.percentSpent - a.percentSpent);
-
-		// Sort unbudgeted by spending (highest first)
-		unbudgetedWithSpending.sort((a, b) => b.spent - a.spent);
-
-		// Sort no activity alphabetically
+		// Sort all sections alphabetically for stable positioning
+		withBudgets.sort((a, b) => a.category.name.localeCompare(b.category.name));
+		unbudgetedWithSpending.sort((a, b) => a.category.name.localeCompare(b.category.name));
 		noActivity.sort((a, b) => a.category.name.localeCompare(b.category.name));
 
 		return { withBudgets, unbudgetedWithSpending, noActivity };
