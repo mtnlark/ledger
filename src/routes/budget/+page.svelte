@@ -65,7 +65,9 @@
 		try {
 			await initializeStorage();
 			currentMonth = getSelectedMonth();
-			categories = await getAllCategories();
+			// Filter out Subscriptions category (removed in favor of subscription tags)
+			const allCategories = await getAllCategories();
+			categories = allCategories.filter((c) => c.name !== 'Subscriptions');
 			availableMonths = await getAvailableMonths();
 
 			// Ensure current month is in the list
