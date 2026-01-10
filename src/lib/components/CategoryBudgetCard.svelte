@@ -104,15 +104,17 @@
 	</div>
 
 	<!-- Amount Display / Edit -->
-	<div class="flex items-center gap-3 shrink-0">
+	<div class="flex items-center gap-3 shrink-0 w-40 justify-end">
 		{#if isEditing}
 			<div class="flex items-center gap-2">
-				<span class="text-charcoal-muted">$</span>
+				<span class="text-charcoal-muted font-mono">$</span>
 				<input
-					type="number"
+					type="text"
+					inputmode="numeric"
+					pattern="[0-9]*"
 					bind:value={editValue}
 					onkeydown={handleKeydown}
-					class="w-20 px-2 py-1 text-right font-mono text-sm border border-theme rounded-md
+					class="w-20 px-3 py-1.5 text-right font-mono text-sm border border-theme rounded-lg
 						focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent
 						bg-surface text-charcoal"
 					placeholder="0"
@@ -132,13 +134,11 @@
 				</button>
 			</div>
 		{:else}
-			<div class="text-right">
-				<div class="font-mono text-sm">
-					<span class="text-charcoal">{formatCurrency(spent)}</span>
-					{#if hasBudget}
-						<span class="text-charcoal-muted"> / {formatCurrency(budgetAmount!)}</span>
-					{/if}
-				</div>
+			<div class="text-right min-w-24">
+				<span class="font-mono text-sm text-charcoal">{formatCurrency(spent)}</span>
+				{#if hasBudget}
+					<span class="font-mono text-sm text-charcoal-muted"> / {formatCurrency(budgetAmount!)}</span>
+				{/if}
 			</div>
 			<button
 				onclick={startEditing}

@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { afterNavigate } from '$app/navigation';
-	import { getMonthKey, navigateMonth, type Category, type CategoryBudget } from '$lib/db';
+	import { getMonthKey, navigateMonth, type Category, type CategoryBudget, type MonthlyBudget } from '$lib/db';
 	import { initializeStorage } from '$lib/storage';
 	import { getAllCategories } from '$lib/stores/categories';
 	import {
@@ -11,6 +11,7 @@
 		getAllCategorySpending,
 		copyBudgetsFromMonth
 	} from '$lib/stores/categoryBudget';
+	import { getBudgetForMonth } from '$lib/stores/budget';
 	import { getSelectedMonth, setSelectedMonth } from '$lib/stores/selectedMonth';
 	import { getAvailableMonths } from '$lib/stores/transactions';
 	import { toast } from '$lib/stores/toast';
@@ -26,6 +27,7 @@
 	let budgets = $state<Map<number, CategoryBudget>>(new Map());
 	let spending = $state<Map<number, number>>(new Map());
 	let suggestions = $state<Map<number, number>>(new Map());
+	let monthlyBudget = $state<MonthlyBudget | null>(null);
 	let currentMonth = $state(getMonthKey(new Date()));
 	let availableMonths = $state<string[]>([getMonthKey(new Date())]);
 
@@ -37,6 +39,12 @@
 	let budgetedSpent = $derived(
 		Array.from(budgets.keys()).reduce((sum, categoryId) => sum + (spending.get(categoryId) || 0), 0)
 	);
+
+	// Calculate remaining to spend from monthly budget (income - saved - spent)
+	let income = $derived(monthlyBudget?.income ?? 0);
+	let saved = $derived(monthlyBudget?.savedAmount ?? 0);
+	let available = $derived(income - saved);
+	let remaining = $derived(available - totalSpent);
 
 	// Check if there are suggestions to apply (categories with suggestions but no budget)
 	let hasSuggestionsToApply = $derived.by(() => {
@@ -75,16 +83,18 @@
 	}
 
 	async function loadMonthData() {
-		const [budgetList, spendingMap, suggestionMap] = await Promise.all([
+		const [budgetList, spendingMap, suggestionMap, monthBudget] = await Promise.all([
 			getCategoryBudgetsForMonth(currentMonth),
 			getAllCategorySpending(currentMonth),
-			generateAllSuggestions(currentMonth)
+			generateAllSuggestions(currentMonth),
+			getBudgetForMonth(currentMonth)
 		]);
 
 		// Convert budget array to map by categoryId
 		budgets = new Map(budgetList.map((b) => [b.categoryId, b]));
 		spending = spendingMap;
 		suggestions = suggestionMap;
+		monthlyBudget = monthBudget;
 	}
 
 	async function handleMonthChange(month: string) {
@@ -215,12 +225,31 @@
 				<div class="bg-surface rounded-xl shadow-md shadow-theme p-6">
 					<h2 class="font-display text-lg font-medium text-charcoal mb-4">Budget Summary</h2>
 					<div class="flex flex-wrap gap-x-8 gap-y-4">
-						<div>
-							<span class="text-sm text-charcoal-muted">Total Budgeted</span>
-							<p class="font-mono text-xl font-medium text-charcoal">
-								{formatCurrency(totalBudgeted)}
-							</p>
-						</div>
+						{#if monthlyBudget}
+							<div>
+								<span class="text-sm text-charcoal-muted">Remaining to Spend</span>
+								<p
+									class="font-mono text-xl font-medium {remaining >= 0
+										? 'text-success-600'
+										: 'text-danger-500'}"
+								>
+									{formatCurrency(remaining)}
+								</p>
+							</div>
+							<div class="border-l border-theme pl-8">
+								<span class="text-sm text-charcoal-muted">Total Budgeted</span>
+								<p class="font-mono text-xl font-medium text-charcoal">
+									{formatCurrency(totalBudgeted)}
+								</p>
+							</div>
+						{:else}
+							<div>
+								<span class="text-sm text-charcoal-muted">Total Budgeted</span>
+								<p class="font-mono text-xl font-medium text-charcoal">
+									{formatCurrency(totalBudgeted)}
+								</p>
+							</div>
+						{/if}
 						<div>
 							<span class="text-sm text-charcoal-muted">Budgeted Spent</span>
 							<p
