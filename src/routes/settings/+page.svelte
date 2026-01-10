@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { afterNavigate } from '$app/navigation';
 	import { Upload, Download, Database, FileSpreadsheet, Sun, Moon, Monitor } from 'lucide-svelte';
 	import { type Settings, type Category, type Transaction, DEFAULT_SETTINGS } from '$lib/db';
 	import { initializeStorage } from '$lib/storage';
@@ -122,6 +123,8 @@
 
 			if (result.success) {
 				toast.success(result.message);
+				// Reload data to reflect imported changes
+				await loadData();
 			} else {
 				toast.error(result.message);
 			}
@@ -175,8 +178,24 @@
 		}
 	}
 
-	onMount(() => {
+	// Reload data when navigating to this page
+	afterNavigate(() => {
 		loadData();
+	});
+
+	onMount(() => {
+		// Reload data when page becomes visible (e.g., switching browser tabs)
+		function handleVisibilityChange() {
+			if (document.visibilityState === 'visible' && !isLoading) {
+				loadData();
+			}
+		}
+
+		document.addEventListener('visibilitychange', handleVisibilityChange);
+
+		return () => {
+			document.removeEventListener('visibilitychange', handleVisibilityChange);
+		};
 	});
 </script>
 

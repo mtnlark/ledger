@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { afterNavigate } from '$app/navigation';
 	import { type Transaction, type Category, type Settings, DEFAULT_SETTINGS } from '$lib/db';
 	import { initializeStorage } from '$lib/storage';
 	import { getUnsettledTransactions, calculateOutstandingBalance, markAsSettled } from '$lib/stores/transactions';
@@ -47,8 +48,24 @@
 		}
 	}
 
-	onMount(() => {
+	// Reload data when navigating to this page (handles in-app navigation)
+	afterNavigate(() => {
 		loadData();
+	});
+
+	onMount(() => {
+		// Reload data when page becomes visible (e.g., switching browser tabs)
+		function handleVisibilityChange() {
+			if (document.visibilityState === 'visible' && !isLoading) {
+				loadData();
+			}
+		}
+
+		document.addEventListener('visibilitychange', handleVisibilityChange);
+
+		return () => {
+			document.removeEventListener('visibilitychange', handleVisibilityChange);
+		};
 	});
 </script>
 

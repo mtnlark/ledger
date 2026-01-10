@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { afterNavigate } from '$app/navigation';
 	import { format, startOfDay, parseISO } from 'date-fns';
 	import { getMonthKey, parseMonthKey, type Transaction, type Category, type Settings, type MonthlyBudget, DEFAULT_SETTINGS } from '$lib/db';
 	import { initializeStorage } from '$lib/storage';
@@ -404,8 +405,25 @@
 		}
 	}
 
-	onMount(() => {
+	// Reload data when navigating to this page (handles in-app navigation)
+	// This ensures categories/settings changes from Settings page are picked up
+	afterNavigate(() => {
 		loadData();
+	});
+
+	onMount(() => {
+		// Reload data when page becomes visible (e.g., switching browser tabs)
+		function handleVisibilityChange() {
+			if (document.visibilityState === 'visible' && !isLoading) {
+				loadData();
+			}
+		}
+
+		document.addEventListener('visibilitychange', handleVisibilityChange);
+
+		return () => {
+			document.removeEventListener('visibilitychange', handleVisibilityChange);
+		};
 	});
 
 	function formatCurrency(amount: number): string {
