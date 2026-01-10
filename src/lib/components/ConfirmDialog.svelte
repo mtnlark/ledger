@@ -53,14 +53,14 @@
 	<!-- Dialog -->
 	<div class="fixed inset-0 z-50 flex items-center justify-center p-4">
 		<div
-			class="bg-white rounded-xl shadow-xl shadow-gray-300/50 w-full max-w-sm animate-enter"
+			class="bg-surface rounded-xl shadow-xl shadow-[var(--color-shadow)] w-full max-w-sm animate-enter"
 			onclick={(e) => e.stopPropagation()}
 			role="dialog"
 			aria-modal="true"
 			aria-labelledby="confirm-dialog-title"
 		>
 			<!-- Header -->
-			<div class="flex items-center gap-3 px-6 py-4 border-b border-dashed border-gray-200">
+			<div class="flex items-center gap-3 px-6 py-4 border-b border-dashed border-theme-dashed">
 				{#if variant === 'danger' || variant === 'warning'}
 					<div class="w-10 h-10 rounded-full flex items-center justify-center {variant === 'danger' ? 'bg-danger-100' : 'bg-warning-100'}">
 						<AlertTriangle size={20} class="{variant === 'danger' ? 'text-danger-500' : 'text-warning-500'}" />
@@ -85,7 +85,7 @@
 			</div>
 
 			<!-- Footer -->
-			<div class="flex gap-3 px-6 py-4 border-t border-dashed border-gray-200 bg-cream-dark rounded-b-xl">
+			<div class="flex gap-3 px-6 py-4 border-t border-dashed border-theme-dashed bg-surface-alt rounded-b-xl">
 				<button
 					type="button"
 					onclick={onConfirm}

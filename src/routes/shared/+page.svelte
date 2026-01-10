@@ -64,8 +64,8 @@
 	<main class="max-w-4xl mx-auto px-4 py-6 space-y-6">
 		{#if isLoading}
 			<!-- Settlement tracker skeleton -->
-			<div class="bg-white rounded-xl shadow-md shadow-gray-200/50 overflow-hidden">
-				<div class="px-6 py-5 border-b border-dashed border-gray-200 bg-gradient-to-r from-success-50 to-success-100/50">
+			<div class="bg-surface rounded-xl shadow-md shadow-[var(--color-shadow)] overflow-hidden">
+				<div class="px-6 py-5 border-b border-dashed border-theme-dashed bg-gradient-to-r from-success-50 to-success-100/50">
 					<Skeleton class="h-4 mb-2" width="180px" rounded="sm" />
 					<Skeleton class="h-8 mb-1" width="120px" rounded="sm" />
 					<Skeleton class="h-4" width="80px" rounded="sm" />

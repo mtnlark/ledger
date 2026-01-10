@@ -42,10 +42,10 @@
 </script>
 
 <aside
-	class="flex fixed left-0 top-0 h-full bg-white border-r border-dashed border-gray-200 z-30 flex-col transition-all duration-300 ease-in-out {isExpanded ? 'w-52' : 'w-16'}"
+	class="flex fixed left-0 top-0 h-full bg-surface border-r border-dashed border-theme-dashed z-30 flex-col transition-all duration-300 ease-in-out {isExpanded ? 'w-52' : 'w-16'}"
 >
 	<!-- Logo/Brand area -->
-	<div class="h-16 flex items-center border-b border-dashed border-gray-200 {isExpanded ? 'mx-2 px-3' : 'justify-center'}">
+	<div class="h-16 flex items-center border-b border-dashed border-theme-dashed {isExpanded ? 'mx-2 px-3' : 'justify-center'}">
 		{#if isExpanded}
 			<span class="font-display text-lg font-medium text-primary-600 whitespace-nowrap">Ledger</span>
 		{:else}
@@ -61,7 +61,7 @@
 				href={item.href}
 				class="flex items-center gap-3 mx-2 px-3 py-2.5 rounded-lg transition-colors {active
 					? 'bg-primary-50 text-primary-700'
-					: 'text-charcoal-soft hover:bg-cream'}"
+					: 'text-charcoal-soft hover:bg-surface-hover'}"
 				title={isExpanded ? undefined : item.label}
 			>
 				<item.icon size={20} strokeWidth={active ? 2.5 : 2} />
@@ -73,10 +73,10 @@
 	</nav>
 
 	<!-- Collapse/Expand toggle -->
-	<div class="border-t border-dashed border-gray-200 p-2">
+	<div class="border-t border-dashed border-theme-dashed p-2">
 		<button
 			onclick={toggleSidebar}
-			class="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg text-charcoal-soft hover:bg-cream transition-colors"
+			class="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg text-charcoal-soft hover:bg-surface-hover transition-colors"
 			aria-label={isExpanded ? 'Collapse sidebar' : 'Expand sidebar'}
 		>
 			{#if isExpanded}

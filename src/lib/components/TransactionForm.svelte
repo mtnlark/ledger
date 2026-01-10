@@ -295,14 +295,14 @@
 </script>
 
 <div
-	class="bg-white rounded-xl shadow-md shadow-gray-200/50 overflow-hidden transition-all duration-500 {mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-3'}"
+	class="bg-surface rounded-xl shadow-md shadow-[var(--color-shadow)] overflow-hidden transition-all duration-500 {mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-3'}"
 	style="transition-timing-function: cubic-bezier(0.16, 1, 0.3, 1);"
 >
 	<!-- Collapsible Header -->
 	<button
 		type="button"
 		onclick={toggleExpanded}
-		class="w-full px-6 py-4 flex items-center justify-between hover:bg-cream/50 transition-colors"
+		class="w-full px-6 py-4 flex items-center justify-between hover:bg-surface-hover transition-colors"
 	>
 		<div class="flex items-center gap-3">
 			<div class="w-8 h-8 rounded-lg bg-primary-100 flex items-center justify-center">
@@ -409,7 +409,7 @@
 						<select
 							value={line.categoryId}
 							onchange={(e) => updateSplitLine(index, 'categoryId', parseInt(e.currentTarget.value))}
-							class="flex-1 px-3 py-2 bg-white border border-[rgba(45,42,38,0.15)] rounded-lg focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-colors text-sm"
+							class="flex-1 px-3 py-2 bg-surface border border-[var(--color-border)] rounded-lg focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-colors text-sm"
 						>
 							<option value={0}>Select category...</option>
 							{#each activeCategories as cat (cat.id)}
@@ -424,7 +424,7 @@
 								oninput={(e) => updateSplitLine(index, 'amount', parseFloat(e.currentTarget.value) || 0)}
 								step="0.01"
 								min="0"
-								class="w-full pl-5 pr-2 py-2 bg-white border border-[rgba(45,42,38,0.15)] rounded-lg focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-colors font-mono text-sm"
+								class="w-full pl-5 pr-2 py-2 bg-surface border border-[var(--color-border)] rounded-lg focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-colors font-mono text-sm"
 							/>
 						</div>
 						<button
@@ -478,7 +478,7 @@
 		{/if}
 
 		<!-- Shared Toggle -->
-		<div class="border-t border-dashed border-gray-200 pt-4">
+		<div class="border-t border-dashed border-theme-dashed pt-4">
 			<label class="flex items-center gap-3 cursor-pointer">
 				<input
 					type="checkbox"
@@ -501,7 +501,7 @@
 							class="px-3 py-1.5 text-sm font-medium rounded-lg transition-all duration-150 {splitType ===
 							'percentage'
 								? 'bg-success-500 text-white shadow-sm'
-								: 'bg-white text-charcoal-soft border border-[rgba(45,42,38,0.15)] hover:bg-cream'}"
+								: 'bg-surface text-charcoal-soft border border-[var(--color-border)] hover:bg-surface-hover'}"
 						>
 							% Percentage
 						</button>
@@ -511,7 +511,7 @@
 							class="px-3 py-1.5 text-sm font-medium rounded-lg transition-all duration-150 {splitType ===
 							'fixed'
 								? 'bg-success-500 text-white shadow-sm'
-								: 'bg-white text-charcoal-soft border border-[rgba(45,42,38,0.15)] hover:bg-cream'}"
+								: 'bg-surface text-charcoal-soft border border-[var(--color-border)] hover:bg-surface-hover'}"
 						>
 							$ Fixed Amount
 						</button>
@@ -551,7 +551,7 @@
 									step="0.01"
 									min="0"
 									max={amount}
-									class="w-full pl-7 pr-3 py-2 bg-white border rounded-lg focus:ring-2 transition-colors font-mono {splitValueInvalid ? 'border-warning-500 focus:ring-warning-500/20 focus:border-warning-500' : 'border-[rgba(45,42,38,0.15)] focus:ring-success-500/20 focus:border-success-500'}"
+									class="w-full pl-7 pr-3 py-2 bg-surface border rounded-lg focus:ring-2 transition-colors font-mono {splitValueInvalid ? 'border-warning-500 focus:ring-warning-500/20 focus:border-warning-500' : 'border-[var(--color-border)] focus:ring-success-500/20 focus:border-success-500'}"
 								/>
 							</div>
 							{#if splitValueInvalid}
@@ -602,7 +602,7 @@
 		</div>
 
 		<!-- Essential Toggle -->
-		<div class="border-t border-dashed border-gray-200 pt-4">
+		<div class="border-t border-dashed border-theme-dashed pt-4">
 			<label class="flex items-center justify-between cursor-pointer">
 				<div>
 					<span class="text-sm font-medium text-charcoal-soft">Essential spending</span>
@@ -617,7 +617,7 @@
 				<button
 					type="button"
 					onclick={() => (isEssential = !isEssential)}
-					class="relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:ring-offset-2 {isEssential ? 'bg-primary-500' : 'bg-gray-200'}"
+					class="relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:ring-offset-2 {isEssential ? 'bg-primary-500' : 'bg-[var(--color-border-dashed)]'}"
 					role="switch"
 					aria-checked={isEssential}
 					aria-label="Toggle essential spending"
@@ -630,7 +630,7 @@
 		</div>
 
 		<!-- Subscription Toggle -->
-		<div class="border-t border-dashed border-gray-200 pt-4">
+		<div class="border-t border-dashed border-theme-dashed pt-4">
 			<label class="flex items-center justify-between cursor-pointer">
 				<div>
 					<span class="text-sm font-medium text-charcoal-soft">Subscription</span>
@@ -639,7 +639,7 @@
 				<button
 					type="button"
 					onclick={() => (isSubscription = !isSubscription)}
-					class="relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:ring-offset-2 {isSubscription ? 'bg-primary-500' : 'bg-gray-200'}"
+					class="relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:ring-offset-2 {isSubscription ? 'bg-primary-500' : 'bg-[var(--color-border-dashed)]'}"
 					role="switch"
 					aria-checked={isSubscription}
 					aria-label="Toggle subscription"

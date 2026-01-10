@@ -128,7 +128,7 @@
 
 	{#if showSuggestions && suggestions.length > 0}
 		<ul
-			class="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden"
+			class="absolute z-50 w-full mt-1 bg-surface border border-theme rounded-lg shadow-lg overflow-hidden"
 			role="listbox"
 		>
 			{#each suggestions as suggestion, i (suggestion.merchant)}
@@ -137,7 +137,7 @@
 					aria-selected={i === selectedIndex}
 					class="px-3 py-2.5 cursor-pointer transition-colors {i === selectedIndex
 						? 'bg-primary-50 text-primary-700'
-						: 'hover:bg-cream'}"
+						: 'hover:bg-surface-hover'}"
 					onmousedown={() => selectSuggestion(suggestion)}
 				>
 					<div class="flex items-center justify-between">

@@ -352,7 +352,7 @@
 </script>
 
 {#if hasTakeaways}
-	<div class="bg-white rounded-xl shadow-md shadow-gray-200/50 overflow-hidden">
+	<div class="bg-surface rounded-xl shadow-md shadow-[var(--color-shadow)] overflow-hidden">
 		<div class="px-6 py-4">
 			<h2 class="font-display text-lg font-medium text-charcoal mb-3">Highlights</h2>
 			<div class="space-y-2">

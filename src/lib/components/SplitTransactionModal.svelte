@@ -93,7 +93,7 @@
 	<!-- Modal -->
 	<div class="fixed inset-0 z-50 flex items-center justify-center p-4">
 		<div
-			class="bg-white rounded-xl shadow-xl shadow-gray-300/50 w-full max-w-lg max-h-[90vh] overflow-y-auto animate-enter"
+			class="bg-surface rounded-xl shadow-xl shadow-[var(--color-shadow)] w-full max-w-lg max-h-[90vh] overflow-y-auto animate-enter"
 			onclick={(e) => e.stopPropagation()}
 			role="dialog"
 			aria-modal="true"
@@ -102,7 +102,7 @@
 			<form onsubmit={handleSubmit}>
 				<!-- Header -->
 				<div
-					class="flex items-center justify-between px-6 py-4 border-b border-dashed border-gray-200"
+					class="flex items-center justify-between px-6 py-4 border-b border-dashed border-theme-dashed"
 				>
 					<h2 id="split-modal-title" class="font-display text-xl font-medium text-charcoal">
 						Split by Category
@@ -110,7 +110,7 @@
 					<button
 						type="button"
 						onclick={onClose}
-						class="p-2 text-charcoal-muted hover:text-charcoal hover:bg-cream rounded-lg transition-colors"
+						class="p-2 text-charcoal-muted hover:text-charcoal hover:bg-surface-hover rounded-lg transition-colors"
 						aria-label="Close"
 					>
 						<X size={20} />
@@ -230,7 +230,7 @@
 
 				<!-- Footer -->
 				<div
-					class="flex gap-3 px-6 py-4 border-t border-dashed border-gray-200 bg-cream-dark rounded-b-xl"
+					class="flex gap-3 px-6 py-4 border-t border-dashed border-theme-dashed bg-surface-alt rounded-b-xl"
 				>
 					<button
 						type="submit"
@@ -242,7 +242,7 @@
 					<button
 						type="button"
 						onclick={onClose}
-						class="px-4 py-2.5 border border-[rgba(45,42,38,0.15)] text-charcoal-soft rounded-lg font-medium hover:bg-cream transition-colors"
+						class="px-4 py-2.5 border border-[rgba(45,42,38,0.15)] text-charcoal-soft rounded-lg font-medium hover:bg-surface-hover transition-colors"
 					>
 						Cancel
 					</button>

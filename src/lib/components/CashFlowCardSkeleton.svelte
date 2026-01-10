@@ -2,7 +2,7 @@
 	import Skeleton from './Skeleton.svelte';
 </script>
 
-<div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+<div class="bg-surface rounded-xl shadow-sm border border-theme overflow-hidden">
 	<!-- Header -->
 	<div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
 		<Skeleton class="h-6" width="120px" rounded="sm" />
@@ -24,7 +24,7 @@
 		</div>
 
 		<!-- Divider -->
-		<div class="border-t border-gray-200"></div>
+		<div class="border-t border-theme"></div>
 
 		<!-- Available row -->
 		<div class="flex justify-between items-center">
@@ -39,7 +39,7 @@
 		</div>
 
 		<!-- Divider -->
-		<div class="border-t border-gray-200"></div>
+		<div class="border-t border-theme"></div>
 
 		<!-- Surplus row -->
 		<div class="flex justify-between items-center">

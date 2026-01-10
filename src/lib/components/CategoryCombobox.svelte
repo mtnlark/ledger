@@ -131,7 +131,7 @@
 		aria-expanded={isOpen}
 		aria-haspopup="listbox"
 		aria-autocomplete="list"
-		class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+		class="w-full px-3 py-2 border border-[var(--color-border)] rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
 	/>
 
 	<!-- Dropdown arrow -->
@@ -142,7 +142,7 @@
 			isOpen = !isOpen;
 			if (isOpen) inputRef?.focus();
 		}}
-		class="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-gray-600"
+		class="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-charcoal-muted hover:text-charcoal-soft"
 	>
 		<ChevronDown size={16} class="transition-transform {isOpen ? 'rotate-180' : ''}" />
 	</button>
@@ -151,10 +151,10 @@
 	{#if isOpen}
 		<ul
 			role="listbox"
-			class="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-auto"
+			class="absolute z-50 w-full mt-1 bg-surface border border-theme rounded-lg shadow-lg max-h-60 overflow-auto"
 		>
 			{#if filteredCategories.length === 0}
-				<li class="px-3 py-2 text-sm text-gray-500">No matching categories</li>
+				<li class="px-3 py-2 text-sm text-charcoal-muted">No matching categories</li>
 			{:else}
 				{#each filteredCategories as cat, index (cat.id)}
 					<li
@@ -162,7 +162,7 @@
 						aria-selected={cat.id === value}
 						class="px-3 py-2 cursor-pointer flex items-center gap-2 {index === highlightedIndex
 							? 'bg-blue-50 text-blue-900'
-							: 'hover:bg-gray-50'} {cat.id === value ? 'font-medium' : ''}"
+							: 'hover:bg-surface-hover'} {cat.id === value ? 'font-medium' : ''}"
 						onmouseenter={() => (highlightedIndex = index)}
 						onmousedown={() => selectCategory(cat)}
 					>

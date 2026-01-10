@@ -1,9 +1,9 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { Upload, Download, Database, FileSpreadsheet } from 'lucide-svelte';
+	import { Upload, Download, Database, FileSpreadsheet, Sun, Moon, Monitor } from 'lucide-svelte';
 	import { type Settings, type Category, type Transaction, DEFAULT_SETTINGS } from '$lib/db';
 	import { initializeStorage } from '$lib/storage';
-	import { getSettings, updateSettings } from '$lib/stores/settings';
+	import { getSettings, updateSettings, updateTheme } from '$lib/stores/settings';
 	import { getTransactionsByMonth, getAvailableMonths } from '$lib/stores/transactions';
 	import { getAllCategories } from '$lib/stores/categories';
 	import HeaderNav from '$lib/components/HeaderNav.svelte';
@@ -68,6 +68,18 @@
 		} finally {
 			isSaving = false;
 		}
+	}
+
+	// Theme options for the toggle
+	const themeOptions = [
+		{ value: 'light' as const, label: 'Light', icon: Sun },
+		{ value: 'dark' as const, label: 'Dark', icon: Moon },
+		{ value: 'system' as const, label: 'System', icon: Monitor }
+	];
+
+	async function handleThemeChange(theme: 'light' | 'dark' | 'system') {
+		await updateTheme(theme);
+		settings = await getSettings();
 	}
 
 	// Import from Excel
@@ -184,8 +196,8 @@
 			</div>
 		{:else}
 			<!-- Partner Settings -->
-			<div class="bg-white rounded-xl shadow-md shadow-gray-200/50 overflow-hidden">
-				<div class="px-6 py-4 border-b border-dashed border-gray-200">
+			<div class="bg-surface rounded-xl shadow-md shadow-[var(--color-shadow)] overflow-hidden">
+				<div class="px-6 py-4 border-b border-dashed border-theme-dashed">
 					<h2 class="font-display text-xl font-medium text-charcoal">Expense Sharing</h2>
 					<p class="text-sm text-charcoal-muted mt-1">Configure default settings for shared expenses</p>
 				</div>
@@ -286,9 +298,39 @@
 				</div>
 			</div>
 
+			<!-- Appearance -->
+			<div class="bg-surface rounded-xl shadow-md shadow-[var(--color-shadow)] overflow-hidden">
+				<div class="px-6 py-4 border-b border-dashed border-theme-dashed">
+					<h2 class="font-display text-xl font-medium text-charcoal">Appearance</h2>
+					<p class="text-sm text-charcoal-muted mt-1">Choose how Ledger looks</p>
+				</div>
+
+				<div class="p-6">
+					<div class="flex gap-3">
+						{#each themeOptions as option}
+							<button
+								type="button"
+								onclick={() => handleThemeChange(option.value)}
+								class="flex-1 flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all duration-150
+									{settings.theme === option.value
+										? 'border-primary-500 bg-primary-50'
+										: 'border-[var(--color-border)] hover:border-primary-300 hover:bg-surface-hover'}"
+							>
+								<option.icon size={24}
+									class="{settings.theme === option.value ? 'text-primary-600' : 'text-charcoal-soft'}" />
+								<span class="text-sm font-medium
+									{settings.theme === option.value ? 'text-primary-600' : 'text-charcoal-soft'}">
+									{option.label}
+								</span>
+							</button>
+						{/each}
+					</div>
+				</div>
+			</div>
+
 			<!-- Category Management -->
-			<div class="bg-white rounded-xl shadow-md shadow-gray-200/50 overflow-hidden">
-				<div class="px-6 py-4 border-b border-dashed border-gray-200">
+			<div class="bg-surface rounded-xl shadow-md shadow-[var(--color-shadow)] overflow-hidden">
+				<div class="px-6 py-4 border-b border-dashed border-theme-dashed">
 					<h2 class="font-display text-xl font-medium text-charcoal">Categories</h2>
 					<p class="text-sm text-charcoal-muted mt-1">Manage expense categories, reorder, and customize</p>
 				</div>
@@ -299,8 +341,8 @@
 			</div>
 
 			<!-- Data Management -->
-			<div class="bg-white rounded-xl shadow-md shadow-gray-200/50 overflow-hidden">
-				<div class="px-6 py-4 border-b border-dashed border-gray-200">
+			<div class="bg-surface rounded-xl shadow-md shadow-[var(--color-shadow)] overflow-hidden">
+				<div class="px-6 py-4 border-b border-dashed border-theme-dashed">
 					<h2 class="font-display text-xl font-medium text-charcoal">Data Management</h2>
 					<p class="text-sm text-charcoal-muted mt-1">Import and export your budget data</p>
 				</div>
@@ -360,7 +402,7 @@
 					</div>
 
 					<!-- Divider -->
-					<div class="border-t border-dashed border-gray-200"></div>
+					<div class="border-t border-dashed border-theme-dashed"></div>
 
 					<!-- Export Section -->
 					<div>
@@ -404,8 +446,8 @@
 			</div>
 
 			<!-- About -->
-			<div class="bg-white rounded-xl shadow-md shadow-gray-200/50 overflow-hidden">
-				<div class="px-6 py-4 border-b border-dashed border-gray-200">
+			<div class="bg-surface rounded-xl shadow-md shadow-[var(--color-shadow)] overflow-hidden">
+				<div class="px-6 py-4 border-b border-dashed border-theme-dashed">
 					<h2 class="font-display text-xl font-medium text-charcoal">About</h2>
 				</div>
 				<div class="p-6">

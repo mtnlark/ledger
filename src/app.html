@@ -4,6 +4,19 @@
 		<meta charset="utf-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
 
+		<!-- Flash prevention: apply dark mode before CSS loads -->
+		<script>
+			(function() {
+				try {
+					var theme = localStorage.getItem('ledger-theme') || 'system';
+					if (theme === 'dark' ||
+						(theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+						document.documentElement.classList.add('dark');
+					}
+				} catch (e) {}
+			})();
+		</script>
+
 		<!-- Google Fonts - Warm Ledger Design System -->
 		<link rel="preconnect" href="https://fonts.googleapis.com">
 		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>

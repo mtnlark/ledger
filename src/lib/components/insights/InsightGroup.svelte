@@ -32,7 +32,7 @@
 	}
 </script>
 
-<div class="bg-white rounded-xl shadow-md shadow-gray-200/50 overflow-hidden">
+<div class="bg-surface rounded-xl shadow-md shadow-[var(--color-shadow)] overflow-hidden">
 	<!-- Header (always visible, clickable) -->
 	<button
 		class="w-full px-6 py-4 flex items-center justify-between hover:bg-cream/50 transition-colors"
@@ -62,7 +62,7 @@
 
 	<!-- Full content (shown when expanded) -->
 	{#if isExpanded}
-		<div transition:slide={{ duration: 200 }} class="px-6 pb-6 border-t border-dashed border-gray-200 pt-4">
+		<div transition:slide={{ duration: 200 }} class="px-6 pb-6 border-t border-dashed border-theme-dashed pt-4">
 			{@render children()}
 		</div>
 	{/if}

@@ -180,7 +180,7 @@
 	<!-- Modal -->
 	<div class="fixed inset-0 z-50 flex items-center justify-center p-4">
 		<div
-			class="bg-white rounded-xl shadow-xl shadow-gray-300/50 w-full max-w-lg max-h-[90vh] overflow-y-auto animate-enter"
+			class="bg-surface rounded-xl shadow-xl shadow-[var(--color-shadow)] w-full max-w-lg max-h-[90vh] overflow-y-auto animate-enter"
 			onclick={(e) => e.stopPropagation()}
 			role="dialog"
 			aria-modal="true"
@@ -188,12 +188,12 @@
 		>
 			<form onsubmit={handleSubmit}>
 				<!-- Header -->
-				<div class="flex items-center justify-between px-6 py-4 border-b border-dashed border-gray-200">
+				<div class="flex items-center justify-between px-6 py-4 border-b border-dashed border-theme-dashed">
 					<h2 id="edit-modal-title" class="font-display text-xl font-medium text-charcoal">Edit Transaction</h2>
 					<button
 						type="button"
 						onclick={handleClose}
-						class="p-2 text-charcoal-muted hover:text-charcoal hover:bg-cream rounded-lg transition-colors"
+						class="p-2 text-charcoal-muted hover:text-charcoal hover:bg-surface-hover rounded-lg transition-colors"
 						aria-label="Close"
 					>
 						<X size={20} />
@@ -265,7 +265,7 @@
 					</div>
 
 					<!-- Shared Toggle -->
-					<div class="border-t border-dashed border-gray-200 pt-4">
+					<div class="border-t border-dashed border-theme-dashed pt-4">
 						<label class="flex items-center gap-3 cursor-pointer">
 							<input
 								type="checkbox"
@@ -288,7 +288,7 @@
 										class="px-3 py-1.5 text-sm font-medium rounded-lg transition-all duration-150 {splitType ===
 										'percentage'
 											? 'bg-success-500 text-white shadow-sm'
-											: 'bg-white text-charcoal-soft border border-[rgba(45,42,38,0.15)] hover:bg-cream'}"
+											: 'bg-surface text-charcoal-soft border border-[rgba(45,42,38,0.15)] hover:bg-surface-hover'}"
 									>
 										% Percentage
 									</button>
@@ -298,7 +298,7 @@
 										class="px-3 py-1.5 text-sm font-medium rounded-lg transition-all duration-150 {splitType ===
 										'fixed'
 											? 'bg-success-500 text-white shadow-sm'
-											: 'bg-white text-charcoal-soft border border-[rgba(45,42,38,0.15)] hover:bg-cream'}"
+											: 'bg-surface text-charcoal-soft border border-[rgba(45,42,38,0.15)] hover:bg-surface-hover'}"
 									>
 										$ Fixed Amount
 									</button>
@@ -338,7 +338,7 @@
 												step="0.01"
 												min="0"
 												max={amount}
-												class="w-full pl-7 pr-3 py-2 bg-white border rounded-lg focus:ring-2 transition-colors font-mono {splitValueInvalid ? 'border-warning-500 focus:ring-warning-500/20 focus:border-warning-500' : 'border-[rgba(45,42,38,0.15)] focus:ring-success-500/20 focus:border-success-500'}"
+												class="w-full pl-7 pr-3 py-2 bg-surface border rounded-lg focus:ring-2 transition-colors font-mono {splitValueInvalid ? 'border-warning-500 focus:ring-warning-500/20 focus:border-warning-500' : 'border-[rgba(45,42,38,0.15)] focus:ring-success-500/20 focus:border-success-500'}"
 											/>
 										</div>
 										{#if splitValueInvalid}
@@ -379,7 +379,7 @@
 					</div>
 
 					<!-- Essential Toggle -->
-					<div class="border-t border-dashed border-gray-200 pt-4">
+					<div class="border-t border-dashed border-theme-dashed pt-4">
 						<label class="flex items-center justify-between cursor-pointer">
 							<div>
 								<span class="text-sm font-medium text-charcoal-soft">Essential spending</span>
@@ -407,7 +407,7 @@
 					</div>
 
 					<!-- Subscription Toggle -->
-					<div class="border-t border-dashed border-gray-200 pt-4">
+					<div class="border-t border-dashed border-theme-dashed pt-4">
 						<label class="flex items-center justify-between cursor-pointer">
 							<div>
 								<span class="text-sm font-medium text-charcoal-soft">Subscription</span>
@@ -435,7 +435,7 @@
 									onclick={() => (subscriptionFrequency = 'monthly')}
 									class="px-3 py-1.5 text-sm font-medium rounded-lg transition-all duration-150 {subscriptionFrequency === 'monthly'
 										? 'bg-primary-500 text-white shadow-sm'
-										: 'bg-cream text-charcoal-soft border border-[rgba(45,42,38,0.15)] hover:bg-cream-dark'}"
+										: 'bg-cream text-charcoal-soft border border-[rgba(45,42,38,0.15)] hover:bg-surface-hover-dark'}"
 								>
 									Monthly
 								</button>
@@ -444,7 +444,7 @@
 									onclick={() => (subscriptionFrequency = 'annual')}
 									class="px-3 py-1.5 text-sm font-medium rounded-lg transition-all duration-150 {subscriptionFrequency === 'annual'
 										? 'bg-primary-500 text-white shadow-sm'
-										: 'bg-cream text-charcoal-soft border border-[rgba(45,42,38,0.15)] hover:bg-cream-dark'}"
+										: 'bg-cream text-charcoal-soft border border-[rgba(45,42,38,0.15)] hover:bg-surface-hover-dark'}"
 								>
 									Annual
 								</button>
@@ -452,7 +452,7 @@
 
 							<!-- Cancel Subscription Option -->
 							{#if onCancelSubscription}
-								<div class="mt-3 pt-3 border-t border-dashed border-gray-200">
+								<div class="mt-3 pt-3 border-t border-dashed border-theme-dashed">
 									{#if !showCancelConfirm}
 										<button
 											type="button"
@@ -480,7 +480,7 @@
 												<button
 													type="button"
 													onclick={() => (showCancelConfirm = false)}
-													class="px-3 py-1.5 text-sm font-medium text-charcoal-soft border border-[rgba(45,42,38,0.15)] rounded-lg hover:bg-cream transition-colors"
+													class="px-3 py-1.5 text-sm font-medium text-charcoal-soft border border-[rgba(45,42,38,0.15)] rounded-lg hover:bg-surface-hover transition-colors"
 												>
 													Never mind
 												</button>
@@ -494,11 +494,11 @@
 
 					<!-- Split by Category Button -->
 					{#if canSplit}
-						<div class="border-t border-dashed border-gray-200 pt-4">
+						<div class="border-t border-dashed border-theme-dashed pt-4">
 							<button
 								type="button"
 								onclick={() => transaction && onSplit?.(transaction)}
-								class="w-full flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium text-charcoal-soft hover:text-charcoal border border-[rgba(45,42,38,0.15)] hover:bg-cream rounded-lg transition-colors"
+								class="w-full flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium text-charcoal-soft hover:text-charcoal border border-[rgba(45,42,38,0.15)] hover:bg-surface-hover rounded-lg transition-colors"
 							>
 								<Scissors size={16} />
 								<span>Split by Category</span>
@@ -511,7 +511,7 @@
 				</div>
 
 				<!-- Footer -->
-				<div class="flex gap-3 px-6 py-4 border-t border-dashed border-gray-200 bg-cream-dark rounded-b-xl">
+				<div class="flex gap-3 px-6 py-4 border-t border-dashed border-theme-dashed bg-surface-alt rounded-b-xl">
 					<button
 						type="submit"
 						disabled={!merchant.trim() || amount <= 0 || !categoryId || (isFutureDate && !futureDateConfirmed)}
@@ -522,7 +522,7 @@
 					<button
 						type="button"
 						onclick={handleClose}
-						class="px-4 py-2.5 border border-[rgba(45,42,38,0.15)] text-charcoal-soft rounded-lg font-medium hover:bg-cream transition-colors"
+						class="px-4 py-2.5 border border-[rgba(45,42,38,0.15)] text-charcoal-soft rounded-lg font-medium hover:bg-surface-hover transition-colors"
 					>
 						Cancel
 					</button>

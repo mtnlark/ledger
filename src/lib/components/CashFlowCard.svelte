@@ -51,7 +51,7 @@
 </script>
 
 <div
-	class="bg-white rounded-xl shadow-md shadow-gray-200/50 overflow-hidden transition-all duration-500 {mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-3'}"
+	class="bg-surface rounded-xl shadow-md shadow-[var(--color-shadow)] overflow-hidden transition-all duration-500 {mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-3'}"
 	style="transition-timing-function: cubic-bezier(0.16, 1, 0.3, 1);"
 >
 	<!-- Header (always visible) -->
@@ -102,7 +102,7 @@
 
 	<!-- Cash Flow Breakdown (collapsible) -->
 	{#if isExpanded}
-		<div transition:slide={{ duration: 200 }} class="px-6 pb-6 pt-2 border-t border-dashed border-gray-200">
+		<div transition:slide={{ duration: 200 }} class="px-6 pb-6 pt-2 border-t border-dashed border-theme-dashed">
 			{#if !budget}
 				<div class="text-center py-6 text-charcoal-muted">
 					<p>No budget set for this month</p>
@@ -132,7 +132,7 @@
 					</div>
 
 					<!-- Divider -->
-					<div class="border-t border-gray-200 my-2"></div>
+					<div class="border-t border-theme my-2"></div>
 
 					<!-- Available -->
 					<div class="flex items-baseline">
@@ -149,7 +149,7 @@
 					</div>
 
 					<!-- Divider -->
-					<div class="border-t border-gray-200 my-2"></div>
+					<div class="border-t border-theme my-2"></div>
 
 					<!-- Surplus - Hero Element -->
 					<div class="flex items-baseline">
@@ -169,12 +169,12 @@
 
 					<!-- Progress Bar -->
 					{#if available > 0}
-						<div class="mt-5 pt-4 border-t border-dashed border-gray-200">
+						<div class="mt-5 pt-4 border-t border-dashed border-theme-dashed">
 							<div class="flex justify-between text-xs text-charcoal-muted mb-2">
 								<span>Spending Progress</span>
 								<span class="font-mono">{Math.round(spentPercent)}% used</span>
 							</div>
-							<div class="h-2.5 bg-cream-dark rounded-full overflow-hidden shadow-[inset_0_1px_2px_rgba(45,42,38,0.08)]">
+							<div class="h-2.5 bg-surface-alt rounded-full overflow-hidden shadow-[inset_0_1px_2px_rgba(45,42,38,0.08)]">
 								<div
 									class="h-full rounded-full transition-all duration-500 ease-out {totalSpent > available
 										? 'bg-gradient-to-r from-danger-300 to-danger-500'

@@ -51,7 +51,7 @@
 
 	// Color classes for each intensity level
 	const intensityColors = [
-		'bg-gray-100', // 0 - no spending
+		'bg-surface-alt', // 0 - no spending
 		'bg-green-200', // 1 - low
 		'bg-green-300', // 2 - medium-low
 		'bg-green-400', // 3 - medium-high
@@ -113,9 +113,9 @@
 	<!-- Month grid -->
 	<div class="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
 		{#each monthsData as monthData}
-			<div class="bg-gray-50 rounded-lg p-2">
+			<div class="bg-surface-hover rounded-lg p-2">
 				<!-- Month label -->
-				<div class="text-xs font-medium text-gray-600 mb-2 text-center">
+				<div class="text-xs font-medium text-charcoal-soft mb-2 text-center">
 					{monthData.label}
 				</div>
 
@@ -130,14 +130,14 @@
 								{:else if day.isFutureDay}
 									<!-- Future day - grey -->
 									<div
-										class="bg-gray-200 rounded-sm"
+										class="bg-surface-alt rounded-sm"
 										style="width: {cellSize}px; height: {cellSize}px;"
 										title={format(day.date, 'MMM d, yyyy')}
 									></div>
 								{:else}
 									<!-- Past/today with spending data -->
 									<div
-										class="{intensityColors[day.intensity]} rounded-sm cursor-pointer hover:ring-1 hover:ring-gray-400 {isToday(day.date) ? 'ring-2 ring-blue-400' : ''}"
+										class="{intensityColors[day.intensity]} rounded-sm cursor-pointer hover:ring-1 hover:ring-charcoal-muted {isToday(day.date) ? 'ring-2 ring-blue-400' : ''}"
 										style="width: {cellSize}px; height: {cellSize}px;"
 										title="{format(day.date, 'MMM d, yyyy')}: ${day.amount.toLocaleString()}"
 									></div>
@@ -152,7 +152,7 @@
 
 	<!-- Legend -->
 	{#if !compact}
-		<div class="flex items-center justify-end gap-1 text-xs text-gray-500">
+		<div class="flex items-center justify-end gap-1 text-xs text-charcoal-muted">
 			<span>Less</span>
 			{#each intensityColors as color}
 				<div class="{color} rounded-sm" style="width: {cellSize}px; height: {cellSize}px;"></div>

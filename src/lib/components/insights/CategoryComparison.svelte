@@ -109,7 +109,7 @@
 </script>
 
 {#if comparisonData.length === 0}
-	<div class="text-center py-8 text-gray-500">
+	<div class="text-center py-8 text-charcoal-muted">
 		<p>No transaction data available for comparison</p>
 	</div>
 {:else}

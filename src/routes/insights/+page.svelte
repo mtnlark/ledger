@@ -89,7 +89,7 @@
 		{#if isLoading}
 			<!-- Loading skeletons -->
 			{#each Array(3) as _}
-				<div class="bg-white rounded-xl shadow-md shadow-gray-200/50 overflow-hidden">
+				<div class="bg-surface rounded-xl shadow-md shadow-[var(--color-shadow)] overflow-hidden">
 					<div class="px-6 py-4 flex items-center justify-between">
 						<div>
 							<Skeleton class="h-6 mb-2" width="180px" rounded="sm" />

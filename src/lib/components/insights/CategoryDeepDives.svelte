@@ -119,20 +119,20 @@
 				<div class="flex items-center gap-2">
 					<span class="text-xl">{topChange.icon}</span>
 					<div>
-						<p class="text-sm font-medium text-gray-900">{topChange.name}</p>
-						<p class="text-xs text-gray-500">
+						<p class="text-sm font-medium text-charcoal">{topChange.name}</p>
+						<p class="text-xs text-charcoal-muted">
 							{topChange.change > 0 ? '+' : ''}{topChange.change.toFixed(0)}% vs last month
 						</p>
 					</div>
 				</div>
 				<div class="text-right">
-					<p class="text-lg font-semibold text-gray-900">
+					<p class="text-lg font-semibold text-charcoal">
 						${topChange.current.toLocaleString()}
 					</p>
-					<p class="text-xs text-gray-500">this month</p>
+					<p class="text-xs text-charcoal-muted">this month</p>
 				</div>
 			{:else}
-				<p class="text-sm text-gray-500">Select a category to view trends</p>
+				<p class="text-sm text-charcoal-muted">Select a category to view trends</p>
 			{/if}
 		</div>
 	{/snippet}
@@ -144,13 +144,13 @@
 
 			<!-- Category Selector for Trends -->
 			<div>
-				<label for="category-select" class="block text-sm font-medium text-gray-700 mb-2">
+				<label for="category-select" class="block text-sm font-medium text-charcoal-soft mb-2">
 					Explore Category Trends
 				</label>
 				<select
 					id="category-select"
 					bind:value={selectedCategoryId}
-					class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+					class="w-full px-3 py-2 bg-surface border border-[var(--color-border)] rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-charcoal"
 				>
 					{#each sortedCategories as cat}
 						{@const spent = categorySpending.get(cat.id!) || 0}
@@ -164,7 +164,7 @@
 			<!-- Category Trends Chart -->
 			{#if selectedCategory && categoryTrendData.size > 0}
 				<div>
-					<h3 class="text-sm font-medium text-gray-700 mb-3">
+					<h3 class="text-sm font-medium text-charcoal-soft mb-3">
 						{selectedCategory.icon} {selectedCategory.name} Over Time
 					</h3>
 					<CategoryTrendsChart
@@ -177,7 +177,7 @@
 
 			<!-- Category Comparison -->
 			<div>
-				<h3 class="text-sm font-medium text-gray-700 mb-3">
+				<h3 class="text-sm font-medium text-charcoal-soft mb-3">
 					{format(parseMonthKey(currentMonth), 'MMMM')} vs {format(parseMonthKey(previousMonth), 'MMMM')}
 				</h3>
 				<CategoryComparison

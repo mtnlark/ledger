@@ -74,7 +74,7 @@
 	}
 </script>
 
-<div class="bg-white rounded-xl shadow-md shadow-gray-200/50 overflow-hidden">
+<div class="bg-surface rounded-xl shadow-md shadow-[var(--color-shadow)] overflow-hidden">
 	<!-- Search Bar -->
 	<div class="px-4 py-3">
 		<div class="relative">
@@ -84,7 +84,7 @@
 				placeholder="Search transactions..."
 				value={filters.searchQuery}
 				oninput={(e) => handleSearchInput(e.currentTarget.value)}
-				class="w-full pl-10 pr-10 py-2.5 bg-cream rounded-lg border border-transparent focus:border-primary-300 focus:ring-2 focus:ring-primary-100 focus:bg-white transition-all text-charcoal placeholder:text-charcoal-muted/60"
+				class="w-full pl-10 pr-10 py-2.5 bg-cream rounded-lg border border-transparent focus:border-primary-300 focus:ring-2 focus:ring-primary-100 focus:bg-surface transition-all text-charcoal placeholder:text-charcoal-muted/60"
 			/>
 			{#if filters.searchQuery}
 				<button
@@ -100,7 +100,7 @@
 	<!-- Filter Toggle -->
 	<button
 		onclick={() => showAdvanced = !showAdvanced}
-		class="w-full px-4 py-2 flex items-center justify-between text-sm text-charcoal-muted hover:bg-cream/50 transition-colors border-t border-dashed border-gray-200"
+		class="w-full px-4 py-2 flex items-center justify-between text-sm text-charcoal-muted hover:bg-cream/50 transition-colors border-t border-dashed border-theme-dashed"
 	>
 		<div class="flex items-center gap-2">
 			<Filter size={16} />
@@ -120,7 +120,7 @@
 
 	<!-- Advanced Filters (collapsible) -->
 	{#if showAdvanced}
-		<div transition:slide={{ duration: 150 }} class="px-4 pb-4 pt-2 border-t border-dashed border-gray-200 space-y-3">
+		<div transition:slide={{ duration: 150 }} class="px-4 pb-4 pt-2 border-t border-dashed border-theme-dashed space-y-3">
 			<!-- Category Filter -->
 			<div>
 				<label for="category-filter" class="block text-xs font-medium text-charcoal-muted mb-1">Category</label>
@@ -128,7 +128,7 @@
 					id="category-filter"
 					value={filters.categoryId ?? ''}
 					onchange={(e) => handleCategoryChange(e.currentTarget.value)}
-					class="w-full px-3 py-2 bg-cream rounded-lg border border-transparent focus:border-primary-300 focus:ring-2 focus:ring-primary-100 focus:bg-white transition-all text-charcoal"
+					class="w-full px-3 py-2 bg-cream rounded-lg border border-transparent focus:border-primary-300 focus:ring-2 focus:ring-primary-100 focus:bg-surface transition-all text-charcoal"
 				>
 					<option value="">All categories</option>
 					{#each categories.filter(c => c.isActive) as category (category.id)}
@@ -148,7 +148,7 @@
 						type="date"
 						value={filters.dateFrom}
 						onchange={(e) => handleDateFromChange(e.currentTarget.value)}
-						class="w-full px-3 py-2 bg-cream rounded-lg border border-transparent focus:border-primary-300 focus:ring-2 focus:ring-primary-100 focus:bg-white transition-all text-charcoal"
+						class="w-full px-3 py-2 bg-cream rounded-lg border border-transparent focus:border-primary-300 focus:ring-2 focus:ring-primary-100 focus:bg-surface transition-all text-charcoal"
 					/>
 				</div>
 				<div>
@@ -158,7 +158,7 @@
 						type="date"
 						value={filters.dateTo}
 						onchange={(e) => handleDateToChange(e.currentTarget.value)}
-						class="w-full px-3 py-2 bg-cream rounded-lg border border-transparent focus:border-primary-300 focus:ring-2 focus:ring-primary-100 focus:bg-white transition-all text-charcoal"
+						class="w-full px-3 py-2 bg-cream rounded-lg border border-transparent focus:border-primary-300 focus:ring-2 focus:ring-primary-100 focus:bg-surface transition-all text-charcoal"
 					/>
 				</div>
 			</div>
@@ -167,7 +167,7 @@
 
 	<!-- Results count & Clear button -->
 	{#if hasActiveFilters}
-		<div class="px-4 py-2.5 bg-cream/50 border-t border-dashed border-gray-200 flex items-center justify-between">
+		<div class="px-4 py-2.5 bg-cream/50 border-t border-dashed border-theme-dashed flex items-center justify-between">
 			<span class="text-sm text-charcoal-muted">
 				{#if resultCount !== undefined && totalCount !== undefined}
 					Showing <span class="font-mono font-medium text-charcoal">{resultCount}</span> of {totalCount} transactions

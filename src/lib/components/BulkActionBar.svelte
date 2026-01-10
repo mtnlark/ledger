@@ -59,7 +59,7 @@
 
 <!-- Floating action bar -->
 <div
-	class="fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-sm border-t border-gray-200 shadow-lg shadow-gray-300/50 animate-slide-up"
+	class="fixed bottom-0 left-0 right-0 z-40 bg-surface/95 backdrop-blur-sm border-t border-theme shadow-lg shadow-[var(--color-shadow)] animate-slide-up"
 >
 	<div class="max-w-4xl mx-auto px-4 py-3">
 		<div class="flex items-center justify-between gap-4">
@@ -77,7 +77,7 @@
 					<button
 						type="button"
 						onclick={toggleCategoryDropdown}
-						class="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-charcoal-soft bg-cream border border-[rgba(45,42,38,0.15)] rounded-lg hover:bg-cream-dark transition-colors"
+						class="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-charcoal-soft bg-cream border border-[rgba(45,42,38,0.15)] rounded-lg hover:bg-surface-hover-dark transition-colors"
 					>
 						<FolderInput size={16} />
 						<span>Change Category</span>
@@ -99,7 +99,7 @@
 
 						<ul
 							role="listbox"
-							class="absolute bottom-full left-0 mb-2 w-64 bg-white border border-gray-200 rounded-lg shadow-lg max-h-64 overflow-auto z-50"
+							class="absolute bottom-full left-0 mb-2 w-64 bg-surface border border-theme rounded-lg shadow-lg max-h-64 overflow-auto z-50"
 						>
 							{#each activeCategories as cat, index (cat.id)}
 								<li
@@ -108,7 +108,7 @@
 									class="px-3 py-2 cursor-pointer flex items-center gap-2 text-sm {index ===
 									highlightedIndex
 										? 'bg-primary-50 text-primary-900'
-										: 'hover:bg-cream'}"
+										: 'hover:bg-surface-hover'}"
 									onmouseenter={() => (highlightedIndex = index)}
 									onmousedown={() => handleCategorySelect(cat.id!)}
 								>
@@ -134,7 +134,7 @@
 				<button
 					type="button"
 					onclick={onCancel}
-					class="p-2 text-charcoal-muted hover:text-charcoal hover:bg-cream rounded-lg transition-colors"
+					class="p-2 text-charcoal-muted hover:text-charcoal hover:bg-surface-hover rounded-lg transition-colors"
 					aria-label="Cancel selection"
 				>
 					<X size={20} />

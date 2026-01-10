@@ -435,7 +435,7 @@
 		{#if isLoading}
 			<!-- Skeleton loading states -->
 			<CashFlowCardSkeleton />
-			<div class="bg-white rounded-xl shadow-md shadow-gray-200/50 p-6">
+			<div class="bg-surface rounded-xl shadow-md shadow-[var(--color-shadow)] p-6">
 				<div class="animate-pulse h-6 w-32 bg-cream-dark rounded mb-4"></div>
 				<div class="space-y-4">
 					<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">

@@ -66,7 +66,7 @@
 	<button
 		onclick={goPrev}
 		disabled={!canGoPrev}
-		class="p-2 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+		class="p-2 hover:bg-surface-hover rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed text-charcoal-soft"
 		aria-label="Previous month"
 	>
 		<ChevronLeft size={20} />
@@ -76,12 +76,12 @@
 	<div class="relative">
 		<button
 			onclick={() => (isOpen = !isOpen)}
-			class="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-lg transition-colors min-w-[140px] justify-center"
+			class="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-charcoal hover:bg-surface-hover rounded-lg transition-colors min-w-[140px] justify-center"
 			aria-expanded={isOpen}
 			aria-haspopup="listbox"
 		>
 			<span>{formatMonth(currentMonth)}</span>
-			<ChevronDown size={16} class="text-gray-400 transition-transform {isOpen ? 'rotate-180' : ''}" />
+			<ChevronDown size={16} class="text-charcoal-muted transition-transform {isOpen ? 'rotate-180' : ''}" />
 		</button>
 
 		{#if isOpen}
@@ -92,7 +92,7 @@
 
 			<!-- Dropdown -->
 			<div
-				class="absolute right-0 mt-1 w-40 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-20 max-h-64 overflow-auto"
+				class="absolute right-0 mt-1 w-40 bg-surface rounded-lg shadow-lg border border-theme py-1 z-20 max-h-64 overflow-auto"
 				role="listbox"
 			>
 				{#each [...availableMonths].reverse() as month (month)}
@@ -101,8 +101,8 @@
 						role="option"
 						aria-selected={month === currentMonth}
 						class="w-full px-3 py-2 text-sm text-left transition-colors {month === currentMonth
-							? 'bg-blue-50 text-blue-700 font-medium'
-							: 'text-gray-700 hover:bg-gray-50'}"
+							? 'bg-primary-50 text-primary-700 font-medium'
+							: 'text-charcoal hover:bg-surface-hover'}"
 					>
 						{formatMonthShort(month)}
 					</button>
@@ -115,7 +115,7 @@
 	<button
 		onclick={goNext}
 		disabled={!canGoNext}
-		class="p-2 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+		class="p-2 hover:bg-surface-hover rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed text-charcoal-soft"
 		aria-label="Next month"
 	>
 		<ChevronRight size={20} />

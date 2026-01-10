@@ -213,7 +213,7 @@
 
 			<!-- All-time comparison -->
 			{#if allTransactions.length > transactions.length}
-				<div class="mt-6 pt-4 border-t border-dashed border-gray-200">
+				<div class="mt-6 pt-4 border-t border-dashed border-theme">
 					<h4 class="text-sm font-medium text-charcoal-muted mb-2">All-Time Average</h4>
 					<div class="flex items-center gap-4 text-sm">
 						<span class="text-charcoal-soft">

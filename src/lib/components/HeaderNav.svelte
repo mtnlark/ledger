@@ -11,14 +11,14 @@
 	let { title = 'Ledger', showBack = false, children }: Props = $props();
 </script>
 
-<header class="bg-white border-b border-dashed border-gray-200">
+<header class="bg-surface border-b border-dashed border-theme-dashed">
 	<div class="max-w-4xl mx-auto px-4 py-4">
 		<div class="flex items-center gap-4">
 			<!-- Back button (mobile only when showBack) -->
 			{#if showBack}
 				<a
 					href="/"
-					class="p-2 hover:bg-cream rounded-lg transition-colors md:hidden text-charcoal-soft"
+					class="p-2 hover:bg-surface-hover rounded-lg transition-colors md:hidden text-charcoal-soft"
 					aria-label="Back to dashboard"
 				>
 					<ChevronLeft size={20} />

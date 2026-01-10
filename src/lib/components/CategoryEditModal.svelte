@@ -141,19 +141,19 @@
 	class="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none"
 >
 	<div
-		class="bg-white rounded-2xl shadow-xl max-w-md w-full pointer-events-auto"
+		class="bg-surface rounded-2xl shadow-xl max-w-md w-full pointer-events-auto"
 		transition:scale={{ duration: 200, start: 0.95 }}
 	>
 		<form onsubmit={handleSubmit}>
 			<!-- Header -->
-			<div class="px-6 py-4 border-b border-dashed border-gray-200 flex items-center justify-between">
+			<div class="px-6 py-4 border-b border-dashed border-theme-dashed flex items-center justify-between">
 				<h2 class="font-display text-xl font-medium text-charcoal">
 					{isEditing ? 'Edit Category' : 'Add Category'}
 				</h2>
 				<button
 					type="button"
 					onclick={onClose}
-					class="p-2 text-charcoal-muted hover:text-charcoal hover:bg-cream rounded-lg transition-colors"
+					class="p-2 text-charcoal-muted hover:text-charcoal hover:bg-surface-hover rounded-lg transition-colors"
 				>
 					<X size={20} />
 				</button>
@@ -204,7 +204,7 @@
 							<button
 								type="button"
 								onclick={() => (icon = emoji)}
-								class="w-8 h-8 rounded-lg hover:bg-cream border border-transparent hover:border-gray-200 transition-colors text-lg {icon === emoji ? 'bg-primary-100 border-primary-300' : ''}"
+								class="w-8 h-8 rounded-lg hover:bg-surface-hover border border-transparent hover:border-theme transition-colors text-lg {icon === emoji ? 'bg-primary-100 border-primary-300' : ''}"
 							>
 								{emoji}
 							</button>
@@ -247,7 +247,7 @@
 				</div>
 
 				<!-- Essential Toggle -->
-				<div class="pt-4 border-t border-dashed border-gray-200">
+				<div class="pt-4 border-t border-dashed border-theme-dashed">
 					<label class="flex items-center justify-between cursor-pointer">
 						<div>
 							<span class="font-medium text-charcoal">Essential spending</span>
@@ -271,7 +271,7 @@
 
 				<!-- Delete Section (only when editing) -->
 				{#if isEditing}
-					<div class="pt-4 border-t border-dashed border-gray-200">
+					<div class="pt-4 border-t border-dashed border-theme-dashed">
 						{#if !showDeleteConfirm}
 							<button
 								type="button"
@@ -296,7 +296,7 @@
 									<button
 										type="button"
 										onclick={() => (showDeleteConfirm = false)}
-										class="px-3 py-1.5 text-sm bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+										class="px-3 py-1.5 text-sm bg-surface border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
 									>
 										Cancel
 									</button>
@@ -320,7 +320,7 @@
 				<button
 					type="button"
 					onclick={onClose}
-					class="flex-1 py-2.5 px-4 border border-[rgba(45,42,38,0.15)] text-charcoal-soft rounded-lg font-medium hover:bg-cream transition-colors"
+					class="flex-1 py-2.5 px-4 border border-[rgba(45,42,38,0.15)] text-charcoal-soft rounded-lg font-medium hover:bg-surface-hover transition-colors"
 				>
 					Cancel
 				</button>

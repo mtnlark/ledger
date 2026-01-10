@@ -83,11 +83,11 @@
 </script>
 
 <div
-	class="bg-white rounded-xl shadow-md shadow-gray-200/50 overflow-hidden transition-all duration-500 {mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-3'}"
+	class="bg-surface rounded-xl shadow-md shadow-[var(--color-shadow)] overflow-hidden transition-all duration-500 {mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-3'}"
 	style="transition-timing-function: cubic-bezier(0.16, 1, 0.3, 1);"
 >
 	<!-- Header with outstanding balance -->
-	<div class="px-6 py-5 border-b border-dashed border-gray-200 bg-gradient-to-r from-success-50 to-success-100/50">
+	<div class="px-6 py-5 border-b border-dashed border-theme-dashed bg-gradient-to-r from-success-50 to-success-100/50">
 		<div class="flex items-center justify-between mb-1">
 			<h2 class="text-sm font-medium text-charcoal-soft">Outstanding Balance with {settings.partnerName}</h2>
 		</div>

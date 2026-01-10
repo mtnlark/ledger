@@ -395,13 +395,13 @@
 									<div class="flex gap-1 flex-shrink-0">
 										<button
 											onclick={() => handleConfirmActive(sub.merchant)}
-											class="px-2 py-1 text-xs font-medium text-charcoal-soft bg-white border border-gray-200 rounded hover:bg-gray-50 transition-colors"
+											class="px-2 py-1 text-xs font-medium text-charcoal-soft bg-surface border border-theme rounded hover:bg-surface-hover transition-colors"
 										>
 											Still Active
 										</button>
 										<button
 											onclick={() => handleCancelSubscription(sub.merchant)}
-											class="px-2 py-1 text-xs font-medium text-danger-600 bg-white border border-danger-200 rounded hover:bg-danger-50 transition-colors"
+											class="px-2 py-1 text-xs font-medium text-danger-600 bg-surface border border-danger-200 rounded hover:bg-danger-50 transition-colors"
 										>
 											Cancelled
 										</button>

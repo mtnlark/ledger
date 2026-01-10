@@ -139,22 +139,22 @@
 		<div class="space-y-3">
 			<div class="flex items-center justify-between">
 				<div>
-					<p class="text-2xl font-bold text-gray-900">${totalSpent.toLocaleString()}</p>
-					<p class="text-sm text-gray-500">Total spent in {currentYear}</p>
+					<p class="text-2xl font-bold text-charcoal">${totalSpent.toLocaleString()}</p>
+					<p class="text-sm text-charcoal-muted">Total spent in {currentYear}</p>
 				</div>
 				<div class="text-right">
 					<p class="text-lg font-semibold text-green-600">{noSpendDays}</p>
-					<p class="text-sm text-gray-500">no-spend days</p>
+					<p class="text-sm text-charcoal-muted">no-spend days</p>
 				</div>
 			</div>
 			<!-- Mini heatmap preview (last 30 days) -->
 			<div class="pt-2">
-				<p class="text-xs text-gray-500 mb-1">Last 30 days</p>
+				<p class="text-xs text-charcoal-muted mb-1">Last 30 days</p>
 				<div class="flex gap-1">
 					{#each Array.from(recentDailySpending.entries()) as [dateKey, amount]}
 						{@const maxAmount = Math.max(...Array.from(recentDailySpending.values()))}
 						{@const intensity = amount === 0 ? 0 : Math.min(4, Math.ceil((amount / (maxAmount || 1)) * 4))}
-						{@const colors = ['bg-gray-100', 'bg-green-200', 'bg-green-300', 'bg-green-400', 'bg-green-600']}
+						{@const colors = ['bg-surface-alt', 'bg-green-200', 'bg-green-300', 'bg-green-400', 'bg-green-600']}
 						<div
 							class="{colors[intensity]} rounded-sm"
 							style="width: 8px; height: 8px;"
@@ -170,7 +170,7 @@
 		<div class="space-y-6">
 			<!-- Full calendar heatmap -->
 			<div>
-				<h3 class="text-sm font-medium text-gray-700 mb-3">Spending Calendar</h3>
+				<h3 class="text-sm font-medium text-charcoal-soft mb-3">Spending Calendar</h3>
 				<CalendarHeatmap {dailySpending} year={currentYear} />
 			</div>
 
@@ -196,7 +196,7 @@
 
 			<!-- Needs vs Wants Summary (compact) -->
 			{#if needsWantsStats.total > 0}
-				<div class="flex items-center justify-between p-4 bg-cream-dark rounded-lg border border-dashed border-gray-200">
+				<div class="flex items-center justify-between p-4 bg-cream-dark rounded-lg border border-dashed border-theme">
 					<span class="text-sm text-charcoal-soft">All-time needs vs wants:</span>
 					<span class="font-mono text-sm text-charcoal">
 						{needsWantsStats.needsPercent.toFixed(0)}% needs / {needsWantsStats.wantsPercent.toFixed(0)}% wants

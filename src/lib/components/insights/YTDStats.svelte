@@ -109,16 +109,16 @@
 <div class="space-y-6">
 	<!-- Key metrics grid -->
 	<div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-		<div class="bg-gray-50 rounded-lg p-4">
+		<div class="bg-surface-hover rounded-lg p-4">
 			<InsightMetric value="${totalSpent.toLocaleString()}" label="Total YTD" size="md" />
 		</div>
-		<div class="bg-gray-50 rounded-lg p-4">
+		<div class="bg-surface-hover rounded-lg p-4">
 			<InsightMetric value={ytdTransactions.length.toString()} label="Transactions" size="md" />
 		</div>
-		<div class="bg-gray-50 rounded-lg p-4">
+		<div class="bg-surface-hover rounded-lg p-4">
 			<InsightMetric value={noSpendDays.toString()} label="No-Spend Days" size="md" />
 		</div>
-		<div class="bg-gray-50 rounded-lg p-4">
+		<div class="bg-surface-hover rounded-lg p-4">
 			<InsightMetric
 				value="${Math.round(totalSpent / (daysInYearSoFar || 1)).toLocaleString()}"
 				label="Daily Avg"
@@ -129,15 +129,15 @@
 
 	<!-- Top categories -->
 	<div>
-		<h4 class="text-sm font-medium text-gray-700 mb-3">Top Categories</h4>
+		<h4 class="text-sm font-medium text-charcoal-soft mb-3">Top Categories</h4>
 		<div class="space-y-2">
 			{#each topCategories as cat, i}
-				<div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+				<div class="flex items-center justify-between p-3 bg-surface-hover rounded-lg">
 					<div class="flex items-center gap-3">
 						<span class="text-lg">{cat.icon}</span>
-						<span class="font-medium text-gray-900">{cat.name}</span>
+						<span class="font-medium text-charcoal">{cat.name}</span>
 					</div>
-					<span class="font-semibold text-gray-900">${cat.amount.toLocaleString()}</span>
+					<span class="font-semibold text-charcoal">${cat.amount.toLocaleString()}</span>
 				</div>
 			{/each}
 		</div>
@@ -146,17 +146,17 @@
 	<!-- Additional stats -->
 	<div class="grid grid-cols-2 gap-4">
 		{#if biggestMonth}
-			<div class="bg-gray-50 rounded-lg p-4">
-				<p class="text-sm text-gray-500">Biggest Month</p>
-				<p class="font-semibold text-gray-900">{biggestMonth.label}</p>
-				<p class="text-sm text-gray-600">${biggestMonth.amount.toLocaleString()}</p>
+			<div class="bg-surface-hover rounded-lg p-4">
+				<p class="text-sm text-charcoal-muted">Biggest Month</p>
+				<p class="font-semibold text-charcoal">{biggestMonth.label}</p>
+				<p class="text-sm text-charcoal-soft">${biggestMonth.amount.toLocaleString()}</p>
 			</div>
 		{/if}
 		{#if topMerchant}
-			<div class="bg-gray-50 rounded-lg p-4">
-				<p class="text-sm text-gray-500">Most Frequent</p>
-				<p class="font-semibold text-gray-900 truncate">{topMerchant.merchant}</p>
-				<p class="text-sm text-gray-600">{topMerchant.count} visits</p>
+			<div class="bg-surface-hover rounded-lg p-4">
+				<p class="text-sm text-charcoal-muted">Most Frequent</p>
+				<p class="font-semibold text-charcoal truncate">{topMerchant.merchant}</p>
+				<p class="text-sm text-charcoal-soft">{topMerchant.count} visits</p>
 			</div>
 		{/if}
 	</div>

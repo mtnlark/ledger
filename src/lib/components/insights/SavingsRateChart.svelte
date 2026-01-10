@@ -101,15 +101,15 @@
 </script>
 
 {#if savingsData.length === 0}
-	<div class="text-center py-8 text-gray-500">
+	<div class="text-center py-8 text-charcoal-muted">
 		<p>No budget data available</p>
 		<p class="text-sm mt-1">Set monthly budgets to track your savings rate</p>
 	</div>
 {:else if savingsData.length === 1}
 	<div class="text-center py-8">
 		<p class="text-3xl font-bold text-green-600">{(savingsData[0].rate * 100).toFixed(1)}%</p>
-		<p class="text-sm text-gray-500 mt-1">Savings rate for {savingsData[0].label}</p>
-		<p class="text-xs text-gray-400 mt-2">Add more months to see trends</p>
+		<p class="text-sm text-charcoal-muted mt-1">Savings rate for {savingsData[0].label}</p>
+		<p class="text-xs text-charcoal-muted mt-2">Add more months to see trends</p>
 	</div>
 {:else}
 	<div class="h-[250px]">

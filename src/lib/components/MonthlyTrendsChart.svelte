@@ -113,8 +113,8 @@
 	}
 </script>
 
-<div class="bg-white rounded-xl shadow-md shadow-gray-200/50 overflow-hidden">
-	<div class="px-6 py-4 border-b border-dashed border-gray-200">
+<div class="bg-surface rounded-xl shadow-md shadow-[var(--color-shadow)] overflow-hidden">
+	<div class="px-6 py-4 border-b border-dashed border-theme-dashed">
 		<h2 class="font-display text-xl font-medium text-charcoal">Monthly Spending Trends</h2>
 		<p class="text-sm text-charcoal-muted mt-1">
 			Average: <span class="font-mono">{formatCurrency(average)}</span>/month

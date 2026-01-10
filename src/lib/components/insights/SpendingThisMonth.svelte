@@ -91,7 +91,7 @@
 	{#snippet children()}
 		<div class="space-y-6">
 			<!-- Month Picker (embedded) -->
-			<div class="flex items-center justify-between pb-4 border-b border-dashed border-gray-200">
+			<div class="flex items-center justify-between pb-4 border-b border-dashed border-theme">
 				<p class="text-sm text-charcoal-muted">
 					{#if isCurrentMonth}
 						Viewing current month
@@ -108,7 +108,7 @@
 
 			<!-- Quick Stats -->
 			{#if transactions.length > 0}
-				<div class="bg-cream-dark rounded-lg p-4 border border-dashed border-gray-200">
+				<div class="bg-cream-dark rounded-lg p-4 border border-dashed border-theme">
 					<h3 class="text-sm font-medium text-charcoal-soft mb-3">Quick Stats</h3>
 					<div class="grid grid-cols-3 gap-4">
 						<div class="text-center">

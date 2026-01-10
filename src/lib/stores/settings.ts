@@ -37,6 +37,10 @@ export async function updateDefaultSplit(
 // Update theme
 export async function updateTheme(theme: 'light' | 'dark' | 'system'): Promise<void> {
 	await db.settings.update(1, { theme });
+	// Sync to localStorage for flash prevention on page load
+	if (typeof localStorage !== 'undefined') {
+		localStorage.setItem('ledger-theme', theme);
+	}
 	await persistData();
 }
 

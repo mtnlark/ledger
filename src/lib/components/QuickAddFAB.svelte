@@ -154,7 +154,7 @@
 	{#if isExpanded}
 		<!-- Expanded Form -->
 		<div
-			class="bg-white rounded-2xl shadow-xl shadow-charcoal/15 w-[calc(100vw-2rem)] max-w-sm overflow-hidden"
+			class="bg-surface rounded-2xl shadow-xl shadow-charcoal/15 w-[calc(100vw-2rem)] max-w-sm overflow-hidden"
 			transition:fly={{ y: 20, duration: 200 }}
 		>
 			<form onsubmit={handleSubmit}>
@@ -274,7 +274,7 @@
 					<button
 						type="button"
 						onclick={close}
-						class="flex-1 py-2.5 px-4 border border-[rgba(45,42,38,0.15)] text-charcoal-soft rounded-lg font-medium hover:bg-cream transition-colors"
+						class="flex-1 py-2.5 px-4 border border-[rgba(45,42,38,0.15)] text-charcoal-soft rounded-lg font-medium hover:bg-surface-hover transition-colors"
 					>
 						Cancel
 					</button>

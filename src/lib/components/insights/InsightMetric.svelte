@@ -19,8 +19,8 @@
 </script>
 
 <div class="text-center">
-	<p class="{sizeClasses[size].value} text-gray-900">{value}</p>
-	<p class="{sizeClasses[size].label} text-gray-500">{label}</p>
+	<p class="{sizeClasses[size].value} text-charcoal">{value}</p>
+	<p class="{sizeClasses[size].label} text-charcoal-muted">{label}</p>
 	{#if trend}
 		<p
 			class="text-xs mt-1 {trend.isPositive !== false ? 'text-green-600' : 'text-red-600'}"

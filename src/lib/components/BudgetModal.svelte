@@ -80,15 +80,15 @@
 		onclick={handleBackdropClick}
 	>
 		<!-- Modal -->
-		<div class="bg-white rounded-xl shadow-xl shadow-gray-300/50 max-w-md w-full animate-enter" onclick={(e) => e.stopPropagation()}>
+		<div class="bg-surface rounded-xl shadow-xl shadow-[var(--color-shadow)] max-w-md w-full animate-enter" onclick={(e) => e.stopPropagation()}>
 			<!-- Header -->
-			<div class="px-6 py-4 border-b border-dashed border-gray-200 flex items-center justify-between">
+			<div class="px-6 py-4 border-b border-dashed border-theme-dashed flex items-center justify-between">
 				<h2 class="font-display text-xl font-medium text-charcoal">
 					Budget for {monthDisplay}
 				</h2>
 				<button
 					onclick={onClose}
-					class="text-charcoal-muted hover:text-charcoal p-1.5 hover:bg-cream rounded-lg transition-colors"
+					class="text-charcoal-muted hover:text-charcoal p-1.5 hover:bg-surface-hover rounded-lg transition-colors"
 					aria-label="Close"
 				>
 					<X size={20} />
@@ -156,7 +156,7 @@
 					{@const income = parseFloat(cleanNumberInput(incomeStr)) || 0}
 					{@const saved = parseFloat(cleanNumberInput(savedStr)) || 0}
 					{@const available = income - saved}
-					<div class="bg-cream-dark rounded-lg p-4 border border-dashed border-gray-200">
+					<div class="bg-surface-alt rounded-lg p-4 border border-dashed border-theme-dashed">
 						<div class="flex items-baseline text-charcoal-soft">
 							<span class="text-sm">Available to spend:</span>
 							<span class="ledger-line"></span>
@@ -178,7 +178,7 @@
 					<button
 						type="button"
 						onclick={onClose}
-						class="px-4 py-2.5 border border-[rgba(45,42,38,0.15)] text-charcoal-soft rounded-lg font-medium hover:bg-cream transition-colors"
+						class="px-4 py-2.5 border border-[rgba(45,42,38,0.15)] text-charcoal-soft rounded-lg font-medium hover:bg-surface-hover transition-colors"
 					>
 						Cancel
 					</button>
