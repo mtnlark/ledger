@@ -47,6 +47,9 @@
 	let available = $derived(income - saved);
 	let remaining = $derived(available - totalSpent);
 
+	// Calculate unallocated: available money not assigned to any budget category
+	let unallocated = $derived(available - totalBudgeted);
+
 	// Check if there are suggestions to apply (categories with suggestions but no budget)
 	let hasSuggestionsToApply = $derived.by(() => {
 		for (const [categoryId, amount] of suggestions) {
@@ -310,6 +313,23 @@
 								</p>
 							{/if}
 						</div>
+						{#if monthlyBudget}
+							<div class="border-l border-theme pl-8">
+								<span class="text-sm text-charcoal-muted">Unallocated</span>
+								<p
+									class="font-mono text-xl font-medium {unallocated >= 0
+										? 'text-charcoal'
+										: 'text-warning-600'}"
+								>
+									{formatCurrency(Math.abs(unallocated))}
+									{#if unallocated < 0}
+										<span class="text-sm font-sans font-normal text-warning-600">
+											over-allocated
+										</span>
+									{/if}
+								</p>
+							</div>
+						{/if}
 						{#if totalBudgeted > 0}
 							<div class="border-l border-theme pl-8">
 								<span class="text-sm text-charcoal-muted">Budget Status</span>
