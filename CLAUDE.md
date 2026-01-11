@@ -78,23 +78,30 @@ budget-tracker/
 │   │   │   ├── categories.ts
 │   │   │   ├── settings.ts
 │   │   │   ├── budget.ts
+│   │   │   ├── categoryBudget.ts   # Per-category budget tracking
 │   │   │   ├── merchants.ts
 │   │   │   ├── recurring.ts
-│   │   │   ├── selectedMonth.ts  # UI state for month selection
-│   │   │   └── toast.ts          # Toast notification system
+│   │   │   ├── selectedMonth.ts    # UI state for month selection
+│   │   │   ├── theme.ts            # Light/dark/system theme
+│   │   │   └── toast.ts            # Toast notification system
 │   │   ├── components/
 │   │   │   ├── SideNav.svelte         # Collapsible sidebar
 │   │   │   ├── HeaderNav.svelte       # Page headers
 │   │   │   ├── TransactionForm.svelte
 │   │   │   ├── TransactionList.svelte
+│   │   │   ├── TransactionListSkeleton.svelte
 │   │   │   ├── TransactionFilters.svelte
 │   │   │   ├── EditTransactionModal.svelte
 │   │   │   ├── SplitTransactionModal.svelte
 │   │   │   ├── CashFlowCard.svelte
+│   │   │   ├── CashFlowCardSkeleton.svelte
 │   │   │   ├── SettlementTracker.svelte
 │   │   │   ├── QuickAddFAB.svelte
 │   │   │   ├── BulkActionBar.svelte
 │   │   │   ├── BudgetModal.svelte
+│   │   │   ├── BudgetProgressBar.svelte
+│   │   │   ├── CategoryBudgetCard.svelte
+│   │   │   ├── CategoryBudgetList.svelte
 │   │   │   ├── CategoryManager.svelte
 │   │   │   ├── CategoryCombobox.svelte
 │   │   │   ├── CategoryEditModal.svelte
@@ -125,7 +132,9 @@ budget-tracker/
 │   │   │   ├── import.ts          # Excel import
 │   │   │   ├── export.ts          # CSV/JSON export
 │   │   │   ├── category-helpers.ts
+│   │   │   ├── chart-theme.ts     # Chart.js theme configuration
 │   │   │   ├── date-helpers.ts
+│   │   │   ├── debug.ts           # Debugging utilities
 │   │   │   └── string-helpers.ts
 │   │   └── assets/
 │   │       └── favicon.svg
@@ -133,6 +142,7 @@ budget-tracker/
 │   │   ├── +layout.svelte    # App shell with SideNav
 │   │   ├── +layout.ts
 │   │   ├── +page.svelte      # Dashboard
+│   │   ├── budget/+page.svelte
 │   │   ├── insights/+page.svelte
 │   │   ├── shared/+page.svelte
 │   │   └── settings/+page.svelte
@@ -198,6 +208,15 @@ interface MonthlyBudget {
   notes?: string;
 }
 
+interface CategoryBudget {
+  id?: number;
+  month: string;           // "YYYY-MM" format
+  categoryId: number;      // References Category.id
+  budgetAmount: number;    // Target spending limit
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 interface CancelledSubscription {
   merchant: string;        // Normalized merchant name
   cancelledDate: string;   // ISO date string
@@ -222,6 +241,7 @@ interface Settings {
 
 **Collapsible Sidebar:**
 - Dashboard (home)
+- Budget (category budgets)
 - Insights (charts & trends)
 - Shared (settlement tracking)
 - Settings (categories, import/export)
@@ -240,6 +260,13 @@ Sidebar state persists to localStorage (`ledger-sidebar-expanded`).
 - Edit/split transaction modals
 - Bulk action toolbar for multi-select operations
 - Month picker for navigating between months
+
+### Budget
+- Per-category budget tracking
+- Visual progress bars showing spending vs budget
+- Summary card with total budgeted, spent, and remaining
+- Alerts for categories approaching or over budget
+- Month picker for viewing different months
 
 ### Insights
 - Smart takeaways with AI-generated highlights
