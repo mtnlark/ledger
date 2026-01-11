@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { TrendingUp, TrendingDown, AlertTriangle, Gauge, ShoppingBag, Receipt, Store } from 'lucide-svelte';
+	import { TrendingUp, TrendingDown, AlertTriangle, Gauge, Receipt, Store } from 'lucide-svelte';
 	import { getMonthKey, navigateMonth, parseMonthKey } from '$lib/db';
 	import type { Transaction, Category, MonthlyBudget } from '$lib/db';
 
@@ -199,20 +199,27 @@
 		return biggestShift;
 	});
 
-	// Fallback: Top spending category this month
-	let topCategory = $derived.by(() => {
-		const spending = getSpendingByCategory(currentMonthTransactions);
-		if (spending.size === 0) return null;
+	// Fallback: Needs vs wants ratio
+	let needsVsWants = $derived.by(() => {
+		if (currentMonthTransactions.length === 0) return null;
 
-		let top = { catId: 0, amount: 0 };
-		for (const [catId, amount] of spending) {
-			if (amount > top.amount) {
-				top = { catId, amount };
+		let needsTotal = 0;
+		let wantsTotal = 0;
+
+		for (const t of currentMonthTransactions) {
+			const amount = t.isShared ? t.amount - t.partnerShare : t.amount;
+			if (t.isEssential) {
+				needsTotal += amount;
+			} else {
+				wantsTotal += amount;
 			}
 		}
 
-		const cat = categories.find((c) => c.id === top.catId);
-		return cat ? { name: cat.name, icon: cat.icon, amount: top.amount } : null;
+		const total = needsTotal + wantsTotal;
+		if (total === 0) return null;
+
+		const needsPercent = Math.round((needsTotal / total) * 100);
+		return { needsTotal, wantsTotal, needsPercent };
 	});
 
 	// Fallback: Spending velocity comparison (daily average this month vs last month)
@@ -271,7 +278,7 @@
 
 	// Build takeaways list
 	interface Takeaway {
-		type: 'anomaly' | 'pace' | 'shift' | 'topCategory' | 'monthComparison' | 'topMerchant';
+		type: 'anomaly' | 'pace' | 'shift' | 'needsWants' | 'monthComparison' | 'topMerchant';
 		icon: typeof AlertTriangle;
 		iconColor: string;
 		text: string;
@@ -326,12 +333,12 @@
 			});
 		}
 
-		if (items.length < 3 && topCategory) {
+		if (items.length < 3 && needsVsWants) {
 			items.push({
-				type: 'topCategory',
-				icon: ShoppingBag,
+				type: 'needsWants',
+				icon: Receipt,
 				iconColor: 'text-primary-500',
-				text: `${topCategory.name} leads with $${topCategory.amount.toLocaleString()} this month`
+				text: `${needsVsWants.needsPercent}% of spending is on needs this month`
 			});
 		}
 
