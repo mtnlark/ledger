@@ -15,11 +15,12 @@
 	import { getSelectedMonth, setSelectedMonth } from '$lib/stores/selectedMonth';
 	import { getAvailableMonths } from '$lib/stores/transactions';
 	import { toast } from '$lib/stores/toast';
-	import { Sparkles, Copy, AlertTriangle } from 'lucide-svelte';
+	import { Sparkles, Copy, AlertTriangle, X } from 'lucide-svelte';
 	import HeaderNav from '$lib/components/HeaderNav.svelte';
 	import MonthPicker from '$lib/components/MonthPicker.svelte';
 	import CategoryBudgetList from '$lib/components/CategoryBudgetList.svelte';
 	import Skeleton from '$lib/components/Skeleton.svelte';
+	import { calculateBudgetAlerts, type BudgetAlert } from '$lib/utils/budget-alerts';
 
 	// State
 	let isLoading = $state(true);
@@ -63,51 +64,52 @@
 	// Get previous month for "Copy from Last Month"
 	let previousMonth = $derived(navigateMonth(currentMonth, -1));
 
-	// Calculate budget alerts
-	const APPROACHING_THRESHOLD = 5; // Show "approaching" alert when within $5 of budget
-	let budgetAlerts = $derived.by(() => {
-		const alerts: Array<{
-			type: 'over' | 'approaching';
-			categoryName: string;
-			categoryIcon: string;
-			amount: number; // Over amount or remaining amount
-		}> = [];
+	// Track dismissed budget alerts per month (stored in localStorage)
+	let dismissedAlerts = $state<Set<string>>(new Set());
 
-		for (const [categoryId, budget] of budgets) {
-			const spent = spending.get(categoryId) || 0;
-			const category = categories.find((c) => c.id === categoryId);
-			if (!category) continue;
+	function getDismissedAlertsKey(month: string): string {
+		return `ledger-dismissed-budget-alerts-${month}`;
+	}
 
-			const remaining = budget.budgetAmount - spent;
-
-			if (remaining < 0) {
-				// Over budget
-				alerts.push({
-					type: 'over',
-					categoryName: category.name,
-					categoryIcon: category.icon || '📦',
-					amount: Math.abs(remaining)
-				});
-			} else if (remaining <= APPROACHING_THRESHOLD && remaining >= 0) {
-				// Approaching budget (within $5)
-				alerts.push({
-					type: 'approaching',
-					categoryName: category.name,
-					categoryIcon: category.icon || '📦',
-					amount: remaining
-				});
+	function loadDismissedAlerts(month: string) {
+		try {
+			const stored = localStorage.getItem(getDismissedAlertsKey(month));
+			if (stored) {
+				dismissedAlerts = new Set(JSON.parse(stored));
+			} else {
+				dismissedAlerts = new Set();
 			}
+		} catch {
+			dismissedAlerts = new Set();
 		}
+	}
 
-		// Sort: over budget first, then approaching
-		alerts.sort((a, b) => {
-			if (a.type === 'over' && b.type !== 'over') return -1;
-			if (a.type !== 'over' && b.type === 'over') return 1;
-			return a.categoryName.localeCompare(b.categoryName);
-		});
+	function dismissAlert(categoryName: string) {
+		dismissedAlerts.add(categoryName);
+		dismissedAlerts = new Set(dismissedAlerts); // Trigger reactivity
+		localStorage.setItem(getDismissedAlertsKey(currentMonth), JSON.stringify([...dismissedAlerts]));
+	}
 
-		return alerts;
+	// Calculate budget alerts using utility function (handles floating point precision)
+	let budgetAlerts = $derived.by(() => {
+		const categoryBudgetData = Array.from(budgets.entries()).map(([categoryId, budget]) => {
+			const category = categories.find((c) => c.id === categoryId);
+			return {
+				categoryId,
+				categoryName: category?.name ?? 'Unknown',
+				categoryIcon: category?.icon ?? '📦',
+				budgetAmount: budget.budgetAmount,
+				spent: spending.get(categoryId) || 0
+			};
+		}).filter((data) => categories.some((c) => c.id === data.categoryId));
+
+		return calculateBudgetAlerts(categoryBudgetData);
 	});
+
+	// Filter out dismissed alerts
+	let visibleBudgetAlerts = $derived(
+		budgetAlerts.filter((alert) => !dismissedAlerts.has(alert.categoryName))
+	);
 
 	// Load data
 	async function loadData() {
@@ -135,6 +137,9 @@
 	}
 
 	async function loadMonthData() {
+		// Load dismissed alerts for this month
+		loadDismissedAlerts(currentMonth);
+
 		const [budgetList, spendingMap, suggestionMap, monthBudget] = await Promise.all([
 			getCategoryBudgetsForMonth(currentMonth),
 			getAllCategorySpending(currentMonth),
@@ -375,26 +380,37 @@
 				</div>
 
 				<!-- Budget Alerts (only shown when there are alerts) -->
-				{#if budgetAlerts.length > 0}
+				{#if visibleBudgetAlerts.length > 0}
 					<div class="bg-surface rounded-xl shadow-md shadow-theme p-5 border-l-4 border-warning-500">
 						<div class="flex items-center gap-2 mb-3">
 							<AlertTriangle size={18} class="text-warning-600" />
 							<h3 class="font-medium text-charcoal">Budget Alerts</h3>
 						</div>
 						<ul class="space-y-2">
-							{#each budgetAlerts as alert}
-								<li class="flex items-center gap-3 text-sm">
+							{#each visibleBudgetAlerts as alert}
+								<li class="flex items-center gap-3 text-sm group">
 									<span class="text-lg">{alert.categoryIcon}</span>
 									{#if alert.type === 'over'}
-										<span class="text-danger-600">
+										<span class="text-danger-600 flex-1">
 											You're <span class="font-mono font-medium">{formatCurrency(alert.amount)}</span> over budget for {alert.categoryName}
 										</span>
+									{:else if alert.type === 'at'}
+										<span class="text-warning-700 flex-1">
+											You're at budget for {alert.categoryName}
+										</span>
 									{:else}
-										<span class="text-warning-700">
+										<span class="text-warning-700 flex-1">
 											You're approaching your budget for {alert.categoryName}
 											<span class="text-charcoal-muted">({formatCurrency(alert.amount)} left)</span>
 										</span>
 									{/if}
+									<button
+										onclick={() => dismissAlert(alert.categoryName)}
+										class="p-1 rounded text-charcoal-muted hover:text-charcoal hover:bg-surface-alt transition-colors opacity-0 group-hover:opacity-100"
+										title="Dismiss alert"
+									>
+										<X size={16} />
+									</button>
 								</li>
 							{/each}
 						</ul>
