@@ -240,10 +240,10 @@
 					</div>
 
 					<!-- Default Split Type -->
-					<div>
-						<label class="block text-sm font-medium text-charcoal-soft mb-2">
+					<div role="group" aria-labelledby="split-type-label">
+						<span id="split-type-label" class="block text-sm font-medium text-charcoal-soft mb-2">
 							Default Split Type
-						</label>
+						</span>
 						<div class="flex gap-4">
 							<label class="flex items-center gap-2 cursor-pointer">
 								<input
@@ -336,7 +336,7 @@
 										: 'border-[var(--color-border)] hover:border-primary-300 hover:bg-surface-hover'}"
 							>
 								<option.icon size={24}
-									class="{settings.theme === option.value ? 'text-primary-600' : 'text-charcoal-soft'}" />
+									class={settings.theme === option.value ? 'text-primary-600' : 'text-charcoal-soft'} />
 								<span class="text-sm font-medium
 									{settings.theme === option.value ? 'text-primary-600' : 'text-charcoal-soft'}">
 									{option.label}

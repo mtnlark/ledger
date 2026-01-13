@@ -17,19 +17,25 @@
 		monthlyTrends: Map<string, number>;
 	}
 
-	const props = $props<Props>();
+	let {
+		initialTransactions,
+		availableMonths,
+		initialBudget,
+		allBudgets,
+		monthlyTrends
+	}: Props = $props();
 
 	// Local state for browsing different months
 	let currentMonth = $state(getMonthKey(new Date()));
-	let transactions = $state<Transaction[]>(props.initialTransactions);
-	let budget = $state<MonthlyBudget | null>(props.initialBudget);
+	let transactions = $state<Transaction[]>(initialTransactions);
+	let budget = $state<MonthlyBudget | null>(initialBudget);
 
 	// Sync with initial data when it changes (e.g., on page load)
 	$effect(() => {
 		const actualCurrentMonth = getMonthKey(new Date());
 		if (currentMonth === actualCurrentMonth) {
-			transactions = props.initialTransactions;
-			budget = props.initialBudget;
+			transactions = initialTransactions;
+			budget = initialBudget;
 		}
 	});
 
@@ -100,7 +106,7 @@
 				</p>
 				<MonthPicker
 					{currentMonth}
-					availableMonths={props.availableMonths}
+					{availableMonths}
 					onMonthChange={handleMonthChange}
 				/>
 			</div>
@@ -129,16 +135,16 @@
 			{/if}
 
 			<!-- Savings Rate Over Time -->
-			{#if props.allBudgets.length > 0}
+			{#if allBudgets.length > 0}
 				<div>
 					<h3 class="text-sm font-medium text-charcoal-soft mb-3">Savings Rate Over Time</h3>
-					<SavingsRateChart budgets={props.allBudgets} />
+					<SavingsRateChart budgets={allBudgets} />
 				</div>
 			{/if}
 
 			<!-- Monthly Spending Trends -->
-			{#if props.monthlyTrends.size > 0}
-				<MonthlyTrendsChart monthlyData={props.monthlyTrends} />
+			{#if monthlyTrends.size > 0}
+				<MonthlyTrendsChart monthlyData={monthlyTrends} />
 			{/if}
 		</div>
 	{/snippet}

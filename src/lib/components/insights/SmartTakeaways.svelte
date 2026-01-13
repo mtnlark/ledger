@@ -135,8 +135,17 @@
 	// Get previous month for comparison
 	let previousMonthKey = $derived(navigateMonth(currentMonthKey, -1));
 
+	// Type for category shift data
+	type ShiftData = {
+		name: string;
+		current: number;
+		previous: number;
+		diff: number;
+		isIncrease: boolean;
+	};
+
 	// Calculate top category shift (biggest change from last month)
-	let topShift = $derived.by(() => {
+	let topShift = $derived.by((): ShiftData | null => {
 		const prevTransactions = getTransactionsForMonth(previousMonthKey);
 		if (prevTransactions.length === 0) return null;
 
@@ -148,13 +157,7 @@
 		const currentDay = today.getDate();
 		const isEarlyInMonth = currentDay <= 15;
 
-		let biggestShift: {
-			name: string;
-			current: number;
-			previous: number;
-			diff: number;
-			isIncrease: boolean;
-		} | null = null;
+		let biggestShift: ShiftData | null = null;
 		let biggestAbsDiff = 0;
 
 		// Check all categories with spending in either month

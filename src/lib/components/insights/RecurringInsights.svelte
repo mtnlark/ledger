@@ -22,15 +22,19 @@
 		onSubscriptionChange?: () => void;
 	}
 
-	// Keep props as object for reactive access in $derived computations
-	const props = $props<Props>();
+	let {
+		recurring,
+		categories,
+		allTransactions,
+		cancelledSubscriptions,
+		confirmedActiveSubscriptions,
+		onDismiss,
+		onSubscriptionChange
+	}: Props = $props();
 
-	// Destructure callbacks (non-reactive)
-	const { onDismiss, onSubscriptionChange } = props;
 
-
-	// Create category helpers bound to current categories (access via props for reactivity)
-	let categoryHelpers = $derived(createCategoryHelpers(props.categories));
+	// Create category helpers bound to current categories
+	let categoryHelpers = $derived(createCategoryHelpers(categories));
 	let getCategoryIcon = $derived(categoryHelpers.getIcon);
 	let getCategoryName = $derived(categoryHelpers.getName);
 
@@ -80,7 +84,7 @@
 
 	// Get unique subscriptions from transactions (most recent for each merchant)
 	let allSubscriptions = $derived.by(() => {
-		const subTransactions = props.allTransactions.filter((t) => t.isSubscription);
+		const subTransactions = allTransactions.filter((t: Transaction) => t.isSubscription);
 
 		// Group by merchant to get unique subscriptions (keep most recent)
 		const byMerchant = new Map<string, Transaction>();
@@ -96,7 +100,7 @@
 
 	// Create a map of cancelled merchants to their cancellation dates
 	let cancelledMerchantMap = $derived(
-		new Map(props.cancelledSubscriptions.map((c) => [c.merchant, new Date(c.cancelledDate)]))
+		new Map(cancelledSubscriptions.map((c: CancelledSubscription) => [c.merchant, new Date(c.cancelledDate)]))
 	);
 
 	// Helper to check if a subscription is cancelled (and not resubscribed after cancellation)
@@ -110,7 +114,7 @@
 
 	// Normalize confirmed active merchant names for lookup
 	let confirmedActiveSet = $derived(
-		new Set(props.confirmedActiveSubscriptions)
+		new Set(confirmedActiveSubscriptions)
 	);
 
 	// Classify subscriptions
@@ -179,7 +183,7 @@
 
 	// Calculate detected recurring totals (user's portion only, converted to monthly)
 	let totalDetectedMonthly = $derived(
-		props.recurring.reduce((sum, r) => {
+		recurring.reduce((sum: number, r: DetectedRecurring) => {
 			// Convert to monthly equivalent based on frequency
 			if (r.frequency === 'semi-annual') {
 				return sum + r.averageUserAmount / 6;
@@ -195,7 +199,7 @@
 
 	// Has any data?
 	let hasData = $derived(
-		allSubscriptions.length > 0 || props.recurring.length > 0
+		allSubscriptions.length > 0 || recurring.length > 0
 	);
 
 	// Action handlers - handleDismiss now shows confirmation dialog
@@ -275,7 +279,7 @@
 				</div>
 				<div class="text-charcoal-muted">|</div>
 				<div class="text-sm text-charcoal-muted">
-					{activeSubscriptions.length} sub{activeSubscriptions.length !== 1 ? 's' : ''}, {props.recurring.length} bill{props.recurring.length !== 1 ? 's' : ''}
+					{activeSubscriptions.length} sub{activeSubscriptions.length !== 1 ? 's' : ''}, {recurring.length} bill{recurring.length !== 1 ? 's' : ''}
 					{#if possiblyInactiveSubscriptions.length > 0}
 						<span class="text-warning-600 ml-1">({possiblyInactiveSubscriptions.length} inactive?)</span>
 					{/if}
@@ -424,16 +428,16 @@
 				{/if}
 
 				<!-- Detected Recurring Bills Section -->
-				{#if props.recurring.length > 0}
+				{#if recurring.length > 0}
 					<div>
 						<h4 class="text-sm font-medium text-charcoal-muted mb-3 flex items-center gap-2">
 							<Zap size={14} />
 							Detected Bills
-							<span class="text-xs font-normal">({props.recurring.length})</span>
+							<span class="text-xs font-normal">({recurring.length})</span>
 						</h4>
 
 						<div class="space-y-2">
-							{#each props.recurring as item (item.merchant)}
+							{#each recurring as item (item.merchant)}
 								{@const freqLabel = item.frequency === 'monthly' ? '/mo' : item.frequency === 'semi-annual' ? '/6mo' : '/yr'}
 								{@const freqDesc = item.frequency === 'monthly' ? 'monthly' : item.frequency === 'semi-annual' ? 'every 6 months' : 'annually'}
 								<div class="flex items-center gap-3 py-2 px-3 bg-cream/50 rounded-lg group">

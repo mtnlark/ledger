@@ -12,12 +12,12 @@
 		children: Snippet;
 	}
 
-	const props = $props<Props>();
+	let { title, description, defaultExpanded = false, preview, children }: Props = $props();
 
 	// Create a storage key based on title
-	let storageKey = $derived(`ledger-insight-${props.title.toLowerCase().replace(/\s+/g, '-')}`);
+	let storageKey = $derived(`ledger-insight-${title.toLowerCase().replace(/\s+/g, '-')}`);
 
-	let isExpanded = $state(props.defaultExpanded ?? false);
+	let isExpanded = $state(defaultExpanded);
 
 	onMount(() => {
 		const stored = localStorage.getItem(storageKey);
@@ -39,9 +39,9 @@
 		onclick={toggleExpanded}
 	>
 		<div class="text-left">
-			<h2 class="font-display text-xl font-medium text-charcoal">{props.title}</h2>
-			{#if props.description}
-				<p class="text-sm text-charcoal-muted mt-0.5">{props.description}</p>
+			<h2 class="font-display text-xl font-medium text-charcoal">{title}</h2>
+			{#if description}
+				<p class="text-sm text-charcoal-muted mt-0.5">{description}</p>
 			{/if}
 		</div>
 		<div class="text-charcoal-muted ml-4 flex-shrink-0">
@@ -56,14 +56,14 @@
 	<!-- Preview (shown when collapsed) -->
 	{#if !isExpanded}
 		<div class="px-6 pb-4 pt-0">
-			{@render props.preview()}
+			{@render preview()}
 		</div>
 	{/if}
 
 	<!-- Full content (shown when expanded) -->
 	{#if isExpanded}
 		<div transition:slide={{ duration: 200 }} class="px-6 pb-6 border-t border-dashed border-theme-dashed pt-4">
-			{@render props.children()}
+			{@render children()}
 		</div>
 	{/if}
 </div>

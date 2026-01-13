@@ -131,6 +131,7 @@
 		aria-expanded={isOpen}
 		aria-haspopup="listbox"
 		aria-autocomplete="list"
+		aria-controls="category-listbox"
 		class="w-full px-3 py-2 border border-[var(--color-border)] rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
 	/>
 
@@ -150,6 +151,7 @@
 	<!-- Dropdown list -->
 	{#if isOpen}
 		<ul
+			id="category-listbox"
 			role="listbox"
 			class="absolute z-50 w-full mt-1 bg-surface border border-theme rounded-lg shadow-lg max-h-60 overflow-auto"
 		>

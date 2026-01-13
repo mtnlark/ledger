@@ -45,6 +45,7 @@
 	<div
 		class="fixed inset-0 bg-black/40 z-50 backdrop-blur-sm"
 		onclick={onCancel}
+		onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') onCancel(); }}
 		role="button"
 		tabindex="-1"
 		aria-label="Close dialog"
@@ -58,6 +59,7 @@
 			role="dialog"
 			aria-modal="true"
 			aria-labelledby="confirm-dialog-title"
+			tabindex="-1"
 		>
 			<!-- Header -->
 			<div class="flex items-center gap-3 px-6 py-4 border-b border-dashed border-theme-dashed">
