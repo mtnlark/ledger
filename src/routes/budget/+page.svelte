@@ -84,8 +84,9 @@
 		}
 	}
 
-	function dismissAlert(categoryName: string) {
-		dismissedAlerts.add(categoryName);
+	function dismissAlert(alertType: string, categoryName: string) {
+		const key = `${alertType}:${categoryName}`;
+		dismissedAlerts.add(key);
 		dismissedAlerts = new Set(dismissedAlerts); // Trigger reactivity
 		localStorage.setItem(getDismissedAlertsKey(currentMonth), JSON.stringify([...dismissedAlerts]));
 	}
@@ -106,9 +107,9 @@
 		return calculateBudgetAlerts(categoryBudgetData);
 	});
 
-	// Filter out dismissed alerts
+	// Filter out dismissed alerts (key format: "alertType:categoryName")
 	let visibleBudgetAlerts = $derived(
-		budgetAlerts.filter((alert) => !dismissedAlerts.has(alert.categoryName))
+		budgetAlerts.filter((alert) => !dismissedAlerts.has(`${alert.type}:${alert.categoryName}`))
 	);
 
 	// Load data
@@ -405,7 +406,7 @@
 										</span>
 									{/if}
 									<button
-										onclick={() => dismissAlert(alert.categoryName)}
+										onclick={() => dismissAlert(alert.type, alert.categoryName)}
 										class="p-1 rounded text-charcoal-muted hover:text-charcoal hover:bg-surface-alt transition-colors opacity-0 group-hover:opacity-100"
 										title="Dismiss alert"
 									>
