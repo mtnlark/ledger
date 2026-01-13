@@ -3,6 +3,8 @@
 ## Overview
 A Tauri desktop application for personal budget tracking with expense splitting, category insights, and Venmo settlement tracking. Local-first architecture with all data stored on-device.
 
+Use test-driven development (TDD) best practices when adding new code. Update CLAUDE.md whenever you make relevant changes to any of the areas listed below.
+
 ---
 
 ## Technology Stack
