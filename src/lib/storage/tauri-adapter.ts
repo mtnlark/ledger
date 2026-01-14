@@ -188,12 +188,8 @@ export async function isICloudAvailable(): Promise<boolean> {
 		// Check if the iCloud Drive base directory exists
 		const homeDir = await path.homeDir();
 		const iCloudBase = await path.join(homeDir, 'Library/Mobile Documents/com~apple~CloudDocs');
-		console.log('[iCloud] Checking path:', iCloudBase);
-		const exists = await fs.exists(iCloudBase);
-		console.log('[iCloud] Directory exists:', exists);
-		return exists;
-	} catch (error) {
-		console.error('[iCloud] Error checking availability:', error);
+		return await fs.exists(iCloudBase);
+	} catch {
 		return false;
 	}
 }

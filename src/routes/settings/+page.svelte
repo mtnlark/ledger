@@ -48,14 +48,11 @@
 			defaultSplitValue = settings.defaultSplitValue;
 			// Check iCloud availability
 			try {
-				console.log('[Settings] Checking iCloud availability...');
 				iCloudAvailable = await isICloudAvailable();
-				console.log('[Settings] iCloud available:', iCloudAvailable);
 				if (iCloudAvailable) {
 					iCloudPath = getICloudBackupDir();
 				}
-			} catch (error) {
-				console.error('[Settings] Error checking iCloud:', error);
+			} catch {
 				iCloudAvailable = false;
 			}
 		} catch (error) {
