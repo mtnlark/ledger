@@ -11,9 +11,9 @@
 	let { title = 'Ledger', showBack = false, children }: Props = $props();
 </script>
 
-<header class="bg-surface border-b border-dashed border-theme-dashed">
-	<div class="max-w-4xl mx-auto px-4 py-4">
-		<div class="flex items-center gap-4">
+<header class="h-16 bg-surface border-b border-dashed border-theme-dashed">
+	<div class="h-full max-w-4xl mx-auto px-4">
+		<div class="h-full flex items-center gap-4">
 			<!-- Back button (mobile only when showBack) -->
 			{#if showBack}
 				<a
