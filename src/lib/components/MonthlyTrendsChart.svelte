@@ -7,6 +7,7 @@
 	import EmptyState from './EmptyState.svelte';
 	import { parseMonthKey } from '$lib/db';
 	import { getChartTheme, type ChartTheme } from '$lib/utils/chart-theme';
+	import { formatCurrency } from '$lib/utils/modal-helpers';
 
 	interface Props {
 		monthlyData: Map<string, number>;
@@ -121,14 +122,6 @@
 			}
 		}
 	});
-
-	function formatCurrency(amount: number): string {
-		return new Intl.NumberFormat('en-US', {
-			style: 'currency',
-			currency: 'USD',
-			minimumFractionDigits: 2
-		}).format(amount);
-	}
 </script>
 
 <div class="bg-surface rounded-xl shadow-md shadow-[var(--color-shadow)] overflow-hidden">

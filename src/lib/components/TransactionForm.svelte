@@ -5,6 +5,7 @@
 	import { slide } from 'svelte/transition';
 	import type { Category, Settings } from '$lib/db';
 	import { parseLocalDate } from '$lib/utils/date-helpers';
+	import { formatCurrency } from '$lib/utils/modal-helpers';
 	import CategoryCombobox from './CategoryCombobox.svelte';
 	import MerchantAutocomplete from './MerchantAutocomplete.svelte';
 	import { getMostCommonCategory } from '$lib/stores/merchants';
@@ -255,13 +256,6 @@
 		isSplitMode = false;
 		splitLines = [];
 		futureDateConfirmed = false;
-	}
-
-	function formatCurrency(value: number): string {
-		return new Intl.NumberFormat('en-US', {
-			style: 'currency',
-			currency: 'USD'
-		}).format(value);
 	}
 
 	// Handle merchant selection from autocomplete

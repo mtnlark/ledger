@@ -2,6 +2,8 @@
  * Budget alert calculation utilities
  */
 
+import { config } from '$lib/config';
+
 export type BudgetAlertType = 'over' | 'at' | 'approaching';
 
 export interface BudgetAlert {
@@ -19,26 +21,21 @@ export interface CategoryBudgetData {
 	spent: number;
 }
 
-// Threshold for "approaching budget" alert (within $5)
-export const APPROACHING_THRESHOLD = 5;
-
-// Epsilon for floating point comparison
-// Using $0.50 because formatCurrency rounds to whole dollars,
-// so any amount < $0.50 would display as $0
-const EPSILON = 0.5;
+// Re-export for backwards compatibility
+export const APPROACHING_THRESHOLD = config.budget.approachingThreshold;
 
 /**
  * Check if two numbers are approximately equal (within epsilon)
  */
 function approxEqual(a: number, b: number): boolean {
-	return Math.abs(a - b) < EPSILON;
+	return Math.abs(a - b) < config.budget.epsilon;
 }
 
 /**
  * Check if a number is approximately zero
  */
 function approxZero(n: number): boolean {
-	return Math.abs(n) < EPSILON;
+	return Math.abs(n) < config.budget.epsilon;
 }
 
 /**
@@ -53,7 +50,7 @@ export function calculateBudgetAlerts(categoryBudgets: CategoryBudgetData[]): Bu
 	for (const data of categoryBudgets) {
 		const remaining = data.budgetAmount - data.spent;
 
-		if (remaining < -EPSILON) {
+		if (remaining < -config.budget.epsilon) {
 			// Over budget (more than epsilon below zero)
 			alerts.push({
 				type: 'over',
@@ -69,7 +66,7 @@ export function calculateBudgetAlerts(categoryBudgets: CategoryBudgetData[]): Bu
 				categoryIcon: data.categoryIcon,
 				amount: 0
 			});
-		} else if (remaining <= APPROACHING_THRESHOLD) {
+		} else if (remaining <= config.budget.approachingThreshold) {
 			// Approaching budget (within threshold but not at zero)
 			alerts.push({
 				type: 'approaching',

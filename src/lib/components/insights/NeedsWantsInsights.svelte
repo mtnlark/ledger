@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { Transaction, Category } from '$lib/db';
+	import { formatCurrencyWhole } from '$lib/utils/modal-helpers';
 	import InsightGroup from './InsightGroup.svelte';
 
 	interface Props {
@@ -79,15 +80,6 @@
 			discretionary: toSorted(discretionaryTotals)
 		};
 	});
-
-	function formatCurrency(amount: number): string {
-		return new Intl.NumberFormat('en-US', {
-			style: 'currency',
-			currency: 'USD',
-			minimumFractionDigits: 0,
-			maximumFractionDigits: 0
-		}).format(amount);
-	}
 </script>
 
 <InsightGroup title="Needs vs Wants" description="Essential vs discretionary spending">
@@ -138,13 +130,13 @@
 					<div class="flex items-center gap-2">
 						<div class="w-3 h-3 rounded bg-primary-500"></div>
 						<span class="text-charcoal-soft">
-							Needs: {formatCurrency(currentMonthStats.needs)}
+							Needs: {formatCurrencyWhole(currentMonthStats.needs)}
 						</span>
 					</div>
 					<div class="flex items-center gap-2">
 						<div class="w-3 h-3 rounded bg-gray-300"></div>
 						<span class="text-charcoal-soft">
-							Wants: {formatCurrency(currentMonthStats.wants)}
+							Wants: {formatCurrencyWhole(currentMonthStats.wants)}
 						</span>
 					</div>
 				</div>
@@ -155,7 +147,7 @@
 				<div class="bg-primary-50 rounded-lg p-4">
 					<p class="text-sm text-charcoal-muted mb-1">This Month - Needs</p>
 					<p class="text-2xl font-mono font-medium text-charcoal">
-						{formatCurrency(currentMonthStats.needs)}
+						{formatCurrencyWhole(currentMonthStats.needs)}
 					</p>
 					<p class="text-sm text-primary-600 font-medium">
 						{currentMonthStats.needsPercent.toFixed(1)}% of spending
@@ -164,7 +156,7 @@
 				<div class="bg-cream rounded-lg p-4">
 					<p class="text-sm text-charcoal-muted mb-1">This Month - Wants</p>
 					<p class="text-2xl font-mono font-medium text-charcoal">
-						{formatCurrency(currentMonthStats.wants)}
+						{formatCurrencyWhole(currentMonthStats.wants)}
 					</p>
 					<p class="text-sm text-charcoal-soft font-medium">
 						{currentMonthStats.wantsPercent.toFixed(1)}% of spending
@@ -183,7 +175,7 @@
 								<div class="flex items-center gap-2">
 									<span class="text-lg">{category.icon}</span>
 									<span class="text-sm text-charcoal truncate flex-1">{category.name}</span>
-									<span class="font-mono text-sm text-charcoal-soft">{formatCurrency(amount)}</span>
+									<span class="font-mono text-sm text-charcoal-soft">{formatCurrencyWhole(amount)}</span>
 								</div>
 							{/if}
 						{:else}
@@ -201,7 +193,7 @@
 								<div class="flex items-center gap-2">
 									<span class="text-lg">{category.icon}</span>
 									<span class="text-sm text-charcoal truncate flex-1">{category.name}</span>
-									<span class="font-mono text-sm text-charcoal-soft">{formatCurrency(amount)}</span>
+									<span class="font-mono text-sm text-charcoal-soft">{formatCurrencyWhole(amount)}</span>
 								</div>
 							{/if}
 						{:else}

@@ -1,6 +1,7 @@
 import { db, type Transaction } from '$lib/db';
 import { getDismissedRecurring } from './settings';
 import { normalizeMerchant } from '$lib/utils/string-helpers';
+import { config } from '$lib/config';
 
 export interface DetectedRecurring {
 	merchant: string;
@@ -122,18 +123,20 @@ function detectRecurringPattern(transactions: Transaction[]): PatternResult | nu
 	const daysOfMonth = sorted.map((t) => new Date(t.date).getDate());
 	const dayOfMonth = mode(daysOfMonth);
 
-	// Check for monthly pattern (25-35 days)
-	if (avgInterval >= 25 && avgInterval <= 35) {
+	const { intervals: intervalConfig } = config.recurring;
+
+	// Check for monthly pattern
+	if (avgInterval >= intervalConfig.monthly.min && avgInterval <= intervalConfig.monthly.max) {
 		return { frequency: 'monthly', dayOfMonth };
 	}
 
-	// Check for semi-annual pattern (160-200 days, ~6 months)
-	if (avgInterval >= 160 && avgInterval <= 200) {
+	// Check for semi-annual pattern (~6 months)
+	if (avgInterval >= intervalConfig.semiAnnual.min && avgInterval <= intervalConfig.semiAnnual.max) {
 		return { frequency: 'semi-annual', dayOfMonth };
 	}
 
-	// Check for annual pattern (350-380 days, ~12 months)
-	if (avgInterval >= 350 && avgInterval <= 380) {
+	// Check for annual pattern (~12 months)
+	if (avgInterval >= intervalConfig.annual.min && avgInterval <= intervalConfig.annual.max) {
 		return { frequency: 'annual', dayOfMonth };
 	}
 
@@ -197,12 +200,12 @@ export async function detectRecurringExpenses(): Promise<DetectedRecurring[]> {
 		const amounts = transactions.map((t) => t.amount);
 		const variance = calculateVariance(amounts);
 
-		// Allow up to 50% variance for variable bills (utilities)
-		// 50%+ is too unpredictable to be considered recurring
-		if (variance >= 0.50) continue;
+		// Skip if variance is too high to be considered recurring
+		if (variance >= config.recurring.maxVariance) continue;
 
-		// Classify as fixed (<15% variance) or variable (15-50% variance)
-		const amountType: 'fixed' | 'variable' = variance <= 0.15 ? 'fixed' : 'variable';
+		// Classify as fixed (low variance) or variable (higher variance)
+		const amountType: 'fixed' | 'variable' =
+			variance <= config.recurring.fixedVarianceThreshold ? 'fixed' : 'variable';
 
 		// Calculate average amount
 		const avgAmount = average(amounts);

@@ -6,6 +6,7 @@
 	import EmptyState from './EmptyState.svelte';
 	import type { Transaction, Category } from '$lib/db';
 	import { getChartTheme, type ChartTheme } from '$lib/utils/chart-theme';
+	import { formatCurrency } from '$lib/utils/modal-helpers';
 
 	interface Props {
 		transactions: Transaction[];
@@ -94,14 +95,6 @@
 			cutout: '60%'
 		}
 	});
-
-	function formatCurrency(amount: number): string {
-		return new Intl.NumberFormat('en-US', {
-			style: 'currency',
-			currency: 'USD',
-			minimumFractionDigits: 2
-		}).format(amount);
-	}
 </script>
 
 <div class="bg-surface rounded-xl shadow-md shadow-[var(--color-shadow)] overflow-hidden">

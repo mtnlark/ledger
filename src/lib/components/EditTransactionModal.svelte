@@ -3,6 +3,7 @@
 	import { X, Scissors } from 'lucide-svelte';
 	import type { Category, Settings, Transaction } from '$lib/db';
 	import { parseLocalDate } from '$lib/utils/date-helpers';
+	import { formatCurrency, calculateSplitShares } from '$lib/utils/modal-helpers';
 	import CategoryCombobox from './CategoryCombobox.svelte';
 
 	interface Props {
@@ -157,13 +158,6 @@
 	function handleClose() {
 		onClose();
 	}
-
-	function formatCurrency(value: number): string {
-		return new Intl.NumberFormat('en-US', {
-			style: 'currency',
-			currency: 'USD'
-		}).format(value);
-	}
 </script>
 
 {#if isOpen && transaction}
@@ -178,13 +172,13 @@
 	></div>
 
 	<!-- Modal -->
-	<div class="fixed inset-0 z-50 flex items-center justify-center p-4">
+	<div class="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
 		<div
-			class="bg-surface rounded-xl shadow-xl shadow-[var(--color-shadow)] w-full max-w-lg max-h-[90vh] overflow-y-auto animate-enter"
-			onclick={(e) => e.stopPropagation()}
+			class="bg-surface rounded-xl shadow-xl shadow-[var(--color-shadow)] w-full max-w-lg max-h-[90vh] overflow-y-auto animate-enter pointer-events-auto"
 			role="dialog"
 			aria-modal="true"
 			aria-labelledby="edit-modal-title"
+			tabindex="-1"
 		>
 			<form onsubmit={handleSubmit}>
 				<!-- Header -->

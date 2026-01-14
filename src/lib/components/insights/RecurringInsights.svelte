@@ -2,6 +2,7 @@
 	import { RefreshCw, X, Calendar, Zap, AlertCircle } from 'lucide-svelte';
 	import type { Category, Transaction, CancelledSubscription } from '$lib/db';
 	import { createCategoryHelpers } from '$lib/utils/category-helpers';
+	import { formatCurrencyWhole, formatCurrency } from '$lib/utils/modal-helpers';
 	import InsightGroup from './InsightGroup.svelte';
 	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
 	import type { DetectedRecurring } from '$lib/stores/recurring';
@@ -11,6 +12,7 @@
 		confirmSubscriptionActive
 	} from '$lib/stores/settings';
 	import { normalizeMerchant } from '$lib/utils/string-helpers';
+	import { config } from '$lib/config';
 
 	interface Props {
 		recurring: DetectedRecurring[];
@@ -65,10 +67,6 @@
 		closeConfirmDialog();
 	}
 
-	// Staleness thresholds
-	const MONTHLY_STALE_DAYS = 60; // 2 months
-	const ANNUAL_STALE_MONTHS = 13; // 13 months
-
 	// Check if a subscription is stale based on last transaction date
 	function isStale(lastDate: Date, frequency: 'monthly' | 'annual' | undefined): boolean {
 		const now = new Date();
@@ -76,9 +74,9 @@
 
 		if (frequency === 'annual') {
 			const monthsSince = daysSince / 30;
-			return monthsSince > ANNUAL_STALE_MONTHS;
+			return monthsSince > config.subscription.annualStaleMonths;
 		} else {
-			return daysSince > MONTHLY_STALE_DAYS;
+			return daysSince > config.subscription.monthlyStaleDays;
 		}
 	}
 
@@ -217,24 +215,6 @@
 		onSubscriptionChange?.();
 	}
 
-	function formatCurrency(amount: number): string {
-		return new Intl.NumberFormat('en-US', {
-			style: 'currency',
-			currency: 'USD',
-			minimumFractionDigits: 0,
-			maximumFractionDigits: 0
-		}).format(amount);
-	}
-
-	function formatCurrencyDecimal(amount: number): string {
-		return new Intl.NumberFormat('en-US', {
-			style: 'currency',
-			currency: 'USD',
-			minimumFractionDigits: 2,
-			maximumFractionDigits: 2
-		}).format(amount);
-	}
-
 	function formatDayOfMonth(day: number): string {
 		const suffix =
 			day === 1 || day === 21 || day === 31
@@ -273,7 +253,7 @@
 			<div class="flex items-center gap-4">
 				<div>
 					<span class="font-mono text-lg font-medium text-charcoal">
-						{formatCurrency(totalMonthlyRecurring)}
+						{formatCurrencyWhole(totalMonthlyRecurring)}
 					</span>
 					<span class="text-sm text-charcoal-muted ml-1">/mo</span>
 				</div>
@@ -303,10 +283,10 @@
 				<div class="bg-primary-50 rounded-lg p-4">
 					<p class="text-sm text-charcoal-muted mb-1">Total Monthly</p>
 					<p class="text-2xl font-mono font-medium text-charcoal">
-						{formatCurrency(totalMonthlyRecurring)}
+						{formatCurrencyWhole(totalMonthlyRecurring)}
 					</p>
 					<p class="text-sm text-primary-600 font-medium">
-						{formatCurrency(totalMonthlyRecurring * 12)}/year
+						{formatCurrencyWhole(totalMonthlyRecurring * 12)}/year
 					</p>
 				</div>
 				<div class="bg-cream rounded-lg p-4">
@@ -314,11 +294,11 @@
 					<div class="space-y-1">
 						<div class="flex items-center justify-between text-sm">
 							<span class="text-charcoal-soft">Subscriptions</span>
-							<span class="font-mono text-charcoal">{formatCurrency(totalSubMonthly)}</span>
+							<span class="font-mono text-charcoal">{formatCurrencyWhole(totalSubMonthly)}</span>
 						</div>
 						<div class="flex items-center justify-between text-sm">
 							<span class="text-charcoal-soft">Bills</span>
-							<span class="font-mono text-charcoal">{formatCurrency(totalDetectedMonthly)}</span>
+							<span class="font-mono text-charcoal">{formatCurrencyWhole(totalDetectedMonthly)}</span>
 						</div>
 					</div>
 				</div>
@@ -346,7 +326,7 @@
 									</div>
 									<div class="text-right">
 										<p class="font-mono text-sm font-medium text-charcoal">
-											{formatCurrencyDecimal(userAmount)}/mo
+											{formatCurrency(userAmount)}/mo
 										</p>
 										{#if sub.isShared}
 											<p class="text-xs text-success-600">Shared</p>
@@ -370,10 +350,10 @@
 									</div>
 									<div class="text-right">
 										<p class="font-mono text-sm font-medium text-charcoal">
-											{formatCurrencyDecimal(userAmount)}/yr
+											{formatCurrency(userAmount)}/yr
 										</p>
 										<p class="text-xs text-charcoal-muted">
-											~{formatCurrencyDecimal(monthlyEquiv)}/mo
+											~{formatCurrency(monthlyEquiv)}/mo
 										</p>
 									</div>
 								</div>
@@ -404,7 +384,7 @@
 									</div>
 									<div class="text-right flex-shrink-0">
 										<p class="font-mono text-sm font-medium text-charcoal">
-											{formatCurrencyDecimal(userAmount)}{sub.subscriptionFrequency === 'annual' ? '/yr' : '/mo'}
+											{formatCurrency(userAmount)}{sub.subscriptionFrequency === 'annual' ? '/yr' : '/mo'}
 										</p>
 									</div>
 									<div class="flex gap-1 flex-shrink-0">
@@ -456,7 +436,7 @@
 									</div>
 									<div class="text-right flex-shrink-0">
 										<p class="font-mono text-sm font-medium text-charcoal">
-											~{formatCurrencyDecimal(item.averageUserAmount)}{freqLabel}
+											~{formatCurrency(item.averageUserAmount)}{freqLabel}
 										</p>
 										{#if item.isShared}
 											<p class="text-xs text-success-600">Shared</p>

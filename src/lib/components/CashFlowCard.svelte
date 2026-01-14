@@ -3,6 +3,7 @@
 	import { slide } from 'svelte/transition';
 	import { Check, AlertTriangle, ChevronDown, ChevronUp } from 'lucide-svelte';
 	import type { MonthlyBudget } from '$lib/db';
+	import { formatCurrency } from '$lib/utils/modal-helpers';
 
 	const STORAGE_KEY = 'ledger-cashflow-expanded';
 
@@ -40,14 +41,6 @@
 	let surplus = $derived(available - totalSpent);
 	let surplusPercent = $derived(available > 0 ? (surplus / available) * 100 : 0);
 	let spentPercent = $derived(available > 0 ? Math.min(100, (totalSpent / available) * 100) : 0);
-
-	function formatCurrency(amount: number): string {
-		return new Intl.NumberFormat('en-US', {
-			style: 'currency',
-			currency: 'USD',
-			minimumFractionDigits: 2
-		}).format(amount);
-	}
 </script>
 
 <div

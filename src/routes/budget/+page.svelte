@@ -15,6 +15,7 @@
 	import { getSelectedMonth, setSelectedMonth } from '$lib/stores/selectedMonth';
 	import { getAvailableMonths } from '$lib/stores/transactions';
 	import { toast } from '$lib/stores/toast';
+	import { formatCurrencyWhole } from '$lib/utils/modal-helpers';
 	import { Sparkles, Copy, AlertTriangle, X } from 'lucide-svelte';
 	import HeaderNav from '$lib/components/HeaderNav.svelte';
 	import MonthPicker from '$lib/components/MonthPicker.svelte';
@@ -222,15 +223,6 @@
 		}
 	}
 
-	function formatCurrency(amount: number): string {
-		return new Intl.NumberFormat('en-US', {
-			style: 'currency',
-			currency: 'USD',
-			minimumFractionDigits: 0,
-			maximumFractionDigits: 0
-		}).format(amount);
-	}
-
 	// Reload data on navigation (handles back/forward)
 	afterNavigate(() => {
 		loadData();
@@ -291,31 +283,31 @@
 										? 'text-success-600'
 										: 'text-danger-500'}"
 								>
-									{formatCurrency(remaining)}
+									{formatCurrencyWhole(remaining)}
 								</p>
 							</div>
 							<div class="border-l border-theme pl-8">
 								<span class="text-sm text-charcoal-muted">Total Budgeted</span>
 								<p class="font-mono text-xl font-medium text-charcoal">
-									{formatCurrency(totalBudgeted)}
+									{formatCurrencyWhole(totalBudgeted)}
 								</p>
 							</div>
 						{:else}
 							<div>
 								<span class="text-sm text-charcoal-muted">Total Budgeted</span>
 								<p class="font-mono text-xl font-medium text-charcoal">
-									{formatCurrency(totalBudgeted)}
+									{formatCurrencyWhole(totalBudgeted)}
 								</p>
 							</div>
 						{/if}
 						<div>
 							<span class="text-sm text-charcoal-muted">Total Spent</span>
 							<p class="font-mono text-xl font-medium text-charcoal">
-								{formatCurrency(totalSpent)}
+								{formatCurrencyWhole(totalSpent)}
 							</p>
 							{#if unbudgetedSpent > 0}
 								<p class="text-xs text-charcoal-muted mt-0.5">
-									incl. {formatCurrency(unbudgetedSpent)} unbudgeted
+									incl. {formatCurrencyWhole(unbudgetedSpent)} unbudgeted
 								</p>
 							{/if}
 						</div>
@@ -327,7 +319,7 @@
 										? 'text-charcoal'
 										: 'text-warning-600'}"
 								>
-									{formatCurrency(Math.abs(unallocated))}
+									{formatCurrencyWhole(Math.abs(unallocated))}
 									{#if unallocated < 0}
 										<span class="text-sm font-sans font-normal text-warning-600">
 											over-allocated
@@ -344,7 +336,7 @@
 										? 'text-success-600'
 										: 'text-danger-500'}"
 								>
-									{formatCurrency(Math.abs(totalBudgeted - budgetedSpent))}
+									{formatCurrencyWhole(Math.abs(totalBudgeted - budgetedSpent))}
 									<span class="text-sm font-sans font-normal {budgetedSpent <= totalBudgeted
 										? 'text-success-600'
 										: 'text-danger-500'}">
@@ -393,7 +385,7 @@
 									<span class="text-lg">{alert.categoryIcon}</span>
 									{#if alert.type === 'over'}
 										<span class="text-danger-600 flex-1">
-											You're <span class="font-mono font-medium">{formatCurrency(alert.amount)}</span> over budget for {alert.categoryName}
+											You're <span class="font-mono font-medium">{formatCurrencyWhole(alert.amount)}</span> over budget for {alert.categoryName}
 										</span>
 									{:else if alert.type === 'at'}
 										<span class="text-warning-700 flex-1">
@@ -402,7 +394,7 @@
 									{:else}
 										<span class="text-warning-700 flex-1">
 											You're approaching your budget for {alert.categoryName}
-											<span class="text-charcoal-muted">({formatCurrency(alert.amount)} left)</span>
+											<span class="text-charcoal-muted">({formatCurrencyWhole(alert.amount)} left)</span>
 										</span>
 									{/if}
 									<button

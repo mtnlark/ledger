@@ -1,5 +1,6 @@
 import { db, type CategoryBudget, navigateMonth } from '$lib/db';
 import { persistData } from '$lib/storage';
+import { getMonthDateRange } from '$lib/utils/date-helpers';
 
 /**
  * Get all category budgets for a specific month
@@ -74,25 +75,47 @@ export async function deleteCategoryBudget(categoryId: number, month: string): P
 
 /**
  * Calculate spending for a category in a specific month
+ * Uses indexed date range query for efficiency
  * Returns user's portion (amount - partnerShare for shared transactions)
  */
 async function getCategorySpendingForMonth(categoryId: number, month: string): Promise<number> {
+	const { start, end } = getMonthDateRange(month);
+
+	// Use indexed date range query and filter by category
 	const transactions = await db.transactions
-		.where('categoryId')
-		.equals(categoryId)
+		.where('date')
+		.between(start, end, true, true)
+		.filter((t) => t.categoryId === categoryId && !t.isSplitParent)
 		.toArray();
 
-	// Filter to target month and exclude split parents
-	const monthTransactions = transactions.filter((t) => {
-		const txMonth = `${t.date.getFullYear()}-${String(t.date.getMonth() + 1).padStart(2, '0')}`;
-		return txMonth === month && !t.isSplitParent;
-	});
-
 	// Sum user's portion
-	return monthTransactions.reduce((sum, t) => {
+	return transactions.reduce((sum, t) => {
 		const userAmount = t.isShared ? t.amount - t.partnerShare : t.amount;
 		return sum + userAmount;
 	}, 0);
+}
+
+/**
+ * Get the date range spanning multiple months for batch queries
+ */
+function getMultiMonthDateRange(months: string[]): { start: Date; end: Date } {
+	if (months.length === 0) {
+		const now = new Date();
+		return { start: now, end: now };
+	}
+
+	// Sort months to find earliest and latest
+	const sorted = [...months].sort();
+	const { start } = getMonthDateRange(sorted[0]);
+	const { end } = getMonthDateRange(sorted[sorted.length - 1]);
+	return { start, end };
+}
+
+/**
+ * Get month key from a date
+ */
+function getMonthKeyFromDate(date: Date): string {
+	return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
 }
 
 /**
@@ -114,10 +137,28 @@ export async function calculateSuggestedBudget(
 		months.push(currentMonth);
 	}
 
-	// Calculate spending for each month
+	// Load all transactions for the date range in one query
+	const { start, end } = getMultiMonthDateRange(months);
+	const transactions = await db.transactions
+		.where('date')
+		.between(start, end, true, true)
+		.filter((t) => t.categoryId === categoryId && !t.isSplitParent)
+		.toArray();
+
+	// Group by month and calculate spending
+	const monthlySpending = new Map<string, number>();
+	for (const t of transactions) {
+		const monthKey = getMonthKeyFromDate(t.date);
+		if (!months.includes(monthKey)) continue;
+
+		const userAmount = t.isShared ? t.amount - t.partnerShare : t.amount;
+		monthlySpending.set(monthKey, (monthlySpending.get(monthKey) || 0) + userAmount);
+	}
+
+	// Get non-zero spending values
 	const spending: number[] = [];
 	for (const month of months) {
-		const amount = await getCategorySpendingForMonth(categoryId, month);
+		const amount = monthlySpending.get(month) || 0;
 		if (amount > 0) {
 			spending.push(amount);
 		}
@@ -137,16 +178,66 @@ export async function calculateSuggestedBudget(
 
 /**
  * Generate suggestions for all active categories
+ * Uses a single batch query instead of N+1 queries
  * @param month - The target month
  * @returns Map of categoryId to suggested amount
  */
 export async function generateAllSuggestions(month: string): Promise<Map<number, number>> {
 	const categories = await db.categories.filter((c) => c.isActive).toArray();
+
+	// Get previous 3 months
+	const months: string[] = [];
+	let currentMonth = month;
+	for (let i = 0; i < 3; i++) {
+		currentMonth = navigateMonth(currentMonth, -1);
+		months.push(currentMonth);
+	}
+
+	// Load ALL transactions for the 3-month range in ONE query
+	const { start, end } = getMultiMonthDateRange(months);
+	const transactions = await db.transactions
+		.where('date')
+		.between(start, end, true, true)
+		.filter((t) => !t.isSplitParent)
+		.toArray();
+
+	// Build spending map: Map<categoryId, Map<monthKey, spending>>
+	const categoryMonthSpending = new Map<number, Map<string, number>>();
+
+	for (const t of transactions) {
+		const monthKey = getMonthKeyFromDate(t.date);
+		if (!months.includes(monthKey)) continue;
+
+		if (!categoryMonthSpending.has(t.categoryId)) {
+			categoryMonthSpending.set(t.categoryId, new Map());
+		}
+
+		const userAmount = t.isShared ? t.amount - t.partnerShare : t.amount;
+		const monthSpending = categoryMonthSpending.get(t.categoryId)!;
+		monthSpending.set(monthKey, (monthSpending.get(monthKey) || 0) + userAmount);
+	}
+
+	// Calculate suggestions for each category
 	const suggestions = new Map<number, number>();
 
 	for (const category of categories) {
-		const suggested = await calculateSuggestedBudget(category.id!, month);
-		suggestions.set(category.id!, suggested);
+		const monthSpending = categoryMonthSpending.get(category.id!) || new Map();
+
+		// Get non-zero spending values
+		const spending: number[] = [];
+		for (const m of months) {
+			const amount = monthSpending.get(m) || 0;
+			if (amount > 0) {
+				spending.push(amount);
+			}
+		}
+
+		if (spending.length === 0) {
+			suggestions.set(category.id!, 0);
+		} else {
+			const average = spending.reduce((sum, s) => sum + s, 0) / spending.length;
+			suggestions.set(category.id!, Math.round(average / 5) * 5);
+		}
 	}
 
 	return suggestions;
@@ -191,21 +282,23 @@ export async function getCategorySpending(categoryId: number, month: string): Pr
 
 /**
  * Get spending for all categories in a month
+ * Uses indexed date range query for O(log n) lookup instead of loading all transactions
  * @param month - Month in "YYYY-MM" format
  * @returns Map of categoryId to spending amount
  */
 export async function getAllCategorySpending(month: string): Promise<Map<number, number>> {
-	const transactions = await db.transactions.toArray();
+	const { start, end } = getMonthDateRange(month);
+
+	// Use indexed date range query - much more efficient than loading all transactions
+	const transactions = await db.transactions
+		.where('date')
+		.between(start, end, true, true)
+		.filter((t) => !t.isSplitParent)
+		.toArray();
+
 	const spending = new Map<number, number>();
 
 	for (const t of transactions) {
-		// Skip split parents
-		if (t.isSplitParent) continue;
-
-		// Check month
-		const txMonth = `${t.date.getFullYear()}-${String(t.date.getMonth() + 1).padStart(2, '0')}`;
-		if (txMonth !== month) continue;
-
 		// Calculate user's portion
 		const userAmount = t.isShared ? t.amount - t.partnerShare : t.amount;
 		const current = spending.get(t.categoryId) || 0;

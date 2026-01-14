@@ -2,6 +2,7 @@
 	import { Pencil, Check, X, Sparkles } from 'lucide-svelte';
 	import BudgetProgressBar from './BudgetProgressBar.svelte';
 	import type { Category } from '$lib/db';
+	import { formatCurrencyWhole } from '$lib/utils/modal-helpers';
 
 	interface Props {
 		category: Category;
@@ -55,15 +56,6 @@
 		}
 	}
 
-	function formatCurrency(amount: number): string {
-		return new Intl.NumberFormat('en-US', {
-			style: 'currency',
-			currency: 'USD',
-			minimumFractionDigits: 0,
-			maximumFractionDigits: 0
-		}).format(amount);
-	}
-
 	let hasBudget = $derived(budgetAmount !== null && budgetAmount > 0);
 	let showSuggestion = $derived(!hasBudget && suggestedAmount > 0);
 </script>
@@ -91,7 +83,7 @@
 					title="Based on your last 3 months of spending"
 				>
 					<Sparkles size={12} />
-					{formatCurrency(suggestedAmount)}
+					{formatCurrencyWhole(suggestedAmount)}
 				</button>
 			{/if}
 		</div>
@@ -135,9 +127,9 @@
 			</div>
 		{:else}
 			<div class="text-right min-w-24">
-				<span class="font-mono text-sm text-charcoal">{formatCurrency(spent)}</span>
+				<span class="font-mono text-sm text-charcoal">{formatCurrencyWhole(spent)}</span>
 				{#if hasBudget}
-					<span class="font-mono text-sm text-charcoal-muted"> / {formatCurrency(budgetAmount!)}</span>
+					<span class="font-mono text-sm text-charcoal-muted"> / {formatCurrencyWhole(budgetAmount!)}</span>
 				{/if}
 			</div>
 			<button

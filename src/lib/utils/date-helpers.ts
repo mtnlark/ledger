@@ -1,3 +1,5 @@
+import { config } from '$lib/config';
+
 /**
  * Parse an ISO date string (YYYY-MM-DD) to a local Date
  * Used for HTML date input values which are always in ISO format
@@ -34,7 +36,7 @@ export function parseDateString(dateStr: string): Date | null {
 		// Handle 2-digit years
 		let yearNum = parseInt(year);
 		if (yearNum < 100) {
-			yearNum += yearNum < 50 ? 2000 : 1900;
+			yearNum += yearNum < config.date.twoDigitYearCutoff ? 2000 : 1900;
 		}
 		return new Date(yearNum, parseInt(month) - 1, parseInt(day));
 	}

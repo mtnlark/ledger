@@ -5,7 +5,8 @@ import {
 	getCategoryIcon,
 	getCategoryColor,
 	getCategoryDisplay,
-	createCategoryHelpers
+	createCategoryHelpers,
+	createCategoryLookup
 } from './category-helpers';
 
 // Mock category data for testing
@@ -129,6 +130,94 @@ describe('Category Helpers', () => {
 			expect(display.name).toBe('Groceries');
 			expect(display.icon).toBe('🛒');
 			expect(display.color).toBe('#5B8C5A');
+		});
+	});
+
+	describe('createCategoryLookup (Map-based O(1) lookup)', () => {
+		it('creates a lookup with Map-based get function', () => {
+			const lookup = createCategoryLookup(mockCategories);
+
+			expect(typeof lookup.get).toBe('function');
+			expect(typeof lookup.getName).toBe('function');
+			expect(typeof lookup.getIcon).toBe('function');
+			expect(typeof lookup.getColor).toBe('function');
+			expect(typeof lookup.getDisplay).toBe('function');
+		});
+
+		it('get returns category for valid ID', () => {
+			const lookup = createCategoryLookup(mockCategories);
+
+			const groceries = lookup.get(1);
+			expect(groceries?.name).toBe('Groceries');
+			expect(groceries?.icon).toBe('🛒');
+		});
+
+		it('get returns undefined for non-existent ID', () => {
+			const lookup = createCategoryLookup(mockCategories);
+
+			expect(lookup.get(999)).toBeUndefined();
+		});
+
+		it('getName returns category name with O(1) lookup', () => {
+			const lookup = createCategoryLookup(mockCategories);
+
+			expect(lookup.getName(1)).toBe('Groceries');
+			expect(lookup.getName(2)).toBe('Gas');
+			expect(lookup.getName(999)).toBe('Unknown');
+		});
+
+		it('getIcon returns category icon with O(1) lookup', () => {
+			const lookup = createCategoryLookup(mockCategories);
+
+			expect(lookup.getIcon(1)).toBe('🛒');
+			expect(lookup.getIcon(2)).toBe('⛽');
+			expect(lookup.getIcon(999)).toBe('📝');
+		});
+
+		it('getColor returns category color with O(1) lookup', () => {
+			const lookup = createCategoryLookup(mockCategories);
+
+			expect(lookup.getColor(1)).toBe('#5B8C5A');
+			expect(lookup.getColor(2)).toBe('#D4915D');
+			expect(lookup.getColor(999)).toBe('#8A847C');
+		});
+
+		it('getDisplay returns all properties with O(1) lookup', () => {
+			const lookup = createCategoryLookup(mockCategories);
+			const display = lookup.getDisplay(1);
+
+			expect(display.name).toBe('Groceries');
+			expect(display.icon).toBe('🛒');
+			expect(display.color).toBe('#5B8C5A');
+		});
+
+		it('handles empty categories array', () => {
+			const lookup = createCategoryLookup([]);
+
+			expect(lookup.get(1)).toBeUndefined();
+			expect(lookup.getName(1)).toBe('Unknown');
+			expect(lookup.getIcon(1)).toBe('📝');
+			expect(lookup.getColor(1)).toBe('#8A847C');
+		});
+
+		it('handles categories with missing optional fields', () => {
+			const lookup = createCategoryLookup(mockCategories);
+
+			// Category 4 has no icon
+			expect(lookup.getIcon(4)).toBe('📝');
+			expect(lookup.getName(4)).toBe('No Icon');
+
+			// Category 5 has no color
+			expect(lookup.getColor(5)).toBe('#8A847C');
+			expect(lookup.getIcon(5)).toBe('❓');
+		});
+
+		it('has size property reflecting number of categories', () => {
+			const lookup = createCategoryLookup(mockCategories);
+			expect(lookup.size).toBe(5);
+
+			const emptyLookup = createCategoryLookup([]);
+			expect(emptyLookup.size).toBe(0);
 		});
 	});
 });

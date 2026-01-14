@@ -52,10 +52,9 @@
 	></div>
 
 	<!-- Dialog -->
-	<div class="fixed inset-0 z-50 flex items-center justify-center p-4">
+	<div class="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
 		<div
-			class="bg-surface rounded-xl shadow-xl shadow-[var(--color-shadow)] w-full max-w-sm animate-enter"
-			onclick={(e) => e.stopPropagation()}
+			class="bg-surface rounded-xl shadow-xl shadow-[var(--color-shadow)] w-full max-w-sm animate-enter pointer-events-auto"
 			role="dialog"
 			aria-modal="true"
 			aria-labelledby="confirm-dialog-title"

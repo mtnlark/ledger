@@ -4,6 +4,11 @@ import { persistData } from '$lib/storage';
 import { invalidateMerchantCache } from './merchants';
 import { invalidateRecurringCache } from './recurring';
 import { getMonthDateRange } from '$lib/utils/date-helpers';
+import { getTransactionCache } from './transactionCache';
+
+// Re-export cache utilities for external use
+export { getTransactionCache, invalidateTransactionCache } from './transactionCache';
+export type { CachedTransaction } from './transactionCache';
 
 // Helper to invalidate all caches that depend on transaction data
 function invalidateTransactionCaches(): void {
@@ -59,6 +64,7 @@ export async function getTransactionsByDateRange(
 }
 
 // Add a new transaction
+// Returns the ID of the created transaction
 export async function addTransaction(
 	transaction: Omit<Transaction, 'id' | 'partnerShare' | 'createdAt' | 'updatedAt'>
 ): Promise<number> {
@@ -67,12 +73,20 @@ export async function addTransaction(
 		? calculatePartnerShare(transaction.amount, transaction.splitType, transaction.splitValue)
 		: 0;
 
-	const id = await db.transactions.add({
+	const newTransaction: Omit<Transaction, 'id'> = {
 		...transaction,
 		partnerShare,
 		createdAt: now,
 		updatedAt: now
-	}) as number;
+	};
+
+	const id = (await db.transactions.add(newTransaction)) as number;
+
+	// Update the cache incrementally
+	const cache = getTransactionCache();
+	if (cache.isLoaded) {
+		cache.add({ ...newTransaction, id } as Transaction & { id: number });
+	}
 
 	invalidateTransactionCaches();
 	await persistData();
@@ -103,11 +117,19 @@ export async function updateTransaction(
 		partnerShare = isShared ? calculatePartnerShare(amount, splitType, splitValue) : 0;
 	}
 
-	await db.transactions.update(id, {
+	const updatedFields = {
 		...updates,
 		partnerShare,
 		updatedAt: new Date()
-	});
+	};
+
+	await db.transactions.update(id, updatedFields);
+
+	// Update the cache incrementally
+	const cache = getTransactionCache();
+	if (cache.isLoaded) {
+		cache.update(id, updatedFields);
+	}
 
 	invalidateTransactionCaches();
 	await persistData();
@@ -116,6 +138,13 @@ export async function updateTransaction(
 // Delete a transaction
 export async function deleteTransaction(id: number): Promise<void> {
 	await db.transactions.delete(id);
+
+	// Update the cache incrementally
+	const cache = getTransactionCache();
+	if (cache.isLoaded) {
+		cache.remove(id);
+	}
+
 	invalidateTransactionCaches();
 	await persistData();
 }
@@ -124,6 +153,13 @@ export async function deleteTransaction(id: number): Promise<void> {
 export async function bulkDeleteTransactions(ids: number[]): Promise<void> {
 	if (ids.length === 0) return;
 	await db.transactions.where('id').anyOf(ids).delete();
+
+	// Update the cache incrementally
+	const cache = getTransactionCache();
+	if (cache.isLoaded) {
+		cache.bulkRemove(ids);
+	}
+
 	invalidateTransactionCaches();
 	await persistData();
 }
@@ -131,15 +167,24 @@ export async function bulkDeleteTransactions(ids: number[]): Promise<void> {
 // Bulk update category for transactions
 export async function bulkUpdateCategory(ids: number[], categoryId: number): Promise<void> {
 	if (ids.length === 0) return;
+	const updatedAt = new Date();
 	await db.transactions.where('id').anyOf(ids).modify({
 		categoryId,
-		updatedAt: new Date()
+		updatedAt
 	});
+
+	// Update the cache incrementally
+	const cache = getTransactionCache();
+	if (cache.isLoaded) {
+		cache.bulkUpdate(ids, { categoryId, updatedAt });
+	}
+
 	invalidateTransactionCaches();
 	await persistData();
 }
 
 // Split a transaction into multiple category-based parts
+// Returns the child transaction IDs
 export async function splitTransaction(
 	id: number,
 	splits: { categoryId: number; amount: number; notes?: string }[]
@@ -166,6 +211,7 @@ export async function splitTransaction(
 
 	const now = new Date();
 	const childIds: number[] = [];
+	const childTransactions: Transaction[] = [];
 
 	// Create child transactions
 	for (const split of splits) {
@@ -173,7 +219,7 @@ export async function splitTransaction(
 			? calculatePartnerShare(split.amount, parent.splitType, parent.splitValue)
 			: 0;
 
-		const childId = await db.transactions.add({
+		const childData: Omit<Transaction, 'id'> = {
 			date: parent.date,
 			merchant: parent.merchant,
 			amount: split.amount,
@@ -191,8 +237,11 @@ export async function splitTransaction(
 			parentTransactionId: id,
 			createdAt: now,
 			updatedAt: now
-		});
-		childIds.push(childId as number);
+		};
+
+		const childId = (await db.transactions.add(childData)) as number;
+		childIds.push(childId);
+		childTransactions.push({ ...childData, id: childId } as Transaction);
 	}
 
 	// Mark the parent as split so it's hidden from normal queries
@@ -200,6 +249,17 @@ export async function splitTransaction(
 		isSplitParent: true,
 		updatedAt: now
 	});
+
+	// Update the cache incrementally
+	const cache = getTransactionCache();
+	if (cache.isLoaded) {
+		// Mark parent as split (will be excluded from getAll)
+		cache.markSplitParent(id);
+		// Add child transactions
+		for (const child of childTransactions) {
+			cache.add({ ...child, id: child.id! });
+		}
+	}
 
 	invalidateTransactionCaches();
 	await persistData();
@@ -225,6 +285,13 @@ export async function markAsSettled(ids: number[]): Promise<void> {
 		settledDate: now,
 		updatedAt: now
 	});
+
+	// Update the cache incrementally
+	const cache = getTransactionCache();
+	if (cache.isLoaded) {
+		cache.bulkUpdate(ids, { isSettled: true, settledDate: now, updatedAt: now });
+	}
+
 	invalidateTransactionCaches();
 	await persistData();
 }
@@ -320,9 +387,22 @@ export async function getAvailableMonths(): Promise<string[]> {
 }
 
 // Get all transactions (for YTD calculations)
+// Uses cache when available, otherwise loads from DB and initializes cache
 // Filters out split parent transactions (they've been replaced by children)
 export async function getAllTransactions(): Promise<Transaction[]> {
-	return db.transactions.filter((t) => !t.isSplitParent).toArray();
+	const cache = getTransactionCache();
+
+	// If cache is loaded, return from cache (already filters split parents)
+	if (cache.isLoaded) {
+		return cache.getAll();
+	}
+
+	// Load from DB and initialize cache
+	const allTransactions = await db.transactions.toArray();
+	cache.initialize(allTransactions);
+
+	// Return filtered list (cache.getAll() filters split parents)
+	return cache.getAll();
 }
 
 // Get spending by category across multiple months

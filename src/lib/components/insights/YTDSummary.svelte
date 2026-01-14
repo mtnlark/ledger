@@ -2,6 +2,7 @@
 	import { format } from 'date-fns';
 	import { getMonthKey } from '$lib/db';
 	import type { Transaction } from '$lib/db';
+	import { formatCurrencyWhole } from '$lib/utils/modal-helpers';
 	import InsightGroup from './InsightGroup.svelte';
 	import CalendarHeatmap from './CalendarHeatmap.svelte';
 
@@ -123,15 +124,6 @@
 
 		return { needs, wants, total, needsPercent, wantsPercent };
 	});
-
-	function formatCurrency(amount: number): string {
-		return new Intl.NumberFormat('en-US', {
-			style: 'currency',
-			currency: 'USD',
-			minimumFractionDigits: 0,
-			maximumFractionDigits: 0
-		}).format(amount);
-	}
 </script>
 
 <InsightGroup title="Year in Review" description="{currentYear} spending overview">
@@ -177,7 +169,7 @@
 			<!-- Quick Stats Row -->
 			<div class="grid grid-cols-3 gap-4">
 				<div class="bg-cream-dark rounded-lg p-3 text-center">
-					<p class="font-mono text-lg font-medium text-charcoal">{formatCurrency(dailyAvg)}</p>
+					<p class="font-mono text-lg font-medium text-charcoal">{formatCurrencyWhole(dailyAvg)}</p>
 					<p class="text-xs text-charcoal-muted">Daily Avg</p>
 				</div>
 				{#if biggestMonth}

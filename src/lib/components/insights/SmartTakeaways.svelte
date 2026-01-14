@@ -2,6 +2,7 @@
 	import { TrendingUp, TrendingDown, AlertTriangle, Gauge, Receipt, Store } from 'lucide-svelte';
 	import { getMonthKey, navigateMonth, parseMonthKey } from '$lib/db';
 	import type { Transaction, Category, MonthlyBudget } from '$lib/db';
+	import { config } from '$lib/config';
 
 	interface Props {
 		currentMonthTransactions: Transaction[];
@@ -48,10 +49,10 @@
 		const averages = new Map<number, number>();
 		if (availableMonths.length < 2) return averages;
 
-		// Get last 3 months excluding current
+		// Get recent months excluding current for averaging
 		const recentMonths: string[] = [];
 		let month = navigateMonth(currentMonthKey, -1);
-		for (let i = 0; i < 3; i++) {
+		for (let i = 0; i < config.insights.takeaways.monthsToAverage; i++) {
 			if (availableMonths.includes(month)) {
 				recentMonths.push(month);
 			}
@@ -86,10 +87,10 @@
 
 		for (const [catId, current] of currentSpending) {
 			const avg = categoryAverages.get(catId) || 0;
-			if (avg > 20) {
+			if (avg > config.insights.anomaly.minAverage) {
 				// Only flag if there's meaningful historical spending
 				const ratio = current / avg;
-				if (ratio > 1.5) {
+				if (ratio > config.insights.anomaly.ratioThreshold) {
 					results.push({
 						catId,
 						name: getCategoryName(catId),
@@ -101,7 +102,7 @@
 			}
 		}
 
-		return results.sort((a, b) => b.ratio - a.ratio).slice(0, 2); // Top 2 anomalies
+		return results.sort((a, b) => b.ratio - a.ratio).slice(0, config.insights.anomaly.maxToShow);
 	});
 
 	// Calculate pace projection
@@ -155,7 +156,7 @@
 		// Check how far into the month we are
 		const today = new Date();
 		const currentDay = today.getDate();
-		const isEarlyInMonth = currentDay <= 15;
+		const isEarlyInMonth = currentDay <= config.insights.shift.earlyMonthCutoff;
 
 		let biggestShift: ShiftData | null = null;
 		let biggestAbsDiff = 0;
@@ -176,13 +177,13 @@
 			if (isDecrease) {
 				// Don't show "down" for categories with $0 this month - likely just hasn't hit yet
 				if (current === 0) continue;
-				// Don't show "down" if we're early in month and current is <20% of previous
+				// Don't show "down" if we're early in month and current is below ratio threshold
 				// (likely a recurring expense that hasn't posted)
-				if (isEarlyInMonth && previous > 0 && current / previous < 0.2) continue;
+				if (isEarlyInMonth && previous > 0 && current / previous < config.insights.shift.earlyMonthRatio) continue;
 			}
 
-			// Only consider meaningful shifts (at least $30 difference and some base amount)
-			if (absDiff > biggestAbsDiff && absDiff >= 30 && (current > 20 || previous > 20)) {
+			// Only consider meaningful shifts (min difference and some base amount)
+			if (absDiff > biggestAbsDiff && absDiff >= config.insights.shift.minDifference && (current > config.insights.shift.minAmount || previous > config.insights.shift.minAmount)) {
 				biggestAbsDiff = absDiff;
 				biggestShift = {
 					name: getCategoryName(catId),
@@ -254,8 +255,8 @@
 
 		const percentChange = Math.round(((currentDailyAvg - prevDailyAvg) / prevDailyAvg) * 100);
 
-		// Only show if there's a meaningful difference (>5%)
-		if (Math.abs(percentChange) < 5) return null;
+		// Only show if there's a meaningful difference
+		if (Math.abs(percentChange) < config.insights.velocity.percentThreshold) return null;
 
 		return { currentDailyAvg, prevDailyAvg, percentChange, isUp: percentChange > 0 };
 	});
@@ -276,7 +277,7 @@
 			}
 		}
 
-		return top.count >= 2 ? top : null; // Only show if visited at least twice
+		return top.count >= config.insights.topMerchant.minVisits ? top : null;
 	});
 
 	// Build takeaways list
@@ -325,8 +326,8 @@
 			});
 		}
 
-		// Add fallbacks to reach 3 items
-		if (items.length < 3 && velocityComparison) {
+		// Add fallbacks to reach max count
+		if (items.length < config.insights.takeaways.maxCount && velocityComparison) {
 			const verb = velocityComparison.isUp ? 'faster' : 'slower';
 			items.push({
 				type: 'monthComparison',
@@ -336,7 +337,7 @@
 			});
 		}
 
-		if (items.length < 3 && needsVsWants) {
+		if (items.length < config.insights.takeaways.maxCount && needsVsWants) {
 			items.push({
 				type: 'needsWants',
 				icon: Receipt,
@@ -345,7 +346,7 @@
 			});
 		}
 
-		if (items.length < 3 && topMerchant) {
+		if (items.length < config.insights.takeaways.maxCount && topMerchant) {
 			items.push({
 				type: 'topMerchant',
 				icon: Store,
@@ -354,7 +355,7 @@
 			});
 		}
 
-		return items.slice(0, 3); // Always show exactly 3
+		return items.slice(0, config.insights.takeaways.maxCount);
 	});
 
 	// Check if we have any takeaways to show

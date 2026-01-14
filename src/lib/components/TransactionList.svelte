@@ -1,9 +1,10 @@
 <script lang="ts">
-	import { format, isToday, isYesterday, startOfDay } from 'date-fns';
 	import type { ComponentType } from 'svelte';
 	import { Pencil, Trash2, Receipt, CheckSquare, Square, Check } from 'lucide-svelte';
 	import type { Transaction, Category, Settings } from '$lib/db';
 	import { createCategoryHelpers } from '$lib/utils/category-helpers';
+	import { formatCurrency } from '$lib/utils/modal-helpers';
+	import { createDateGroups, type DateGroup } from '$lib/utils/transaction-grouping';
 	import EmptyState from './EmptyState.svelte';
 	import BulkActionBar from './BulkActionBar.svelte';
 
@@ -106,57 +107,8 @@
 	let getCategoryIcon = $derived(categoryHelpers.getIcon);
 	let getCategoryColor = $derived(categoryHelpers.getColor);
 
-	// Group transactions by date
-	interface DateGroup {
-		dateKey: string;
-		label: string;
-		transactions: Transaction[];
-	}
-
-	let groupedTransactions = $derived.by(() => {
-		const groups = new Map<string, Transaction[]>();
-
-		// Sort transactions by date (newest first)
-		const sorted = [...transactions].sort((a, b) =>
-			new Date(b.date).getTime() - new Date(a.date).getTime()
-		);
-
-		for (const tx of sorted) {
-			const date = startOfDay(new Date(tx.date));
-			const dateKey = format(date, 'yyyy-MM-dd');
-			const existing = groups.get(dateKey) || [];
-			groups.set(dateKey, [...existing, tx]);
-		}
-
-		// Convert to array with labels
-		const result: DateGroup[] = [];
-		for (const [dateKey, txs] of groups) {
-			// Parse date string as local time, not UTC
-			// (new Date("yyyy-MM-dd") interprets as UTC, causing off-by-one day issues)
-			const [year, month, day] = dateKey.split('-').map(Number);
-			const date = new Date(year, month - 1, day);
-			let label: string;
-
-			if (isToday(date)) {
-				label = 'Today';
-			} else if (isYesterday(date)) {
-				label = 'Yesterday';
-			} else {
-				label = format(date, 'EEEE, MMMM d');
-			}
-
-			result.push({ dateKey, label, transactions: txs });
-		}
-
-		return result;
-	});
-
-	function formatCurrency(amount: number): string {
-		return new Intl.NumberFormat('en-US', {
-			style: 'currency',
-			currency: 'USD'
-		}).format(amount);
-	}
+	// Group transactions by date using the utility function
+	let groupedTransactions = $derived(createDateGroups(transactions));
 </script>
 
 <div class="space-y-5">
@@ -207,9 +159,9 @@
 								: 'hover:bg-surface-hover/50'} {selectedIds.has(transaction.id!) ? 'bg-primary-50 hover:bg-primary-100' : 'hover:bg-surface-hover/50'}"
 							style="border-left-color: {getCategoryColor(transaction.categoryId)}; animation-delay: {(groupIndex * 50) + (txIndex * 30)}ms;"
 							onclick={isSelectionMode ? () => toggleSelection(transaction.id!) : undefined}
-							onkeydown={isSelectionMode ? (e) => e.key === 'Enter' && toggleSelection(transaction.id!) : undefined}
-							role={isSelectionMode ? 'button' : undefined}
-							tabindex={isSelectionMode ? 0 : undefined}
+							onkeydown={isSelectionMode ? (e: KeyboardEvent) => e.key === 'Enter' && toggleSelection(transaction.id!) : undefined}
+							role={isSelectionMode ? 'button' : 'listitem'}
+							tabindex={isSelectionMode ? 0 : -1}
 						>
 							<!-- Checkbox (selection mode) -->
 							{#if isSelectionMode}

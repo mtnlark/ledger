@@ -4,6 +4,7 @@
 	import { Check, PartyPopper } from 'lucide-svelte';
 	import type { Transaction, Category, Settings } from '$lib/db';
 	import { createCategoryHelpers } from '$lib/utils/category-helpers';
+	import { formatCurrency } from '$lib/utils/modal-helpers';
 	import EmptyState from './EmptyState.svelte';
 
 	interface Props {
@@ -30,14 +31,6 @@
 	let getCategoryName = $derived(categoryHelpers.getName);
 	let getCategoryIcon = $derived(categoryHelpers.getIcon);
 	let getCategoryColor = $derived(categoryHelpers.getColor);
-
-	function formatCurrency(amount: number): string {
-		return new Intl.NumberFormat('en-US', {
-			style: 'currency',
-			currency: 'USD',
-			minimumFractionDigits: 2
-		}).format(amount);
-	}
 
 	function formatDate(date: Date): string {
 		return new Intl.DateTimeFormat('en-US', {
