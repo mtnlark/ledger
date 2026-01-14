@@ -234,6 +234,7 @@ interface Settings {
   dismissedRecurring: string[];           // Hidden from recurring detection
   cancelledSubscriptions: CancelledSubscription[];
   confirmedActiveSubscriptions: string[]; // Override staleness detection
+  iCloudBackupEnabled: boolean;           // Copy backups to iCloud Drive
 }
 ```
 
@@ -291,7 +292,7 @@ Sidebar state persists to localStorage (`ledger-sidebar-expanded`).
 - Default split settings
 - Category management (add/edit/reorder)
 - Excel import / JSON export
-- Data repair tools
+- iCloud backup toggle (copies backups to iCloud Drive when enabled)
 
 ### Subscriptions
 - Mark transactions as subscriptions (monthly/annual)
@@ -345,7 +346,13 @@ Car, Cash withdrawals, Clothes & accessories, Coffee & snacks, Donations, Electr
 
 macOS: `~/Library/Application Support/app.ledger.desktop/`
 - `data.json` - Main data file
-- `backups/` - Auto-timestamped backups before each save
+- `backups/` - Auto-timestamped backups before each save (max 10, debounced 1 min)
+
+### iCloud Backup (Optional)
+When enabled in Settings, backups are also copied to iCloud Drive:
+- `~/Library/Mobile Documents/com~apple~CloudDocs/Ledger/ledger-backup.json`
+- Single file overwritten on each backup (not versioned in iCloud)
+- Requires iCloud Drive to be enabled on the Mac
 
 ---
 
