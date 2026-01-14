@@ -65,6 +65,7 @@ export interface Settings {
 	dismissedRecurring: string[]; // Normalized merchant names to hide from recurring detection
 	cancelledSubscriptions: CancelledSubscription[]; // Subscriptions user has marked as cancelled
 	confirmedActiveSubscriptions: string[]; // Normalized merchant names user confirmed are still active (override staleness)
+	iCloudBackupEnabled: boolean; // Whether to copy backups to iCloud Drive
 }
 
 // Database class
@@ -183,7 +184,8 @@ export const DEFAULT_SETTINGS: Settings = {
 	theme: 'system',
 	dismissedRecurring: [],
 	cancelledSubscriptions: [],
-	confirmedActiveSubscriptions: []
+	confirmedActiveSubscriptions: [],
+	iCloudBackupEnabled: false
 };
 
 // Initialize database with defaults and run migrations

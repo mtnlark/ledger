@@ -21,6 +21,7 @@ let path: typeof import('@tauri-apps/api/path');
 let cachedAppDataDir: string;
 let cachedBackupsDir: string;
 let cachedDataPath: string;
+let cachedICloudDir: string;
 
 // Track if APIs have been initialized
 let apisInitialized = false;
@@ -28,6 +29,7 @@ let apisInitialized = false;
 const DATA_FILE = 'data.json';
 const BACKUPS_DIR = 'backups';
 const MAX_BACKUPS = 10;
+const ICLOUD_APP_FOLDER = 'Ledger';
 
 // Backup debouncing - track last backup time
 let lastBackupTime = 0;
@@ -47,6 +49,14 @@ async function initializeApis(): Promise<void> {
 	cachedAppDataDir = await path.appDataDir();
 	cachedBackupsDir = await path.join(cachedAppDataDir, BACKUPS_DIR);
 	cachedDataPath = await path.join(cachedAppDataDir, DATA_FILE);
+
+	// Cache iCloud path (~/Library/Mobile Documents/com~apple~CloudDocs/Ledger/)
+	const homeDir = await path.homeDir();
+	cachedICloudDir = await path.join(
+		homeDir,
+		'Library/Mobile Documents/com~apple~CloudDocs',
+		ICLOUD_APP_FOLDER
+	);
 
 	apisInitialized = true;
 }
@@ -132,6 +142,17 @@ export async function createBackup(): Promise<void> {
 
 	// Clean up old backups
 	await pruneOldBackups();
+
+	// Copy to iCloud if enabled
+	try {
+		const settings = await db.settings.get(1);
+		if (settings?.iCloudBackupEnabled) {
+			await copyBackupToICloud(content, backupName);
+		}
+	} catch (error) {
+		// Don't block on iCloud backup errors
+		console.error('iCloud backup check failed:', error);
+	}
 }
 
 /**
@@ -154,6 +175,62 @@ async function pruneOldBackups(): Promise<void> {
 			const filepath = await path.join(cachedBackupsDir, filename);
 			await fs.remove(filepath);
 		}
+	}
+}
+
+/**
+ * Check if iCloud Drive is available on this system
+ */
+export async function isICloudAvailable(): Promise<boolean> {
+	ensureInitialized();
+
+	try {
+		// Check if the iCloud Drive base directory exists
+		const homeDir = await path.homeDir();
+		const iCloudBase = await path.join(homeDir, 'Library/Mobile Documents/com~apple~CloudDocs');
+		console.log('[iCloud] Checking path:', iCloudBase);
+		const exists = await fs.exists(iCloudBase);
+		console.log('[iCloud] Directory exists:', exists);
+		return exists;
+	} catch (error) {
+		console.error('[iCloud] Error checking availability:', error);
+		return false;
+	}
+}
+
+/**
+ * Get the iCloud backup directory path
+ */
+export function getICloudBackupDir(): string {
+	ensureInitialized();
+	return cachedICloudDir;
+}
+
+/**
+ * Copy a backup file to iCloud Drive
+ */
+async function copyBackupToICloud(backupContent: string, backupName: string): Promise<void> {
+	ensureInitialized();
+
+	try {
+		// Check if iCloud is available
+		if (!(await isICloudAvailable())) {
+			console.log('iCloud Drive not available, skipping cloud backup');
+			return;
+		}
+
+		// Ensure iCloud app directory exists
+		if (!(await fs.exists(cachedICloudDir))) {
+			await fs.mkdir(cachedICloudDir, { recursive: true });
+		}
+
+		// Write backup to iCloud (overwrite the single backup file)
+		const iCloudBackupPath = await path.join(cachedICloudDir, 'ledger-backup.json');
+		await fs.writeTextFile(iCloudBackupPath, backupContent);
+		console.log('Backup copied to iCloud:', iCloudBackupPath);
+	} catch (error) {
+		// Don't throw - iCloud backup failure shouldn't block the app
+		console.error('Failed to copy backup to iCloud:', error);
 	}
 }
 

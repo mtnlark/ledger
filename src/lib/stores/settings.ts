@@ -84,3 +84,9 @@ export async function getDismissedRecurring(): Promise<string[]> {
 	const settings = await getSettings();
 	return settings.dismissedRecurring ?? [];
 }
+
+// Update iCloud backup setting
+export async function updateICloudBackup(enabled: boolean): Promise<void> {
+	await db.settings.update(1, { iCloudBackupEnabled: enabled });
+	await persistData();
+}

@@ -1,10 +1,11 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { afterNavigate } from '$app/navigation';
-	import { Upload, Download, Database, FileSpreadsheet, Sun, Moon, Monitor } from 'lucide-svelte';
+	import { Upload, Download, Database, FileSpreadsheet, Sun, Moon, Monitor, Cloud, CloudOff } from 'lucide-svelte';
 	import { type Settings, type Category, type Transaction, DEFAULT_SETTINGS } from '$lib/db';
 	import { initializeStorage } from '$lib/storage';
-	import { getSettings, updateSettings, updateTheme } from '$lib/stores/settings';
+	import { getSettings, updateSettings, updateTheme, updateICloudBackup } from '$lib/stores/settings';
+	import { isICloudAvailable, getICloudBackupDir } from '$lib/storage/tauri-adapter';
 	import { getTransactionsByMonth, getAvailableMonths } from '$lib/stores/transactions';
 	import { getAllCategories } from '$lib/stores/categories';
 	import HeaderNav from '$lib/components/HeaderNav.svelte';
@@ -25,6 +26,10 @@
 	let fileInput = $state<HTMLInputElement | null>(null);
 	let jsonFileInput = $state<HTMLInputElement | null>(null);
 
+	// iCloud state
+	let iCloudAvailable = $state(false);
+	let iCloudPath = $state('');
+
 	// Form state
 	let partnerName = $state('');
 	let defaultSplitType = $state<'percentage' | 'fixed'>('percentage');
@@ -41,6 +46,18 @@
 			partnerName = settings.partnerName;
 			defaultSplitType = settings.defaultSplitType;
 			defaultSplitValue = settings.defaultSplitValue;
+			// Check iCloud availability
+			try {
+				console.log('[Settings] Checking iCloud availability...');
+				iCloudAvailable = await isICloudAvailable();
+				console.log('[Settings] iCloud available:', iCloudAvailable);
+				if (iCloudAvailable) {
+					iCloudPath = getICloudBackupDir();
+				}
+			} catch (error) {
+				console.error('[Settings] Error checking iCloud:', error);
+				iCloudAvailable = false;
+			}
 		} catch (error) {
 			console.error('Failed to load settings:', error);
 		} finally {
@@ -81,6 +98,19 @@
 	async function handleThemeChange(theme: 'light' | 'dark' | 'system') {
 		await updateTheme(theme);
 		settings = await getSettings();
+	}
+
+	// Toggle iCloud backup
+	async function handleICloudToggle() {
+		const newValue = !settings.iCloudBackupEnabled;
+		try {
+			await updateICloudBackup(newValue);
+			settings = await getSettings();
+			toast.success(newValue ? 'iCloud backup enabled' : 'iCloud backup disabled');
+		} catch (error) {
+			console.error('Failed to update iCloud setting:', error);
+			toast.error('Failed to update iCloud setting');
+		}
 	}
 
 	// Import from Excel
@@ -451,6 +481,53 @@
 								<div class="animate-spin rounded-full h-4 w-4 border-b-2 border-primary-600"></div>
 								<span>Exporting...</span>
 							</div>
+						{/if}
+					</div>
+
+					<!-- Divider -->
+					<div class="border-t border-dashed border-theme-dashed"></div>
+
+					<!-- iCloud Backup Section -->
+					<div>
+						<h3 class="text-sm font-medium text-charcoal mb-3">Cloud Backup</h3>
+						<div class="flex items-center justify-between p-4 bg-surface-alt rounded-lg border border-theme">
+							<div class="flex items-center gap-3">
+								{#if iCloudAvailable}
+									<Cloud size={20} class="text-primary-500" />
+								{:else}
+									<CloudOff size={20} class="text-charcoal-muted" />
+								{/if}
+								<div>
+									<p class="text-sm font-medium text-charcoal">Back up to iCloud</p>
+									<p class="text-xs text-charcoal-muted">
+										{#if iCloudAvailable}
+											Automatically copy backups to iCloud Drive
+										{:else}
+											iCloud Drive not available on this device
+										{/if}
+									</p>
+								</div>
+							</div>
+							<button
+								type="button"
+								role="switch"
+								aria-checked={settings.iCloudBackupEnabled}
+								aria-label="Toggle iCloud backup"
+								disabled={!iCloudAvailable}
+								onclick={handleICloudToggle}
+								class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed
+									{settings.iCloudBackupEnabled ? 'bg-primary-500' : 'bg-[#C5C0B8]'}"
+							>
+								<span
+									class="inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform
+										{settings.iCloudBackupEnabled ? 'translate-x-6' : 'translate-x-1'}"
+								></span>
+							</button>
+						</div>
+						{#if iCloudAvailable && settings.iCloudBackupEnabled}
+							<p class="mt-2 text-xs text-charcoal-muted">
+								Backups sync to: <span class="font-mono text-[10px]">{iCloudPath}</span>
+							</p>
 						{/if}
 					</div>
 
