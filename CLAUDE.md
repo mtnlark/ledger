@@ -63,7 +63,7 @@ Use test-driven development (TDD) best practices when adding new code. Update CL
 ## Application Structure
 
 ```
-budget-tracker/
+ledger/
 ├── src/
 │   ├── app.html              # HTML template
 │   ├── app.css               # Tailwind + design system

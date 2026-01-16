@@ -178,7 +178,7 @@
 			}
 
 			const csv = await exportTransactionsToCSV(allTransactions, categories);
-			const filename = `budget-tracker-export-${new Date().toISOString().slice(0, 10)}.csv`;
+			const filename = `ledger-export-${new Date().toISOString().slice(0, 10)}.csv`;
 			downloadFile(csv, filename, 'text/csv');
 			toast.success(`Exported ${allTransactions.length} transactions to CSV`);
 		} catch (error) {
@@ -194,7 +194,7 @@
 		isExporting = true;
 		try {
 			const json = await exportAllDataToJSON();
-			const filename = `budget-tracker-backup-${new Date().toISOString().slice(0, 10)}.json`;
+			const filename = `ledger-backup-${new Date().toISOString().slice(0, 10)}.json`;
 			downloadFile(json, filename, 'application/json');
 			toast.success('Backup downloaded');
 		} catch (error) {
