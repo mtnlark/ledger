@@ -69,7 +69,7 @@ export interface Settings {
 }
 
 // Database class
-class BudgetTrackerDB extends Dexie {
+class LedgerDB extends Dexie {
 	transactions!: EntityTable<Transaction, 'id'>;
 	categories!: EntityTable<Category, 'id'>;
 	monthlyBudgets!: EntityTable<MonthlyBudget, 'id'>;
@@ -77,7 +77,7 @@ class BudgetTrackerDB extends Dexie {
 	settings!: EntityTable<Settings, 'id'>;
 
 	constructor() {
-		super('BudgetTrackerDB');
+		super('LedgerDB');
 
 		this.version(1).stores({
 			transactions: '++id, date, merchant, categoryId, isShared, isSettled, [date+merchant+amount]',
@@ -106,7 +106,7 @@ class BudgetTrackerDB extends Dexie {
 }
 
 // Database instance
-export const db = new BudgetTrackerDB();
+export const db = new LedgerDB();
 
 // Helper functions
 export function calculatePartnerShare(
