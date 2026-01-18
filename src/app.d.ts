@@ -10,4 +10,14 @@ declare global {
 	}
 }
 
+// emoji-picker-element web component
+declare namespace svelteHTML {
+	interface IntrinsicElements {
+		'emoji-picker': {
+			class?: string;
+			'onemoji-click'?: (event: CustomEvent<{ unicode: string }>) => void;
+		};
+	}
+}
+
 export {};

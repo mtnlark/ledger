@@ -5,6 +5,7 @@
 	import type { Category } from '$lib/db';
 	import { updateCategory, addCategory, deleteCategory, getCategoryUsageCount } from '$lib/stores/categories';
 	import { toast } from '$lib/stores/toast';
+	import 'emoji-picker-element';
 
 	interface Props {
 		category: Category | null; // null = adding new
@@ -23,6 +24,10 @@
 	let isEssential = $state(category?.isEssential ?? false);
 	let isSaving = $state(false);
 
+	// Emoji picker state
+	let showEmojiPicker = $state(false);
+	let emojiPickerRef = $state<HTMLDivElement | null>(null);
+
 	// Delete state
 	let showDeleteConfirm = $state(false);
 	let usageCount = $state(0);
@@ -34,35 +39,58 @@
 		}
 	});
 
-	// Predefined color palette
-	const colorPalette = [
-		'#EF4444', // red
-		'#F97316', // orange
-		'#F59E0B', // amber
-		'#EAB308', // yellow
-		'#84CC16', // lime
-		'#22C55E', // green
-		'#10B981', // emerald
-		'#14B8A6', // teal
-		'#06B6D4', // cyan
-		'#0EA5E9', // sky
-		'#3B82F6', // blue
-		'#6366F1', // indigo
-		'#8B5CF6', // violet
-		'#A855F7', // purple
-		'#D946EF', // fuchsia
-		'#EC4899', // pink
-		'#F43F5E', // rose
-		'#6B7280', // gray
-		'#78716C', // stone
-		'#A1887F'  // warm brown
-	];
+	function handleEmojiSelect(event: Event) {
+		const customEvent = event as CustomEvent<{ emoji: { unicode: string } }>;
+		icon = customEvent.detail.emoji.unicode;
+		showEmojiPicker = false;
+	}
 
-	// Common emoji suggestions for categories
-	const emojiSuggestions = [
-		'🛒', '🍽️', '🚗', '⛽', '🏠', '💊', '🎬', '✈️',
-		'👕', '💇', '🐕', '🎁', '💪', '☕', '💳', '📱',
-		'🔌', '🅿️', '💰', '🛍️', '🎮', '📚', '🌿', '🎵'
+	function setupEmojiPicker(node: HTMLElement) {
+		node.addEventListener('emoji-click', handleEmojiSelect);
+		return {
+			destroy() {
+				node.removeEventListener('emoji-click', handleEmojiSelect);
+			}
+		};
+	}
+
+	function handleClickOutsideEmoji(event: MouseEvent) {
+		if (showEmojiPicker && emojiPickerRef && !emojiPickerRef.contains(event.target as Node)) {
+			showEmojiPicker = false;
+		}
+	}
+
+	// Predefined color palette - Warm Ledger design system
+	const colorPalette = [
+		// Terracotta (Primary)
+		'#C45D3A', // primary-500
+		'#B5522F', // primary-600
+		'#D4AD9C', // primary-300
+		// Sage Green (Success)
+		'#5B8C5A', // success-500
+		'#6FA56F', // success-400
+		'#3A5A3A', // success-700
+		// Amber (Warning)
+		'#D4915D', // warning-500
+		'#D4A574', // warning-400
+		// Muted Rose (Danger)
+		'#C17B7B', // danger-500
+		'#D4ABAB', // danger-300
+		// Warm Blues
+		'#5B7C8C', // dusty teal-blue
+		'#7BA3B5', // soft sky blue
+		'#4A6670', // deep teal
+		// Warm Teals
+		'#5A8C8C', // sage teal
+		'#6FA5A5', // light teal
+		'#3A5A5A', // deep teal
+		// Muted Purples
+		'#8B7B9C', // dusty lavender
+		'#A592B0', // soft purple
+		'#6B5A7C', // deep plum
+		// Warm Neutrals
+		'#8A847C', // charcoal-muted
+		'#A1887F'  // warm brown
 	];
 
 	let isValid = $derived(name.trim() !== '' && icon.trim() !== '');
@@ -102,7 +130,9 @@
 
 	function handleKeydown(e: KeyboardEvent) {
 		if (e.key === 'Escape') {
-			if (showDeleteConfirm) {
+			if (showEmojiPicker) {
+				showEmojiPicker = false;
+			} else if (showDeleteConfirm) {
 				showDeleteConfirm = false;
 			} else {
 				onClose();
@@ -126,7 +156,7 @@
 	}
 </script>
 
-<svelte:window onkeydown={handleKeydown} />
+<svelte:window onkeydown={handleKeydown} onclick={handleClickOutsideEmoji} />
 
 <!-- Backdrop -->
 <button
@@ -186,30 +216,23 @@
 				</div>
 
 				<!-- Icon -->
-				<div>
-					<label for="category-icon" class="block text-sm font-medium text-charcoal-soft mb-1.5">
+				<div class="relative" bind:this={emojiPickerRef}>
+					<label class="block text-sm font-medium text-charcoal-soft mb-1.5">
 						Icon (Emoji)
 					</label>
-					<input
-						type="text"
-						id="category-icon"
-						bind:value={icon}
-						placeholder="🛒"
-						maxlength="4"
-						class="w-full px-3 py-2.5 bg-cream border border-[rgba(45,42,38,0.15)] rounded-lg focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-colors placeholder:text-charcoal-muted text-center text-xl"
-					/>
-					<!-- Emoji suggestions -->
-					<div class="flex flex-wrap gap-1.5 mt-2">
-						{#each emojiSuggestions as emoji}
-							<button
-								type="button"
-								onclick={() => (icon = emoji)}
-								class="w-8 h-8 rounded-lg hover:bg-surface-hover border border-transparent hover:border-theme transition-colors text-lg {icon === emoji ? 'bg-primary-100 border-primary-300' : ''}"
-							>
-								{emoji}
-							</button>
-						{/each}
-					</div>
+					<button
+						type="button"
+						onclick={() => (showEmojiPicker = !showEmojiPicker)}
+						class="w-full px-3 py-3 bg-cream border border-[rgba(45,42,38,0.15)] rounded-lg hover:border-primary-400 focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-colors text-2xl"
+					>
+						{icon || '✨'}
+					</button>
+
+					{#if showEmojiPicker}
+						<div class="absolute top-full left-0 mt-1 z-20" use:setupEmojiPicker>
+							<emoji-picker class="light"></emoji-picker>
+						</div>
+					{/if}
 				</div>
 
 				<!-- Color -->
