@@ -339,9 +339,11 @@ export async function getMonthlySpendingTrends(months: string[]): Promise<Map<st
 	const { end } = getMonthDateRange(lastMonth);
 
 	// Only load transactions within the requested date range
+	// Exclude split parent transactions (they've been replaced by children)
 	const transactions = await db.transactions
 		.where('date')
 		.between(start, end, true, true)
+		.filter((t) => !t.isSplitParent)
 		.toArray();
 
 	// Sum spending for each month
@@ -428,12 +430,13 @@ export async function getCategoryTrends(
 	const { end } = getMonthDateRange(lastMonth);
 
 	// Use categoryId index and filter by date range
+	// Exclude split parent transactions (they've been replaced by children)
 	const transactions = await db.transactions
 		.where('categoryId')
 		.equals(categoryId)
 		.filter((t) => {
 			const date = new Date(t.date);
-			return date >= start && date <= end;
+			return date >= start && date <= end && !t.isSplitParent;
 		})
 		.toArray();
 
