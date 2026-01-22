@@ -74,9 +74,11 @@
 		}
 	});
 
-	// Load previous month transactions for comparison
+	// Load previous month transactions for comparison when month changes
 	$effect(() => {
-		loadPreviousMonth();
+		// Explicitly read currentMonth to track it as a dependency
+		const prevMonth = navigateMonth(currentMonth, -1);
+		loadPreviousMonth(prevMonth);
 	});
 
 	async function loadCategoryTrends() {
@@ -84,8 +86,7 @@
 		categoryTrendData = await getCategoryTrends(selectedCategoryId, availableMonths);
 	}
 
-	async function loadPreviousMonth() {
-		const prevMonth = navigateMonth(currentMonth, -1);
+	async function loadPreviousMonth(prevMonth: string) {
 		previousTransactions = await getTransactionsByMonth(prevMonth);
 	}
 

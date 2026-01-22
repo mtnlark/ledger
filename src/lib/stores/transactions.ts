@@ -17,12 +17,14 @@ function invalidateTransactionCaches(): void {
 }
 
 // Reactive transactions for current month
+// Filters out split parent transactions (they've been replaced by children)
 export function createTransactionsStore(month: string) {
 	const { start, end } = getMonthDateRange(month);
 	return liveQuery(() =>
 		db.transactions
 			.where('date')
 			.between(start, end, true, true)
+			.filter((t) => !t.isSplitParent)
 			.reverse()
 			.sortBy('date')
 	);
@@ -298,9 +300,10 @@ export async function markAsSettled(ids: number[]): Promise<void> {
 
 // Get unsettled transactions (sorted by date, most recent first)
 // Note: IndexedDB doesn't support boolean index keys, so we use filter
+// Filters out split parent transactions (they've been replaced by children)
 export async function getUnsettledTransactions(): Promise<Transaction[]> {
 	return db.transactions
-		.filter((t) => t.isShared && !t.isSettled)
+		.filter((t) => t.isShared && !t.isSettled && !t.isSplitParent)
 		.reverse()
 		.sortBy('date');
 }

@@ -2,49 +2,30 @@
 	import type { Transaction, MonthlyBudget } from '$lib/db';
 	import { parseMonthKey, getMonthKey } from '$lib/db';
 	import { format } from 'date-fns';
-	import { getTransactionsByMonth } from '$lib/stores/transactions';
-	import { getBudgetForMonth } from '$lib/stores/budget';
 	import InsightGroup from './InsightGroup.svelte';
 	import MonthPicker from '../MonthPicker.svelte';
 	import SavingsRateChart from './SavingsRateChart.svelte';
 	import MonthlyTrendsChart from '../MonthlyTrendsChart.svelte';
 
 	interface Props {
-		initialTransactions: Transaction[];
+		currentMonth: string;
+		transactions: Transaction[];
 		availableMonths: string[];
-		initialBudget: MonthlyBudget | null;
+		budget: MonthlyBudget | null;
 		allBudgets: MonthlyBudget[];
 		monthlyTrends: Map<string, number>;
+		onMonthChange: (month: string) => void;
 	}
 
 	let {
-		initialTransactions,
+		currentMonth,
+		transactions,
 		availableMonths,
-		initialBudget,
+		budget,
 		allBudgets,
-		monthlyTrends
+		monthlyTrends,
+		onMonthChange
 	}: Props = $props();
-
-	// Local state for browsing different months
-	let currentMonth = $state(getMonthKey(new Date()));
-	let transactions = $state<Transaction[]>(initialTransactions);
-	let budget = $state<MonthlyBudget | null>(initialBudget);
-
-	// Sync with initial data when it changes (e.g., on page load)
-	$effect(() => {
-		const actualCurrentMonth = getMonthKey(new Date());
-		if (currentMonth === actualCurrentMonth) {
-			transactions = initialTransactions;
-			budget = initialBudget;
-		}
-	});
-
-	// Load data when month changes
-	async function handleMonthChange(month: string) {
-		currentMonth = month;
-		transactions = await getTransactionsByMonth(month);
-		budget = await getBudgetForMonth(month);
-	}
 
 	// Check if viewing current month
 	let isCurrentMonth = $derived(currentMonth === getMonthKey(new Date()));
@@ -107,7 +88,7 @@
 				<MonthPicker
 					{currentMonth}
 					{availableMonths}
-					onMonthChange={handleMonthChange}
+					{onMonthChange}
 				/>
 			</div>
 

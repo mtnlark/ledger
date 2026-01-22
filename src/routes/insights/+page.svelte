@@ -30,9 +30,9 @@
 	// State
 	let isLoading = $state(true);
 	let categories = $state<Category[]>([]);
-	let currentMonthTransactions = $state<Transaction[]>([]);
+	let selectedMonthTransactions = $state<Transaction[]>([]);
 	let allTransactions = $state<Transaction[]>([]);
-	let currentMonth = $state(getMonthKey(new Date()));
+	let selectedMonth = $state(getMonthKey(new Date()));
 	let availableMonths = $state<string[]>([getMonthKey(new Date())]);
 	let monthlyTrends = $state<Map<string, number>>(new Map());
 	let budget = $state<MonthlyBudget | null>(null);
@@ -46,7 +46,7 @@
 		isLoading = true;
 		try {
 			await initializeStorage();
-			currentMonth = getMonthKey(new Date());
+			selectedMonth = getMonthKey(new Date());
 			categories = await getAllCategories();
 			availableMonths = await getAvailableMonths();
 			allTransactions = await getAllTransactions();
@@ -54,9 +54,9 @@
 			recurring = await detectRecurringExpenses();
 			cancelledSubscriptions = await getCancelledSubscriptions();
 			confirmedActiveSubscriptions = await getConfirmedActiveSubscriptions();
-			// Load current month data
-			currentMonthTransactions = await getTransactionsByMonth(currentMonth);
-			budget = await getBudgetForMonth(currentMonth);
+			// Load selected month data
+			selectedMonthTransactions = await getTransactionsByMonth(selectedMonth);
+			budget = await getBudgetForMonth(selectedMonth);
 			// Get trends for all available months
 			monthlyTrends = await getMonthlySpendingTrends(availableMonths);
 		} catch (error) {
@@ -64,6 +64,13 @@
 		} finally {
 			isLoading = false;
 		}
+	}
+
+	// Handle month change - update transactions and budget for selected month
+	async function handleMonthChange(month: string) {
+		selectedMonth = month;
+		selectedMonthTransactions = await getTransactionsByMonth(month);
+		budget = await getBudgetForMonth(month);
 	}
 
 	// Reload subscription-related data when subscriptions change
@@ -122,7 +129,7 @@
 		{:else}
 			<!-- Smart Takeaways (always visible at top) -->
 			<SmartTakeaways
-				{currentMonthTransactions}
+				currentMonthTransactions={selectedMonthTransactions}
 				{allTransactions}
 				{categories}
 				{availableMonths}
@@ -131,15 +138,17 @@
 
 			<!-- Spending This Month -->
 			<SpendingThisMonth
-				initialTransactions={currentMonthTransactions}
+				currentMonth={selectedMonth}
+				transactions={selectedMonthTransactions}
 				{availableMonths}
-				initialBudget={budget}
+				{budget}
 				{allBudgets}
 				{monthlyTrends}
+				onMonthChange={handleMonthChange}
 			/>
 
 			<!-- Category Deep Dives -->
-			<CategoryDeepDives {currentMonth} transactions={currentMonthTransactions} {categories} {availableMonths} />
+			<CategoryDeepDives currentMonth={selectedMonth} transactions={selectedMonthTransactions} {categories} {availableMonths} />
 
 			<!-- Recurring Expenses (subscriptions + auto-detected bills) -->
 			<RecurringInsights
