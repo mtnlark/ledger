@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { Transaction, Category } from '$lib/db';
 	import { formatCurrencyWhole } from '$lib/utils/modal-helpers';
+	import { getInsightsEngine } from '$lib/insights';
 	import InsightGroup from './InsightGroup.svelte';
 
 	interface Props {
@@ -11,49 +12,13 @@
 
 	let { transactions, categories, allTransactions }: Props = $props();
 
-	// Calculate needs vs wants for current month (uses transaction's isEssential)
-	let currentMonthStats = $derived.by(() => {
-		let needs = 0;
-		let wants = 0;
+	const engine = getInsightsEngine();
 
-		for (const tx of transactions) {
-			const userAmount = tx.isShared ? tx.amount - tx.partnerShare : tx.amount;
-
-			if (tx.isEssential) {
-				needs += userAmount;
-			} else {
-				wants += userAmount;
-			}
-		}
-
-		const total = needs + wants;
-		const needsPercent = total > 0 ? (needs / total) * 100 : 0;
-		const wantsPercent = total > 0 ? (wants / total) * 100 : 0;
-
-		return { needs, wants, total, needsPercent, wantsPercent };
-	});
+	// Calculate needs vs wants for current month
+	let currentMonthStats = $derived(engine.getNeedsVsWantsFull(transactions, 'current-month'));
 
 	// Calculate all-time stats
-	let allTimeStats = $derived.by(() => {
-		let needs = 0;
-		let wants = 0;
-
-		for (const tx of allTransactions) {
-			const userAmount = tx.isShared ? tx.amount - tx.partnerShare : tx.amount;
-
-			if (tx.isEssential) {
-				needs += userAmount;
-			} else {
-				wants += userAmount;
-			}
-		}
-
-		const total = needs + wants;
-		const needsPercent = total > 0 ? (needs / total) * 100 : 0;
-		const wantsPercent = total > 0 ? (wants / total) * 100 : 0;
-
-		return { needs, wants, total, needsPercent, wantsPercent };
-	});
+	let allTimeStats = $derived(engine.getNeedsVsWantsFull(allTransactions, 'all-time'));
 
 	// Get top essential and discretionary categories for current month
 	let topCategories = $derived.by(() => {

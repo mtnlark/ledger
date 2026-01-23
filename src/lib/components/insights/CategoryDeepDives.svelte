@@ -3,6 +3,8 @@
 	import { parseMonthKey, navigateMonth } from '$lib/db';
 	import type { Transaction, Category } from '$lib/db';
 	import { getCategoryTrends, getTransactionsByMonth } from '$lib/stores/transactions';
+	import { getInsightsEngine } from '$lib/insights';
+	import { computeCategoryDeepDiveShift } from '$lib/insights/calculations';
 	import InsightGroup from './InsightGroup.svelte';
 	import InsightMetric from './InsightMetric.svelte';
 	import CategoryTrendsChart from './CategoryTrendsChart.svelte';
@@ -18,20 +20,15 @@
 
 	let { currentMonth, transactions, categories, availableMonths }: Props = $props();
 
+	const engine = getInsightsEngine();
+
 	// Selected category for trends chart
 	let selectedCategoryId = $state<number | null>(null);
 	let categoryTrendData = $state<Map<string, number>>(new Map());
 	let previousTransactions = $state<Transaction[]>([]);
 
 	// Calculate spending by category for current month
-	let categorySpending = $derived.by(() => {
-		const spending = new Map<number, number>();
-		for (const t of transactions) {
-			const amount = t.isShared ? t.amount - t.partnerShare : t.amount;
-			spending.set(t.categoryId, (spending.get(t.categoryId) || 0) + amount);
-		}
-		return spending;
-	});
+	let categorySpending = $derived(engine.getSpendingByCategory(transactions, currentMonth));
 
 	// Get all categories sorted alphabetically
 	let sortedCategories = $derived(
@@ -94,48 +91,11 @@
 	let selectedCategory = $derived(categories.find((c) => c.id === selectedCategoryId));
 
 	// Calculate top changing category for preview (by largest absolute dollar change)
-	let topChange = $derived.by(() => {
-		if (previousTransactions.length === 0 || transactions.length === 0) return null;
-
-		const currentSpending = new Map<number, number>();
-		const prevSpending = new Map<number, number>();
-
-		for (const t of transactions) {
-			const amount = t.isShared ? t.amount - t.partnerShare : t.amount;
-			currentSpending.set(t.categoryId, (currentSpending.get(t.categoryId) || 0) + amount);
-		}
-		for (const t of previousTransactions) {
-			const amount = t.isShared ? t.amount - t.partnerShare : t.amount;
-			prevSpending.set(t.categoryId, (prevSpending.get(t.categoryId) || 0) + amount);
-		}
-
-		let maxChange = { categoryId: 0, absDiff: 0, changePercent: 0, current: 0, previous: 0 };
-
-		// Consider all categories present in either month
-		const allCategoryIds = new Set([...currentSpending.keys(), ...prevSpending.keys()]);
-
-		for (const catId of allCategoryIds) {
-			const current = currentSpending.get(catId) || 0;
-			const previous = prevSpending.get(catId) || 0;
-			const absDiff = Math.abs(current - previous);
-
-			if (absDiff > maxChange.absDiff) {
-				const changePercent = previous > 0 ? ((current - previous) / previous) * 100 : 0;
-				maxChange = { categoryId: catId, absDiff, changePercent, current, previous };
-			}
-		}
-
-		if (maxChange.categoryId === 0 || maxChange.absDiff === 0) return null;
-
-		const cat = categories.find((c) => c.id === maxChange.categoryId);
-		return {
-			name: cat?.name ?? 'Unknown',
-			icon: cat?.icon ?? '',
-			changePercent: maxChange.changePercent,
-			current: maxChange.current,
-			previous: maxChange.previous
-		};
-	});
+	// Uses the pure function directly (not engine-memoized) because previousTransactions
+	// is async component-local state that changes independently of TransactionCache.version.
+	let topChange = $derived(
+		computeCategoryDeepDiveShift(transactions, previousTransactions, categories)
+	);
 
 	let previousMonth = $derived(navigateMonth(currentMonth, -1));
 </script>

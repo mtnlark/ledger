@@ -3,6 +3,7 @@
 	import { getMonthKey, navigateMonth, parseMonthKey } from '$lib/db';
 	import type { Transaction, Category, MonthlyBudget } from '$lib/db';
 	import { config } from '$lib/config';
+	import { getInsightsEngine } from '$lib/insights';
 
 	interface Props {
 		currentMonthTransactions: Transaction[];
@@ -15,23 +16,10 @@
 	let { currentMonthTransactions, allTransactions, categories, availableMonths, budget }: Props =
 		$props();
 
+	const engine = getInsightsEngine();
+
 	// Current month key
 	let currentMonthKey = getMonthKey(new Date());
-
-	// Get category name helper
-	function getCategoryName(catId: number): string {
-		return categories.find((c) => c.id === catId)?.name ?? 'Unknown';
-	}
-
-	// Calculate spending by category for a given month's transactions
-	function getSpendingByCategory(transactions: Transaction[]): Map<number, number> {
-		const spending = new Map<number, number>();
-		for (const t of transactions) {
-			const amount = t.isShared ? t.amount - t.partnerShare : t.amount;
-			spending.set(t.categoryId, (spending.get(t.categoryId) || 0) + amount);
-		}
-		return spending;
-	}
 
 	// Get transactions for a specific month from all transactions
 	function getTransactionsForMonth(month: string): Transaction[] {
@@ -46,10 +34,8 @@
 
 	// Calculate 3-month average per category (excluding current month)
 	let categoryAverages = $derived.by(() => {
-		const averages = new Map<number, number>();
-		if (availableMonths.length < 2) return averages;
+		if (availableMonths.length < 2) return new Map<number, number>();
 
-		// Get recent months excluding current for averaging
 		const recentMonths: string[] = [];
 		let month = navigateMonth(currentMonthKey, -1);
 		for (let i = 0; i < config.insights.takeaways.monthsToAverage; i++) {
@@ -59,172 +45,47 @@
 			month = navigateMonth(month, -1);
 		}
 
-		if (recentMonths.length === 0) return averages;
+		if (recentMonths.length === 0) return new Map<number, number>();
 
-		// Sum spending per category across recent months
-		const categoryTotals = new Map<number, number>();
-		for (const m of recentMonths) {
-			const transactions = getTransactionsForMonth(m);
-			const spending = getSpendingByCategory(transactions);
-			for (const [catId, amount] of spending) {
-				categoryTotals.set(catId, (categoryTotals.get(catId) || 0) + amount);
-			}
-		}
-
-		// Calculate averages
-		for (const [catId, total] of categoryTotals) {
-			averages.set(catId, total / recentMonths.length);
-		}
-
-		return averages;
+		return engine.getCategoryAverages(getTransactionsForMonth, recentMonths, currentMonthKey);
 	});
 
 	// Detect anomalies (categories significantly above average)
 	let anomalies = $derived.by(() => {
-		const currentSpending = getSpendingByCategory(currentMonthTransactions);
-		const results: { catId: number; name: string; current: number; avg: number; ratio: number }[] =
-			[];
-
-		for (const [catId, current] of currentSpending) {
-			const avg = categoryAverages.get(catId) || 0;
-			if (avg > config.insights.anomaly.minAverage) {
-				// Only flag if there's meaningful historical spending
-				const ratio = current / avg;
-				if (ratio > config.insights.anomaly.ratioThreshold) {
-					results.push({
-						catId,
-						name: getCategoryName(catId),
-						current,
-						avg,
-						ratio
-					});
-				}
-			}
-		}
-
-		return results.sort((a, b) => b.ratio - a.ratio).slice(0, config.insights.anomaly.maxToShow);
+		const currentSpending = engine.getSpendingByCategory(currentMonthTransactions, currentMonthKey);
+		return engine.getAnomalies(currentSpending, categoryAverages, categories, config.insights.anomaly, currentMonthKey);
 	});
 
 	// Calculate pace projection
 	let paceProjection = $derived.by(() => {
-		if (!budget) return null;
-
 		const today = new Date();
 		const currentDay = today.getDate();
 		const daysInMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
-
-		if (currentDay === 0) return null;
-
-		const totalSpent = currentMonthTransactions.reduce(
-			(sum, t) => sum + (t.isShared ? t.amount - t.partnerShare : t.amount),
-			0
-		);
-
-		const dailyAvg = totalSpent / currentDay;
-		const projected = totalSpent + dailyAvg * (daysInMonth - currentDay);
-		const available = budget.income - budget.savedAmount;
-		const percentOfBudget = available > 0 ? (projected / available) * 100 : 0;
-
-		return {
-			projected: Math.round(projected),
-			available: Math.round(available),
-			percentOfBudget: Math.round(percentOfBudget),
-			isOverBudget: projected > available
-		};
+		const totalSpent = engine.getTotalSpent(currentMonthTransactions, currentMonthKey);
+		return engine.getPaceProjection(totalSpent, budget, currentDay, daysInMonth, currentMonthKey);
 	});
 
 	// Get previous month for comparison
 	let previousMonthKey = $derived(navigateMonth(currentMonthKey, -1));
 
-	// Type for category shift data
-	type ShiftData = {
-		name: string;
-		current: number;
-		previous: number;
-		diff: number;
-		isIncrease: boolean;
-	};
-
 	// Calculate top category shift (biggest change from last month)
-	let topShift = $derived.by((): ShiftData | null => {
+	let topShift = $derived.by(() => {
 		const prevTransactions = getTransactionsForMonth(previousMonthKey);
-		if (prevTransactions.length === 0) return null;
-
-		const currentSpending = getSpendingByCategory(currentMonthTransactions);
-		const prevSpending = getSpendingByCategory(prevTransactions);
-
-		// Check how far into the month we are
 		const today = new Date();
 		const currentDay = today.getDate();
-		const isEarlyInMonth = currentDay <= config.insights.shift.earlyMonthCutoff;
-
-		let biggestShift: ShiftData | null = null;
-		let biggestAbsDiff = 0;
-
-		// Check all categories with spending in either month
-		const allCatIds = new Set([...currentSpending.keys(), ...prevSpending.keys()]);
-
-		for (const catId of allCatIds) {
-			const current = currentSpending.get(catId) || 0;
-			const previous = prevSpending.get(catId) || 0;
-			const diff = current - previous;
-			const absDiff = Math.abs(diff);
-			const isDecrease = diff < 0;
-
-			// Skip "down" shifts if:
-			// 1. Current spending is $0 or very low (expense likely hasn't hit yet)
-			// 2. We're early in the month and it looks like a recurring expense that hasn't posted
-			if (isDecrease) {
-				// Don't show "down" for categories with $0 this month - likely just hasn't hit yet
-				if (current === 0) continue;
-				// Don't show "down" if we're early in month and current is below ratio threshold
-				// (likely a recurring expense that hasn't posted)
-				if (isEarlyInMonth && previous > 0 && current / previous < config.insights.shift.earlyMonthRatio) continue;
-			}
-
-			// Only consider meaningful shifts (min difference and some base amount)
-			if (absDiff > biggestAbsDiff && absDiff >= config.insights.shift.minDifference && (current > config.insights.shift.minAmount || previous > config.insights.shift.minAmount)) {
-				biggestAbsDiff = absDiff;
-				biggestShift = {
-					name: getCategoryName(catId),
-					current,
-					previous,
-					diff,
-					isIncrease: diff > 0
-				};
-			}
-		}
-
-		// Don't show if it's already an anomaly (avoid duplication)
-		if (biggestShift && anomalies.some((a) => a.name === biggestShift!.name)) {
-			return null;
-		}
-
-		return biggestShift;
+		return engine.getTopCategoryShift(
+			currentMonthTransactions,
+			prevTransactions,
+			categories,
+			currentDay,
+			anomalies,
+			config.insights.shift,
+			currentMonthKey
+		);
 	});
 
 	// Fallback: Needs vs wants ratio
-	let needsVsWants = $derived.by(() => {
-		if (currentMonthTransactions.length === 0) return null;
-
-		let needsTotal = 0;
-		let wantsTotal = 0;
-
-		for (const t of currentMonthTransactions) {
-			const amount = t.isShared ? t.amount - t.partnerShare : t.amount;
-			if (t.isEssential) {
-				needsTotal += amount;
-			} else {
-				wantsTotal += amount;
-			}
-		}
-
-		const total = needsTotal + wantsTotal;
-		if (total === 0) return null;
-
-		const needsPercent = Math.round((needsTotal / total) * 100);
-		return { needsTotal, wantsTotal, needsPercent };
-	});
+	let needsVsWants = $derived(engine.getNeedsVsWants(currentMonthTransactions, currentMonthKey));
 
 	// Fallback: Spending velocity comparison (daily average this month vs last month)
 	let velocityComparison = $derived.by(() => {
@@ -233,52 +94,26 @@
 
 		const today = new Date();
 		const currentDay = today.getDate();
-		if (currentDay === 0) return null;
+		const currentTotal = engine.getTotalSpent(currentMonthTransactions, currentMonthKey);
 
-		// Current month: total / days elapsed
-		const currentTotal = currentMonthTransactions.reduce(
-			(sum, t) => sum + (t.isShared ? t.amount - t.partnerShare : t.amount),
-			0
-		);
-		const currentDailyAvg = currentTotal / currentDay;
-
-		// Previous month: total / days in that month
 		const prevMonthDate = parseMonthKey(previousMonthKey);
 		const daysInPrevMonth = new Date(prevMonthDate.getFullYear(), prevMonthDate.getMonth() + 1, 0).getDate();
-		const prevTotal = prevTransactions.reduce(
-			(sum, t) => sum + (t.isShared ? t.amount - t.partnerShare : t.amount),
-			0
+		const prevTotal = engine.getTotalSpent(prevTransactions, previousMonthKey);
+
+		return engine.getVelocityComparison(
+			currentTotal,
+			prevTotal,
+			currentDay,
+			daysInPrevMonth,
+			config.insights.velocity.percentThreshold,
+			currentMonthKey
 		);
-		const prevDailyAvg = prevTotal / daysInPrevMonth;
-
-		if (prevDailyAvg === 0) return null;
-
-		const percentChange = Math.round(((currentDailyAvg - prevDailyAvg) / prevDailyAvg) * 100);
-
-		// Only show if there's a meaningful difference
-		if (Math.abs(percentChange) < config.insights.velocity.percentThreshold) return null;
-
-		return { currentDailyAvg, prevDailyAvg, percentChange, isUp: percentChange > 0 };
 	});
 
 	// Fallback: Most frequent merchant this month
-	let topMerchant = $derived.by(() => {
-		if (currentMonthTransactions.length === 0) return null;
-
-		const freq = new Map<string, number>();
-		for (const t of currentMonthTransactions) {
-			freq.set(t.merchant, (freq.get(t.merchant) || 0) + 1);
-		}
-
-		let top = { merchant: '', count: 0 };
-		for (const [merchant, count] of freq) {
-			if (count > top.count) {
-				top = { merchant, count };
-			}
-		}
-
-		return top.count >= config.insights.topMerchant.minVisits ? top : null;
-	});
+	let topMerchant = $derived(
+		engine.getTopMerchant(currentMonthTransactions, currentMonthKey, config.insights.topMerchant.minVisits)
+	);
 
 	// Build takeaways list
 	interface Takeaway {

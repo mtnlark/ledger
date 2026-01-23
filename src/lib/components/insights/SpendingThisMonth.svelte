@@ -2,6 +2,7 @@
 	import type { Transaction, MonthlyBudget } from '$lib/db';
 	import { parseMonthKey, getMonthKey } from '$lib/db';
 	import { format } from 'date-fns';
+	import { getInsightsEngine } from '$lib/insights';
 	import InsightGroup from './InsightGroup.svelte';
 	import MonthPicker from '../MonthPicker.svelte';
 	import SavingsRateChart from './SavingsRateChart.svelte';
@@ -27,6 +28,8 @@
 		onMonthChange
 	}: Props = $props();
 
+	const engine = getInsightsEngine();
+
 	// Check if viewing current month
 	let isCurrentMonth = $derived(currentMonth === getMonthKey(new Date()));
 
@@ -34,9 +37,7 @@
 	let monthDisplay = $derived(format(parseMonthKey(currentMonth), 'MMMM yyyy'));
 
 	// Calculate totals
-	let totalSpent = $derived(
-		transactions.reduce((sum, t) => sum + (t.isShared ? t.amount - t.partnerShare : t.amount), 0)
-	);
+	let totalSpent = $derived(engine.getTotalSpent(transactions, currentMonth));
 
 	// Current savings rate
 	let currentSavingsRate = $derived(

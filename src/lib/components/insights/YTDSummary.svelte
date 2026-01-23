@@ -1,8 +1,8 @@
 <script lang="ts">
 	import { format } from 'date-fns';
-	import { getMonthKey } from '$lib/db';
 	import type { Transaction } from '$lib/db';
 	import { formatCurrencyWhole } from '$lib/utils/modal-helpers';
+	import { getInsightsEngine } from '$lib/insights';
 	import InsightGroup from './InsightGroup.svelte';
 	import CalendarHeatmap from './CalendarHeatmap.svelte';
 
@@ -12,46 +12,21 @@
 
 	let { transactions }: Props = $props();
 
+	const engine = getInsightsEngine();
 	let currentYear = new Date().getFullYear();
 
-	// Filter to current year
-	let ytdTransactions = $derived(
-		transactions.filter((t) => new Date(t.date).getFullYear() === currentYear)
-	);
+	// Compute all YTD stats via the engine (memoized)
+	let ytdStats = $derived(engine.getYTDStats(transactions, currentYear));
 
-	// Build daily spending map
-	let dailySpending = $derived.by(() => {
-		const spending = new Map<string, number>();
-		for (const t of ytdTransactions) {
-			const dateKey = format(new Date(t.date), 'yyyy-MM-dd');
-			const amount = t.isShared ? t.amount - t.partnerShare : t.amount;
-			spending.set(dateKey, (spending.get(dateKey) || 0) + amount);
-		}
-		return spending;
-	});
+	// Destructure for template usage
+	let totalSpent = $derived(ytdStats.totalSpent);
+	let noSpendDays = $derived(ytdStats.noSpendDays);
+	let dailySpending = $derived(ytdStats.dailySpending);
+	let dailyAvg = $derived(ytdStats.dailyAvg);
+	let biggestMonth = $derived(ytdStats.biggestMonth);
+	let topMerchant = $derived(ytdStats.topMerchant);
 
-	// Calculate preview metrics
-	let totalSpent = $derived(
-		ytdTransactions.reduce((sum, t) => sum + (t.isShared ? t.amount - t.partnerShare : t.amount), 0)
-	);
-
-	let spendDays = $derived.by(() => {
-		const days = new Set<string>();
-		for (const t of ytdTransactions) {
-			days.add(format(new Date(t.date), 'yyyy-MM-dd'));
-		}
-		return days.size;
-	});
-
-	let daysInYearSoFar = $derived.by(() => {
-		const start = new Date(currentYear, 0, 1);
-		const today = new Date();
-		return Math.floor((today.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
-	});
-
-	let noSpendDays = $derived(daysInYearSoFar - spendDays);
-
-	// Recent 30 days for mini heatmap
+	// Recent 30 days for mini heatmap (UI-only, not worth memoizing in engine)
 	let recentDailySpending = $derived.by(() => {
 		const recent = new Map<string, number>();
 		const today = new Date();
@@ -64,66 +39,8 @@
 		return recent;
 	});
 
-	// Daily average
-	let dailyAvg = $derived(daysInYearSoFar > 0 ? totalSpent / daysInYearSoFar : 0);
-
-	// Biggest spending month (calculated from transactions)
-	let biggestMonth = $derived.by(() => {
-		const monthlySpending = new Map<string, number>();
-		for (const t of ytdTransactions) {
-			const monthKey = getMonthKey(new Date(t.date));
-			const amount = t.isShared ? t.amount - t.partnerShare : t.amount;
-			monthlySpending.set(monthKey, (monthlySpending.get(monthKey) || 0) + amount);
-		}
-		if (monthlySpending.size === 0) return null;
-		let max = { month: '', amount: 0 };
-		for (const [month, amount] of monthlySpending) {
-			if (amount > max.amount) {
-				max = { month, amount };
-			}
-		}
-		if (!max.month) return null;
-		const [year, monthNum] = max.month.split('-').map(Number);
-		const monthName = new Date(year, monthNum - 1).toLocaleString('default', { month: 'long' });
-		return { label: monthName, amount: max.amount };
-	});
-
-	// Most frequent merchant
-	let topMerchant = $derived.by(() => {
-		const freq = new Map<string, number>();
-		for (const t of ytdTransactions) {
-			freq.set(t.merchant, (freq.get(t.merchant) || 0) + 1);
-		}
-		let max = { merchant: '', count: 0 };
-		for (const [merchant, count] of freq) {
-			if (count > max.count) {
-				max = { merchant, count };
-			}
-		}
-		return max.merchant ? max : null;
-	});
-
-	// Calculate all-time needs vs wants
-	let needsWantsStats = $derived.by(() => {
-		let needs = 0;
-		let wants = 0;
-
-		for (const tx of transactions) {
-			const userAmount = tx.isShared ? tx.amount - tx.partnerShare : tx.amount;
-
-			if (tx.isEssential) {
-				needs += userAmount;
-			} else {
-				wants += userAmount;
-			}
-		}
-
-		const total = needs + wants;
-		const needsPercent = total > 0 ? (needs / total) * 100 : 0;
-		const wantsPercent = total > 0 ? (wants / total) * 100 : 0;
-
-		return { needs, wants, total, needsPercent, wantsPercent };
-	});
+	// All-time needs vs wants
+	let needsWantsStats = $derived(engine.getNeedsVsWantsFull(transactions, 'ytd-all-time'));
 </script>
 
 <InsightGroup title="Year in Review" description="{currentYear} spending overview">

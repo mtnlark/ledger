@@ -86,6 +86,22 @@ ledger/
 │   │   │   ├── selectedMonth.ts    # UI state for month selection
 │   │   │   ├── theme.ts            # Light/dark/system theme
 │   │   │   └── toast.ts            # Toast notification system
+│   │   ├── insights/             # Memoized insight calculations
+│   │   │   ├── index.ts          # Public API (getInsightsEngine)
+│   │   │   ├── types.ts          # Type definitions
+│   │   │   ├── memo.ts           # Version-based memoization utilities
+│   │   │   ├── insights-engine.ts # InsightsEngine singleton
+│   │   │   └── calculations/     # Pure calculation functions
+│   │   │       ├── index.ts
+│   │   │       ├── spending.ts
+│   │   │       ├── needs-wants.ts
+│   │   │       ├── category-shift.ts
+│   │   │       ├── category-averages.ts
+│   │   │       ├── anomalies.ts
+│   │   │       ├── pace-projection.ts
+│   │   │       ├── velocity.ts
+│   │   │       ├── top-merchant.ts
+│   │   │       └── ytd-stats.ts
 │   │   ├── components/
 │   │   │   ├── SideNav.svelte         # Collapsible sidebar
 │   │   │   ├── HeaderNav.svelte       # Page headers
