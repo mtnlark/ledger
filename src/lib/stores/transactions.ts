@@ -3,6 +3,7 @@ import { liveQuery } from 'dexie';
 import { persistData } from '$lib/storage';
 import { invalidateMerchantCache } from './merchants';
 import { invalidateRecurringCache } from './recurring';
+import { isSubscriptionCancelled, reactivateSubscription } from './subscriptionSettings';
 import { getMonthDateRange } from '$lib/utils/date-helpers';
 import { getTransactionCache } from './transactionCache';
 
@@ -90,6 +91,11 @@ export async function addTransaction(
 		cache.add({ ...newTransaction, id } as Transaction & { id: number });
 	}
 
+	// Auto-reactivate if adding a subscription for a cancelled merchant
+	if (transaction.isSubscription && await isSubscriptionCancelled(transaction.merchant)) {
+		await reactivateSubscription(transaction.merchant);
+	}
+
 	invalidateTransactionCaches();
 	await persistData();
 	return id;
@@ -131,6 +137,14 @@ export async function updateTransaction(
 	const cache = getTransactionCache();
 	if (cache.isLoaded) {
 		cache.update(id, updatedFields);
+	}
+
+	// Auto-reactivate if marking as subscription for a cancelled merchant
+	if (updates.isSubscription === true) {
+		const merchant = updates.merchant ?? existing.merchant;
+		if (await isSubscriptionCancelled(merchant)) {
+			await reactivateSubscription(merchant);
+		}
 	}
 
 	invalidateTransactionCaches();

@@ -101,13 +101,17 @@
 		new Map(cancelledSubscriptions.map((c: CancelledSubscription) => [c.merchant, new Date(c.cancelledDate)]))
 	);
 
-	// Helper to check if a subscription is cancelled (and not resubscribed after cancellation)
-	function isCancelled(merchant: string, createdAt: Date): boolean {
+	// Check if a merchant is cancelled (with resubscription detection via charge date)
+	// Only a charge date AFTER the cancellation is treated as a resubscription —
+	// createdAt is not used since users may record old charges after cancelling
+	function isCancelled(merchant: string, lastChargeDate?: Date): boolean {
 		const normalized = normalizeMerchant(merchant);
 		const cancelledDate = cancelledMerchantMap.get(normalized);
 		if (!cancelledDate) return false;
-		// If the transaction was added after the cancellation, it's a resubscription
-		return createdAt <= cancelledDate;
+		if (lastChargeDate && !isNaN(lastChargeDate.getTime()) && lastChargeDate > cancelledDate) {
+			return false;
+		}
+		return true;
 	}
 
 	// Normalize confirmed active merchant names for lookup
@@ -121,12 +125,7 @@
 			.filter((sub) => {
 				const normalized = normalizeMerchant(sub.merchant);
 				const subDate = new Date(sub.date);
-				// Use createdAt (when user added the transaction) to compare against cancellation
-				// This handles the case where user adds a new subscription with a past charge date
-				const createdAt = new Date(sub.createdAt);
-				// Check if cancelled (but allow resubscriptions added after cancellation)
-				if (isCancelled(sub.merchant, createdAt)) return false;
-				// Either confirmed active OR not stale
+				if (isCancelled(sub.merchant, subDate)) return false;
 				const stale = isStale(subDate, sub.subscriptionFrequency);
 				return confirmedActiveSet.has(normalized) || !stale;
 			})
@@ -143,10 +142,7 @@
 			.filter((sub) => {
 				const normalized = normalizeMerchant(sub.merchant);
 				const subDate = new Date(sub.date);
-				const createdAt = new Date(sub.createdAt);
-				// Not cancelled (or resubscribed after cancellation)
-				if (isCancelled(sub.merchant, createdAt)) return false;
-				// Not confirmed active AND is stale
+				if (isCancelled(sub.merchant, subDate)) return false;
 				if (confirmedActiveSet.has(normalized)) return false;
 				return isStale(subDate, sub.subscriptionFrequency);
 			})
@@ -161,27 +157,40 @@
 		activeSubscriptions.filter((s) => s.subscriptionFrequency === 'annual')
 	);
 
-	// Calculate subscription totals (user's portion only, active only)
+	// Calculate subscription totals (user's portion only, all non-cancelled subscriptions)
+	let allNonCancelledSubs = $derived(
+		allSubscriptions.filter((sub) => !isCancelled(sub.merchant, new Date(sub.date)))
+	);
+
 	let monthlySubCost = $derived(
-		monthlySubscriptions.reduce((sum, t) => {
-			const userAmount = t.isShared ? t.amount - t.partnerShare : t.amount;
-			return sum + userAmount;
-		}, 0)
+		allNonCancelledSubs
+			.filter((s) => s.subscriptionFrequency !== 'annual')
+			.reduce((sum, t) => {
+				const userAmount = t.isShared ? t.amount - t.partnerShare : t.amount;
+				return sum + userAmount;
+			}, 0)
 	);
 
 	let annualSubCost = $derived(
-		annualSubscriptions.reduce((sum, t) => {
-			const userAmount = t.isShared ? t.amount - t.partnerShare : t.amount;
-			return sum + userAmount;
-		}, 0)
+		allNonCancelledSubs
+			.filter((s) => s.subscriptionFrequency === 'annual')
+			.reduce((sum, t) => {
+				const userAmount = t.isShared ? t.amount - t.partnerShare : t.amount;
+				return sum + userAmount;
+			}, 0)
 	);
 
-	// Monthly equivalent of active subscriptions
+	// Monthly equivalent of all non-cancelled subscriptions
 	let totalSubMonthly = $derived(monthlySubCost + annualSubCost / 12);
+
+	// Filter detected recurring to exclude cancelled merchants
+	let activeRecurring = $derived(
+		recurring.filter((r: DetectedRecurring) => !cancelledMerchantMap.has(normalizeMerchant(r.merchant)))
+	);
 
 	// Calculate detected recurring totals (user's portion only, converted to monthly)
 	let totalDetectedMonthly = $derived(
-		recurring.reduce((sum: number, r: DetectedRecurring) => {
+		activeRecurring.reduce((sum: number, r: DetectedRecurring) => {
 			// Convert to monthly equivalent based on frequency
 			if (r.frequency === 'semi-annual') {
 				return sum + r.averageUserAmount / 6;
@@ -192,12 +201,12 @@
 		}, 0)
 	);
 
-	// Grand total monthly (active only)
+	// Grand total monthly (all non-cancelled subscriptions + detected bills)
 	let totalMonthlyRecurring = $derived(totalSubMonthly + totalDetectedMonthly);
 
 	// Has any data?
 	let hasData = $derived(
-		allSubscriptions.length > 0 || recurring.length > 0
+		allSubscriptions.length > 0 || activeRecurring.length > 0
 	);
 
 	// Action handlers - handleDismiss now shows confirmation dialog
@@ -259,7 +268,7 @@
 				</div>
 				<div class="text-charcoal-muted">|</div>
 				<div class="text-sm text-charcoal-muted">
-					{activeSubscriptions.length} sub{activeSubscriptions.length !== 1 ? 's' : ''}, {recurring.length} bill{recurring.length !== 1 ? 's' : ''}
+					{activeSubscriptions.length} sub{activeSubscriptions.length !== 1 ? 's' : ''}, {activeRecurring.length} bill{activeRecurring.length !== 1 ? 's' : ''}
 					{#if possiblyInactiveSubscriptions.length > 0}
 						<span class="text-warning-600 ml-1">({possiblyInactiveSubscriptions.length} inactive?)</span>
 					{/if}
@@ -408,16 +417,16 @@
 				{/if}
 
 				<!-- Detected Recurring Bills Section -->
-				{#if recurring.length > 0}
+				{#if activeRecurring.length > 0}
 					<div>
 						<h4 class="text-sm font-medium text-charcoal-muted mb-3 flex items-center gap-2">
 							<Zap size={14} />
 							Detected Bills
-							<span class="text-xs font-normal">({recurring.length})</span>
+							<span class="text-xs font-normal">({activeRecurring.length})</span>
 						</h4>
 
 						<div class="space-y-2">
-							{#each recurring as item (item.merchant)}
+							{#each activeRecurring as item (item.merchant)}
 								{@const freqLabel = item.frequency === 'monthly' ? '/mo' : item.frequency === 'semi-annual' ? '/6mo' : '/yr'}
 								{@const freqDesc = item.frequency === 'monthly' ? 'monthly' : item.frequency === 'semi-annual' ? 'every 6 months' : 'annually'}
 								<div class="flex items-center gap-3 py-2 px-3 bg-cream/50 rounded-lg group">
