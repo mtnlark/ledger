@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { untrack } from 'svelte';
 	import { format } from 'date-fns';
 	import { parseMonthKey, navigateMonth } from '$lib/db';
 	import type { Transaction, Category } from '$lib/db';
@@ -47,18 +48,16 @@
 		}
 	});
 
-	// Set default selected category to the most anomalous (topChange) if available
+	// Set default selected category to the most anomalous (topChange) if available.
+	// Uses untrack for selectedCategoryId reads to avoid re-triggering on user changes.
 	$effect(() => {
-		// Only auto-select if user hasn't manually chosen
 		if (!hasUserSelected && sortedCategories.length > 0) {
 			if (topChange) {
-				// Default to the most anomalous category
 				const anomalousCat = categories.find((c) => c.name === topChange.name);
-				if (anomalousCat?.id && selectedCategoryId !== anomalousCat.id) {
+				if (anomalousCat?.id && untrack(() => selectedCategoryId) !== anomalousCat.id) {
 					selectedCategoryId = anomalousCat.id;
 				}
-			} else if (selectedCategoryId === null) {
-				// Fallback to first category if no trend data yet
+			} else if (untrack(() => selectedCategoryId) === null) {
 				selectedCategoryId = sortedCategories[0].id!;
 			}
 		}
