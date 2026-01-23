@@ -93,7 +93,7 @@
 	// Get selected category details
 	let selectedCategory = $derived(categories.find((c) => c.id === selectedCategoryId));
 
-	// Calculate top changing category for preview
+	// Calculate top changing category for preview (by largest absolute dollar change)
 	let topChange = $derived.by(() => {
 		if (previousTransactions.length === 0 || transactions.length === 0) return null;
 
@@ -109,26 +109,31 @@
 			prevSpending.set(t.categoryId, (prevSpending.get(t.categoryId) || 0) + amount);
 		}
 
-		let maxChange = { categoryId: 0, change: 0, current: 0, previous: 0 };
+		let maxChange = { categoryId: 0, absDiff: 0, changePercent: 0, current: 0, previous: 0 };
 
-		for (const [catId, current] of currentSpending) {
+		// Consider all categories present in either month
+		const allCategoryIds = new Set([...currentSpending.keys(), ...prevSpending.keys()]);
+
+		for (const catId of allCategoryIds) {
+			const current = currentSpending.get(catId) || 0;
 			const previous = prevSpending.get(catId) || 0;
-			if (previous > 0) {
-				const changePercent = ((current - previous) / previous) * 100;
-				if (Math.abs(changePercent) > Math.abs(maxChange.change)) {
-					maxChange = { categoryId: catId, change: changePercent, current, previous };
-				}
+			const absDiff = Math.abs(current - previous);
+
+			if (absDiff > maxChange.absDiff) {
+				const changePercent = previous > 0 ? ((current - previous) / previous) * 100 : 0;
+				maxChange = { categoryId: catId, absDiff, changePercent, current, previous };
 			}
 		}
 
-		if (maxChange.categoryId === 0) return null;
+		if (maxChange.categoryId === 0 || maxChange.absDiff === 0) return null;
 
 		const cat = categories.find((c) => c.id === maxChange.categoryId);
 		return {
 			name: cat?.name ?? 'Unknown',
 			icon: cat?.icon ?? '',
-			change: maxChange.change,
-			current: maxChange.current
+			changePercent: maxChange.changePercent,
+			current: maxChange.current,
+			previous: maxChange.previous
 		};
 	});
 
@@ -139,20 +144,27 @@
 	{#snippet preview()}
 		<div class="flex items-center justify-between">
 			{#if topChange}
+				{@const diff = topChange.current - topChange.previous}
 				<div class="flex items-center gap-2">
 					<span class="text-xl">{topChange.icon}</span>
 					<div>
 						<p class="text-sm font-medium text-charcoal">{topChange.name}</p>
 						<p class="text-xs text-charcoal-muted">
-							{topChange.change > 0 ? '+' : ''}{topChange.change.toFixed(0)}% vs last month
+							{#if topChange.previous > 0}
+								{diff > 0 ? '+' : ''}{topChange.changePercent.toFixed(0)}% vs last month
+							{:else}
+								new this month
+							{/if}
 						</p>
 					</div>
 				</div>
 				<div class="text-right">
-					<p class="text-lg font-semibold text-charcoal">
-						${topChange.current.toLocaleString()}
+					<p class="text-lg font-semibold text-charcoal font-mono">
+						${topChange.current.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
 					</p>
-					<p class="text-xs text-charcoal-muted">this month</p>
+					<p class="text-xs text-charcoal-muted">
+						{diff > 0 ? '+' : ''}{diff < 0 ? '-' : ''}${Math.abs(diff).toFixed(0)} vs last month
+					</p>
 				</div>
 			{:else}
 				<p class="text-sm text-charcoal-muted">Select a category to view trends</p>
