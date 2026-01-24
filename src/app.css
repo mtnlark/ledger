@@ -305,7 +305,6 @@
   /* Interactive card: subtle lift on hover */
   .card-interactive {
     transition: transform 0.2s var(--ease-out-expo), box-shadow 0.2s ease-out;
-    will-change: transform;
   }
 
   .card-interactive:hover {
@@ -319,15 +318,6 @@
     border-left: 3px solid var(--color-primary-500, #C45D3A);
   }
 
-  /* Amount emphasis: subtle weight for large dollar figures */
-  .text-amount-lg {
-    text-shadow: 0 0 1px rgba(45, 42, 38, 0.1);
-    letter-spacing: -0.01em;
-  }
-
-  .dark .text-amount-lg {
-    text-shadow: 0 0 1px rgba(237, 232, 225, 0.1);
-  }
 
   /* Checkbox spring animation */
   .checkbox-spring {
