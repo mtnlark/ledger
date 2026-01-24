@@ -20,11 +20,10 @@ export const config = {
 		/** Threshold for "approaching budget" alert (within $X of limit) */
 		approachingThreshold: 5,
 		/**
-		 * Epsilon for floating point comparison.
-		 * Using $0.50 because formatCurrency rounds to whole dollars,
-		 * so any amount < $0.50 would display as $0
+		 * Epsilon for floating point comparison (cents).
+		 * Used for determining if spending equals budget amount.
 		 */
-		epsilon: 0.5
+		epsilon: 0.01
 	},
 
 	/**

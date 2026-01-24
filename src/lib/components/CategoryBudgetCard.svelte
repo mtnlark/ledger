@@ -2,7 +2,7 @@
 	import { Pencil, Check, X, Sparkles } from 'lucide-svelte';
 	import BudgetProgressBar from './BudgetProgressBar.svelte';
 	import type { Category } from '$lib/db';
-	import { formatCurrencyWhole } from '$lib/utils/modal-helpers';
+	import { formatCurrencyWhole } from '$lib/utils/format-helpers';
 
 	interface Props {
 		category: Category;

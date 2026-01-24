@@ -21,6 +21,7 @@ export class TransactionCache {
 	private cache: Map<number, CachedTransaction> = new Map();
 	private _isLoaded = false;
 	private _version = 0;
+	private _initPromise: Promise<void> | null = null;
 
 	/**
 	 * Whether the cache has been initialized with data
@@ -56,7 +57,31 @@ export class TransactionCache {
 			}
 		}
 		this._isLoaded = true;
+		this._initPromise = null;
 		this._version++;
+	}
+
+	/**
+	 * Initialize the cache with an async loader function.
+	 * Uses a lock to prevent concurrent initialization.
+	 * Returns immediately if already loaded.
+	 */
+	async initializeAsync(loader: () => Promise<Transaction[]>): Promise<void> {
+		if (this._isLoaded) return;
+
+		// If already initializing, wait for that to complete
+		if (this._initPromise) {
+			await this._initPromise;
+			return;
+		}
+
+		// Start initialization with lock
+		this._initPromise = (async () => {
+			const transactions = await loader();
+			this.initialize(transactions);
+		})();
+
+		await this._initPromise;
 	}
 
 	/**
@@ -180,6 +205,7 @@ export class TransactionCache {
 	invalidate(): void {
 		this.cache.clear();
 		this._isLoaded = false;
+		this._initPromise = null;
 		this._version++;
 	}
 }

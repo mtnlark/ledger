@@ -2,7 +2,7 @@
 	import { X, Plus, Trash2 } from 'lucide-svelte';
 	import type { Category, Transaction } from '$lib/db';
 	import { createCategoryHelpers } from '$lib/utils/category-helpers';
-	import { formatCurrency } from '$lib/utils/modal-helpers';
+	import { formatCurrency } from '$lib/utils/format-helpers';
 
 	interface Props {
 		isOpen: boolean;

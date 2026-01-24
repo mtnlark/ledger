@@ -7,7 +7,27 @@ export default defineConfig({
 		include: ['src/**/*.{test,spec}.{js,ts}'],
 		environment: 'jsdom',
 		globals: true,
-		setupFiles: ['src/tests/setup.ts']
+		setupFiles: ['src/tests/setup.ts'],
+		coverage: {
+			provider: 'v8',
+			reporter: ['text', 'html', 'lcov'],
+			exclude: [
+				'node_modules/**',
+				'src-tauri/**',
+				'src/tests/**',
+				'**/*.d.ts',
+				'**/*.config.*',
+				'**/types.ts',
+				'src/lib/components/**/*.svelte',
+				'src/routes/**'
+			],
+			thresholds: {
+				statements: 60,
+				branches: 55,
+				functions: 60,
+				lines: 60
+			}
+		}
 	},
 	resolve: {
 		alias: {

@@ -4,14 +4,39 @@
 
 import type { Transaction, Category, MonthlyBudget } from '$lib/db';
 
-// Re-export types from existing calculations for convenience
-export type {
-	AnomalyResult,
-	PaceProjectionResult,
-	NeedsVsWantsResult,
-	VelocityComparisonResult,
-	TopMerchantResult
-} from '$lib/utils/insights-calculations';
+export interface AnomalyResult {
+	catId: number;
+	name: string;
+	current: number;
+	avg: number;
+	ratio: number;
+	zScore?: number;
+}
+
+export interface PaceProjectionResult {
+	projected: number;
+	available: number;
+	percentOfBudget: number;
+	isOverBudget: boolean;
+}
+
+export interface NeedsVsWantsResult {
+	needsTotal: number;
+	wantsTotal: number;
+	needsPercent: number;
+}
+
+export interface VelocityComparisonResult {
+	currentDailyAvg: number;
+	prevDailyAvg: number;
+	percentChange: number;
+	isUp: boolean;
+}
+
+export interface TopMerchantResult {
+	merchant: string;
+	count: number;
+}
 
 /**
  * Extended needs/wants result that includes percentages for both sides.

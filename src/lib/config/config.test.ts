@@ -22,7 +22,7 @@ describe('config', () => {
 		});
 
 		it('has epsilon for floating point comparison', () => {
-			expect(config.budget.epsilon).toBe(0.5);
+			expect(config.budget.epsilon).toBe(0.01);
 		});
 	});
 

@@ -13,8 +13,6 @@ export interface DetectedRecurring {
 	frequency: RecurringFrequency;
 	dayOfMonth: number;
 	occurrenceCount: number;
-	/** Whether it's in the Subscriptions category (legacy - use amountType instead) */
-	isSubscription: boolean;
 	/** 'fixed' = low variance (subscriptions, insurance), 'variable' = higher variance (utilities) */
 	amountType: 'fixed' | 'variable';
 	/** Coefficient of variation (0-1+) - how much the amount varies */
@@ -169,9 +167,6 @@ export async function detectRecurringExpenses(): Promise<DetectedRecurring[]> {
 	// Get dismissed merchants to filter out
 	const dismissedMerchants = await getDismissedRecurring();
 
-	// Note: Subscriptions category was removed in favor of isSubscription tag on transactions
-	// The isSubscription field on DetectedRecurring is now always false (legacy field)
-
 	// Group transactions by normalized merchant name
 	// Exclude transactions already tagged as subscriptions (they're shown in subscriptions section)
 	const merchantGroups = new Map<string, Transaction[]>();
@@ -224,9 +219,6 @@ export async function detectRecurringExpenses(): Promise<DetectedRecurring[]> {
 		const categoryIds = transactions.map((t) => t.categoryId);
 		const categoryId = mode(categoryIds);
 
-		// Legacy field - always false since Subscriptions category was removed
-		const isSubscription = false;
-
 		detected.push({
 			merchant: transactions[0].merchant, // Use original casing from first transaction
 			categoryId,
@@ -235,7 +227,6 @@ export async function detectRecurringExpenses(): Promise<DetectedRecurring[]> {
 			frequency: pattern.frequency,
 			dayOfMonth: pattern.dayOfMonth,
 			occurrenceCount: transactions.length,
-			isSubscription,
 			amountType,
 			variance: Math.round(variance * 100) / 100,
 			isShared
@@ -250,24 +241,3 @@ export async function detectRecurringExpenses(): Promise<DetectedRecurring[]> {
 	return detected;
 }
 
-/**
- * Get summary stats for recurring expenses
- */
-export async function getRecurringSummary(): Promise<{
-	totalMonthlyRecurring: number;
-	subscriptionsMonthly: number;
-	recurringCount: number;
-}> {
-	const recurring = await detectRecurringExpenses();
-
-	const totalMonthlyRecurring = recurring.reduce((sum, r) => sum + r.averageAmount, 0);
-	const subscriptionsMonthly = recurring
-		.filter((r) => r.isSubscription)
-		.reduce((sum, r) => sum + r.averageAmount, 0);
-
-	return {
-		totalMonthlyRecurring: Math.round(totalMonthlyRecurring * 100) / 100,
-		subscriptionsMonthly: Math.round(subscriptionsMonthly * 100) / 100,
-		recurringCount: recurring.length
-	};
-}

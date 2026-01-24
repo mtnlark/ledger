@@ -4,7 +4,7 @@
 	import ChartWrapper from '../ChartWrapper.svelte';
 	import { parseMonthKey } from '$lib/db';
 	import type { MonthlyBudget } from '$lib/db';
-	import { getChartTheme, type ChartTheme } from '$lib/utils/chart-theme';
+	import { getChartTheme, onThemeChange, type ChartTheme } from '$lib/utils/chart-theme';
 
 	interface Props {
 		budgets: MonthlyBudget[];
@@ -15,18 +15,11 @@
 	// Theme state that reacts to dark mode changes
 	let theme = $state<ChartTheme>(getChartTheme());
 
-	// Watch for theme changes via MutationObserver
+	// Watch for theme changes via shared observer
 	$effect(() => {
-		if (typeof document === 'undefined') return;
-
-		const observer = new MutationObserver(() => {
+		return onThemeChange(() => {
 			theme = getChartTheme();
 		});
-		observer.observe(document.documentElement, {
-			attributes: true,
-			attributeFilter: ['class']
-		});
-		return () => observer.disconnect();
 	});
 
 	// Calculate savings rate for each budget

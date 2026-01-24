@@ -14,27 +14,48 @@
 
 	let canvasRef = $state<HTMLCanvasElement | null>(null);
 	let chartInstance: Chart | null = null;
+	let currentType: string | undefined = undefined;
+
+	function createChart() {
+		if (canvasRef && config) {
+			chartInstance = new Chart(canvasRef, config);
+			currentType = config.type;
+		}
+	}
+
+	function destroyChart() {
+		if (chartInstance) {
+			chartInstance.destroy();
+			chartInstance = null;
+		}
+	}
 
 	onMount(() => {
-		if (canvasRef) {
-			chartInstance = new Chart(canvasRef, config);
-		}
+		createChart();
 	});
 
 	onDestroy(() => {
-		if (chartInstance) {
-			chartInstance.destroy();
-		}
+		destroyChart();
 	});
 
 	// Update chart when config changes
+	// Recreate if chart type changes, otherwise just update data/options
 	$effect(() => {
-		if (chartInstance && config) {
-			chartInstance.data = config.data;
-			if (config.options) {
-				chartInstance.options = config.options;
+		if (!config) return;
+
+		if (chartInstance) {
+			// If chart type changed, destroy and recreate
+			if (config.type !== currentType) {
+				destroyChart();
+				createChart();
+			} else {
+				// Same type - just update data and options
+				chartInstance.data = config.data;
+				if (config.options) {
+					chartInstance.options = config.options;
+				}
+				chartInstance.update();
 			}
-			chartInstance.update();
 		}
 	});
 </script>

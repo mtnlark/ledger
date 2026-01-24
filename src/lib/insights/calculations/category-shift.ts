@@ -5,7 +5,7 @@
 
 import type { Transaction, Category } from '$lib/db';
 import type { CategoryShiftResult, CategoryDeepDiveShift } from '../types';
-import type { AnomalyResult } from '$lib/utils/insights-calculations';
+import type { AnomalyResult } from '../types';
 import type { CategoryStats } from './category-averages';
 import { getSpendingByCategory, getUserAmount } from './spending';
 

@@ -4,7 +4,7 @@
 	import { Check, PartyPopper } from 'lucide-svelte';
 	import type { Transaction, Category, Settings } from '$lib/db';
 	import { createCategoryHelpers } from '$lib/utils/category-helpers';
-	import { formatCurrency } from '$lib/utils/modal-helpers';
+	import { formatCurrency } from '$lib/utils/format-helpers';
 	import EmptyState from './EmptyState.svelte';
 
 	interface Props {

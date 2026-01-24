@@ -15,7 +15,7 @@
 	import { getSelectedMonth, setSelectedMonth } from '$lib/stores/selectedMonth';
 	import { getAvailableMonths } from '$lib/stores/transactions';
 	import { toast } from '$lib/stores/toast';
-	import { formatCurrencyWhole } from '$lib/utils/modal-helpers';
+	import { formatCurrencyWhole } from '$lib/utils/format-helpers';
 	import { Sparkles, Copy, AlertTriangle, X } from 'lucide-svelte';
 	import HeaderNav from '$lib/components/HeaderNav.svelte';
 	import MonthPicker from '$lib/components/MonthPicker.svelte';

@@ -6,6 +6,12 @@ import { invalidateRecurringCache } from './recurring';
 import { isSubscriptionCancelled, reactivateSubscription } from './subscriptionSettings';
 import { getMonthDateRange } from '$lib/utils/date-helpers';
 import { getTransactionCache } from './transactionCache';
+import {
+	validateAmount,
+	validateMerchant,
+	validateCategory,
+	validateSplitValue
+} from '$lib/utils/transaction-validation';
 
 // Re-export cache utilities for external use
 export { getTransactionCache, invalidateTransactionCache } from './transactionCache';
@@ -68,9 +74,43 @@ export async function getTransactionsByDateRange(
 
 // Add a new transaction
 // Returns the ID of the created transaction
+// Throws if validation fails
 export async function addTransaction(
 	transaction: Omit<Transaction, 'id' | 'partnerShare' | 'createdAt' | 'updatedAt'>
 ): Promise<number> {
+	// Validate required fields
+	const amountResult = validateAmount(transaction.amount);
+	if (!amountResult.isValid) {
+		throw new Error(amountResult.error ?? 'Invalid amount');
+	}
+
+	const merchantResult = validateMerchant(transaction.merchant);
+	if (!merchantResult.isValid) {
+		throw new Error(merchantResult.error ?? 'Invalid merchant');
+	}
+
+	const categoryResult = validateCategory(transaction.categoryId);
+	if (!categoryResult.isValid) {
+		throw new Error(categoryResult.error ?? 'Invalid category');
+	}
+
+	// Validate date is a valid Date object
+	if (!(transaction.date instanceof Date) || isNaN(transaction.date.getTime())) {
+		throw new Error('Invalid date');
+	}
+
+	// Validate split value if shared
+	if (transaction.isShared) {
+		const splitResult = validateSplitValue(
+			transaction.splitType,
+			transaction.splitValue,
+			transaction.amount
+		);
+		if (!splitResult.isValid) {
+			throw new Error('Invalid split value');
+		}
+	}
+
 	const now = new Date();
 	const partnerShare = transaction.isShared
 		? calculatePartnerShare(transaction.amount, transaction.splitType, transaction.splitValue)
@@ -407,18 +447,13 @@ export async function getAvailableMonths(): Promise<string[]> {
 
 // Get all transactions (for YTD calculations)
 // Uses cache when available, otherwise loads from DB and initializes cache
+// Uses async lock to prevent concurrent double-loading
 // Filters out split parent transactions (they've been replaced by children)
 export async function getAllTransactions(): Promise<Transaction[]> {
 	const cache = getTransactionCache();
 
-	// If cache is loaded, return from cache (already filters split parents)
-	if (cache.isLoaded) {
-		return cache.getAll();
-	}
-
-	// Load from DB and initialize cache
-	const allTransactions = await db.transactions.toArray();
-	cache.initialize(allTransactions);
+	// Use async initialization with lock to prevent concurrent loads
+	await cache.initializeAsync(() => db.transactions.toArray());
 
 	// Return filtered list (cache.getAll() filters split parents)
 	return cache.getAll();

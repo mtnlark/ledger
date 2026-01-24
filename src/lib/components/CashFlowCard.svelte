@@ -3,7 +3,7 @@
 	import { slide } from 'svelte/transition';
 	import { Check, AlertTriangle, ChevronDown, ChevronUp } from 'lucide-svelte';
 	import type { MonthlyBudget } from '$lib/db';
-	import { formatCurrency } from '$lib/utils/modal-helpers';
+	import { formatCurrency } from '$lib/utils/format-helpers';
 
 	const STORAGE_KEY = 'ledger-cashflow-expanded';
 

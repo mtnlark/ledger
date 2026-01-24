@@ -90,12 +90,12 @@ describe('calculateBudgetAlerts', () => {
 			expect(alerts[0].type).toBe('at');
 		});
 
-		it('should treat small remaining (<$0.50) as "at budget" since it displays as $0 left', () => {
-			// $0.49 remaining would display as "$0 left" - treat as "at budget" instead
+		it('should treat small remaining (<$0.50) as "approaching" budget', () => {
+			// $0.49 remaining is within the approaching threshold
 			const alerts = calculateBudgetAlerts([makeCategory('Food', 100, 99.51)]);
 
 			expect(alerts).toHaveLength(1);
-			expect(alerts[0].type).toBe('at');
+			expect(alerts[0].type).toBe('approaching');
 		});
 
 		it('should handle accumulated floating point errors from multiple transactions', () => {
@@ -108,12 +108,12 @@ describe('calculateBudgetAlerts', () => {
 			expect(alerts[0].type).toBe('at');
 		});
 
-		it('should treat small overage (<$0.50) as "at budget" since it displays as $0', () => {
-			// $0.49 over would display as "$0 over" - treat as "at budget" instead
+		it('should treat small overage (<$0.50) as "over" budget', () => {
+			// $0.49 over is a real overage, not a floating-point artifact
 			const alerts = calculateBudgetAlerts([makeCategory('Food', 100, 100.49)]);
 
 			expect(alerts).toHaveLength(1);
-			expect(alerts[0].type).toBe('at');
+			expect(alerts[0].type).toBe('over');
 		});
 
 		it('should correctly identify over budget when >= $0.50 over', () => {

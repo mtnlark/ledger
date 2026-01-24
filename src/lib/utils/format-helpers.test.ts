@@ -5,9 +5,9 @@ import {
 	formatPercentage,
 	calculateSplitShares,
 	type SplitSharesResult
-} from './modal-helpers';
+} from './format-helpers';
 
-describe('modal-helpers', () => {
+describe('format-helpers', () => {
 	describe('formatCurrency', () => {
 		it('formats positive amounts with dollar sign', () => {
 			expect(formatCurrency(100)).toBe('$100.00');

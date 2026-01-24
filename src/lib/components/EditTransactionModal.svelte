@@ -3,7 +3,7 @@
 	import { X, Scissors } from 'lucide-svelte';
 	import type { Category, Settings, Transaction } from '$lib/db';
 	import { parseLocalDate } from '$lib/utils/date-helpers';
-	import { formatCurrency, calculateSplitShares } from '$lib/utils/modal-helpers';
+	import { formatCurrency, calculateSplitShares } from '$lib/utils/format-helpers';
 	import CategoryCombobox from './CategoryCombobox.svelte';
 
 	interface Props {

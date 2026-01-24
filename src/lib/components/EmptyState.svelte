@@ -37,7 +37,7 @@
 	{#if actionLabel && onAction}
 		<button
 			onclick={onAction}
-			class="mt-4 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
+			class="mt-4 px-4 py-2 bg-primary-500 text-white text-sm font-medium rounded-lg hover:bg-primary-600 transition-colors"
 		>
 			{actionLabel}
 		</button>

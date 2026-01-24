@@ -35,9 +35,11 @@ export function computeHistoricalRank(
 	const total = allMonthlyTotals.size;
 
 	// Rank from highest (1 = highest spending)
-	const highestRank = totals.indexOf(selectedMonthTotal) + 1;
+	// Use findIndex to count how many values are strictly greater, avoiding
+	// indexOf issues when multiple months have identical totals.
+	const highestRank = totals.filter((v) => v > selectedMonthTotal).length + 1;
 	// Rank from lowest (1 = lowest spending)
-	const lowestRank = total - highestRank + 1;
+	const lowestRank = totals.filter((v) => v < selectedMonthTotal).length + 1;
 
 	if (lowestRank < highestRank) {
 		return { rank: lowestRank, total, direction: 'lowest' };

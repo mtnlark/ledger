@@ -2,7 +2,7 @@
 	import { RefreshCw, X, Calendar, Zap, AlertCircle } from 'lucide-svelte';
 	import type { Category, Transaction, CancelledSubscription } from '$lib/db';
 	import { createCategoryHelpers } from '$lib/utils/category-helpers';
-	import { formatCurrencyWhole, formatCurrency } from '$lib/utils/modal-helpers';
+	import { formatCurrencyWhole, formatCurrency } from '$lib/utils/format-helpers';
 	import InsightGroup from './InsightGroup.svelte';
 	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
 	import type { DetectedRecurring } from '$lib/stores/recurring';

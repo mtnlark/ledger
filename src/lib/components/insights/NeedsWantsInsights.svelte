@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { Transaction, Category } from '$lib/db';
-	import { formatCurrencyWhole } from '$lib/utils/modal-helpers';
+	import { formatCurrencyWhole } from '$lib/utils/format-helpers';
 	import { getInsightsEngine } from '$lib/insights';
 	import InsightGroup from './InsightGroup.svelte';
 

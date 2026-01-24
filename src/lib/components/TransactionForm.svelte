@@ -5,7 +5,7 @@
 	import { slide } from 'svelte/transition';
 	import type { Category, Settings } from '$lib/db';
 	import { parseLocalDate } from '$lib/utils/date-helpers';
-	import { formatCurrency } from '$lib/utils/modal-helpers';
+	import { formatCurrency } from '$lib/utils/format-helpers';
 	import CategoryCombobox from './CategoryCombobox.svelte';
 	import MerchantAutocomplete from './MerchantAutocomplete.svelte';
 	import { getMostCommonCategory } from '$lib/stores/merchants';

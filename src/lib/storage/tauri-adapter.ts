@@ -342,14 +342,33 @@ async function initializeDefaults(): Promise<void> {
 }
 
 /**
+ * Error thrown when data persistence fails
+ */
+export class PersistenceError extends Error {
+	constructor(
+		message: string,
+		public readonly cause?: unknown
+	) {
+		super(message);
+		this.name = 'PersistenceError';
+	}
+}
+
+/**
  * Save current Dexie state to JSON file
  * Called after every data modification
+ * @throws PersistenceError if saving fails
  */
 export async function saveToFile(): Promise<void> {
 	ensureInitialized();
 
 	// Create backup before saving (debounced)
-	await createBackup();
+	try {
+		await createBackup();
+	} catch (error) {
+		// Log backup failure but continue with save
+		console.error('Backup creation failed:', error);
+	}
 
 	// Get all data from Dexie
 	const [transactions, categories, monthlyBudgets, categoryBudgets, settings] = await Promise.all([
@@ -370,7 +389,12 @@ export async function saveToFile(): Promise<void> {
 		settings: settings ?? DEFAULT_SETTINGS
 	};
 
-	await writeDataFile(data);
+	try {
+		await writeDataFile(data);
+	} catch (error) {
+		const message = error instanceof Error ? error.message : String(error);
+		throw new PersistenceError(`Failed to save data: ${message}`, error);
+	}
 }
 
 /**

@@ -9,7 +9,7 @@
 	interface Props {
 		categories: Category[];
 		settings: Settings;
-		onSubmit: (data: QuickAddData) => void;
+		onSubmit: (data: QuickAddData) => void | Promise<void>;
 	}
 
 	export interface QuickAddData {
@@ -110,7 +110,7 @@
 		isSubmitting = true;
 
 		try {
-			onSubmit({
+			await onSubmit({
 				date: new Date(),
 				merchant: merchant.trim(),
 				amount,
@@ -124,6 +124,8 @@
 			});
 
 			close();
+		} catch {
+			// Keep form open on failure so user can retry
 		} finally {
 			isSubmitting = false;
 		}

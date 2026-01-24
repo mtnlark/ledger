@@ -72,7 +72,7 @@ export function calculateCashFlow(income: number, saved: number, spent: number):
 		// If no budget available, cap at 100%
 		percentSpent = 100;
 	} else {
-		percentSpent = (spent / available) * 100;
+		percentSpent = Math.round(((spent / available) * 100) * 100) / 100;
 	}
 
 	return {

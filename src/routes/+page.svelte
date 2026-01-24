@@ -9,7 +9,7 @@
 	import { getBudgetForMonth, saveBudget } from '$lib/stores/budget';
 	import { getSelectedMonth, setSelectedMonth } from '$lib/stores/selectedMonth';
 	import { toast } from '$lib/stores/toast';
-	import { formatCurrency } from '$lib/utils/modal-helpers';
+	import { formatCurrency } from '$lib/utils/format-helpers';
 	import TransactionList from '$lib/components/TransactionList.svelte';
 	import TransactionForm, { type TransactionFormData, type SplitTransactionFormData } from '$lib/components/TransactionForm.svelte';
 	import CashFlowCard from '$lib/components/CashFlowCard.svelte';

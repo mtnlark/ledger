@@ -6,8 +6,8 @@
 	import ChartWrapper from './ChartWrapper.svelte';
 	import EmptyState from './EmptyState.svelte';
 	import { parseMonthKey } from '$lib/db';
-	import { getChartTheme, type ChartTheme } from '$lib/utils/chart-theme';
-	import { formatCurrency } from '$lib/utils/modal-helpers';
+	import { getChartTheme, onThemeChange, type ChartTheme } from '$lib/utils/chart-theme';
+	import { formatCurrency } from '$lib/utils/format-helpers';
 	import { computeStdDev } from '$lib/insights/calculations/stats';
 
 	interface Props {
@@ -19,18 +19,11 @@
 	// Theme state that reacts to dark mode changes
 	let theme = $state<ChartTheme>(getChartTheme());
 
-	// Watch for theme changes via MutationObserver
+	// Watch for theme changes via shared observer
 	$effect(() => {
-		if (typeof document === 'undefined') return;
-
-		const observer = new MutationObserver(() => {
+		return onThemeChange(() => {
 			theme = getChartTheme();
 		});
-		observer.observe(document.documentElement, {
-			attributes: true,
-			attributeFilter: ['class']
-		});
-		return () => observer.disconnect();
 	});
 
 	// Warm Ledger color palette

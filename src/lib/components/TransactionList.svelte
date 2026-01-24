@@ -3,7 +3,7 @@
 	import { Pencil, Trash2, Receipt, CheckSquare, Square, Check } from 'lucide-svelte';
 	import type { Transaction, Category, Settings } from '$lib/db';
 	import { createCategoryHelpers } from '$lib/utils/category-helpers';
-	import { formatCurrency } from '$lib/utils/modal-helpers';
+	import { formatCurrency } from '$lib/utils/format-helpers';
 	import { createDateGroups, type DateGroup } from '$lib/utils/transaction-grouping';
 	import EmptyState from './EmptyState.svelte';
 	import BulkActionBar from './BulkActionBar.svelte';

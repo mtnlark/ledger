@@ -31,8 +31,8 @@
 	let selectedIndex = $state(-1);
 	let inputElement = $state<HTMLInputElement | null>(null);
 
-	// Debounce timer
-	let debounceTimer: ReturnType<typeof setTimeout>;
+	// Debounce timer (per-instance to avoid cross-component interference)
+	let debounceTimer = $state<ReturnType<typeof setTimeout> | undefined>(undefined);
 
 	async function handleInput(e: Event) {
 		const target = e.target as HTMLInputElement;

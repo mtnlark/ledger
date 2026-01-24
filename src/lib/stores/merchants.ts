@@ -15,6 +15,8 @@ export interface MerchantSuggestion {
 
 // Cache for merchant index - invalidated when transactions change
 let cachedMerchantIndex: Map<string, MerchantEntry> | null = null;
+// Secondary index for O(1) case-insensitive lookup
+let normalizedIndex: Map<string, MerchantEntry> | null = null;
 let cacheVersion = 0;
 
 /**
@@ -23,6 +25,7 @@ let cacheVersion = 0;
  */
 export function invalidateMerchantCache(): void {
 	cachedMerchantIndex = null;
+	normalizedIndex = null;
 	cacheVersion++;
 }
 
@@ -72,6 +75,13 @@ export async function buildMerchantIndex(): Promise<Map<string, MerchantEntry>> 
 
 	// Cache the result
 	cachedMerchantIndex = index;
+
+	// Build normalized index for O(1) case-insensitive lookup
+	normalizedIndex = new Map();
+	for (const entry of index.values()) {
+		normalizedIndex.set(entry.merchant.toLowerCase(), entry);
+	}
+
 	return index;
 }
 
@@ -124,16 +134,11 @@ export async function getMerchantSuggestions(
  */
 export async function getMostCommonCategory(merchantName: string): Promise<number | null> {
 	const normalizedName = merchantName.toLowerCase().trim();
-	const index = await buildMerchantIndex();
+	// Ensure index is built (populates normalizedIndex)
+	await buildMerchantIndex();
 
-	// Find merchant (case-insensitive)
-	let entry: MerchantEntry | undefined;
-	for (const [merchant, e] of index) {
-		if (merchant.toLowerCase() === normalizedName) {
-			entry = e;
-			break;
-		}
-	}
+	// O(1) lookup using normalized index
+	const entry = normalizedIndex?.get(normalizedName);
 
 	if (!entry) {
 		return null;

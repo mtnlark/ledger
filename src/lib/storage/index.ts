@@ -96,12 +96,20 @@ export function resetStorageState(): void {
 /**
  * Persist current database state to JSON file
  * Called after any data modification (no-op in tests)
+ * Shows a toast notification on failure
  */
 export async function persistData(): Promise<void> {
 	if (!isTauri()) return;
 
-	const { saveToFile } = await import('./tauri-adapter');
-	await saveToFile();
+	try {
+		const { saveToFile } = await import('./tauri-adapter');
+		await saveToFile();
+	} catch (error) {
+		console.error('Data persistence failed:', error);
+		// Lazy-import toast to avoid circular dependency
+		const { toast } = await import('$lib/stores/toast');
+		toast.error('Failed to save data to disk. Your changes may not persist.');
+	}
 }
 
 /**
