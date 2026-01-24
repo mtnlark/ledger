@@ -149,7 +149,7 @@
 						<span class="text-charcoal-soft text-sm">Surplus</span>
 						<span class="ledger-line"></span>
 						<span
-							class="font-mono text-2xl font-medium flex items-center gap-2 {surplus >= 0 ? 'text-success-500' : 'text-danger-500'}"
+							class="font-mono text-2xl font-medium text-amount-lg flex items-center gap-2 {surplus >= 0 ? 'text-success-500' : 'text-danger-500'}"
 						>
 							{formatCurrency(surplus)}
 							{#if surplus >= 0}

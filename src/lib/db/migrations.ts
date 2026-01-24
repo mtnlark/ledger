@@ -126,6 +126,49 @@ async function migrateTransactionSubscription(): Promise<void> {
 }
 
 /**
+ * Migration: Fix transaction dates corrupted by UTC midnight timezone shift.
+ * When a date string like "2025-01-01T00:00:00.000Z" was parsed with
+ * new Date(isoString), the resulting Date represents UTC midnight,
+ * which in western timezones is the PREVIOUS day locally.
+ * This migration detects that pattern and corrects to the intended local date.
+ */
+async function migrateTransactionDates(): Promise<void> {
+	const allTransactions = await db.transactions.toArray();
+	if (allTransactions.length === 0) return;
+
+	const updates: Transaction[] = [];
+
+	for (const tx of allTransactions) {
+		const d = tx.date instanceof Date ? tx.date : new Date(tx.date);
+		if (isNaN(d.getTime())) continue;
+
+		// Detect UTC midnight corruption: the Date is at UTC midnight
+		// but NOT at local midnight (meaning timezone shifted it)
+		const isUtcMidnight =
+			d.getUTCHours() === 0 &&
+			d.getUTCMinutes() === 0 &&
+			d.getUTCSeconds() === 0 &&
+			d.getUTCMilliseconds() === 0;
+		const isLocalMidnight =
+			d.getHours() === 0 &&
+			d.getMinutes() === 0 &&
+			d.getSeconds() === 0 &&
+			d.getMilliseconds() === 0;
+
+		if (isUtcMidnight && !isLocalMidnight) {
+			// The intended date is the UTC date, not the local date
+			const fixed = new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+			updates.push({ ...tx, date: fixed });
+		}
+	}
+
+	if (updates.length > 0) {
+		await db.transactions.bulkPut(updates);
+		console.log(`Migration: Fixed ${updates.length} transaction dates (UTC midnight shift)`);
+	}
+}
+
+/**
  * Run all database migrations
  * Each migration is idempotent and checks if it needs to run
  */
@@ -135,4 +178,5 @@ export async function runMigrations(): Promise<void> {
 	await migrateSettingsDismissedRecurring();
 	await migrateTransactionEssential();
 	await migrateTransactionSubscription();
+	await migrateTransactionDates();
 }

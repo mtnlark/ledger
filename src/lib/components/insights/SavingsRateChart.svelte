@@ -58,18 +58,18 @@
 				{
 					label: 'Savings Rate',
 					data: savingsData.map((d) => d.rate * 100),
-					borderColor: '#22c55e',
-					backgroundColor: '#22c55e20',
+					borderColor: '#5B8C5A',
+					backgroundColor: '#5B8C5A20',
 					fill: true,
 					tension: 0.3,
 					pointRadius: 4,
 					pointHoverRadius: 6,
-					pointBackgroundColor: '#22c55e'
+					pointBackgroundColor: '#5B8C5A'
 				},
 				{
 					label: 'Average',
 					data: savingsData.map(() => avgRate * 100),
-					borderColor: '#94a3b8',
+					borderColor: '#8A847C',
 					borderDash: [5, 5],
 					fill: false,
 					pointRadius: 0,
@@ -141,7 +141,7 @@
 	</div>
 {:else if savingsData.length === 1}
 	<div class="text-center py-8">
-		<p class="text-3xl font-bold text-green-600">{(savingsData[0].rate * 100).toFixed(1)}%</p>
+		<p class="text-3xl font-bold text-success-600">{(savingsData[0].rate * 100).toFixed(1)}%</p>
 		<p class="text-sm text-charcoal-muted mt-1">Savings rate for {savingsData[0].label}</p>
 		<p class="text-xs text-charcoal-muted mt-2">Add more months to see trends</p>
 	</div>

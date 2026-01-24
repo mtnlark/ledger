@@ -42,7 +42,7 @@
 		class="{heightClass} bg-surface-alt rounded-full overflow-hidden shadow-[inset_0_1px_2px_rgba(45,42,38,0.08)]"
 	>
 		<div
-			class="{heightClass} rounded-full transition-all duration-500 ease-out {colorClass}"
+			class="{heightClass} rounded-full {colorClass} progress-fill"
 			style="width: {displayPercent}%"
 		></div>
 	</div>

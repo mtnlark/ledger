@@ -87,13 +87,13 @@
 				{
 					label: format(parseMonthKey(currentMonth), 'MMM yyyy'),
 					data: comparisonData.map((d) => d.current),
-					backgroundColor: '#3b82f6',
+					backgroundColor: '#C45D3A',
 					borderRadius: 4
 				},
 				{
 					label: format(parseMonthKey(previousMonth), 'MMM yyyy'),
 					data: comparisonData.map((d) => d.previous),
-					backgroundColor: '#94a3b8',
+					backgroundColor: '#D4AD9C',
 					borderRadius: 4
 				}
 			]

@@ -13,6 +13,7 @@
 
 	// State
 	let isLoading = $state(true);
+	let hasLoadedOnce = false;
 	let categories = $state<Category[]>([]);
 	let unsettledTransactions = $state<Transaction[]>([]);
 	let outstandingBalance = $state(0);
@@ -20,7 +21,7 @@
 
 	// Load data
 	async function loadData() {
-		isLoading = true;
+		if (!hasLoadedOnce) isLoading = true;
 		try {
 			await initializeStorage();
 			categories = await getAllCategories();
@@ -31,6 +32,7 @@
 			console.error('Failed to load data:', error);
 		} finally {
 			isLoading = false;
+			hasLoadedOnce = true;
 		}
 	}
 

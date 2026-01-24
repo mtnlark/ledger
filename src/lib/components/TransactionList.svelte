@@ -169,7 +169,7 @@
 									class="w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 transition-colors {selectedIds.has(
 										transaction.id!
 									)
-										? 'bg-primary-500 border-primary-500'
+										? 'bg-primary-500 border-primary-500 checkbox-spring'
 										: 'border-[var(--color-border)] bg-surface'}"
 								>
 									{#if selectedIds.has(transaction.id!)}

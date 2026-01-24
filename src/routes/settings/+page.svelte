@@ -16,6 +16,7 @@
 
 	// State
 	let isLoading = $state(true);
+	let hasLoadedOnce = false;
 	let settings = $state<Settings>(DEFAULT_SETTINGS);
 	let categories = $state<Category[]>([]);
 	let isSaving = $state(false);
@@ -37,7 +38,7 @@
 
 	// Load data
 	async function loadData() {
-		isLoading = true;
+		if (!hasLoadedOnce) isLoading = true;
 		try {
 			await initializeStorage();
 			settings = await getSettings();
@@ -59,6 +60,7 @@
 			console.error('Failed to load settings:', error);
 		} finally {
 			isLoading = false;
+			hasLoadedOnce = true;
 		}
 	}
 

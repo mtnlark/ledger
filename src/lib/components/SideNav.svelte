@@ -21,6 +21,12 @@
 	];
 
 	let isExpanded = $state(false);
+	let bouncingHref = $state<string | null>(null);
+
+	function handleNavClick(href: string) {
+		bouncingHref = href;
+		setTimeout(() => { bouncingHref = null; }, 300);
+	}
 
 	onMount(() => {
 		const stored = localStorage.getItem(STORAGE_KEY);
@@ -60,12 +66,15 @@
 			{@const active = isActive(item.href, $page.url.pathname)}
 			<a
 				href={item.href}
+				onclick={() => handleNavClick(item.href)}
 				class="flex items-center gap-3 mx-2 px-3 py-2.5 rounded-lg transition-colors {active
 					? 'bg-primary-50 text-primary-700'
 					: 'text-charcoal-soft hover:bg-surface-hover'}"
 				title={isExpanded ? undefined : item.label}
 			>
-				<item.icon size={20} strokeWidth={active ? 2.5 : 2} />
+				<span class={bouncingHref === item.href ? 'icon-bounce' : ''}>
+					<item.icon size={20} strokeWidth={active ? 2.5 : 2} />
+				</span>
 				{#if isExpanded}
 					<span class="text-sm font-medium whitespace-nowrap">{item.label}</span>
 				{/if}

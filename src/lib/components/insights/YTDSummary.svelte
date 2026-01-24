@@ -63,7 +63,7 @@
 					{#each Array.from(recentDailySpending.entries()) as [dateKey, amount]}
 						{@const maxAmount = Math.max(...Array.from(recentDailySpending.values()))}
 						{@const intensity = amount === 0 ? 0 : Math.min(4, Math.ceil((amount / (maxAmount || 1)) * 4))}
-						{@const colors = ['bg-surface-alt', 'bg-green-200', 'bg-green-300', 'bg-green-400', 'bg-green-600']}
+						{@const colors = ['bg-surface-alt', 'bg-success-200', 'bg-success-300', 'bg-success-400', 'bg-success-600']}
 						<div
 							class="{colors[intensity]} rounded-sm"
 							style="width: 8px; height: 8px;"

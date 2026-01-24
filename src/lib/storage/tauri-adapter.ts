@@ -260,6 +260,10 @@ export async function initializeTauriStorage(): Promise<void> {
 		// Save initial state
 		await saveToFile();
 	}
+
+	// Run migrations (idempotent, includes date normalization)
+	const { runMigrations } = await import('$lib/db/migrations');
+	await runMigrations();
 }
 
 /**

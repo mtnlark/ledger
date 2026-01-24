@@ -25,6 +25,7 @@
 
 	// State
 	let isLoading = $state(true);
+	let hasLoadedOnce = false;
 	let categories = $state<Category[]>([]);
 	let budgets = $state<Map<number, CategoryBudget>>(new Map());
 	let spending = $state<Map<number, number>>(new Map());
@@ -115,7 +116,7 @@
 
 	// Load data
 	async function loadData() {
-		isLoading = true;
+		if (!hasLoadedOnce) isLoading = true;
 		try {
 			await initializeStorage();
 			currentMonth = getSelectedMonth();
@@ -135,6 +136,7 @@
 			toast.error('Failed to load budget data');
 		} finally {
 			isLoading = false;
+			hasLoadedOnce = true;
 		}
 	}
 

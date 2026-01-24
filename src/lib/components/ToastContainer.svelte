@@ -1,7 +1,7 @@
 <script lang="ts">
+	import { fly, fade } from 'svelte/transition';
 	import { X, CheckCircle, AlertCircle, Info, AlertTriangle } from 'lucide-svelte';
 	import { toasts, toast, type ToastType } from '$lib/stores/toast';
-	import { fly, fade } from 'svelte/transition';
 
 	const iconMap: Record<ToastType, typeof CheckCircle> = {
 		success: CheckCircle,
@@ -49,8 +49,8 @@
 		{@const Icon = iconMap[t.type]}
 		<div
 			role="alert"
-			in:fly={{ y: 20, duration: 200 }}
-			out:fade={{ duration: 150 }}
+			in:fly={{ y: 20, duration: 300 }}
+			out:fade={{ duration: 200 }}
 			class="flex items-center gap-3 px-4 py-3 rounded-lg shadow-lg border {colors.bg} {colors.border}"
 		>
 			<Icon size={20} class={colors.icon} />

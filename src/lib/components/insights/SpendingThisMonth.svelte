@@ -52,7 +52,7 @@
 	{#snippet preview()}
 		<div class="flex items-center justify-between">
 			<div>
-				<p class="font-mono text-2xl font-medium text-charcoal">
+				<p class="font-mono text-2xl font-medium text-charcoal text-amount-lg">
 					${totalSpent.toLocaleString()}
 				</p>
 				<p class="text-sm text-charcoal-muted">
