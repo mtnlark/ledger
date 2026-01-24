@@ -1,6 +1,7 @@
 import { db, type CategoryBudget, navigateMonth } from '$lib/db';
 import { persistData } from '$lib/storage';
 import { getMonthDateRange } from '$lib/utils/date-helpers';
+import { computeStdDev } from '$lib/insights/calculations/stats';
 
 /**
  * Get all category budgets for a specific month
@@ -169,11 +170,13 @@ export async function calculateSuggestedBudget(
 		return 0;
 	}
 
-	// Calculate average
-	const average = spending.reduce((sum, s) => sum + s, 0) / spending.length;
+	// Use mean + 0.5σ to add headroom for spending variance
+	const mean = spending.reduce((sum, s) => sum + s, 0) / spending.length;
+	const sd = computeStdDev(spending);
+	const suggestion = mean + 0.5 * sd;
 
 	// Round to nearest $5
-	return Math.round(average / 5) * 5;
+	return Math.round(suggestion / 5) * 5;
 }
 
 /**
@@ -235,8 +238,10 @@ export async function generateAllSuggestions(month: string): Promise<Map<number,
 		if (spending.length === 0) {
 			suggestions.set(category.id!, 0);
 		} else {
-			const average = spending.reduce((sum, s) => sum + s, 0) / spending.length;
-			suggestions.set(category.id!, Math.round(average / 5) * 5);
+			const mean = spending.reduce((sum, s) => sum + s, 0) / spending.length;
+			const sd = computeStdDev(spending);
+			const suggestion = mean + 0.5 * sd;
+			suggestions.set(category.id!, Math.round(suggestion / 5) * 5);
 		}
 	}
 

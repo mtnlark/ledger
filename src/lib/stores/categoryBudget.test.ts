@@ -160,7 +160,8 @@ describe('CategoryBudget Operations', () => {
 			]);
 
 			const suggested = await calculateSuggestedBudget(1, '2024-06');
-			expect(suggested).toBe(150); // Average of 100+200+150 = 150
+			// Mean of [100,200,150] = 150, stdDev ≈ 40.82, suggestion = 150 + 0.5*40.82 ≈ 170
+			expect(suggested).toBe(170);
 		});
 
 		it('rounds to nearest $5', async () => {
@@ -230,6 +231,65 @@ describe('CategoryBudget Operations', () => {
 
 			const suggested = await calculateSuggestedBudget(1, '2024-06');
 			expect(suggested).toBe(200); // Only uses May, ignores empty March/April
+		});
+
+		it('σ-aware suggestions exceed raw average for variable spending', async () => {
+			const now = new Date();
+			// Highly variable: $50, $300, $150 → mean=166.67, stdDev≈102.14
+			// suggestion = 166.67 + 0.5*102.14 ≈ 217.74 → rounded to 220
+			// Raw average would be 166.67 → 165
+			await db.transactions.bulkAdd([
+				{
+					date: new Date('2024-03-15'),
+					merchant: 'A',
+					amount: 50,
+					categoryId: 1,
+					isShared: false,
+					splitType: 'percentage',
+					splitValue: 0.5,
+					partnerShare: 0,
+					isSettled: false,
+					isEssential: false,
+					isSubscription: false,
+					createdAt: now,
+					updatedAt: now
+				},
+				{
+					date: new Date('2024-04-15'),
+					merchant: 'B',
+					amount: 300,
+					categoryId: 1,
+					isShared: false,
+					splitType: 'percentage',
+					splitValue: 0.5,
+					partnerShare: 0,
+					isSettled: false,
+					isEssential: false,
+					isSubscription: false,
+					createdAt: now,
+					updatedAt: now
+				},
+				{
+					date: new Date('2024-05-15'),
+					merchant: 'C',
+					amount: 150,
+					categoryId: 1,
+					isShared: false,
+					splitType: 'percentage',
+					splitValue: 0.5,
+					partnerShare: 0,
+					isSettled: false,
+					isEssential: false,
+					isSubscription: false,
+					createdAt: now,
+					updatedAt: now
+				}
+			]);
+
+			const suggested = await calculateSuggestedBudget(1, '2024-06');
+			// Should be higher than raw average (165) due to σ headroom
+			expect(suggested).toBeGreaterThan(165);
+			expect(suggested).toBe(220);
 		});
 	});
 

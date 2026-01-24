@@ -4,6 +4,7 @@
 	import type { Transaction, Category, MonthlyBudget } from '$lib/db';
 	import { config } from '$lib/config';
 	import { getInsightsEngine } from '$lib/insights';
+	import { computeStdDev } from '$lib/insights/calculations/stats';
 
 	interface Props {
 		currentMonthTransactions: Transaction[];
@@ -99,6 +100,15 @@
 		});
 	});
 
+	// Compute historical spending stats for pace projection context
+	let monthlyTotalStats = $derived.by(() => {
+		if (historicalMonthlyTotals.length < 2) return null;
+		const mean = historicalMonthlyTotals.reduce((s, v) => s + v, 0) / historicalMonthlyTotals.length;
+		const sd = computeStdDev(historicalMonthlyTotals);
+		if (sd === 0) return null;
+		return { mean, stdDev: sd };
+	});
+
 	// Fallback: Spending velocity comparison (daily average this month vs last month)
 	let velocityComparison = $derived.by(() => {
 		const prevTransactions = getTransactionsForMonth(previousMonthKey);
@@ -152,13 +162,16 @@
 
 		// Add pace projection
 		if (paceProjection) {
+			const rangeContext = monthlyTotalStats
+				? ` (typical: $${Math.round(monthlyTotalStats.mean - monthlyTotalStats.stdDev).toLocaleString()}–$${Math.round(monthlyTotalStats.mean + monthlyTotalStats.stdDev).toLocaleString()})`
+				: '';
 			items.push({
 				type: 'pace',
 				icon: Gauge,
 				iconColor: paceProjection.isOverBudget ? 'text-danger-500' : 'text-success-500',
 				text: paceProjection.isOverBudget
 					? `On pace to spend $${paceProjection.projected.toLocaleString()} (${paceProjection.percentOfBudget}% of budget)`
-					: `On pace to spend $${paceProjection.projected.toLocaleString()} this month`
+					: `On pace to spend $${paceProjection.projected.toLocaleString()} this month${rangeContext}`
 			});
 		}
 

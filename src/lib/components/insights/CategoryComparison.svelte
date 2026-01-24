@@ -5,12 +5,18 @@
 	import { parseMonthKey } from '$lib/db';
 	import type { Transaction, Category } from '$lib/db';
 
+	interface CategoryStats {
+		mean: number;
+		stdDev: number;
+	}
+
 	interface Props {
 		currentMonth: string;
 		previousMonth: string;
 		currentTransactions: Transaction[];
 		previousTransactions: Transaction[];
 		categories: Category[];
+		categoryStats?: Map<number, CategoryStats>;
 	}
 
 	let {
@@ -18,7 +24,8 @@
 		previousMonth,
 		currentTransactions,
 		previousTransactions,
-		categories
+		categories,
+		categoryStats
 	}: Props = $props();
 
 	// Calculate spending by category for each month
@@ -38,20 +45,36 @@
 		// Get categories that have spending in either month
 		const categoryIds = new Set([...currentSpending.keys(), ...previousSpending.keys()]);
 
-		// Build comparison data, sorted by current month spending
+		// Build comparison data with significance scoring
 		const data = Array.from(categoryIds)
 			.map((catId) => {
 				const cat = categories.find((c) => c.id === catId);
+				const current = currentSpending.get(catId) || 0;
+				const previous = previousSpending.get(catId) || 0;
+				const absDiff = Math.abs(current - previous);
+				const stats = categoryStats?.get(catId);
+
+				// Score: prioritize statistically significant changes
+				// If change > 1σ, boost the score significantly
+				let significance = absDiff;
+				if (stats && stats.stdDev > 0) {
+					const zScore = absDiff / stats.stdDev;
+					if (zScore > 1) {
+						significance = absDiff * (1 + zScore);
+					}
+				}
+
 				return {
 					categoryId: catId,
 					name: cat?.name ?? 'Unknown',
 					icon: cat?.icon ?? '',
-					current: currentSpending.get(catId) || 0,
-					previous: previousSpending.get(catId) || 0
+					current,
+					previous,
+					significance
 				};
 			})
-			.sort((a, b) => b.current - a.current)
-			.slice(0, 8); // Top 8 categories
+			.sort((a, b) => b.significance - a.significance)
+			.slice(0, 8);
 
 		return data;
 	});

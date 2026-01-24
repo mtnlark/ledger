@@ -8,6 +8,7 @@
 	import { parseMonthKey } from '$lib/db';
 	import { getChartTheme, type ChartTheme } from '$lib/utils/chart-theme';
 	import { formatCurrency } from '$lib/utils/modal-helpers';
+	import { computeStdDev } from '$lib/insights/calculations/stats';
 
 	interface Props {
 		monthlyData: Map<string, number>;
@@ -56,13 +57,7 @@
 			: 0
 	);
 
-	let stdDev = $derived.by(() => {
-		if (chartData.values.length < 2) return 0;
-		const variance =
-			chartData.values.reduce((sum, v) => sum + (v - average) ** 2, 0) /
-			chartData.values.length;
-		return Math.sqrt(variance);
-	});
+	let stdDev = $derived(computeStdDev(chartData.values));
 
 	// Chart configuration
 	let chartConfig = $derived<ChartConfiguration<'bar'>>({
@@ -88,6 +83,25 @@
 				legend: {
 					display: false
 				},
+				annotation: chartData.values.length >= 3 && stdDev > 0 ? {
+					annotations: {
+						meanLine: {
+							type: 'line' as const,
+							yMin: average,
+							yMax: average,
+							borderColor: theme.mutedTextColor,
+							borderWidth: 1.5,
+							borderDash: [6, 4]
+						},
+						stdDevBand: {
+							type: 'box' as const,
+							yMin: Math.max(0, average - stdDev),
+							yMax: average + stdDev,
+							backgroundColor: theme.gridColor,
+							borderWidth: 0
+						}
+					}
+				} : undefined,
 				tooltip: {
 					backgroundColor: theme.tooltipBg,
 					titleColor: theme.tooltipText,

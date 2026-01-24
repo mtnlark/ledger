@@ -148,7 +148,7 @@
 			/>
 
 			<!-- Category Deep Dives -->
-			<CategoryDeepDives currentMonth={selectedMonth} transactions={selectedMonthTransactions} {categories} {availableMonths} />
+			<CategoryDeepDives currentMonth={selectedMonth} transactions={selectedMonthTransactions} {allTransactions} {categories} {availableMonths} />
 
 			<!-- Recurring Expenses (subscriptions + auto-detected bills) -->
 			<RecurringInsights

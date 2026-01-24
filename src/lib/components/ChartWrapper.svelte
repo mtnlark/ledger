@@ -1,6 +1,9 @@
 <script lang="ts">
 	import { onMount, onDestroy } from 'svelte';
 	import { Chart, type ChartConfiguration } from 'chart.js/auto';
+	import annotationPlugin from 'chartjs-plugin-annotation';
+
+	Chart.register(annotationPlugin);
 
 	interface Props {
 		config: ChartConfiguration;

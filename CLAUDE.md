@@ -380,6 +380,7 @@ When enabled in Settings, backups are also copied to iCloud Drive:
 - `@tauri-apps/api` - Tauri API
 - `dexie` - IndexedDB wrapper
 - `chart.js` - Charts
+- `chartjs-plugin-annotation` - Chart.js annotation overlays (σ bands, mean lines)
 - `date-fns` - Date utilities
 - `lucide-svelte` - Icons
 - `xlsx` - Excel parsing

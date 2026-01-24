@@ -15,11 +15,12 @@
 	interface Props {
 		currentMonth: string;
 		transactions: Transaction[];
+		allTransactions: Transaction[];
 		categories: Category[];
 		availableMonths: string[];
 	}
 
-	let { currentMonth, transactions, categories, availableMonths }: Props = $props();
+	let { currentMonth, transactions, allTransactions, categories, availableMonths }: Props = $props();
 
 	const engine = getInsightsEngine();
 
@@ -27,6 +28,38 @@
 	let selectedCategoryId = $state<number | null>(null);
 	let categoryTrendData = $state<Map<string, number>>(new Map());
 	let previousTransactions = $state<Transaction[]>([]);
+
+	// Get transactions for a specific month from allTransactions
+	function getTransactionsForMonth(month: string): Transaction[] {
+		const d = parseMonthKey(month);
+		return allTransactions.filter((t) => {
+			const td = new Date(t.date);
+			return td.getFullYear() === d.getFullYear() && td.getMonth() === d.getMonth();
+		});
+	}
+
+	// Compute category stats (mean + stdDev) from historical months
+	let categoryStats = $derived.by(() => {
+		const historicalMonths = availableMonths.filter((m) => m < currentMonth);
+		if (historicalMonths.length < 2) return new Map<number, { mean: number; stdDev: number }>();
+		return engine.getCategoryStats(getTransactionsForMonth, historicalMonths, 'deep-dive-stats');
+	});
+
+	// Stats for the selected category
+	let selectedStats = $derived(selectedCategoryId ? categoryStats.get(selectedCategoryId) : undefined);
+
+	// CV (coefficient of variation) for predictability badge
+	let selectedCV = $derived(
+		selectedStats && selectedStats.mean > 0 ? selectedStats.stdDev / selectedStats.mean : null
+	);
+
+	let cvLabel = $derived(
+		selectedCV === null ? '' : selectedCV < 0.2 ? 'Steady' : selectedCV <= 0.5 ? 'Moderate' : 'Variable'
+	);
+
+	let cvColor = $derived(
+		selectedCV === null ? '' : selectedCV < 0.2 ? 'bg-success-500' : selectedCV <= 0.5 ? 'bg-warning-500' : 'bg-danger-500'
+	);
 
 	// Calculate spending by category for current month
 	let categorySpending = $derived(engine.getSpendingByCategory(transactions, currentMonth));
@@ -154,6 +187,19 @@
 						</option>
 					{/each}
 				</select>
+
+				{#if selectedStats && selectedStats.mean > 0 && selectedCV !== null}
+					<div class="flex items-center gap-2 mt-2 text-sm text-charcoal-muted">
+						<span class="inline-block w-2.5 h-2.5 rounded-full {cvColor}"></span>
+						<span class="font-medium text-charcoal-soft">{cvLabel}</span>
+						<span>·</span>
+						<span class="font-mono">${Math.round(selectedStats.mean)}/mo ± ${Math.round(selectedStats.stdDev)}</span>
+						{#if selectedStats.stdDev > 0}
+							<span>·</span>
+							<span>Range ${Math.max(0, Math.floor(selectedStats.mean - selectedStats.stdDev))}–${Math.ceil(selectedStats.mean + selectedStats.stdDev)}</span>
+						{/if}
+					</div>
+				{/if}
 			</div>
 
 			<!-- Category Trends Chart -->
@@ -166,6 +212,8 @@
 						categoryName={selectedCategory.name}
 						categoryColor={selectedCategory.color || '#3b82f6'}
 						trendData={categoryTrendData}
+						mean={selectedStats?.mean}
+						stdDev={selectedStats?.stdDev}
 					/>
 				</div>
 			{/if}
@@ -181,6 +229,7 @@
 					currentTransactions={transactions}
 					{previousTransactions}
 					{categories}
+					{categoryStats}
 				/>
 			</div>
 		</div>
