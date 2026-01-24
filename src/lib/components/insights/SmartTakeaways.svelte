@@ -262,7 +262,7 @@
 
 			if (monthReview) {
 				// vs Average
-				if (items.length < maxCount && monthReview.vsAverage) {
+				if (monthReview.vsAverage) {
 					const { percentDiff, isAbove } = monthReview.vsAverage;
 					items.push({
 						type: 'vsAverage',
@@ -273,7 +273,7 @@
 				}
 
 				// Biggest purchase
-				if (items.length < maxCount && monthReview.biggestPurchase) {
+				if (monthReview.biggestPurchase) {
 					const { merchant, amount } = monthReview.biggestPurchase;
 					items.push({
 						type: 'biggestPurchase',
@@ -284,7 +284,7 @@
 				}
 
 				// Category standout
-				if (items.length < maxCount && monthReview.categoryStandout) {
+				if (monthReview.categoryStandout) {
 					const { name, diff, isIncrease } = monthReview.categoryStandout;
 					items.push({
 						type: 'categoryStandout',
@@ -295,7 +295,7 @@
 				}
 
 				// Historical rank (only show when it's the actual highest or lowest)
-				if (items.length < maxCount && monthReview.historicalRank && monthReview.historicalRank.rank === 1) {
+				if (monthReview.historicalRank && monthReview.historicalRank.rank === 1) {
 					const { total, direction } = monthReview.historicalRank;
 					items.push({
 						type: 'rank',
@@ -306,7 +306,7 @@
 				}
 
 				// Most visited merchant
-				if (items.length < maxCount && monthReview.mostVisitedMerchant) {
+				if (monthReview.mostVisitedMerchant) {
 					const { merchant, count } = monthReview.mostVisitedMerchant;
 					items.push({
 						type: 'mostVisited',
@@ -317,7 +317,7 @@
 				}
 
 				// Needs vs Wants
-				if (items.length < maxCount && monthReview.needsPercent !== null) {
+				if (monthReview.needsPercent !== null) {
 					items.push({
 						type: 'needsWants',
 						icon: Receipt,
@@ -328,7 +328,7 @@
 			}
 		}
 
-		return items.slice(0, maxCount);
+		return isCurrentMonth ? items.slice(0, maxCount) : items;
 	});
 
 	// Check if we have any takeaways to show
