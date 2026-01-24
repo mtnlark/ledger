@@ -13,3 +13,5 @@ export { calculateVelocityComparison } from './velocity';
 export { getTopMerchant } from './top-merchant';
 export { computeYTDStats } from './ytd-stats';
 export { computeStdDev, computeZScore } from './stats';
+export { computeMonthReview } from './month-review';
+export type { MonthReviewResult } from './month-review';

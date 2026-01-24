@@ -19,6 +19,7 @@
 	import { getBudgetForMonth, getAllBudgets } from '$lib/stores/budget';
 	import HeaderNav from '$lib/components/HeaderNav.svelte';
 	import Skeleton from '$lib/components/Skeleton.svelte';
+	import MonthPicker from '$lib/components/MonthPicker.svelte';
 	import SmartTakeaways from '$lib/components/insights/SmartTakeaways.svelte';
 	import SpendingThisMonth from '$lib/components/insights/SpendingThisMonth.svelte';
 	import CategoryDeepDives from '$lib/components/insights/CategoryDeepDives.svelte';
@@ -127,6 +128,15 @@
 				</div>
 			{/each}
 		{:else}
+			<!-- Page-level Month Picker -->
+			<div class="flex justify-end">
+				<MonthPicker
+					currentMonth={selectedMonth}
+					{availableMonths}
+					onMonthChange={handleMonthChange}
+				/>
+			</div>
+
 			<!-- Smart Takeaways (always visible at top) -->
 			<SmartTakeaways
 				currentMonthTransactions={selectedMonthTransactions}
@@ -134,17 +144,16 @@
 				{categories}
 				{availableMonths}
 				{budget}
+				{selectedMonth}
 			/>
 
 			<!-- Spending This Month -->
 			<SpendingThisMonth
 				currentMonth={selectedMonth}
 				transactions={selectedMonthTransactions}
-				{availableMonths}
 				{budget}
 				{allBudgets}
 				{monthlyTrends}
-				onMonthChange={handleMonthChange}
 			/>
 
 			<!-- Category Deep Dives -->

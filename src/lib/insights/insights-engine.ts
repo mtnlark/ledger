@@ -15,7 +15,8 @@ import type {
 	TopMerchantResult,
 	CategoryShiftResult,
 	CategoryDeepDiveShift,
-	YTDStatsResult
+	YTDStatsResult,
+	MonthReviewResult
 } from './types';
 import { memoByVersion, memoByVersionMultiKey } from './memo';
 import { getTransactionCache } from '$lib/stores/transactionCache';
@@ -33,7 +34,8 @@ import {
 	calculatePaceProjection as rawCalculatePaceProjection,
 	calculateVelocityComparison as rawCalculateVelocityComparison,
 	getTopMerchant as rawGetTopMerchant,
-	computeYTDStats as rawComputeYTDStats
+	computeYTDStats as rawComputeYTDStats,
+	computeMonthReview as rawComputeMonthReview
 } from './calculations';
 
 export class InsightsEngine {
@@ -91,6 +93,15 @@ export class InsightsEngine {
 			categories: Category[],
 			config: { minAverage: number; zScoreThreshold: number; maxToShow: number; fallbackRatioThreshold?: number }
 		) => rawDetectAnomalies(currentSpending, categoryStats, categories, config)
+	);
+	private _computeMonthReview = memoByVersionMultiKey(
+		(
+			selectedMonth: string,
+			selectedMonthTransactions: Transaction[],
+			previousMonthTransactions: Transaction[],
+			allTransactions: Transaction[],
+			categories: Category[]
+		) => rawComputeMonthReview(selectedMonth, selectedMonthTransactions, previousMonthTransactions, allTransactions, categories)
 	);
 	private _computeYTDStats = memoByVersion(
 		(allTransactions: Transaction[], year?: number) => rawComputeYTDStats(allTransactions, year)
@@ -227,6 +238,25 @@ export class InsightsEngine {
 		key: string
 	): AnomalyResult[] {
 		return this._detectAnomalies(this.version, key, currentSpending, categoryStats, categories, config);
+	}
+
+	/** Compute month review retrospective superlatives for a past month. */
+	getMonthReview(
+		selectedMonth: string,
+		selectedMonthTransactions: Transaction[],
+		previousMonthTransactions: Transaction[],
+		allTransactions: Transaction[],
+		categories: Category[]
+	): MonthReviewResult {
+		return this._computeMonthReview(
+			this.version,
+			selectedMonth,
+			selectedMonth,
+			selectedMonthTransactions,
+			previousMonthTransactions,
+			allTransactions,
+			categories
+		);
 	}
 
 	/** Compute year-to-date statistics. */

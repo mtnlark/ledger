@@ -61,5 +61,10 @@ export interface YTDStatsResult {
 	dailySpending: Map<string, number>;
 }
 
+/**
+ * Month review retrospective superlatives for a past month.
+ */
+export type { MonthReviewResult } from './calculations/month-review';
+
 // Input types for calculations
 export type { Transaction, Category, MonthlyBudget };

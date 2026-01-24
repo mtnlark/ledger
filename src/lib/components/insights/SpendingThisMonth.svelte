@@ -4,28 +4,23 @@
 	import { format } from 'date-fns';
 	import { getInsightsEngine } from '$lib/insights';
 	import InsightGroup from './InsightGroup.svelte';
-	import MonthPicker from '../MonthPicker.svelte';
 	import SavingsRateChart from './SavingsRateChart.svelte';
 	import MonthlyTrendsChart from '../MonthlyTrendsChart.svelte';
 
 	interface Props {
 		currentMonth: string;
 		transactions: Transaction[];
-		availableMonths: string[];
 		budget: MonthlyBudget | null;
 		allBudgets: MonthlyBudget[];
 		monthlyTrends: Map<string, number>;
-		onMonthChange: (month: string) => void;
 	}
 
 	let {
 		currentMonth,
 		transactions,
-		availableMonths,
 		budget,
 		allBudgets,
-		monthlyTrends,
-		onMonthChange
+		monthlyTrends
 	}: Props = $props();
 
 	const engine = getInsightsEngine();
@@ -77,22 +72,6 @@
 
 	{#snippet children()}
 		<div class="space-y-6">
-			<!-- Month Picker (embedded) -->
-			<div class="flex items-center justify-between pb-4 border-b border-dashed border-theme">
-				<p class="text-sm text-charcoal-muted">
-					{#if isCurrentMonth}
-						Viewing current month
-					{:else}
-						Viewing {monthDisplay}
-					{/if}
-				</p>
-				<MonthPicker
-					{currentMonth}
-					{availableMonths}
-					{onMonthChange}
-				/>
-			</div>
-
 			<!-- Quick Stats -->
 			{#if transactions.length > 0}
 				<div class="bg-cream-dark rounded-lg p-4 border border-dashed border-theme">
