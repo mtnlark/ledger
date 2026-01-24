@@ -170,23 +170,23 @@ describe('InsightsEngine', () => {
 			expect(result?.percentChange).toBe(25);
 		});
 
-		it('getAnomalies works', () => {
+		it('getAnomalies works with CategoryStats', () => {
 			const engine = getInsightsEngine();
 			const current = new Map([[1, 60]]);
-			const averages = new Map([[1, 30]]);
+			const categoryStats = new Map([[1, { mean: 30, stdDev: 10 }]]);
 			const categories = [
 				{ id: 1, name: 'Test', isActive: true, sortOrder: 0, isEssential: false }
 			];
 
 			const result = engine.getAnomalies(
 				current,
-				averages,
+				categoryStats,
 				categories,
-				{ minAverage: 20, ratioThreshold: 1.5, maxToShow: 5 },
+				{ minAverage: 20, zScoreThreshold: 2.0, maxToShow: 5 },
 				'2025-01'
 			);
 			expect(result).toHaveLength(1);
-			expect(result[0].ratio).toBe(2);
+			expect(result[0].zScore).toBe(3); // (60-30)/10
 		});
 	});
 });

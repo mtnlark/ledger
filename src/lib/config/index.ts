@@ -69,10 +69,12 @@ export const config = {
 		anomaly: {
 			/** Minimum 3-month average to detect anomalies ($) */
 			minAverage: 20,
-			/** Ratio above which to flag as anomaly (1.5 = 50% higher) */
-			ratioThreshold: 1.5,
+			/** Z-score threshold: flag if spending exceeds this many SDs above mean */
+			zScoreThreshold: 2.0,
 			/** Maximum number of anomalies to show */
-			maxToShow: 2
+			maxToShow: 2,
+			/** Fallback ratio when stdDev is 0 (single month of history) */
+			fallbackRatioThreshold: 1.5
 		},
 		/** Category shift detection settings */
 		shift: {
@@ -80,14 +82,16 @@ export const config = {
 			earlyMonthCutoff: 15,
 			/** Ratio threshold for early month skip (current/previous) */
 			earlyMonthRatio: 0.2,
-			/** Minimum dollar difference to show shift */
-			minDifference: 30,
+			/** Z-score threshold: shift significant if > N stddevs */
+			zScoreThreshold: 1.0,
 			/** Minimum amount in either month to consider */
-			minAmount: 20
+			minAmount: 20,
+			/** Fallback dollar difference when stdDev is 0 */
+			fallbackMinDifference: 30
 		},
 		/** Spending velocity comparison */
 		velocity: {
-			/** Minimum percent change to show comparison */
+			/** Minimum percent change to show comparison (also floor for adaptive threshold) */
 			percentThreshold: 5
 		},
 		/** Top merchant detection */

@@ -1,21 +1,25 @@
 /**
  * Category shift detection: biggest spending change from previous month.
+ * Uses per-category standard deviation to determine significance.
  */
 
 import type { Transaction, Category } from '$lib/db';
 import type { CategoryShiftResult, CategoryDeepDiveShift } from '../types';
 import type { AnomalyResult } from '$lib/utils/insights-calculations';
+import type { CategoryStats } from './category-averages';
 import { getSpendingByCategory, getUserAmount } from './spending';
 
 interface ShiftConfig {
 	earlyMonthCutoff: number;
 	earlyMonthRatio: number;
-	minDifference: number;
+	zScoreThreshold: number;
 	minAmount: number;
+	fallbackMinDifference: number;
 }
 
 /**
  * Compute the top category shift (biggest absolute dollar change from last month).
+ * Uses per-category stdDev to determine if a shift is statistically significant.
  * Filters out "down" shifts that are likely just expenses that haven't posted yet.
  * Also excludes shifts that overlap with detected anomalies.
  */
@@ -25,7 +29,8 @@ export function computeTopCategoryShift(
 	categories: Category[],
 	currentDay: number,
 	anomalies: AnomalyResult[],
-	config: ShiftConfig
+	config: ShiftConfig,
+	categoryStats?: Map<number, CategoryStats>
 ): CategoryShiftResult | null {
 	if (previousTransactions.length === 0) return null;
 
@@ -57,10 +62,17 @@ export function computeTopCategoryShift(
 				continue;
 		}
 
+		// Determine minimum significant difference for this category
+		const stats = categoryStats?.get(catId);
+		const minDifference =
+			stats && stats.stdDev > 0
+				? stats.stdDev * config.zScoreThreshold
+				: config.fallbackMinDifference;
+
 		// Only consider meaningful shifts
 		if (
 			absDiff > biggestAbsDiff &&
-			absDiff >= config.minDifference &&
+			absDiff >= minDifference &&
 			(current > config.minAmount || previous > config.minAmount)
 		) {
 			biggestAbsDiff = absDiff;

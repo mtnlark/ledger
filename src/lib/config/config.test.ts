@@ -75,12 +75,16 @@ describe('config', () => {
 				expect(config.insights.anomaly.minAverage).toBe(20);
 			});
 
-			it('has ratio threshold for flagging anomalies', () => {
-				expect(config.insights.anomaly.ratioThreshold).toBe(1.5);
+			it('has z-score threshold for flagging anomalies', () => {
+				expect(config.insights.anomaly.zScoreThreshold).toBe(2.0);
 			});
 
 			it('has max anomalies to show', () => {
 				expect(config.insights.anomaly.maxToShow).toBe(2);
+			});
+
+			it('has fallback ratio threshold for low-data scenarios', () => {
+				expect(config.insights.anomaly.fallbackRatioThreshold).toBe(1.5);
 			});
 		});
 
@@ -93,12 +97,16 @@ describe('config', () => {
 				expect(config.insights.shift.earlyMonthRatio).toBe(0.2);
 			});
 
-			it('has minimum difference for shift', () => {
-				expect(config.insights.shift.minDifference).toBe(30);
+			it('has z-score threshold for shift significance', () => {
+				expect(config.insights.shift.zScoreThreshold).toBe(1.0);
 			});
 
 			it('has minimum amount for consideration', () => {
 				expect(config.insights.shift.minAmount).toBe(20);
+			});
+
+			it('has fallback minimum difference when no stats', () => {
+				expect(config.insights.shift.fallbackMinDifference).toBe(30);
 			});
 		});
 

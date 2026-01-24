@@ -32,28 +32,31 @@
 		});
 	}
 
-	// Calculate 3-month average per category (excluding current month)
-	let categoryAverages = $derived.by(() => {
-		if (availableMonths.length < 2) return new Map<number, number>();
+	// Gather recent months for historical comparison (excluding current)
+	let recentMonths = $derived.by(() => {
+		if (availableMonths.length < 2) return [] as string[];
 
-		const recentMonths: string[] = [];
+		const months: string[] = [];
 		let month = navigateMonth(currentMonthKey, -1);
 		for (let i = 0; i < config.insights.takeaways.monthsToAverage; i++) {
 			if (availableMonths.includes(month)) {
-				recentMonths.push(month);
+				months.push(month);
 			}
 			month = navigateMonth(month, -1);
 		}
-
-		if (recentMonths.length === 0) return new Map<number, number>();
-
-		return engine.getCategoryAverages(getTransactionsForMonth, recentMonths, currentMonthKey);
+		return months;
 	});
 
-	// Detect anomalies (categories significantly above average)
+	// Calculate category stats (mean + stdDev) for anomaly and shift detection
+	let categoryStats = $derived.by(() => {
+		if (recentMonths.length === 0) return new Map<number, { mean: number; stdDev: number }>();
+		return engine.getCategoryStats(getTransactionsForMonth, recentMonths, currentMonthKey);
+	});
+
+	// Detect anomalies (categories significantly above average using z-scores)
 	let anomalies = $derived.by(() => {
 		const currentSpending = engine.getSpendingByCategory(currentMonthTransactions, currentMonthKey);
-		return engine.getAnomalies(currentSpending, categoryAverages, categories, config.insights.anomaly, currentMonthKey);
+		return engine.getAnomalies(currentSpending, categoryStats, categories, config.insights.anomaly, currentMonthKey);
 	});
 
 	// Calculate pace projection
@@ -68,7 +71,7 @@
 	// Get previous month for comparison
 	let previousMonthKey = $derived(navigateMonth(currentMonthKey, -1));
 
-	// Calculate top category shift (biggest change from last month)
+	// Calculate top category shift (biggest statistically significant change)
 	let topShift = $derived.by(() => {
 		const prevTransactions = getTransactionsForMonth(previousMonthKey);
 		const today = new Date();
@@ -80,12 +83,21 @@
 			currentDay,
 			anomalies,
 			config.insights.shift,
-			currentMonthKey
+			currentMonthKey,
+			categoryStats
 		);
 	});
 
 	// Fallback: Needs vs wants ratio
 	let needsVsWants = $derived(engine.getNeedsVsWants(currentMonthTransactions, currentMonthKey));
+
+	// Compute historical monthly totals for velocity adaptive threshold
+	let historicalMonthlyTotals = $derived.by(() => {
+		return recentMonths.map((month) => {
+			const txs = getTransactionsForMonth(month);
+			return engine.getTotalSpent(txs, month);
+		});
+	});
 
 	// Fallback: Spending velocity comparison (daily average this month vs last month)
 	let velocityComparison = $derived.by(() => {
@@ -106,7 +118,8 @@
 			currentDay,
 			daysInPrevMonth,
 			config.insights.velocity.percentThreshold,
-			currentMonthKey
+			currentMonthKey,
+			historicalMonthlyTotals
 		);
 	});
 

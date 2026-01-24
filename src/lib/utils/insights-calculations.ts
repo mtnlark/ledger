@@ -62,6 +62,7 @@ export interface AnomalyResult {
 	current: number;
 	avg: number;
 	ratio: number;
+	zScore?: number;
 }
 
 /**

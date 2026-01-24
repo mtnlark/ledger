@@ -19,6 +19,7 @@ import type {
 } from './types';
 import { memoByVersion, memoByVersionMultiKey } from './memo';
 import { getTransactionCache } from '$lib/stores/transactionCache';
+import type { CategoryStats } from './calculations';
 import {
 	getSpendingByCategory as rawGetSpendingByCategory,
 	getTotalSpent as rawGetTotalSpent,
@@ -27,6 +28,7 @@ import {
 	computeTopCategoryShift as rawComputeTopCategoryShift,
 	computeCategoryDeepDiveShift as rawComputeCategoryDeepDiveShift,
 	computeCategoryAverages as rawComputeCategoryAverages,
+	computeCategoryStats as rawComputeCategoryStats,
 	detectAnomalies as rawDetectAnomalies,
 	calculatePaceProjection as rawCalculatePaceProjection,
 	calculateVelocityComparison as rawCalculateVelocityComparison,
@@ -50,8 +52,9 @@ export class InsightsEngine {
 			categories: Category[],
 			currentDay: number,
 			anomalies: AnomalyResult[],
-			config: { earlyMonthCutoff: number; earlyMonthRatio: number; minDifference: number; minAmount: number }
-		) => rawComputeTopCategoryShift(current, previous, categories, currentDay, anomalies, config)
+			config: { earlyMonthCutoff: number; earlyMonthRatio: number; zScoreThreshold: number; minAmount: number; fallbackMinDifference: number },
+			categoryStats?: Map<number, CategoryStats>
+		) => rawComputeTopCategoryShift(current, previous, categories, currentDay, anomalies, config, categoryStats)
 	);
 	private _computeCategoryDeepDiveShift = memoByVersionMultiKey(
 		(current: Transaction[], previous: Transaction[], categories: Category[]) =>
@@ -63,8 +66,9 @@ export class InsightsEngine {
 			prevTotal: number,
 			currentDays: number,
 			prevDays: number,
-			percentThreshold: number
-		) => rawCalculateVelocityComparison(currentTotal, prevTotal, currentDays, prevDays, percentThreshold)
+			percentThreshold: number,
+			historicalMonthlyTotals?: number[]
+		) => rawCalculateVelocityComparison(currentTotal, prevTotal, currentDays, prevDays, percentThreshold, historicalMonthlyTotals)
 	);
 	private _calculatePaceProjection = memoByVersionMultiKey(
 		(totalSpent: number, budget: MonthlyBudget | null, currentDay: number, daysInMonth: number) =>
@@ -76,13 +80,17 @@ export class InsightsEngine {
 		(getTransactionsForMonth: (month: string) => Transaction[], months: string[]) =>
 			rawComputeCategoryAverages(getTransactionsForMonth, months)
 	);
+	private _computeCategoryStats = memoByVersion(
+		(getTransactionsForMonth: (month: string) => Transaction[], months: string[]) =>
+			rawComputeCategoryStats(getTransactionsForMonth, months)
+	);
 	private _detectAnomalies = memoByVersion(
 		(
 			currentSpending: Map<number, number>,
-			averages: Map<number, number>,
+			categoryStats: Map<number, CategoryStats>,
 			categories: Category[],
-			config: { minAverage: number; ratioThreshold: number; maxToShow: number }
-		) => rawDetectAnomalies(currentSpending, averages, categories, config)
+			config: { minAverage: number; zScoreThreshold: number; maxToShow: number; fallbackRatioThreshold?: number }
+		) => rawDetectAnomalies(currentSpending, categoryStats, categories, config)
 	);
 	private _computeYTDStats = memoByVersion(
 		(allTransactions: Transaction[], year?: number) => rawComputeYTDStats(allTransactions, year)
@@ -126,8 +134,9 @@ export class InsightsEngine {
 		categories: Category[],
 		currentDay: number,
 		anomalies: AnomalyResult[],
-		config: { earlyMonthCutoff: number; earlyMonthRatio: number; minDifference: number; minAmount: number },
-		key: string
+		config: { earlyMonthCutoff: number; earlyMonthRatio: number; zScoreThreshold: number; minAmount: number; fallbackMinDifference: number },
+		key: string,
+		categoryStats?: Map<number, CategoryStats>
 	): CategoryShiftResult | null {
 		return this._computeTopCategoryShift(
 			this.version,
@@ -137,7 +146,8 @@ export class InsightsEngine {
 			categories,
 			currentDay,
 			anomalies,
-			config
+			config,
+			categoryStats
 		);
 	}
 
@@ -164,7 +174,8 @@ export class InsightsEngine {
 		currentDays: number,
 		prevDays: number,
 		percentThreshold: number,
-		key: string
+		key: string,
+		historicalMonthlyTotals?: number[]
 	): VelocityComparisonResult | null {
 		return this._calculateVelocityComparison(
 			this.version,
@@ -173,7 +184,8 @@ export class InsightsEngine {
 			prevTotal,
 			currentDays,
 			prevDays,
-			percentThreshold
+			percentThreshold,
+			historicalMonthlyTotals
 		);
 	}
 
@@ -197,15 +209,24 @@ export class InsightsEngine {
 		return this._computeCategoryAverages(this.version, key, getTransactionsForMonth, months);
 	}
 
+	/** Compute category stats (mean + stdDev) across months. */
+	getCategoryStats(
+		getTransactionsForMonth: (month: string) => Transaction[],
+		months: string[],
+		key: string
+	): Map<number, CategoryStats> {
+		return this._computeCategoryStats(this.version, key, getTransactionsForMonth, months);
+	}
+
 	/** Detect spending anomalies above historical averages. */
 	getAnomalies(
 		currentSpending: Map<number, number>,
-		averages: Map<number, number>,
+		categoryStats: Map<number, CategoryStats>,
 		categories: Category[],
-		config: { minAverage: number; ratioThreshold: number; maxToShow: number },
+		config: { minAverage: number; zScoreThreshold: number; maxToShow: number; fallbackRatioThreshold?: number },
 		key: string
 	): AnomalyResult[] {
-		return this._detectAnomalies(this.version, key, currentSpending, averages, categories, config);
+		return this._detectAnomalies(this.version, key, currentSpending, categoryStats, categories, config);
 	}
 
 	/** Compute year-to-date statistics. */

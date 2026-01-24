@@ -101,7 +101,8 @@ ledger/
 │   │   │       ├── pace-projection.ts
 │   │   │       ├── velocity.ts
 │   │   │       ├── top-merchant.ts
-│   │   │       └── ytd-stats.ts
+│   │   │       ├── ytd-stats.ts
+│   │   │       └── stats.ts          # Shared statistical helpers (stdDev, zScore)
 │   │   ├── components/
 │   │   │   ├── SideNav.svelte         # Collapsible sidebar
 │   │   │   ├── HeaderNav.svelte       # Page headers
