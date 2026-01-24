@@ -173,17 +173,17 @@
 	}
 
 	// Handle month change from picker
-	function handleMonthChange(month: string) {
-		currentMonth = month;
+	// Fetch data first, then update all state atomically to prevent UI mismatch
+	async function handleMonthChange(month: string) {
 		setSelectedMonth(month);
-		loadMonthData();
-	}
-
-	// Load just the month-specific data (without re-fetching categories/settings)
-	async function loadMonthData() {
 		try {
-			transactions = await getTransactionsByMonth(currentMonth);
-			budget = await getBudgetForMonth(currentMonth);
+			const [txns, monthBudget] = await Promise.all([
+				getTransactionsByMonth(month),
+				getBudgetForMonth(month)
+			]);
+			currentMonth = month;
+			transactions = txns;
+			budget = monthBudget;
 		} catch (error) {
 			console.error('Failed to load month data:', error);
 		}

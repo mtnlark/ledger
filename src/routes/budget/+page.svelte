@@ -130,7 +130,7 @@
 				availableMonths = [currentMonth, ...availableMonths].sort().reverse();
 			}
 
-			await loadMonthData();
+			await loadMonthData(currentMonth);
 		} catch (error) {
 			console.error('Failed to load budget data:', error);
 			toast.error('Failed to load budget data');
@@ -140,18 +140,18 @@
 		}
 	}
 
-	async function loadMonthData() {
-		// Load dismissed alerts for this month
-		loadDismissedAlerts(currentMonth);
-
+	// Fetch data for a month, then update all state atomically to prevent UI mismatch
+	async function loadMonthData(month: string) {
 		const [budgetList, spendingMap, suggestionMap, monthBudget] = await Promise.all([
-			getCategoryBudgetsForMonth(currentMonth),
-			getAllCategorySpending(currentMonth),
-			generateAllSuggestions(currentMonth),
-			getBudgetForMonth(currentMonth)
+			getCategoryBudgetsForMonth(month),
+			getAllCategorySpending(month),
+			generateAllSuggestions(month),
+			getBudgetForMonth(month)
 		]);
 
-		// Convert budget array to map by categoryId
+		// Update all state atomically
+		currentMonth = month;
+		loadDismissedAlerts(month);
 		budgets = new Map(budgetList.map((b) => [b.categoryId, b]));
 		spending = spendingMap;
 		suggestions = suggestionMap;
@@ -159,15 +159,14 @@
 	}
 
 	async function handleMonthChange(month: string) {
-		currentMonth = month;
 		setSelectedMonth(month);
-		await loadMonthData();
+		await loadMonthData(month);
 	}
 
 	async function handleSaveBudget(categoryId: number, amount: number) {
 		try {
 			await saveCategoryBudget(categoryId, currentMonth, amount);
-			await loadMonthData();
+			await loadMonthData(currentMonth);
 			toast.success('Budget saved');
 		} catch (error) {
 			console.error('Failed to save budget:', error);
@@ -178,7 +177,7 @@
 	async function handleDeleteBudget(categoryId: number) {
 		try {
 			await deleteCategoryBudget(categoryId, currentMonth);
-			await loadMonthData();
+			await loadMonthData(currentMonth);
 			toast.success('Budget removed');
 		} catch (error) {
 			console.error('Failed to delete budget:', error);
@@ -196,7 +195,7 @@
 					applied++;
 				}
 			}
-			await loadMonthData();
+			await loadMonthData(currentMonth);
 			if (applied > 0) {
 				toast.success(`Applied ${applied} budget suggestion${applied === 1 ? '' : 's'}`);
 			} else {
@@ -217,7 +216,7 @@
 			}
 
 			await copyBudgetsFromMonth(previousMonth, currentMonth);
-			await loadMonthData();
+			await loadMonthData(currentMonth);
 			toast.success('Copied budgets from last month');
 		} catch (error) {
 			console.error('Failed to copy budgets:', error);
