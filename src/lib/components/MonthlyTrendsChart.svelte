@@ -35,8 +35,8 @@
 	// Warm Ledger color palette
 	const COLORS = {
 		belowAverage: '#5B8C5A', // success-500 (sage)
-		normal: '#C45D3A',      // primary-500 (terracotta)
-		aboveAverage: '#C17B7B' // danger-500 (rose)
+		normal: '#6B8CA6',      // warm slate blue (neutral)
+		aboveAverage: '#C44D4D' // warm red (over budget)
 	};
 
 	// Convert map to sorted arrays for chart
@@ -49,12 +49,20 @@
 		};
 	});
 
-	// Calculate average and trend
+	// Calculate average and standard deviation for personalized thresholds
 	let average = $derived(
 		chartData.values.length > 0
 			? chartData.values.reduce((a, b) => a + b, 0) / chartData.values.length
 			: 0
 	);
+
+	let stdDev = $derived.by(() => {
+		if (chartData.values.length < 2) return 0;
+		const variance =
+			chartData.values.reduce((sum, v) => sum + (v - average) ** 2, 0) /
+			chartData.values.length;
+		return Math.sqrt(variance);
+	});
 
 	// Chart configuration
 	let chartConfig = $derived<ChartConfiguration<'bar'>>({
@@ -66,7 +74,7 @@
 					label: 'Monthly Spending',
 					data: chartData.values,
 					backgroundColor: chartData.values.map((v) =>
-						v > average * 1.2 ? COLORS.aboveAverage : v < average * 0.8 ? COLORS.belowAverage : COLORS.normal
+						v > average + stdDev ? COLORS.aboveAverage : v < average - stdDev ? COLORS.belowAverage : COLORS.normal
 					),
 					borderRadius: 6,
 					borderSkipped: false
