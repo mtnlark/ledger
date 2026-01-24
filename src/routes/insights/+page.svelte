@@ -70,10 +70,15 @@
 	}
 
 	// Handle month change - update transactions and budget for selected month
+	// Fetch data first, then update all state atomically to prevent UI mismatch
 	async function handleMonthChange(month: string) {
+		const [txns, monthBudget] = await Promise.all([
+			getTransactionsByMonth(month),
+			getBudgetForMonth(month)
+		]);
 		selectedMonth = month;
-		selectedMonthTransactions = await getTransactionsByMonth(month);
-		budget = await getBudgetForMonth(month);
+		selectedMonthTransactions = txns;
+		budget = monthBudget;
 	}
 
 	// Reload subscription-related data when subscriptions change
