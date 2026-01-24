@@ -1,6 +1,24 @@
 import { config } from '$lib/config';
 
 /**
+ * Parse a stored date value (from JSON deserialization) to a local Date.
+ * Transaction dates represent calendar dates, not precise instants.
+ * Extracts YYYY-MM-DD from the ISO string to avoid timezone shift
+ * where UTC midnight becomes the previous day in western timezones.
+ */
+export function parseStoredDate(value: string | Date): Date {
+	if (typeof value === 'string') {
+		const match = value.match(/^(\d{4})-(\d{2})-(\d{2})/);
+		if (match) {
+			return new Date(parseInt(match[1]), parseInt(match[2]) - 1, parseInt(match[3]));
+		}
+	}
+	// Fallback: if already a Date object, normalize to local midnight
+	const d = value instanceof Date ? value : new Date(value);
+	return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+}
+
+/**
  * Parse an ISO date string (YYYY-MM-DD) to a local Date
  * Used for HTML date input values which are always in ISO format
  * Avoids UTC timezone issues that occur with new Date('YYYY-MM-DD')

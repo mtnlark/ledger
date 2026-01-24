@@ -14,6 +14,7 @@ import {
 	type Settings,
 	DEFAULT_SETTINGS
 } from '$lib/db';
+import { parseStoredDate } from '$lib/utils/date-helpers';
 
 // Data structure for file storage
 export interface StoredData {
@@ -179,9 +180,10 @@ export async function replaceAllData(data: StoredData): Promise<void> {
 
 			if (data.transactions.length > 0) {
 				// Convert date strings back to Date objects
+				// Use parseStoredDate for transaction date to avoid timezone shift
 				const transactions = data.transactions.map((t) => ({
 					...t,
-					date: new Date(t.date),
+					date: parseStoredDate(t.date),
 					createdAt: new Date(t.createdAt),
 					updatedAt: new Date(t.updatedAt),
 					settledDate: t.settledDate ? new Date(t.settledDate) : undefined

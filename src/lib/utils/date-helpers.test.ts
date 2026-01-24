@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
+	parseStoredDate,
 	parseLocalDate,
 	parseDateString,
 	excelDateToJS,
@@ -8,6 +9,47 @@ import {
 } from './date-helpers';
 
 describe('Date Helpers', () => {
+	describe('parseStoredDate', () => {
+		it('parses UTC midnight ISO string as local date (avoids timezone shift)', () => {
+			// This is the bug case: "2026-01-01T00:00:00.000Z" should be Jan 1 locally
+			const date = parseStoredDate('2026-01-01T00:00:00.000Z');
+			expect(date.getFullYear()).toBe(2026);
+			expect(date.getMonth()).toBe(0); // January
+			expect(date.getDate()).toBe(1);
+		});
+
+		it('parses ISO string with time offset correctly', () => {
+			// "2026-01-01T08:00:00.000Z" (local midnight in PST stored as UTC)
+			const date = parseStoredDate('2026-01-01T08:00:00.000Z');
+			expect(date.getFullYear()).toBe(2026);
+			expect(date.getMonth()).toBe(0);
+			expect(date.getDate()).toBe(1);
+		});
+
+		it('parses date-only ISO string', () => {
+			const date = parseStoredDate('2025-12-25');
+			expect(date.getFullYear()).toBe(2025);
+			expect(date.getMonth()).toBe(11); // December
+			expect(date.getDate()).toBe(25);
+		});
+
+		it('handles Date object input', () => {
+			const input = new Date(2026, 0, 1); // Jan 1 local
+			const date = parseStoredDate(input);
+			expect(date.getFullYear()).toBe(2026);
+			expect(date.getMonth()).toBe(0);
+			expect(date.getDate()).toBe(1);
+		});
+
+		it('normalizes Date object to midnight', () => {
+			const input = new Date(2025, 5, 15, 14, 30, 0); // June 15 at 2:30pm
+			const date = parseStoredDate(input);
+			expect(date.getHours()).toBe(0);
+			expect(date.getMinutes()).toBe(0);
+			expect(date.getDate()).toBe(15);
+		});
+	});
+
 	describe('parseLocalDate', () => {
 		it('parses ISO date string to local date', () => {
 			const date = parseLocalDate('2025-12-15');

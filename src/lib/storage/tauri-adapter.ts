@@ -11,6 +11,7 @@ import {
 	DEFAULT_CATEGORIES,
 	type Category
 } from '$lib/db';
+import { parseStoredDate } from '$lib/utils/date-helpers';
 import type { StoredData } from './index';
 
 // Tauri API modules - loaded once during initialization
@@ -299,10 +300,11 @@ async function loadDataIntoDexie(data: StoredData): Promise<void> {
 			}
 
 			// Load transactions (convert date strings to Date objects)
+			// Use parseStoredDate for transaction date to avoid timezone shift
 			if (data.transactions && data.transactions.length > 0) {
 				const transactions = data.transactions.map((t) => ({
 					...t,
-					date: new Date(t.date),
+					date: parseStoredDate(t.date),
 					createdAt: new Date(t.createdAt),
 					updatedAt: new Date(t.updatedAt),
 					settledDate: t.settledDate ? new Date(t.settledDate) : undefined

@@ -1,5 +1,6 @@
 import { db, type Transaction, type Category } from '$lib/db';
 import { persistData } from '$lib/storage';
+import { parseStoredDate } from '$lib/utils/date-helpers';
 import { format } from 'date-fns';
 
 /**
@@ -103,9 +104,10 @@ export async function importFromJSON(
 			// Import transactions with original IDs preserved
 			if (transactions && transactions.length > 0) {
 				// Convert date strings back to Date objects
+				// Use parseStoredDate for transaction date to avoid timezone shift
 				const cleanTransactions = transactions.map((t: Transaction) => ({
 					...t,
-					date: new Date(t.date),
+					date: parseStoredDate(t.date),
 					createdAt: new Date(t.createdAt),
 					updatedAt: new Date(t.updatedAt),
 					settledDate: t.settledDate ? new Date(t.settledDate) : undefined
