@@ -183,12 +183,15 @@ describe('Recurring Expense Detection', () => {
 			expect(recurring[0].averageAmount).toBe(105); // Average
 		});
 
-		it('rejects transactions with too much amount variance (>15%)', async () => {
-			// Same merchant but very different amounts - not recurring
+		it('rejects transactions with too much amount variance', async () => {
+			// Same merchant but very different amounts - not recurring.
+			// With only 2 occurrences, adaptive threshold is maxVariance * 1.5 = 0.75 CV.
+			// Need amounts with CV > 0.75 to be rejected.
+			// $20 and $200: mean=110, stdDev=90, CV=0.82 > 0.75
 			await addTransaction({
 				date: new Date(2025, 0, 15),
 				merchant: 'Amazon',
-				amount: 50,
+				amount: 20,
 				categoryId: 1,
 				isShared: false,
 				isSettled: false,
@@ -200,7 +203,7 @@ describe('Recurring Expense Detection', () => {
 			await addTransaction({
 				date: new Date(2025, 1, 15),
 				merchant: 'Amazon',
-				amount: 150, // 3x different - not recurring
+				amount: 200, // 10x different - definitely not recurring
 				categoryId: 1,
 				isShared: false,
 				isSettled: false,

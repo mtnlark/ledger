@@ -23,7 +23,13 @@ export const config = {
 		 * Epsilon for floating point comparison (cents).
 		 * Used for determining if spending equals budget amount.
 		 */
-		epsilon: 0.01
+		epsilon: 0.01,
+		/** Number of months to look back for budget suggestions */
+		suggestionMonths: 6,
+		/** Decay factor for weighted average (0.85 = 15% decay per month) */
+		suggestionDecay: 0.85,
+		/** Base headroom multiplier for stdDev (0.5 = half a standard deviation) */
+		suggestionHeadroom: 0.5
 	},
 
 	/**

@@ -1,7 +1,12 @@
 import { db, type CategoryBudget, navigateMonth } from '$lib/db';
 import { persistData } from '$lib/storage';
 import { getMonthDateRange } from '$lib/utils/date-helpers';
-import { computeStdDev } from '$lib/insights/calculations/stats';
+import {
+	generateDecayWeights,
+	computeWeightedMean,
+	computeWeightedStdDev
+} from '$lib/insights/calculations/stats';
+import { config } from '$lib/config';
 
 /**
  * Get all category budgets for a specific month
@@ -120,8 +125,11 @@ function getMonthKeyFromDate(date: Date): string {
 }
 
 /**
- * Calculate suggested budget for a category based on historical spending
- * Uses average of last 3 months (non-zero months only), rounded to nearest $5
+ * Calculate suggested budget for a category based on historical spending.
+ * Uses weighted average of last N months (configurable, default 6) with exponential
+ * decay so recent months have more influence. Adds adaptive headroom based on
+ * sample size - more buffer when data is sparse.
+ *
  * @param categoryId - The category ID
  * @param targetMonth - The month to calculate suggestion for
  * @returns Suggested budget amount (0 if no history)
@@ -130,12 +138,14 @@ export async function calculateSuggestedBudget(
 	categoryId: number,
 	targetMonth: string
 ): Promise<number> {
-	// Get previous 3 months
+	const { suggestionMonths, suggestionDecay, suggestionHeadroom } = config.budget;
+
+	// Get previous N months (oldest first for proper weighting)
 	const months: string[] = [];
 	let currentMonth = targetMonth;
-	for (let i = 0; i < 3; i++) {
+	for (let i = 0; i < suggestionMonths; i++) {
 		currentMonth = navigateMonth(currentMonth, -1);
-		months.push(currentMonth);
+		months.unshift(currentMonth); // prepend to keep chronological order
 	}
 
 	// Load all transactions for the date range in one query
@@ -156,7 +166,8 @@ export async function calculateSuggestedBudget(
 		monthlySpending.set(monthKey, (monthlySpending.get(monthKey) || 0) + userAmount);
 	}
 
-	// Get non-zero spending values
+	// Build spending array in chronological order (for proper weighting)
+	// Include zeros for months with no spending to maintain time relationship
 	const spending: number[] = [];
 	for (const month of months) {
 		const amount = monthlySpending.get(month) || 0;
@@ -170,33 +181,45 @@ export async function calculateSuggestedBudget(
 		return 0;
 	}
 
-	// Use mean + 0.5σ to add headroom for spending variance
-	const mean = spending.reduce((sum, s) => sum + s, 0) / spending.length;
-	const sd = computeStdDev(spending);
-	const suggestion = mean + 0.5 * sd;
+	// Generate decay weights (oldest first, most recent = 1.0)
+	const weights = generateDecayWeights(spending.length, suggestionDecay);
+
+	// Calculate weighted mean and stdDev
+	const mean = computeWeightedMean(spending, weights);
+	const sd = computeWeightedStdDev(spending, weights);
+
+	// Adaptive headroom: more buffer when sample size is small
+	// With 1 month: headroom × 2.0, with 3 months: headroom × 1.33, with 6+: approaches base
+	const adaptiveMultiplier = 1 + 1 / spending.length;
+	const headroom = suggestionHeadroom * adaptiveMultiplier;
+
+	const suggestion = mean + headroom * sd;
 
 	// Round to nearest $5
 	return Math.round(suggestion / 5) * 5;
 }
 
 /**
- * Generate suggestions for all active categories
- * Uses a single batch query instead of N+1 queries
+ * Generate suggestions for all active categories.
+ * Uses a single batch query instead of N+1 queries.
+ * Applies weighted averages with adaptive headroom (same logic as calculateSuggestedBudget).
+ *
  * @param month - The target month
  * @returns Map of categoryId to suggested amount
  */
 export async function generateAllSuggestions(month: string): Promise<Map<number, number>> {
+	const { suggestionMonths, suggestionDecay, suggestionHeadroom } = config.budget;
 	const categories = await db.categories.filter((c) => c.isActive).toArray();
 
-	// Get previous 3 months
+	// Get previous N months (oldest first for proper weighting)
 	const months: string[] = [];
 	let currentMonth = month;
-	for (let i = 0; i < 3; i++) {
+	for (let i = 0; i < suggestionMonths; i++) {
 		currentMonth = navigateMonth(currentMonth, -1);
-		months.push(currentMonth);
+		months.unshift(currentMonth); // prepend to keep chronological order
 	}
 
-	// Load ALL transactions for the 3-month range in ONE query
+	// Load ALL transactions for the N-month range in ONE query
 	const { start, end } = getMultiMonthDateRange(months);
 	const transactions = await db.transactions
 		.where('date')
@@ -226,7 +249,7 @@ export async function generateAllSuggestions(month: string): Promise<Map<number,
 	for (const category of categories) {
 		const monthSpending = categoryMonthSpending.get(category.id!) || new Map();
 
-		// Get non-zero spending values
+		// Build spending array in chronological order (non-zero months only)
 		const spending: number[] = [];
 		for (const m of months) {
 			const amount = monthSpending.get(m) || 0;
@@ -238,9 +261,16 @@ export async function generateAllSuggestions(month: string): Promise<Map<number,
 		if (spending.length === 0) {
 			suggestions.set(category.id!, 0);
 		} else {
-			const mean = spending.reduce((sum, s) => sum + s, 0) / spending.length;
-			const sd = computeStdDev(spending);
-			const suggestion = mean + 0.5 * sd;
+			// Generate decay weights and calculate weighted stats
+			const weights = generateDecayWeights(spending.length, suggestionDecay);
+			const mean = computeWeightedMean(spending, weights);
+			const sd = computeWeightedStdDev(spending, weights);
+
+			// Adaptive headroom based on sample size
+			const adaptiveMultiplier = 1 + 1 / spending.length;
+			const headroom = suggestionHeadroom * adaptiveMultiplier;
+
+			const suggestion = mean + headroom * sd;
 			suggestions.set(category.id!, Math.round(suggestion / 5) * 5);
 		}
 	}

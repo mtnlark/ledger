@@ -56,7 +56,7 @@
 
 	// Calculate category stats (mean + stdDev) for anomaly and shift detection
 	let categoryStats = $derived.by(() => {
-		if (recentMonths.length === 0) return new Map<number, { mean: number; stdDev: number }>();
+		if (recentMonths.length === 0) return new Map<number, { mean: number; stdDev: number; sampleCount: number }>();
 		return engine.getCategoryStats(getTransactionsForMonth, recentMonths, selectedMonth);
 	});
 

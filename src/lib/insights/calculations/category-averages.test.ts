@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { computeCategoryAverages, computeCategoryStats } from './category-averages';
+import {
+	computeCategoryAverages,
+	computeCategoryStats,
+	computeWeightedCategoryStats
+} from './category-averages';
 import type { Transaction } from '$lib/db';
 
 function makeTx(overrides: Partial<Transaction> = {}): Transaction {
@@ -85,7 +89,7 @@ describe('computeCategoryStats', () => {
 		expect(result.size).toBe(0);
 	});
 
-	it('computes mean and stdDev across months', () => {
+	it('computes mean, stdDev, and sampleCount across months', () => {
 		const data: Record<string, Transaction[]> = {
 			'2025-01': [makeTx({ categoryId: 1, amount: 100 })],
 			'2025-02': [makeTx({ categoryId: 1, amount: 200 })],
@@ -101,6 +105,7 @@ describe('computeCategoryStats', () => {
 		expect(stats.mean).toBe(200); // (100+200+300)/3
 		// stdDev: sqrt(((100-200)²+(200-200)²+(300-200)²)/3) = sqrt(20000/3) ≈ 81.65
 		expect(stats.stdDev).toBeCloseTo(81.65, 1);
+		expect(stats.sampleCount).toBe(3);
 	});
 
 	it('includes zero-spending months in calculations', () => {
@@ -185,5 +190,115 @@ describe('computeCategoryStats', () => {
 		// Category 2: values [0, 200, 200] (padded), mean = 133.33
 		const cat2 = result.get(2)!;
 		expect(cat2.mean).toBeCloseTo(133.33, 1);
+	});
+});
+
+describe('computeWeightedCategoryStats', () => {
+	it('returns empty map for no months', () => {
+		const result = computeWeightedCategoryStats(() => [], []);
+		expect(result.size).toBe(0);
+	});
+
+	it('weights recent months more heavily', () => {
+		const data: Record<string, Transaction[]> = {
+			'2025-01': [makeTx({ categoryId: 1, amount: 100 })], // oldest, lowest weight
+			'2025-02': [makeTx({ categoryId: 1, amount: 100 })],
+			'2025-03': [makeTx({ categoryId: 1, amount: 200 })]  // most recent, highest weight
+		};
+
+		const weighted = computeWeightedCategoryStats(
+			(month) => data[month] || [],
+			['2025-01', '2025-02', '2025-03'],
+			{ decay: 0.5 }
+		);
+
+		const unweighted = computeCategoryStats(
+			(month) => data[month] || [],
+			['2025-01', '2025-02', '2025-03']
+		);
+
+		// Unweighted mean = (100+100+200)/3 = 133.33
+		expect(unweighted.get(1)!.mean).toBeCloseTo(133.33, 1);
+
+		// Weighted mean should be higher (closer to 200) because
+		// recent month with 200 has higher weight
+		expect(weighted.get(1)!.mean).toBeGreaterThan(unweighted.get(1)!.mean);
+	});
+
+	it('reduces apparent variance when recent values are stable', () => {
+		const data: Record<string, Transaction[]> = {
+			'2025-01': [makeTx({ categoryId: 1, amount: 50 })],  // old volatile
+			'2025-02': [makeTx({ categoryId: 1, amount: 200 })], // old volatile
+			'2025-03': [makeTx({ categoryId: 1, amount: 100 })], // recent stable
+			'2025-04': [makeTx({ categoryId: 1, amount: 100 })]  // recent stable
+		};
+
+		const weighted = computeWeightedCategoryStats(
+			(month) => data[month] || [],
+			['2025-01', '2025-02', '2025-03', '2025-04'],
+			{ decay: 0.5 }
+		);
+
+		const unweighted = computeCategoryStats(
+			(month) => data[month] || [],
+			['2025-01', '2025-02', '2025-03', '2025-04']
+		);
+
+		// Weighted stdDev should be lower because recent stable values dominate
+		expect(weighted.get(1)!.stdDev).toBeLessThan(unweighted.get(1)!.stdDev);
+	});
+
+	it('includes sampleCount', () => {
+		const data: Record<string, Transaction[]> = {
+			'2025-01': [makeTx({ categoryId: 1, amount: 100 })],
+			'2025-02': [makeTx({ categoryId: 1, amount: 200 })]
+		};
+
+		const result = computeWeightedCategoryStats(
+			(month) => data[month] || [],
+			['2025-01', '2025-02']
+		);
+
+		expect(result.get(1)!.sampleCount).toBe(2);
+	});
+
+	it('sorts months chronologically for consistent weighting', () => {
+		const data: Record<string, Transaction[]> = {
+			'2025-03': [makeTx({ categoryId: 1, amount: 300 })], // most recent
+			'2025-01': [makeTx({ categoryId: 1, amount: 100 })], // oldest
+			'2025-02': [makeTx({ categoryId: 1, amount: 200 })]
+		};
+
+		// Pass months out of order
+		const result = computeWeightedCategoryStats(
+			(month) => data[month] || [],
+			['2025-03', '2025-01', '2025-02'],  // intentionally unsorted
+			{ decay: 0.5 }
+		);
+
+		// Should still weight 2025-03 highest regardless of input order
+		// With 0.5 decay: weights are [0.25, 0.5, 1] for oldest to newest
+		// weighted mean = (100*0.25 + 200*0.5 + 300*1) / 1.75 = 425/1.75 ≈ 242.86
+		expect(result.get(1)!.mean).toBeCloseTo(242.86, 0);
+	});
+
+	it('uses default decay of 0.85', () => {
+		const data: Record<string, Transaction[]> = {
+			'2025-01': [makeTx({ categoryId: 1, amount: 100 })],
+			'2025-02': [makeTx({ categoryId: 1, amount: 200 })]
+		};
+
+		const resultDefault = computeWeightedCategoryStats(
+			(month) => data[month] || [],
+			['2025-01', '2025-02']
+		);
+
+		const resultExplicit = computeWeightedCategoryStats(
+			(month) => data[month] || [],
+			['2025-01', '2025-02'],
+			{ decay: 0.85 }
+		);
+
+		expect(resultDefault.get(1)!.mean).toBe(resultExplicit.get(1)!.mean);
 	});
 });

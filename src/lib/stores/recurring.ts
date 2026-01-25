@@ -2,6 +2,11 @@ import { db, type Transaction } from '$lib/db';
 import { getDismissedRecurring } from './settings';
 import { normalizeMerchant } from '$lib/utils/string-helpers';
 import { config } from '$lib/config';
+import {
+	generateDecayWeights,
+	computeWeightedMean,
+	computeWeightedStdDev
+} from '$lib/insights/calculations/stats';
 
 export interface DetectedRecurring {
 	merchant: string;
@@ -50,19 +55,55 @@ function average(numbers: number[]): number {
 }
 
 /**
- * Calculate coefficient of variation (relative standard deviation)
- * Returns a value between 0 and 1+ representing variance as percentage of mean
+ * Calculate coefficient of variation (relative standard deviation) with optional weighting.
+ * Uses exponential decay weighting so recent transactions have more influence on
+ * the calculated variance. This is useful for detecting if a subscription price
+ * has recently changed.
+ *
+ * Returns a value between 0 and 1+ representing variance as percentage of mean.
+ *
+ * @param amounts Array of amounts in chronological order (oldest first)
+ * @param useWeighting Whether to apply exponential decay weighting (default true)
+ * @param decay Decay factor per period (default 0.85)
  */
-function calculateVariance(amounts: number[]): number {
+function calculateVariance(amounts: number[], useWeighting = true, decay = 0.85): number {
 	if (amounts.length < 2) return 0;
-	const avg = average(amounts);
-	if (avg === 0) return 0;
 
-	const squaredDiffs = amounts.map((a) => Math.pow(a - avg, 2));
-	const variance = average(squaredDiffs);
-	const stdDev = Math.sqrt(variance);
+	if (useWeighting) {
+		const weights = generateDecayWeights(amounts.length, decay);
+		const mean = computeWeightedMean(amounts, weights);
+		if (mean === 0) return 0;
+		const stdDev = computeWeightedStdDev(amounts, weights);
+		return stdDev / mean;
+	} else {
+		const avg = average(amounts);
+		if (avg === 0) return 0;
+		const squaredDiffs = amounts.map((a) => Math.pow(a - avg, 2));
+		const variance = average(squaredDiffs);
+		const stdDev = Math.sqrt(variance);
+		return stdDev / avg;
+	}
+}
 
-	return stdDev / avg; // Coefficient of variation
+/**
+ * Get adaptive variance thresholds based on occurrence count.
+ * With fewer data points, we need more lenient thresholds because
+ * the variance calculation is noisier.
+ *
+ * Formula: threshold × (1 + 1/occurrenceCount)
+ * - 2 occurrences: threshold × 1.5
+ * - 3 occurrences: threshold × 1.33
+ * - 6 occurrences: threshold × 1.17
+ * - 12+ occurrences: approaches base threshold
+ */
+function getAdaptiveVarianceThresholds(
+	occurrenceCount: number
+): { maxVariance: number; fixedThreshold: number } {
+	const adjustment = 1 + 1 / Math.max(occurrenceCount, 2);
+	return {
+		maxVariance: config.recurring.maxVariance * adjustment,
+		fixedThreshold: config.recurring.fixedVarianceThreshold * adjustment
+	};
 }
 
 /**
@@ -191,16 +232,23 @@ export async function detectRecurringExpenses(): Promise<DetectedRecurring[]> {
 		const pattern = detectRecurringPattern(transactions);
 		if (pattern === null) continue;
 
-		// Calculate amount variance
-		const amounts = transactions.map((t) => t.amount);
-		const variance = calculateVariance(amounts);
+		// Sort transactions chronologically (oldest first) for weighted variance
+		const sortedTransactions = [...transactions].sort(
+			(a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
+		);
+
+		// Calculate weighted variance (recent transactions have more influence)
+		const amounts = sortedTransactions.map((t) => t.amount);
+		const variance = calculateVariance(amounts, true, 0.85);
+
+		// Get adaptive thresholds based on occurrence count
+		const { maxVariance, fixedThreshold } = getAdaptiveVarianceThresholds(transactions.length);
 
 		// Skip if variance is too high to be considered recurring
-		if (variance >= config.recurring.maxVariance) continue;
+		if (variance >= maxVariance) continue;
 
 		// Classify as fixed (low variance) or variable (higher variance)
-		const amountType: 'fixed' | 'variable' =
-			variance <= config.recurring.fixedVarianceThreshold ? 'fixed' : 'variable';
+		const amountType: 'fixed' | 'variable' = variance <= fixedThreshold ? 'fixed' : 'variable';
 
 		// Calculate average amount
 		const avgAmount = average(amounts);

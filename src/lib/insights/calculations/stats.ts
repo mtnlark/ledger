@@ -17,6 +17,50 @@ export function computeStdDev(values: number[]): number {
 }
 
 /**
+ * Generate exponential decay weights for a sequence of values.
+ * Most recent value (last in array) gets weight 1.0, earlier values decay.
+ *
+ * @param length Number of weights to generate
+ * @param decay Decay factor per period (default 0.85 = 15% decay per month)
+ * @returns Array of weights, oldest first (to match chronological order)
+ */
+export function generateDecayWeights(length: number, decay = 0.85): number[] {
+	const weights: number[] = [];
+	for (let i = 0; i < length; i++) {
+		// i=0 is oldest, i=length-1 is most recent
+		const periodsFromEnd = length - 1 - i;
+		weights.push(Math.pow(decay, periodsFromEnd));
+	}
+	return weights;
+}
+
+/**
+ * Compute weighted mean.
+ */
+export function computeWeightedMean(values: number[], weights: number[]): number {
+	if (values.length === 0 || values.length !== weights.length) return 0;
+
+	const weightedSum = values.reduce((sum, v, i) => sum + v * weights[i], 0);
+	const weightSum = weights.reduce((sum, w) => sum + w, 0);
+	return weightSum > 0 ? weightedSum / weightSum : 0;
+}
+
+/**
+ * Compute weighted population standard deviation.
+ * Uses reliability weights (frequency weights) formula.
+ */
+export function computeWeightedStdDev(values: number[], weights: number[]): number {
+	if (values.length < 2 || values.length !== weights.length) return 0;
+
+	const mean = computeWeightedMean(values, weights);
+	const weightSum = weights.reduce((sum, w) => sum + w, 0);
+	if (weightSum === 0) return 0;
+
+	const weightedSquaredDiffs = values.reduce((sum, v, i) => sum + weights[i] * (v - mean) ** 2, 0);
+	return Math.sqrt(weightedSquaredDiffs / weightSum);
+}
+
+/**
  * Compute z-score: how many standard deviations a value is from the mean.
  * Returns 0 if stdDev is 0 (avoids division by zero).
  */

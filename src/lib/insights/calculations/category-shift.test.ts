@@ -116,7 +116,7 @@ describe('computeTopCategoryShift', () => {
 		const previous = [makeTx({ categoryId: 1, amount: 200 })];
 		// diff = $50, stdDev = 100, threshold = 100 * 1.0 = $100
 		// $50 < $100 → not significant
-		const stats = new Map<number, CategoryStats>([[1, { mean: 200, stdDev: 100 }]]);
+		const stats = new Map<number, CategoryStats>([[1, { mean: 200, stdDev: 100, sampleCount: 6 }]]);
 
 		const result = computeTopCategoryShift(
 			current, previous, categories, 20, [], defaultConfig, stats
@@ -129,7 +129,7 @@ describe('computeTopCategoryShift', () => {
 		const previous = [makeTx({ categoryId: 1, amount: 50 })];
 		// diff = $150, stdDev = 10, threshold = 10 * 1.0 = $10
 		// $150 > $10 → significant
-		const stats = new Map<number, CategoryStats>([[1, { mean: 100, stdDev: 10 }]]);
+		const stats = new Map<number, CategoryStats>([[1, { mean: 100, stdDev: 10, sampleCount: 6 }]]);
 
 		const result = computeTopCategoryShift(
 			current, previous, categories, 20, [], defaultConfig, stats
@@ -154,7 +154,7 @@ describe('computeTopCategoryShift', () => {
 		const current = [makeTx({ categoryId: 1, amount: 60 })];
 		const previous = [makeTx({ categoryId: 1, amount: 25 })];
 		// diff = $35 > fallbackMinDifference of $30 → significant
-		const stats = new Map<number, CategoryStats>([[1, { mean: 50, stdDev: 0 }]]);
+		const stats = new Map<number, CategoryStats>([[1, { mean: 50, stdDev: 0, sampleCount: 6 }]]);
 
 		const result = computeTopCategoryShift(
 			current, previous, categories, 20, [], defaultConfig, stats
@@ -174,8 +174,8 @@ describe('computeTopCategoryShift', () => {
 		// Cat 1: stdDev=200, threshold=$200 → $40 not significant
 		// Cat 2: stdDev=10, threshold=$10 → $20 significant (and > minAmount)
 		const stats = new Map<number, CategoryStats>([
-			[1, { mean: 200, stdDev: 200 }],
-			[2, { mean: 60, stdDev: 10 }]
+			[1, { mean: 200, stdDev: 200, sampleCount: 6 }],
+			[2, { mean: 60, stdDev: 10, sampleCount: 6 }]
 		]);
 
 		const result = computeTopCategoryShift(

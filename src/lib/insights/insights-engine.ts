@@ -30,6 +30,7 @@ import {
 	computeCategoryDeepDiveShift as rawComputeCategoryDeepDiveShift,
 	computeCategoryAverages as rawComputeCategoryAverages,
 	computeCategoryStats as rawComputeCategoryStats,
+	computeWeightedCategoryStats as rawComputeWeightedCategoryStats,
 	detectAnomalies as rawDetectAnomalies,
 	calculatePaceProjection as rawCalculatePaceProjection,
 	calculateVelocityComparison as rawCalculateVelocityComparison,
@@ -37,6 +38,7 @@ import {
 	computeYTDStats as rawComputeYTDStats,
 	computeMonthReview as rawComputeMonthReview
 } from './calculations';
+import type { WeightedStatsOptions } from './calculations';
 
 export class InsightsEngine {
 	// Multi-key memoized (month-scoped): cache up to 12 months per version
@@ -85,6 +87,13 @@ export class InsightsEngine {
 	private _computeCategoryStats = memoByVersion(
 		(getTransactionsForMonth: (month: string) => Transaction[], months: string[]) =>
 			rawComputeCategoryStats(getTransactionsForMonth, months)
+	);
+	private _computeWeightedCategoryStats = memoByVersion(
+		(
+			getTransactionsForMonth: (month: string) => Transaction[],
+			months: string[],
+			options?: WeightedStatsOptions
+		) => rawComputeWeightedCategoryStats(getTransactionsForMonth, months, options)
 	);
 	private _detectAnomalies = memoByVersion(
 		(
@@ -227,6 +236,25 @@ export class InsightsEngine {
 		key: string
 	): Map<number, CategoryStats> {
 		return this._computeCategoryStats(this.version, key, getTransactionsForMonth, months);
+	}
+
+	/**
+	 * Compute weighted category stats (mean + stdDev) with exponential decay.
+	 * More recent months are weighted more heavily.
+	 */
+	getWeightedCategoryStats(
+		getTransactionsForMonth: (month: string) => Transaction[],
+		months: string[],
+		key: string,
+		options?: WeightedStatsOptions
+	): Map<number, CategoryStats> {
+		return this._computeWeightedCategoryStats(
+			this.version,
+			key,
+			getTransactionsForMonth,
+			months,
+			options
+		);
 	}
 
 	/** Detect spending anomalies above historical averages. */

@@ -8,7 +8,11 @@
 import type { Transaction, Category } from '$lib/db';
 import { getMonthKey } from '$lib/db';
 import { getUserAmount } from './spending';
-import { computeStdDev } from './stats';
+import {
+	generateDecayWeights,
+	computeWeightedMean,
+	computeWeightedStdDev
+} from './stats';
 
 export interface MonthReviewResult {
 	historicalRank: { rank: number; total: number; direction: 'highest' | 'lowest' } | null;
@@ -49,20 +53,33 @@ export function computeHistoricalRank(
 
 /**
  * Compare the selected month's total to the historical mean and σ.
+ * Uses exponential decay weighting so recent months have more influence
+ * on the baseline—making the comparison more relevant to current lifestyle.
+ *
+ * @param selectedMonthTotal The spending total for the month being reviewed
+ * @param allMonthlyTotals Map of month keys to spending totals
+ * @param decay Decay factor per month (default 0.9 = 10% decay, gentler than other uses)
  */
 export function computeVsAverage(
 	selectedMonthTotal: number,
-	allMonthlyTotals: Map<string, number>
+	allMonthlyTotals: Map<string, number>,
+	decay = 0.9
 ): MonthReviewResult['vsAverage'] {
 	if (allMonthlyTotals.size < 2) return null;
 
-	const values = [...allMonthlyTotals.values()];
-	const mean = values.reduce((s, v) => s + v, 0) / values.length;
+	// Sort months chronologically (oldest first) for proper weighting
+	const sortedEntries = [...allMonthlyTotals.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+	const values = sortedEntries.map(([, v]) => v);
+
+	// Generate decay weights (most recent month = 1.0)
+	const weights = generateDecayWeights(values.length, decay);
+
+	const mean = computeWeightedMean(values, weights);
 	if (mean === 0) return null;
 
-	const stdDev = computeStdDev(values);
+	const stdDev = computeWeightedStdDev(values, weights);
 	const diff = selectedMonthTotal - mean;
-	const percentDiff = Math.round(Math.abs(diff) / mean * 100);
+	const percentDiff = Math.round((Math.abs(diff) / mean) * 100);
 	const isAbove = diff > 0;
 	const withinOneSigma = stdDev > 0 ? Math.abs(diff) <= stdDev : true;
 

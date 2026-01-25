@@ -38,11 +38,12 @@
 		});
 	}
 
-	// Compute category stats (mean + stdDev) from historical months
+	// Compute category stats (mean + stdDev) from ALL available months using weighted calculation.
+	// Uses exponential decay weighting so recent months have more influence than older ones.
 	let categoryStats = $derived.by(() => {
-		const historicalMonths = availableMonths.filter((m) => m < currentMonth);
-		if (historicalMonths.length < 2) return new Map<number, { mean: number; stdDev: number }>();
-		return engine.getCategoryStats(getTransactionsForMonth, historicalMonths, 'deep-dive-stats');
+		if (availableMonths.length < 2) return new Map<number, { mean: number; stdDev: number; sampleCount: number }>();
+		// Use all available months for better statistical stability
+		return engine.getWeightedCategoryStats(getTransactionsForMonth, availableMonths, 'deep-dive-stats', { decay: 0.85 });
 	});
 
 	// Stats for the selected category
@@ -53,13 +54,41 @@
 		selectedStats && selectedStats.mean > 0 ? selectedStats.stdDev / selectedStats.mean : null
 	);
 
-	let cvLabel = $derived(
-		selectedCV === null ? '' : selectedCV < 0.2 ? 'Steady' : selectedCV <= 0.5 ? 'Moderate' : 'Variable'
-	);
+	/**
+	 * Adaptive CV thresholds based on sample size.
+	 * With fewer data points, we widen the thresholds to account for
+	 * higher statistical noise. As sample size grows, thresholds tighten
+	 * toward the target values (0.2 for Steady, 0.5 for Moderate).
+	 *
+	 * Formula: threshold = target × (1 + adjustment/sampleCount)
+	 * - With 3 months: Steady < 0.33, Moderate < 0.83
+	 * - With 6 months: Steady < 0.27, Moderate < 0.67
+	 * - With 12 months: Steady < 0.23, Moderate < 0.58
+	 * - With 24+ months: approaches target thresholds
+	 */
+	let cvThresholds = $derived.by(() => {
+		const sampleCount = selectedStats?.sampleCount ?? 3;
+		// Adjustment factor decreases as sample size grows
+		const adjustment = Math.max(0, 2 / sampleCount);
+		return {
+			steady: 0.2 * (1 + adjustment),
+			moderate: 0.5 * (1 + adjustment)
+		};
+	});
 
-	let cvColor = $derived(
-		selectedCV === null ? '' : selectedCV < 0.2 ? 'bg-success-500' : selectedCV <= 0.5 ? 'bg-warning-500' : 'bg-danger-500'
-	);
+	let cvLabel = $derived.by(() => {
+		if (selectedCV === null) return '';
+		if (selectedCV < cvThresholds.steady) return 'Steady';
+		if (selectedCV <= cvThresholds.moderate) return 'Moderate';
+		return 'Variable';
+	});
+
+	let cvColor = $derived.by(() => {
+		if (selectedCV === null) return '';
+		if (selectedCV < cvThresholds.steady) return 'bg-success-500';
+		if (selectedCV <= cvThresholds.moderate) return 'bg-warning-500';
+		return 'bg-danger-500';
+	});
 
 	// Calculate spending by category for current month
 	let categorySpending = $derived(engine.getSpendingByCategory(transactions, currentMonth));

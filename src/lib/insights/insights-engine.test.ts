@@ -173,7 +173,7 @@ describe('InsightsEngine', () => {
 		it('getAnomalies works with CategoryStats', () => {
 			const engine = getInsightsEngine();
 			const current = new Map([[1, 60]]);
-			const categoryStats = new Map([[1, { mean: 30, stdDev: 10 }]]);
+			const categoryStats = new Map([[1, { mean: 30, stdDev: 10, sampleCount: 6 }]]);
 			const categories = [
 				{ id: 1, name: 'Test', isActive: true, sortOrder: 0, isEssential: false }
 			];
