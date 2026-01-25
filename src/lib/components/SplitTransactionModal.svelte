@@ -3,6 +3,7 @@
 	import type { Category, Transaction } from '$lib/db';
 	import { createCategoryHelpers } from '$lib/utils/category-helpers';
 	import { formatCurrency } from '$lib/utils/format-helpers';
+	import { focusTrap } from '$lib/utils/focus-trap';
 
 	interface Props {
 		isOpen: boolean;
@@ -92,6 +93,7 @@
 			aria-modal="true"
 			aria-labelledby="split-modal-title"
 			tabindex="-1"
+			use:focusTrap
 		>
 			<form onsubmit={handleSubmit}>
 				<!-- Header -->

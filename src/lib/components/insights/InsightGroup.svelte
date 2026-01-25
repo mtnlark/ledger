@@ -17,6 +17,7 @@
 	// Create a storage key based on title
 	let storageKey = $derived(`ledger-insight-${title.toLowerCase().replace(/\s+/g, '-')}`);
 
+	// Initial value from prop, overridden by localStorage in onMount (intentionally not reactive)
 	let isExpanded = $state(defaultExpanded);
 
 	onMount(() => {

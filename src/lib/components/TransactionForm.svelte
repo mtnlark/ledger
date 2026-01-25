@@ -8,6 +8,9 @@
 	import { formatCurrency } from '$lib/utils/format-helpers';
 	import CategoryCombobox from './CategoryCombobox.svelte';
 	import MerchantAutocomplete from './MerchantAutocomplete.svelte';
+	import SharedExpenseFields from './SharedExpenseFields.svelte';
+	import EssentialToggle from './EssentialToggle.svelte';
+	import SubscriptionFields from './SubscriptionFields.svelte';
 	import { getMostCommonCategory } from '$lib/stores/merchants';
 
 	const STORAGE_KEY = 'ledger-addform-expanded';
@@ -79,6 +82,7 @@
 	let categoryId = $state(0);
 	let isShared = $state(false);
 	let isSettled = $state(false);
+	// Initial values from settings (intentionally not reactive - form defaults only)
 	let splitType = $state<'percentage' | 'fixed'>(settings.defaultSplitType);
 	let splitValue = $state(settings.defaultSplitValue);
 	let notes = $state('');
@@ -471,115 +475,15 @@
 			</button>
 		{/if}
 
-		<!-- Shared Toggle -->
-		<div class="border-t border-dashed border-theme-dashed pt-4">
-			<label class="flex items-center gap-3 cursor-pointer">
-				<input
-					type="checkbox"
-					bind:checked={isShared}
-					class="w-5 h-5 text-success-500 border-[var(--color-border)] rounded focus:ring-success-500/20"
-				/>
-				<span class="text-sm font-medium text-charcoal-soft">
-					Shared with {settings.partnerName}
-				</span>
-			</label>
-
-			<!-- Split Options (shown when shared) -->
-			{#if isShared}
-				<div class="mt-4 ml-8 p-4 bg-success-50 border border-success-100 rounded-lg space-y-3">
-					<!-- Split Type Toggle -->
-					<div class="flex gap-2">
-						<button
-							type="button"
-							onclick={() => (splitType = 'percentage')}
-							class="px-3 py-1.5 text-sm font-medium rounded-lg transition-all duration-150 {splitType ===
-							'percentage'
-								? 'bg-success-500 text-white shadow-sm'
-								: 'bg-surface text-charcoal-soft border border-[var(--color-border)] hover:bg-surface-hover'}"
-						>
-							% Percentage
-						</button>
-						<button
-							type="button"
-							onclick={() => (splitType = 'fixed')}
-							class="px-3 py-1.5 text-sm font-medium rounded-lg transition-all duration-150 {splitType ===
-							'fixed'
-								? 'bg-success-500 text-white shadow-sm'
-								: 'bg-surface text-charcoal-soft border border-[var(--color-border)] hover:bg-surface-hover'}"
-						>
-							$ Fixed Amount
-						</button>
-					</div>
-
-					<!-- Split Value Input -->
-					{#if splitType === 'percentage'}
-						<div>
-							<label for="splitPercent" class="block text-sm text-charcoal-soft mb-1">
-								{settings.partnerName}'s share: <span class="font-mono font-medium">{Math.round(splitValue * 100)}%</span>
-							</label>
-							<input
-								type="range"
-								id="splitPercent"
-								min="0"
-								max="1"
-								step="0.05"
-								bind:value={splitValue}
-								class="w-full accent-success-500"
-							/>
-						</div>
-					{:else}
-						<div>
-							<label for="splitFixed" class="block text-sm text-charcoal-soft mb-1">
-								{settings.partnerName}'s exact share
-								{#if amount > 0}
-									<span class="text-charcoal-muted">(max {formatCurrency(amount)})</span>
-								{/if}
-							</label>
-							<div class="relative">
-								<span class="absolute left-3 top-1/2 -translate-y-1/2 text-charcoal-muted font-mono">$</span>
-								<input
-									type="number"
-									id="splitFixed"
-									bind:value={splitValue}
-									onblur={() => { if (splitValue > amount) splitValue = amount; if (splitValue < 0) splitValue = 0; }}
-									step="0.01"
-									min="0"
-									max={amount}
-									class="w-full pl-7 pr-3 py-2 bg-surface border rounded-lg focus:ring-2 transition-colors font-mono {splitValueInvalid ? 'border-warning-500 focus:ring-warning-500/20 focus:border-warning-500' : 'border-[var(--color-border)] focus:ring-success-500/20 focus:border-success-500'}"
-								/>
-							</div>
-							{#if splitValueInvalid}
-								<p class="text-xs text-warning-600 mt-1">Value will be clamped to {formatCurrency(validatedSplitValue)}</p>
-							{/if}
-						</div>
-					{/if}
-
-					<!-- Split Summary -->
-					{#if amount > 0}
-						<div class="text-sm pt-2 border-t border-success-200">
-							<div class="flex justify-between text-charcoal-soft">
-								<span>{settings.partnerName} pays:</span>
-								<span class="font-mono font-medium text-charcoal">{formatCurrency(partnerShare)}</span>
-							</div>
-							<div class="flex justify-between text-charcoal-soft">
-								<span>You pay:</span>
-								<span class="font-mono font-medium text-charcoal">{formatCurrency(yourShare)}</span>
-							</div>
-						</div>
-					{/if}
-
-					<!-- Already Settled Option -->
-					<label class="flex items-center gap-2 pt-2 cursor-pointer">
-						<input
-							type="checkbox"
-							bind:checked={isSettled}
-							class="w-4 h-4 text-success-500 border-[var(--color-border)] rounded focus:ring-success-500/20"
-						/>
-						<span class="text-sm text-charcoal-soft">Already settled</span>
-					</label>
-				</div>
-			{/if}
-		</div>
+		<SharedExpenseFields
+			bind:isShared
+			bind:splitType
+			bind:splitValue
+			{amount}
+			partnerName={settings.partnerName}
+			bind:isSettled
+			showSettledOption={true}
+		/>
 
 		<!-- Notes (optional) -->
 		<div>
@@ -595,79 +499,13 @@
 			/>
 		</div>
 
-		<!-- Essential Toggle -->
-		<div class="border-t border-dashed border-theme-dashed pt-4">
-			<label class="flex items-center justify-between cursor-pointer">
-				<div>
-					<span class="text-sm font-medium text-charcoal-soft">Essential spending</span>
-					<p class="text-xs text-charcoal-muted mt-0.5">
-						{#if selectedCategory}
-							{selectedCategory.isEssential ? 'Category default: Need' : 'Category default: Want'}
-						{:else}
-							Mark as a "need" vs discretionary "want"
-						{/if}
-					</p>
-				</div>
-				<button
-					type="button"
-					onclick={() => (isEssential = !isEssential)}
-					class="relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:ring-offset-2 {isEssential ? 'bg-primary-500' : 'bg-[var(--color-border-dashed)]'}"
-					role="switch"
-					aria-checked={isEssential}
-					aria-label="Toggle essential spending"
-				>
-					<span
-						class="pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out {isEssential ? 'translate-x-5' : 'translate-x-0'}"
-					></span>
-				</button>
-			</label>
-		</div>
+		<EssentialToggle bind:isEssential {selectedCategory} />
 
-		<!-- Subscription Toggle -->
-		<div class="border-t border-dashed border-theme-dashed pt-4">
-			<label class="flex items-center justify-between cursor-pointer">
-				<div>
-					<span class="text-sm font-medium text-charcoal-soft">Subscription</span>
-					<p class="text-xs text-charcoal-muted mt-0.5">Recurring payment (e.g., streaming, news)</p>
-				</div>
-				<button
-					type="button"
-					onclick={() => (isSubscription = !isSubscription)}
-					class="relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:ring-offset-2 {isSubscription ? 'bg-primary-500' : 'bg-[var(--color-border-dashed)]'}"
-					role="switch"
-					aria-checked={isSubscription}
-					aria-label="Toggle subscription"
-				>
-					<span
-						class="pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out {isSubscription ? 'translate-x-5' : 'translate-x-0'}"
-					></span>
-				</button>
-			</label>
-
-			<!-- Frequency selector (shown when subscription is enabled) -->
-			{#if isSubscription}
-				<div class="mt-3 ml-0 flex gap-2" transition:slide={{ duration: 150 }}>
-					<button
-						type="button"
-						onclick={() => (subscriptionFrequency = 'monthly')}
-						class="px-3 py-1.5 text-sm font-medium rounded-lg transition-all duration-150 {subscriptionFrequency === 'monthly'
-							? 'bg-primary-500 text-white shadow-sm'
-							: 'bg-surface-alt text-charcoal-soft border border-theme hover:bg-surface-hover'}"
-					>
-						Monthly
-					</button>
-					<button
-						type="button"
-						onclick={() => (subscriptionFrequency = 'annual')}
-						class="px-3 py-1.5 text-sm font-medium rounded-lg transition-all duration-150 {subscriptionFrequency === 'annual'
-							? 'bg-primary-500 text-white shadow-sm'
-							: 'bg-surface-alt text-charcoal-soft border border-theme hover:bg-surface-hover'}"
-					>
-						Annual
-					</button>
-				</div>
-			{/if}
-		</div>
+		<SubscriptionFields
+			bind:isSubscription
+			bind:subscriptionFrequency
+			showTransition={true}
+		/>
 
 			<!-- Actions -->
 			<div class="flex gap-3 pt-3">

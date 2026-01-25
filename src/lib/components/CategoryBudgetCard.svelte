@@ -27,10 +27,13 @@
 	// Editing state
 	let isEditing = $state(false);
 	let editValue = $state('');
+	let inputRef = $state<HTMLInputElement | null>(null);
 
 	function startEditing() {
 		editValue = budgetAmount ? String(budgetAmount) : '';
 		isEditing = true;
+		// Use queueMicrotask for better screen reader UX vs autofocus attribute
+		queueMicrotask(() => inputRef?.focus());
 	}
 
 	function cancelEditing() {
@@ -105,12 +108,12 @@
 					inputmode="numeric"
 					pattern="[0-9]*"
 					bind:value={editValue}
+					bind:this={inputRef}
 					onkeydown={handleKeydown}
 					class="w-20 px-3 py-1.5 text-right font-mono text-sm border border-theme rounded-lg
 						focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent
 						bg-surface text-charcoal"
 					placeholder="0"
-					autofocus
 				/>
 				<button
 					onclick={saveEdit}

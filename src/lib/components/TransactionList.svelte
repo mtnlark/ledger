@@ -153,15 +153,16 @@
 				<h3 class="text-sm font-medium text-charcoal-muted mb-3 px-1">{group.label}</h3>
 				<div class="space-y-2">
 					{#each group.transactions as transaction, txIndex (transaction.id)}
-						<div
-							class="bg-surface rounded-lg shadow-sm shadow-theme p-4 flex items-center gap-4 transition-colors border-l-4 {isSelectionMode
+						<!-- Use button in selection mode for proper keyboard/screen reader support -->
+						<svelte:element
+							this={isSelectionMode ? 'button' : 'div'}
+							type={isSelectionMode ? 'button' : undefined}
+							role={isSelectionMode ? undefined : 'listitem'}
+							class="bg-surface rounded-lg shadow-sm shadow-theme p-4 flex items-center gap-4 transition-colors border-l-4 text-left w-full {isSelectionMode
 								? 'cursor-pointer'
 								: 'hover:bg-surface-hover/50'} {selectedIds.has(transaction.id!) ? 'bg-primary-50 hover:bg-primary-100' : 'hover:bg-surface-hover/50'}"
 							style="border-left-color: {getCategoryColor(transaction.categoryId)}; animation-delay: {(groupIndex * 50) + (txIndex * 30)}ms;"
 							onclick={isSelectionMode ? () => toggleSelection(transaction.id!) : undefined}
-							onkeydown={isSelectionMode ? (e: KeyboardEvent) => e.key === 'Enter' && toggleSelection(transaction.id!) : undefined}
-							role={isSelectionMode ? 'button' : 'listitem'}
-							tabindex={isSelectionMode ? 0 : -1}
 						>
 							<!-- Checkbox (selection mode) -->
 							{#if isSelectionMode}
@@ -254,7 +255,7 @@
 									{/if}
 								</div>
 							{/if}
-						</div>
+						</svelte:element>
 					{/each}
 				</div>
 			</div>

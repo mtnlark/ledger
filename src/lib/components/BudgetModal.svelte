@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { X } from 'lucide-svelte';
 	import type { MonthlyBudget } from '$lib/db';
+	import { focusTrap } from '$lib/utils/focus-trap';
 
 	interface Props {
 		isOpen: boolean;
@@ -80,10 +81,18 @@
 		onclick={handleBackdropClick}
 	>
 		<!-- Modal -->
-		<div class="bg-surface rounded-xl shadow-xl shadow-[var(--color-shadow)] max-w-md w-full animate-enter" onclick={(e) => e.stopPropagation()}>
+		<div
+			class="bg-surface rounded-xl shadow-xl shadow-[var(--color-shadow)] max-w-md w-full animate-enter"
+			role="dialog"
+			aria-modal="true"
+			aria-labelledby="budget-modal-title"
+			tabindex="-1"
+			onclick={(e) => e.stopPropagation()}
+			use:focusTrap
+		>
 			<!-- Header -->
 			<div class="px-6 py-4 border-b border-dashed border-theme-dashed flex items-center justify-between">
-				<h2 class="font-display text-xl font-medium text-charcoal">
+				<h2 id="budget-modal-title" class="font-display text-xl font-medium text-charcoal">
 					Budget for {monthDisplay}
 				</h2>
 				<button

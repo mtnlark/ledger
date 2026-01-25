@@ -133,6 +133,9 @@ ledger/
 │   │   │   ├── EmptyState.svelte
 │   │   │   ├── Skeleton.svelte
 │   │   │   ├── ChartWrapper.svelte
+│   │   │   ├── SharedExpenseFields.svelte  # Shared expense toggle + split options
+│   │   │   ├── EssentialToggle.svelte      # Needs vs wants toggle
+│   │   │   ├── SubscriptionFields.svelte   # Subscription toggle + frequency
 │   │   │   └── insights/              # Insight components
 │   │   │       ├── InsightGroup.svelte
 │   │   │       ├── InsightMetric.svelte
@@ -154,7 +157,9 @@ ledger/
 │   │   │   ├── chart-theme.ts     # Chart.js theme configuration
 │   │   │   ├── date-helpers.ts
 │   │   │   ├── debug.ts           # Debugging utilities
-│   │   │   └── string-helpers.ts
+│   │   │   ├── string-helpers.ts
+│   │   │   ├── focus-trap.ts      # Modal focus trapping utility
+│   │   │   └── form-validation.ts # Shared form validation helpers
 │   │   └── assets/
 │   │       └── favicon.svg
 │   ├── routes/

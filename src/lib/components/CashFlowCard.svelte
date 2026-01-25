@@ -19,6 +19,7 @@
 
 	// Animation state
 	let mounted = $state(false);
+	// Initial value from prop, overridden by localStorage in onMount (intentionally not reactive)
 	let isExpanded = $state(defaultExpanded);
 
 	onMount(() => {

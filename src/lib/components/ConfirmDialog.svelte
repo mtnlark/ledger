@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { X, AlertTriangle } from 'lucide-svelte';
+	import { focusTrap } from '$lib/utils/focus-trap';
 
 	interface Props {
 		isOpen: boolean;
@@ -59,12 +60,13 @@
 			aria-modal="true"
 			aria-labelledby="confirm-dialog-title"
 			tabindex="-1"
+			use:focusTrap
 		>
 			<!-- Header -->
 			<div class="flex items-center gap-3 px-6 py-4 border-b border-dashed border-theme-dashed">
 				{#if variant === 'danger' || variant === 'warning'}
 					<div class="w-10 h-10 rounded-full flex items-center justify-center {variant === 'danger' ? 'bg-danger-100' : 'bg-warning-100'}">
-						<AlertTriangle size={20} class="{variant === 'danger' ? 'text-danger-500' : 'text-warning-500'}" />
+						<AlertTriangle size={20} class={variant === 'danger' ? 'text-danger-500' : 'text-warning-500'} />
 					</div>
 				{/if}
 				<h2 id="confirm-dialog-title" class="font-display text-lg font-medium text-charcoal flex-1">

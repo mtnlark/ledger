@@ -71,6 +71,7 @@
 
 	// Track if user has manually selected a category
 	let hasUserSelected = $state(false);
+	// Track month changes - captures initial value, updated manually in $effect below
 	let lastMonth = $state(currentMonth);
 
 	// Reset user selection when month changes

@@ -1,10 +1,10 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
 	import { X, Trash2 } from 'lucide-svelte';
 	import { scale } from 'svelte/transition';
 	import type { Category } from '$lib/db';
 	import { updateCategory, addCategory, deleteCategory, getCategoryUsageCount } from '$lib/stores/categories';
 	import { toast } from '$lib/stores/toast';
+	import { focusTrap } from '$lib/utils/focus-trap';
 	import 'emoji-picker-element';
 
 	interface Props {
@@ -17,12 +17,22 @@
 
 	const isEditing = $derived(category !== null);
 
-	// Form state
-	let name = $state(category?.name ?? '');
-	let icon = $state(category?.icon ?? '');
-	let color = $state(category?.color ?? '#6B7280');
-	let isEssential = $state(category?.isEssential ?? false);
+	// Form state - initialize from category prop
+	let name = $state('');
+	let icon = $state('');
+	let color = $state('#6B7280');
+	let isEssential = $state(false);
 	let isSaving = $state(false);
+
+	// Sync form state when category prop changes (fixes stale form on category switch)
+	$effect(() => {
+		name = category?.name ?? '';
+		icon = category?.icon ?? '';
+		color = category?.color ?? '#6B7280';
+		isEssential = category?.isEssential ?? false;
+		// Reset delete confirmation when switching categories
+		showDeleteConfirm = false;
+	});
 
 	// Emoji picker state
 	let showEmojiPicker = $state(false);
@@ -33,9 +43,15 @@
 	let usageCount = $state(0);
 	let isDeleting = $state(false);
 
-	onMount(async () => {
-		if (category?.id) {
-			usageCount = await getCategoryUsageCount(category.id);
+	// Fetch usage count when category changes (for delete warning)
+	$effect(() => {
+		const id = category?.id;
+		if (id) {
+			getCategoryUsageCount(id).then((count) => {
+				usageCount = count;
+			});
+		} else {
+			usageCount = 0;
 		}
 	});
 
@@ -172,12 +188,17 @@
 >
 	<div
 		class="bg-surface rounded-2xl shadow-xl max-w-md w-full pointer-events-auto"
+		role="dialog"
+		aria-modal="true"
+		aria-labelledby="category-modal-title"
+		tabindex="-1"
 		transition:scale={{ duration: 200, start: 0.95 }}
+		use:focusTrap
 	>
 		<form onsubmit={handleSubmit}>
 			<!-- Header -->
 			<div class="px-6 py-4 border-b border-dashed border-theme-dashed flex items-center justify-between">
-				<h2 class="font-display text-xl font-medium text-charcoal">
+				<h2 id="category-modal-title" class="font-display text-xl font-medium text-charcoal">
 					{isEditing ? 'Edit Category' : 'Add Category'}
 				</h2>
 				<button
@@ -217,11 +238,12 @@
 
 				<!-- Icon -->
 				<div class="relative" bind:this={emojiPickerRef}>
-					<label class="block text-sm font-medium text-charcoal-soft mb-1.5">
+					<label for="icon-button" class="block text-sm font-medium text-charcoal-soft mb-1.5">
 						Icon (Emoji)
 					</label>
 					<button
 						type="button"
+						id="icon-button"
 						onclick={() => (showEmojiPicker = !showEmojiPicker)}
 						class="w-full px-3 py-3 bg-cream border border-[rgba(45,42,38,0.15)] rounded-lg hover:border-primary-400 focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-colors text-2xl"
 					>
