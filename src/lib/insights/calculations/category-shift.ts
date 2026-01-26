@@ -129,7 +129,8 @@ export function computeCategoryDeepDiveShift(
 		const absDiff = Math.abs(current - previous);
 
 		if (absDiff > maxChange.absDiff) {
-			const changePercent = previous > 0 ? ((current - previous) / previous) * 100 : 0;
+			// Round percentage for display consistency
+			const changePercent = previous > 0 ? Math.round(((current - previous) / previous) * 100) : 0;
 			maxChange = { categoryId: catId, absDiff, changePercent, current, previous };
 		}
 	}

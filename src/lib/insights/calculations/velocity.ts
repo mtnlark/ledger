@@ -33,7 +33,8 @@ export function calculateVelocityComparison(
 
 	if (prevDailyAvg === 0) return null;
 
-	const percentChange = Math.round(((currentDailyAvg - prevDailyAvg) / prevDailyAvg) * 100);
+	// Calculate raw percentage change for accurate threshold comparison
+	const rawPercentChange = ((currentDailyAvg - prevDailyAvg) / prevDailyAvg) * 100;
 
 	// Determine effective threshold
 	let effectiveThreshold = percentThreshold;
@@ -46,7 +47,11 @@ export function calculateVelocityComparison(
 		}
 	}
 
-	if (Math.abs(percentChange) < effectiveThreshold) return null;
+	// Compare raw value against threshold to avoid rounding errors at boundaries
+	if (Math.abs(rawPercentChange) < effectiveThreshold) return null;
+
+	// Round for display after threshold comparison
+	const percentChange = Math.round(rawPercentChange);
 
 	return {
 		currentDailyAvg,

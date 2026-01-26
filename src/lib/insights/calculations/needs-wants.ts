@@ -51,8 +51,9 @@ export function calculateNeedsVsWantsFull(transactions: Transaction[]): NeedsWan
 	}
 
 	const total = needs + wants;
-	const needsPercent = total > 0 ? (needs / total) * 100 : 0;
-	const wantsPercent = total > 0 ? (wants / total) * 100 : 0;
+	// Round percentages to match calculateNeedsVsWants() for display consistency
+	const needsPercent = total > 0 ? Math.round((needs / total) * 100) : 0;
+	const wantsPercent = total > 0 ? Math.round((wants / total) * 100) : 0;
 
 	return { needs, wants, total, needsPercent, wantsPercent };
 }

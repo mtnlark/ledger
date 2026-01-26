@@ -93,4 +93,25 @@ describe('calculateNeedsVsWantsFull', () => {
 		expect(result.wantsPercent).toBe(40);
 		expect(result.total).toBe(100);
 	});
+
+	it('rounds percentages to match calculateNeedsVsWants consistency', () => {
+		// 33.33% should round to 33, 66.67% should round to 67
+		const txs = [
+			makeTx({ amount: 100, isEssential: true }),
+			makeTx({ amount: 200, isEssential: false })
+		];
+		const result = calculateNeedsVsWantsFull(txs);
+		expect(result.needsPercent).toBe(33);
+		expect(result.wantsPercent).toBe(67);
+	});
+
+	it('produces same needsPercent as calculateNeedsVsWants for same input', () => {
+		const txs = [
+			makeTx({ amount: 75.5, isEssential: true }),
+			makeTx({ amount: 24.5, isEssential: false })
+		];
+		const basicResult = calculateNeedsVsWants(txs);
+		const fullResult = calculateNeedsVsWantsFull(txs);
+		expect(fullResult.needsPercent).toBe(basicResult!.needsPercent);
+	});
 });

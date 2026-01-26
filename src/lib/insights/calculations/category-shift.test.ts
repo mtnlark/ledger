@@ -229,4 +229,26 @@ describe('computeCategoryDeepDiveShift', () => {
 		expect(result?.name).toBe('Travel');
 		expect(result?.changePercent).toBe(0); // previous was 0
 	});
+
+	it('rounds changePercent for display consistency', () => {
+		// current: $133.33, previous: $100
+		// raw change = (133.33-100)/100 * 100 = 33.33%
+		// should round to 33%
+		const current = [makeTx({ categoryId: 1, amount: 133.33 })];
+		const previous = [makeTx({ categoryId: 1, amount: 100 })];
+
+		const result = computeCategoryDeepDiveShift(current, previous, categories);
+		expect(result?.changePercent).toBe(33);
+	});
+
+	it('rounds negative changePercent correctly', () => {
+		// current: $66.67, previous: $100
+		// raw change = (66.67-100)/100 * 100 = -33.33%
+		// should round to -33%
+		const current = [makeTx({ categoryId: 1, amount: 66.67 })];
+		const previous = [makeTx({ categoryId: 1, amount: 100 })];
+
+		const result = computeCategoryDeepDiveShift(current, previous, categories);
+		expect(result?.changePercent).toBe(-33);
+	});
 });

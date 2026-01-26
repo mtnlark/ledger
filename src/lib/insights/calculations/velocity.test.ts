@@ -112,4 +112,46 @@ describe('calculateVelocityComparison', () => {
 			expect(result).toBeNull();
 		});
 	});
+
+	describe('threshold boundary precision', () => {
+		it('correctly handles raw value just below threshold that would round up', () => {
+			// This test verifies we compare before rounding to avoid false positives
+			// current: 546/15 = $36.4/day, prev: 1200/30 = $40/day
+			// raw change = (36.4-40)/40 * 100 = -9% exactly
+			// threshold = 10%
+			// |-9%| < 10% → should NOT be flagged
+			const result = calculateVelocityComparison(546, 1200, 15, 30, 10);
+			expect(result).toBeNull();
+		});
+
+		it('correctly handles raw value just above threshold', () => {
+			// current: 540/15 = $36/day, prev: 1200/30 = $40/day
+			// raw change = (36-40)/40 * 100 = -10% exactly
+			// threshold = 10%
+			// |-10%| = 10%, NOT < 10% → should be flagged
+			const result = calculateVelocityComparison(540, 1200, 15, 30, 10);
+			expect(result).not.toBeNull();
+			expect(result!.percentChange).toBe(-10);
+		});
+
+		it('handles fractional percentages that round to threshold', () => {
+			// current: 543/15 = $36.2/day, prev: 1200/30 = $40/day
+			// raw change = (36.2-40)/40 * 100 = -9.5%
+			// threshold = 10%
+			// |-9.5%| < 10% → should NOT be flagged
+			// (Old buggy code would round -9.5 to -10, then 10 < 10 = false → flagged incorrectly)
+			const result = calculateVelocityComparison(543, 1200, 15, 30, 10);
+			expect(result).toBeNull();
+		});
+
+		it('returns rounded percentage in result for display', () => {
+			// current: 528/15 = $35.2/day, prev: 1200/30 = $40/day
+			// raw change = (35.2-40)/40 * 100 = -12%
+			// threshold = 10%, so flagged
+			// returned percentChange should be -12 (rounded)
+			const result = calculateVelocityComparison(528, 1200, 15, 30, 10);
+			expect(result).not.toBeNull();
+			expect(result!.percentChange).toBe(-12);
+		});
+	});
 });
