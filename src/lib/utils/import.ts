@@ -3,6 +3,7 @@ import { db } from '$lib/db';
 import { getAllCategories, getCategoryByName } from '$lib/stores/categories';
 import { excelDateToJS, parseDateString } from '$lib/utils/date-helpers';
 import { persistData } from '$lib/storage';
+import { roundCurrency } from '$lib/utils/currency';
 
 export interface ImportedTransaction {
 	date: Date;
@@ -109,10 +110,10 @@ export function parseExpensesSheet(workbook: XLSX.WorkBook): ImportedTransaction
 		transactions.push({
 			date,
 			merchant: String(merchant).trim(),
-			amount: Math.round(parsedAmount * 100) / 100, // Round to 2 decimals
+			amount: roundCurrency(parsedAmount),
 			category,
 			isShared,
-			partnerShare: Math.round(partnerShare * 100) / 100,
+			partnerShare: roundCurrency(partnerShare),
 			isSettled
 		});
 	}
@@ -175,13 +176,14 @@ export async function importTransactions(
 
 			if (t.isShared && t.partnerShare > 0 && t.amount > 0) {
 				const ratio = t.partnerShare / t.amount;
+				const roundedRatio = roundCurrency(ratio);
 				// If it's close to a round percentage, use percentage mode
 				if (Math.abs(ratio - 0.5) < 0.01) {
 					splitType = 'percentage';
 					splitValue = 0.5;
-				} else if (Math.abs(ratio - Math.round(ratio * 100) / 100) < 0.01) {
+				} else if (Math.abs(ratio - roundedRatio) < 0.01) {
 					splitType = 'percentage';
-					splitValue = Math.round(ratio * 100) / 100;
+					splitValue = roundedRatio;
 				}
 			}
 

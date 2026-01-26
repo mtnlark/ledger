@@ -82,3 +82,64 @@ export function sumCurrency(values: number[]): number {
 export function isSplitBalanced(remaining: number): boolean {
 	return isZeroCurrency(remaining);
 }
+
+// ============================================================================
+// Percentage Utilities
+// ============================================================================
+
+/**
+ * Calculate a percentage value.
+ *
+ * @param part - The numerator (portion of the whole)
+ * @param whole - The denominator (total)
+ * @param round - Whether to round to nearest integer (default: false)
+ * @returns Percentage as a number (0-100+), or 0 if whole is 0
+ *
+ * @example
+ * calculatePercent(25, 100) // 25
+ * calculatePercent(1, 3) // 33.33333...
+ * calculatePercent(1, 3, true) // 33
+ * calculatePercent(50, 0) // 0 (safe division)
+ */
+export function calculatePercent(part: number, whole: number, round = false): number {
+	if (whole === 0) return 0;
+	const percent = (part / whole) * 100;
+	return round ? Math.round(percent) : percent;
+}
+
+/**
+ * Check if a percentage exceeds a threshold.
+ * Uses raw calculation for comparison to avoid rounding errors at boundaries.
+ *
+ * @param part - The numerator
+ * @param whole - The denominator
+ * @param threshold - The threshold percentage to compare against
+ * @returns True if (part/whole)*100 > threshold
+ *
+ * @example
+ * percentExceeds(81, 100, 80) // true (81% > 80%)
+ * percentExceeds(80, 100, 80) // false (80% is not > 80%)
+ * percentExceeds(50, 0, 80) // false (safe division)
+ */
+export function percentExceeds(part: number, whole: number, threshold: number): boolean {
+	if (whole <= 0) return false;
+	return (part / whole) * 100 > threshold;
+}
+
+/**
+ * Check if a percentage meets or exceeds a threshold.
+ * Uses raw calculation for comparison to avoid rounding errors at boundaries.
+ *
+ * @param part - The numerator
+ * @param whole - The denominator
+ * @param threshold - The threshold percentage to compare against
+ * @returns True if (part/whole)*100 >= threshold
+ *
+ * @example
+ * percentMeetsOrExceeds(80, 100, 80) // true (80% >= 80%)
+ * percentMeetsOrExceeds(79, 100, 80) // false (79% < 80%)
+ */
+export function percentMeetsOrExceeds(part: number, whole: number, threshold: number): boolean {
+	if (whole <= 0) return false;
+	return (part / whole) * 100 >= threshold;
+}

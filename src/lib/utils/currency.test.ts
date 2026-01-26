@@ -5,7 +5,10 @@ import {
 	currencyEquals,
 	isZeroCurrency,
 	sumCurrency,
-	isSplitBalanced
+	isSplitBalanced,
+	calculatePercent,
+	percentExceeds,
+	percentMeetsOrExceeds
 } from './currency';
 
 describe('CURRENCY_EPSILON', () => {
@@ -186,6 +189,109 @@ describe('isSplitBalanced', () => {
 		// $100 with only $99 allocated
 		const remaining = 100 - 99;
 		expect(isSplitBalanced(remaining)).toBe(false);
+	});
+});
+
+describe('calculatePercent', () => {
+	it('should calculate basic percentages', () => {
+		expect(calculatePercent(25, 100)).toBe(25);
+		expect(calculatePercent(50, 100)).toBe(50);
+		expect(calculatePercent(100, 100)).toBe(100);
+	});
+
+	it('should handle fractions', () => {
+		expect(calculatePercent(1, 3)).toBeCloseTo(33.333333, 5);
+		expect(calculatePercent(2, 3)).toBeCloseTo(66.666666, 5);
+	});
+
+	it('should round when requested', () => {
+		expect(calculatePercent(1, 3, true)).toBe(33);
+		expect(calculatePercent(2, 3, true)).toBe(67);
+		expect(calculatePercent(1, 6, true)).toBe(17); // 16.666... rounds to 17
+	});
+
+	it('should return 0 when whole is 0', () => {
+		expect(calculatePercent(50, 0)).toBe(0);
+		expect(calculatePercent(50, 0, true)).toBe(0);
+	});
+
+	it('should handle percentages over 100', () => {
+		expect(calculatePercent(150, 100)).toBe(150);
+		expect(calculatePercent(200, 100, true)).toBe(200);
+	});
+
+	it('should handle budget scenarios', () => {
+		// $85.50 spent of $100 budget
+		expect(calculatePercent(85.5, 100)).toBe(85.5);
+		expect(calculatePercent(85.5, 100, true)).toBe(86);
+	});
+});
+
+describe('percentExceeds', () => {
+	it('should return true when percentage exceeds threshold', () => {
+		expect(percentExceeds(81, 100, 80)).toBe(true);
+		expect(percentExceeds(100, 100, 80)).toBe(true);
+		expect(percentExceeds(160, 100, 80)).toBe(true);
+	});
+
+	it('should return false when percentage equals threshold', () => {
+		expect(percentExceeds(80, 100, 80)).toBe(false);
+	});
+
+	it('should return false when percentage is below threshold', () => {
+		expect(percentExceeds(79, 100, 80)).toBe(false);
+		expect(percentExceeds(50, 100, 80)).toBe(false);
+	});
+
+	it('should return false when whole is 0', () => {
+		expect(percentExceeds(50, 0, 80)).toBe(false);
+	});
+
+	it('should return false when whole is negative', () => {
+		expect(percentExceeds(50, -100, 80)).toBe(false);
+	});
+
+	it('should handle boundary precision', () => {
+		// 80.4% should not exceed 80% (but rounded would equal it)
+		// This tests raw comparison without rounding issues
+		expect(percentExceeds(80.4, 100, 80)).toBe(true);
+		expect(percentExceeds(80.0, 100, 80)).toBe(false);
+	});
+
+	it('should work with realistic budget values', () => {
+		// $17.65 spent of $18 budget = 98.06%
+		expect(percentExceeds(17.65, 18, 98)).toBe(true);
+		expect(percentExceeds(17.65, 18, 99)).toBe(false);
+	});
+});
+
+describe('percentMeetsOrExceeds', () => {
+	it('should return true when percentage equals threshold', () => {
+		expect(percentMeetsOrExceeds(80, 100, 80)).toBe(true);
+	});
+
+	it('should return true when percentage exceeds threshold', () => {
+		expect(percentMeetsOrExceeds(81, 100, 80)).toBe(true);
+	});
+
+	it('should return false when percentage is below threshold', () => {
+		expect(percentMeetsOrExceeds(79, 100, 80)).toBe(false);
+	});
+
+	it('should return false when whole is 0', () => {
+		expect(percentMeetsOrExceeds(50, 0, 80)).toBe(false);
+	});
+
+	it('should handle exact 100% budget usage', () => {
+		// $100 spent of $100 budget
+		expect(percentMeetsOrExceeds(100, 100, 100)).toBe(true);
+	});
+
+	it('should handle budget approaching threshold', () => {
+		// $79.99 of $100 = 79.99%, threshold is 80%
+		expect(percentMeetsOrExceeds(79.99, 100, 80)).toBe(false);
+		// $80.00 of $100 = 80%, threshold is 80%
+		expect(percentMeetsOrExceeds(80, 100, 80)).toBe(true);
 	});
 });
 

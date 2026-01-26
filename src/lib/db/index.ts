@@ -1,4 +1,5 @@
 import Dexie, { type EntityTable } from 'dexie';
+import { roundCurrency } from '$lib/utils/currency';
 
 // Type definitions
 export interface Transaction {
@@ -115,7 +116,7 @@ export function calculatePartnerShare(
 	splitValue: number
 ): number {
 	if (splitType === 'percentage') {
-		return Math.round(amount * splitValue * 100) / 100;
+		return roundCurrency(amount * splitValue);
 	}
 	return splitValue;
 }

@@ -151,6 +151,8 @@ ledger/
 │   │   │       ├── SavingsRateChart.svelte
 │   │   │       └── CalendarHeatmap.svelte
 │   │   ├── utils/
+│   │   │   ├── currency.ts        # Currency/percentage utilities (rounding, comparison)
+│   │   │   ├── budget-status.ts   # Budget status calculation (under/approaching/at/over)
 │   │   │   ├── import.ts          # Excel import
 │   │   │   ├── export.ts          # CSV/JSON export
 │   │   │   ├── category-helpers.ts
@@ -330,6 +332,52 @@ UI state persisted across sessions:
 - `ledger-cashflow-expanded` - Cash flow card state
 - `ledger-addform-expanded` - Transaction form state
 - `ledger-insight-{title}` - Each insight group state
+
+---
+
+## Currency & Percentage Handling
+
+To avoid floating-point precision issues, use the utilities in `src/lib/utils/currency.ts`:
+
+### Currency Functions
+```typescript
+import { roundCurrency, currencyEquals, isZeroCurrency, sumCurrency, isSplitBalanced } from '$lib/utils/currency';
+
+// Round to 2 decimal places
+roundCurrency(33.333)     // 33.33
+
+// Compare with tolerance (0.005)
+currencyEquals(10.0, 10.001)  // true
+
+// Check if effectively zero
+isZeroCurrency(0.001)     // true
+
+// Sum with final rounding
+sumCurrency([0.1, 0.2])   // 0.30
+
+// Validate split transactions
+isSplitBalanced(remaining) // true if ~0
+```
+
+### Percentage Functions
+```typescript
+import { calculatePercent, percentExceeds, percentMeetsOrExceeds } from '$lib/utils/currency';
+
+// Calculate percentage (optionally rounded)
+calculatePercent(85, 100)       // 85
+calculatePercent(1, 3, true)    // 33 (rounded)
+
+// Compare percentages (use raw values)
+percentExceeds(81, 100, 80)     // true (81% > 80%)
+percentMeetsOrExceeds(80, 100, 80)  // true (80% >= 80%)
+```
+
+### Key Conventions
+1. **Round at calculation time**, not display time
+2. Use `roundCurrency()` instead of `Math.round(value * 100) / 100`
+3. For threshold comparisons, compare raw values first, then round for display
+4. Use `CURRENCY_EPSILON` (0.005) for tolerance-based comparisons
+5. When displayed values don't match internal calculations, round both to the same precision
 
 ---
 

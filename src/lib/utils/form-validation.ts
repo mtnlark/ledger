@@ -2,6 +2,8 @@
  * Shared form validation utilities for transaction forms
  */
 
+import { roundCurrency } from './currency';
+
 /**
  * Validates a split value for shared expenses
  * @param value - The split value to validate
@@ -60,14 +62,14 @@ export function calculateSplitShares(
 	let partnerShare: number;
 
 	if (splitType === 'percentage') {
-		partnerShare = Math.round(amount * splitValue * 100) / 100;
+		partnerShare = roundCurrency(amount * splitValue);
 	} else {
 		partnerShare = Math.min(Math.max(splitValue, 0), amount);
 	}
 
 	return {
 		partnerShare,
-		yourShare: Math.round((amount - partnerShare) * 100) / 100
+		yourShare: roundCurrency(amount - partnerShare)
 	};
 }
 

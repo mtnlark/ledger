@@ -127,72 +127,36 @@ These issues affect the insights/analytics display but not core data.
 
 ---
 
-## Phase 4: Standardization & Cleanup (Lower Priority)
+## Phase 4: Standardization & Cleanup (Lower Priority) ✅ COMPLETE
 
 Create utilities and patterns to prevent future issues.
 
-### 4.1 Create Currency Utility Module
-**New file:** `src/lib/utils/currency.ts`
+### 4.1 Create Currency Utility Module ✅ (Done in Phase 1)
+**File:** `src/lib/utils/currency.ts`
 
-```typescript
-/** Epsilon for currency comparisons (half a cent) */
-export const CURRENCY_EPSILON = 0.005;
+Created with functions: `roundCurrency`, `currencyEquals`, `isZeroCurrency`, `sumCurrency`, `isSplitBalanced`
 
-/** Round to 2 decimal places (cents) */
-export function roundCurrency(value: number): number {
-  return Math.round(value * 100) / 100;
-}
+### 4.2 Create Percentage Utility Functions ✅
+**Added to:** `src/lib/utils/currency.ts`
 
-/** Compare two currency values with tolerance */
-export function currencyEquals(a: number, b: number): boolean {
-  return Math.abs(a - b) < CURRENCY_EPSILON;
-}
+Added functions:
+- `calculatePercent(part, whole, round?)` - Calculate percentage, optionally rounded
+- `percentExceeds(part, whole, threshold)` - Check if percentage > threshold
+- `percentMeetsOrExceeds(part, whole, threshold)` - Check if percentage >= threshold
 
-/** Check if currency value is effectively zero */
-export function isZeroCurrency(value: number): boolean {
-  return Math.abs(value) < CURRENCY_EPSILON;
-}
+Added 19 new tests for percentage utilities.
 
-/** Sum currency values with final rounding */
-export function sumCurrency(values: number[]): number {
-  return roundCurrency(values.reduce((sum, v) => sum + v, 0));
-}
-```
+### 4.3 Update Existing Code to Use Utilities ✅
+Refactored files to use `roundCurrency()`:
+- `src/lib/db/index.ts` - `calculatePartnerShare()`
+- `src/lib/utils/form-validation.ts` - `calculateSplitShares()`
+- `src/lib/utils/import.ts` - Transaction amount and partner share rounding
+- `src/lib/stores/recurring.ts` - Average amounts and variance rounding
 
-### 4.2 Create Percentage Utility Functions
-**Add to:** `src/lib/utils/currency.ts` or new file
-
-```typescript
-/** Calculate percentage, optionally rounded */
-export function calculatePercent(
-  part: number,
-  whole: number,
-  round: boolean = false
-): number {
-  if (whole === 0) return 0;
-  const percent = (part / whole) * 100;
-  return round ? Math.round(percent) : percent;
-}
-
-/** Compare percentage against threshold */
-export function percentExceeds(
-  part: number,
-  whole: number,
-  threshold: number
-): boolean {
-  // Use raw calculation for comparison, not rounded
-  return whole > 0 && (part / whole) * 100 > threshold;
-}
-```
-
-### 4.3 Update Existing Code to Use Utilities
-- Replace inline `Math.round(value * 100) / 100` with `roundCurrency()`
-- Replace `Math.abs(a - b) < 0.01` with `currencyEquals()` or `isZeroCurrency()`
-- Replace direct percentage comparisons with `percentExceeds()`
-
-### 4.4 Add Documentation
-- Add JSDoc comments explaining rounding strategy
-- Document in CLAUDE.md the currency handling conventions
+### 4.4 Add Documentation ✅
+- Added "Currency & Percentage Handling" section to CLAUDE.md
+- Documents all utility functions with examples
+- Lists key conventions for currency handling
 
 ---
 
@@ -235,11 +199,11 @@ Phase 3 (Insights)           ✅ COMPLETE
 ├── 3.3 Category shift ✅
 └── 3.4 Recurring detection ✅ (already correct)
 
-Phase 4 (Standardization)    OPTIONAL
-├── 4.1 Currency utilities ✅ (created in Phase 1)
-├── 4.2 Percentage utilities (optional)
-├── 4.3 Refactor existing code (optional)
-└── 4.4 Documentation (optional)
+Phase 4 (Standardization)    ✅ COMPLETE
+├── 4.1 Currency utilities ✅
+├── 4.2 Percentage utilities ✅
+├── 4.3 Refactor existing code ✅
+└── 4.4 Documentation ✅
 ```
 
 ---
