@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { formatCurrency } from '$lib/utils/format-helpers';
+	import { roundCurrency } from '$lib/utils/currency';
 
 	interface Props {
 		isShared: boolean;
@@ -23,15 +24,15 @@
 		idPrefix = ''
 	}: Props = $props();
 
-	// Computed split values
+	// Computed split values - use roundCurrency for consistent precision
 	let partnerShare = $derived.by(() => {
 		if (splitType === 'percentage') {
-			return Math.round(amount * splitValue * 100) / 100;
+			return roundCurrency(amount * splitValue);
 		}
-		return Math.min(Math.max(splitValue, 0), amount);
+		return roundCurrency(Math.min(Math.max(splitValue, 0), amount));
 	});
 
-	let yourShare = $derived(amount - partnerShare);
+	let yourShare = $derived(roundCurrency(amount - partnerShare));
 
 	// Validation for fixed split
 	let splitValueInvalid = $derived(

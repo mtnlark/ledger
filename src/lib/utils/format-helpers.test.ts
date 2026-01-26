@@ -173,10 +173,12 @@ describe('format-helpers', () => {
 				expect(result.yourShare).toBe(0);
 			});
 
-			it('handles decimal amounts correctly', () => {
+			it('handles decimal amounts correctly with rounding', () => {
+				// 99.99 * 0.5 = 49.995, which rounds to 50.00
+				// yourShare = 99.99 - 50.00 = 49.99
 				const result = calculateSplitShares(99.99, 'percentage', 0.5);
-				expect(result.partnerShare).toBeCloseTo(49.995);
-				expect(result.yourShare).toBeCloseTo(49.995);
+				expect(result.partnerShare).toBe(50);
+				expect(result.yourShare).toBe(49.99);
 			});
 		});
 	});

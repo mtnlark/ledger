@@ -3,6 +3,7 @@
 	import type { Category, Transaction } from '$lib/db';
 	import { createCategoryHelpers } from '$lib/utils/category-helpers';
 	import { formatCurrency } from '$lib/utils/format-helpers';
+	import { isSplitBalanced, roundCurrency } from '$lib/utils/currency';
 	import { focusTrap } from '$lib/utils/focus-trap';
 
 	interface Props {
@@ -45,13 +46,13 @@
 	let isValid = $derived(
 		lines.length >= 2 &&
 			transaction !== null &&
-			Math.abs(remaining) < 0.01 &&
+			isSplitBalanced(remaining) &&
 			lines.every((l) => l.categoryId > 0 && l.amount > 0)
 	);
 
 	function addLine() {
 		// Add new line with remaining amount (if positive)
-		const newAmount = remaining > 0 ? Math.round(remaining * 100) / 100 : 0;
+		const newAmount = remaining > 0 ? roundCurrency(remaining) : 0;
 		lines = [...lines, { categoryId: 0, amount: newAmount }];
 	}
 
@@ -191,7 +192,7 @@
 
 					<!-- Validation Summary -->
 					<div
-						class="p-3 rounded-lg {Math.abs(remaining) < 0.01
+						class="p-3 rounded-lg {isSplitBalanced(remaining)
 							? 'bg-success-50 border border-success-200'
 							: 'bg-warning-50 border border-warning-200'}"
 					>
@@ -202,7 +203,7 @@
 						<div class="flex justify-between text-sm mt-1">
 							<span class="text-charcoal-soft">Remaining:</span>
 							<span
-								class="font-mono font-medium {Math.abs(remaining) < 0.01
+								class="font-mono font-medium {isSplitBalanced(remaining)
 									? 'text-success-600'
 									: remaining > 0
 										? 'text-warning-600'

@@ -6,6 +6,7 @@ import { invalidateRecurringCache } from './recurring';
 import { isSubscriptionCancelled, reactivateSubscription } from './subscriptionSettings';
 import { getMonthDateRange } from '$lib/utils/date-helpers';
 import { getTransactionCache } from './transactionCache';
+import { sumCurrency } from '$lib/utils/currency';
 import {
 	validateAmount,
 	validateMerchant,
@@ -363,9 +364,10 @@ export async function getUnsettledTransactions(): Promise<Transaction[]> {
 }
 
 // Calculate outstanding balance (what partner owes)
+// Uses sumCurrency to avoid accumulated floating-point errors from many additions
 export async function calculateOutstandingBalance(): Promise<number> {
 	const unsettled = await getUnsettledTransactions();
-	return unsettled.reduce((sum, t) => sum + t.partnerShare, 0);
+	return sumCurrency(unsettled.map((t) => t.partnerShare));
 }
 
 // Get the earliest month that has transactions (for month picker)

@@ -1,3 +1,5 @@
+import { roundCurrency } from './currency';
+
 /**
  * Result of calculating split shares between user and partner
  */
@@ -46,7 +48,9 @@ export function formatPercentage(value: number, decimalPlaces: number = 0): stri
 }
 
 /**
- * Calculate partner and user shares for a shared expense
+ * Calculate partner and user shares for a shared expense.
+ * Both shares are rounded to 2 decimal places to avoid floating-point issues.
+ *
  * @param amount - Total transaction amount
  * @param splitType - 'percentage' or 'fixed'
  * @param splitValue - For percentage: 0-1, for fixed: dollar amount
@@ -71,7 +75,8 @@ export function calculateSplitShares(
 			validatedValue = 1;
 			wasClampedHigh = true;
 		}
-		partnerShare = amount * validatedValue;
+		// Round to avoid floating-point precision issues (e.g., 100 * 0.333... = 33.33)
+		partnerShare = roundCurrency(amount * validatedValue);
 	} else {
 		// Fixed: clamp between 0 and amount
 		if (splitValue < 0) {
@@ -81,13 +86,16 @@ export function calculateSplitShares(
 			partnerShare = amount;
 			wasClampedHigh = true;
 		} else {
-			partnerShare = splitValue;
+			partnerShare = roundCurrency(splitValue);
 		}
 	}
 
+	// Calculate yourShare from rounded partnerShare to ensure they sum correctly
+	const yourShare = roundCurrency(amount - partnerShare);
+
 	return {
 		partnerShare,
-		yourShare: amount - partnerShare,
+		yourShare,
 		...(wasClampedLow && { wasClampedLow }),
 		...(wasClampedHigh && { wasClampedHigh })
 	};

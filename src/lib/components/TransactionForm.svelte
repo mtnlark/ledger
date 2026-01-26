@@ -6,6 +6,7 @@
 	import type { Category, Settings } from '$lib/db';
 	import { parseLocalDate } from '$lib/utils/date-helpers';
 	import { formatCurrency } from '$lib/utils/format-helpers';
+	import { isSplitBalanced, roundCurrency } from '$lib/utils/currency';
 	import CategoryCombobox from './CategoryCombobox.svelte';
 	import MerchantAutocomplete from './MerchantAutocomplete.svelte';
 	import SharedExpenseFields from './SharedExpenseFields.svelte';
@@ -143,7 +144,7 @@
 	let isSplitValid = $derived(
 		splitLines.length >= 2 &&
 		amount > 0 &&
-		Math.abs(splitRemaining) < 0.01 &&
+		isSplitBalanced(splitRemaining) &&
 		splitLines.every((l) => l.categoryId > 0 && l.amount > 0)
 	);
 
@@ -180,7 +181,7 @@
 	}
 
 	function addSplitLine() {
-		const newAmount = splitRemaining > 0 ? Math.round(splitRemaining * 100) / 100 : 0;
+		const newAmount = splitRemaining > 0 ? roundCurrency(splitRemaining) : 0;
 		splitLines = [...splitLines, { categoryId: 0, amount: newAmount }];
 	}
 
@@ -447,14 +448,14 @@
 				</button>
 
 				<!-- Validation Summary -->
-				<div class="p-2 rounded-lg text-sm {Math.abs(splitRemaining) < 0.01 ? 'bg-success-50 border border-success-200' : 'bg-warning-50 border border-warning-200'}">
+				<div class="p-2 rounded-lg text-sm {isSplitBalanced(splitRemaining) ? 'bg-success-50 border border-success-200' : 'bg-warning-50 border border-warning-200'}">
 					<div class="flex justify-between">
 						<span class="text-charcoal-soft">Total:</span>
 						<span class="font-mono font-medium text-charcoal">{formatCurrency(splitTotal)}</span>
 					</div>
 					<div class="flex justify-between">
 						<span class="text-charcoal-soft">Remaining:</span>
-						<span class="font-mono font-medium {Math.abs(splitRemaining) < 0.01 ? 'text-success-600' : splitRemaining > 0 ? 'text-warning-600' : 'text-danger-600'}">
+						<span class="font-mono font-medium {isSplitBalanced(splitRemaining) ? 'text-success-600' : splitRemaining > 0 ? 'text-warning-600' : 'text-danger-600'}">
 							{formatCurrency(splitRemaining)}
 						</span>
 					</div>
