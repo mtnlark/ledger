@@ -25,7 +25,6 @@
 			category: Category;
 			budget: CategoryBudget;
 			spent: number;
-			percentSpent: number;
 		}> = [];
 		const unbudgetedWithSpending: Array<{
 			category: Category;
@@ -46,12 +45,9 @@
 			const suggestion = suggestions.get(categoryId) || 0;
 
 			if (budget) {
-				withBudgets.push({
-					category,
-					budget,
-					spent,
-					percentSpent: budget.budgetAmount > 0 ? (spent / budget.budgetAmount) * 100 : 0
-				});
+				// Note: percentSpent is calculated by BudgetProgressBar using rounded values
+				// to ensure display/status consistency
+				withBudgets.push({ category, budget, spent });
 			} else if (spent > 0) {
 				unbudgetedWithSpending.push({ category, spent, suggestion });
 			} else {

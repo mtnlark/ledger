@@ -4,6 +4,7 @@
 	import { Check, AlertTriangle, ChevronDown, ChevronUp } from 'lucide-svelte';
 	import type { MonthlyBudget } from '$lib/db';
 	import { formatCurrency } from '$lib/utils/format-helpers';
+	import { getBudgetStatus } from '$lib/utils/budget-status';
 
 	const STORAGE_KEY = 'ledger-cashflow-expanded';
 
@@ -40,8 +41,12 @@
 	let saved = $derived(budget?.savedAmount ?? 0);
 	let available = $derived(income - saved);
 	let surplus = $derived(available - totalSpent);
-	let surplusPercent = $derived(available > 0 ? (surplus / available) * 100 : 0);
-	let spentPercent = $derived(available > 0 ? Math.min(100, (totalSpent / available) * 100) : 0);
+
+	// Use getBudgetStatus for consistent color determination across the app
+	// Rounds values to match displayed amounts (prevents display/status mismatch)
+	let spendingStatus = $derived(
+		available > 0 ? getBudgetStatus(Math.round(totalSpent), Math.round(available)) : null
+	);
 </script>
 
 <div
@@ -162,20 +167,16 @@
 					</div>
 
 					<!-- Progress Bar -->
-					{#if available > 0}
+					{#if available > 0 && spendingStatus}
 						<div class="mt-5 pt-4 border-t border-dashed border-theme-dashed">
 							<div class="flex justify-between text-xs text-charcoal-muted mb-2">
 								<span>Spending Progress</span>
-								<span class="font-mono">{Math.round(spentPercent)}% used</span>
+								<span class="font-mono">{Math.round(spendingStatus.percentSpent)}% used</span>
 							</div>
 							<div class="h-2.5 bg-surface-alt rounded-full overflow-hidden shadow-[inset_0_1px_2px_rgba(45,42,38,0.08)]">
 								<div
-									class="h-full rounded-full transition-all duration-500 ease-out {totalSpent > available
-										? 'bg-gradient-to-r from-danger-300 to-danger-500'
-										: totalSpent > available * 0.8
-											? 'bg-gradient-to-r from-warning-300 to-warning-500'
-											: 'bg-gradient-to-r from-success-200 to-success-500'}"
-									style="width: {spentPercent}%"
+									class="h-full rounded-full transition-all duration-500 ease-out {spendingStatus.colorClass}"
+									style="width: {spendingStatus.displayPercent}%"
 								></div>
 							</div>
 						</div>
