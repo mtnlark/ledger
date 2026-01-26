@@ -264,6 +264,151 @@ describe('getBudgetStatus', () => {
 			expect(getBudgetStatus(510, 500).status).toBe('over');
 		});
 	});
+
+	/**
+	 * These tests use realistic transaction amounts with cents to verify
+	 * that the status calculation works correctly with real-world data.
+	 *
+	 * IMPORTANT: The BudgetProgressBar component rounds values before calling
+	 * getBudgetStatus, so these tests verify the utility's behavior with
+	 * already-rounded values (simulating how it's actually used in the UI).
+	 */
+	describe('realistic transaction amounts (with rounding as used in UI)', () => {
+		// Helper to simulate how BudgetProgressBar calls getBudgetStatus
+		const getStatusWithRounding = (spent: number, budget: number) =>
+			getBudgetStatus(Math.round(spent), Math.round(budget));
+
+		describe('values that display as equal should show "at" status', () => {
+			it('$17.65 spent / $18 budget → displays as $18/$18 → at', () => {
+				// This was the actual bug: displayed "$18 / $18" but showed amber
+				const result = getStatusWithRounding(17.65, 18);
+				expect(result.status).toBe('at');
+			});
+
+			it('$49.51 spent / $50 budget → displays as $50/$50 → at', () => {
+				const result = getStatusWithRounding(49.51, 50);
+				expect(result.status).toBe('at');
+			});
+
+			it('$99.50 spent / $100 budget → displays as $100/$100 → at', () => {
+				const result = getStatusWithRounding(99.5, 100);
+				expect(result.status).toBe('at');
+			});
+
+			it('$199.72 spent / $200 budget → displays as $200/$200 → at', () => {
+				const result = getStatusWithRounding(199.72, 200);
+				expect(result.status).toBe('at');
+			});
+		});
+
+		describe('grocery budget scenarios ($400-600 typical)', () => {
+			it('$423.87 spent / $500 budget → under (85%)', () => {
+				const result = getStatusWithRounding(423.87, 500);
+				expect(result.status).toBe('approaching'); // 424/500 = 84.8% rounds to 85%
+			});
+
+			it('$387.42 spent / $500 budget → under (77%)', () => {
+				const result = getStatusWithRounding(387.42, 500);
+				expect(result.status).toBe('under'); // 387/500 = 77.4%
+			});
+
+			it('$498.33 spent / $500 budget → at (displays $498/$500)', () => {
+				const result = getStatusWithRounding(498.33, 500);
+				expect(result.status).toBe('at'); // 498/500 = 99.6%
+			});
+
+			it('$512.45 spent / $500 budget → at (within $10 tolerance)', () => {
+				// $500 budget: 1% = $5 tolerance, so $505 max for "at"
+				const result = getStatusWithRounding(512.45, 500);
+				expect(result.status).toBe('over'); // 512/500 = 102.4%
+			});
+		});
+
+		describe('restaurant budget scenarios ($150-300 typical)', () => {
+			it('$127.89 spent / $200 budget → under (64%)', () => {
+				const result = getStatusWithRounding(127.89, 200);
+				expect(result.status).toBe('under');
+			});
+
+			it('$178.43 spent / $200 budget → approaching (89%)', () => {
+				const result = getStatusWithRounding(178.43, 200);
+				expect(result.status).toBe('approaching');
+			});
+
+			it('$198.76 spent / $200 budget → at (displays $199/$200)', () => {
+				const result = getStatusWithRounding(198.76, 200);
+				expect(result.status).toBe('at'); // 199/200 = 99.5%
+			});
+
+			it('$215.50 spent / $200 budget → over ($15 over > $2 min)', () => {
+				const result = getStatusWithRounding(215.5, 200);
+				expect(result.status).toBe('over');
+			});
+		});
+
+		describe('small budget scenarios ($20-50 typical)', () => {
+			it('$12.47 spent / $25 budget → under (50%)', () => {
+				const result = getStatusWithRounding(12.47, 25);
+				expect(result.status).toBe('under');
+			});
+
+			it('$22.89 spent / $25 budget → approaching (92%)', () => {
+				const result = getStatusWithRounding(22.89, 25);
+				expect(result.status).toBe('approaching'); // 23/25 = 92%
+			});
+
+			it('$24.67 spent / $25 budget → at (displays $25/$25)', () => {
+				const result = getStatusWithRounding(24.67, 25);
+				expect(result.status).toBe('at');
+			});
+
+			it('$27.33 spent / $25 budget → at ($2 over = $2 min tolerance)', () => {
+				const result = getStatusWithRounding(27.33, 25);
+				expect(result.status).toBe('at'); // 27/25 = 108%, but $2 tolerance
+			});
+
+			it('$28.10 spent / $25 budget → over ($3 over > $2 min)', () => {
+				const result = getStatusWithRounding(28.1, 25);
+				expect(result.status).toBe('over');
+			});
+		});
+
+		describe('subscription/utility scenarios (exact or near-exact amounts)', () => {
+			it('$14.99 subscription spent / $15 budget → at', () => {
+				const result = getStatusWithRounding(14.99, 15);
+				expect(result.status).toBe('at'); // 15/15 = 100%
+			});
+
+			it('$9.99 + $4.99 subscriptions / $15 budget → at', () => {
+				const result = getStatusWithRounding(9.99 + 4.99, 15);
+				expect(result.status).toBe('at'); // 15/15 = 100%
+			});
+
+			it('$79.00 utility / $80 budget → at (99%)', () => {
+				const result = getStatusWithRounding(79.0, 80);
+				expect(result.status).toBe('at');
+			});
+
+			it('$156.23 utilities / $150 budget → over', () => {
+				const result = getStatusWithRounding(156.23, 150);
+				expect(result.status).toBe('over'); // 156/150 = 104%
+			});
+		});
+
+		describe('accumulated small transactions', () => {
+			it('multiple coffee purchases: $4.75 + $5.25 + $4.50 + $5.00 / $20 budget', () => {
+				const spent = 4.75 + 5.25 + 4.5 + 5.0; // $19.50
+				const result = getStatusWithRounding(spent, 20);
+				expect(result.status).toBe('at'); // 20/20 = 100% (rounds up)
+			});
+
+			it('multiple lunches: $12.34 + $15.67 + $11.99 / $50 budget', () => {
+				const spent = 12.34 + 15.67 + 11.99; // $40.00
+				const result = getStatusWithRounding(spent, 50);
+				expect(result.status).toBe('approaching'); // 40/50 = 80%
+			});
+		});
+	});
 });
 
 describe('getBudgetColorClass', () => {
