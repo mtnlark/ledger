@@ -51,6 +51,18 @@
   --color-danger-700: #8A5050;
   --color-danger-800: #724343;
   --color-danger-900: #5E3838;
+
+  /* Neutral - Warm Slate Blue (for "at budget" state) */
+  --color-neutral-50: #F7F8FA;
+  --color-neutral-100: #ECEEF2;
+  --color-neutral-200: #D5DAE3;
+  --color-neutral-300: #B0B9C9;
+  --color-neutral-400: #8A96AC;
+  --color-neutral-500: #6B7A94;
+  --color-neutral-600: #566379;
+  --color-neutral-700: #475163;
+  --color-neutral-800: #3C4352;
+  --color-neutral-900: #343A46;
 }
 
 :root {

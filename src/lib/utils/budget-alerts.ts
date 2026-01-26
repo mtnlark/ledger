@@ -27,9 +27,9 @@ export const APPROACHING_THRESHOLD = config.budget.approachingThreshold;
 /**
  * Calculate budget alerts for a list of category budgets
  *
- * Alert types are determined based on remaining amount rounded to whole dollars,
- * since that's how they're displayed to users. This prevents confusing alerts
- * like "$0 over" or "$0 left approaching" when spending is very close to budget.
+ * Alert types are determined by rounding spent and budget to whole dollars first,
+ * since that's how they're displayed to users. This ensures alerts match what
+ * users see (e.g., "$18 / $18" shows as "at budget", not "approaching").
  *
  * @param categoryBudgets - Array of budget data with spending
  * @returns Sorted array of alerts (over first, then at, then approaching)
@@ -38,9 +38,11 @@ export function calculateBudgetAlerts(categoryBudgets: CategoryBudgetData[]): Bu
 	const alerts: BudgetAlert[] = [];
 
 	for (const data of categoryBudgets) {
-		const remaining = data.budgetAmount - data.spent;
-		// Round to whole dollars for display consistency
-		const roundedRemaining = Math.round(remaining);
+		// Round spent and budget separately to match how they're displayed
+		// This ensures alert status matches what users see in the UI
+		const roundedSpent = Math.round(data.spent);
+		const roundedBudget = Math.round(data.budgetAmount);
+		const roundedRemaining = roundedBudget - roundedSpent;
 
 		if (roundedRemaining < 0) {
 			// Over budget (rounded remaining is negative)

@@ -29,7 +29,15 @@ export const config = {
 		/** Decay factor for weighted average (0.85 = 15% decay per month) */
 		suggestionDecay: 0.85,
 		/** Base headroom multiplier for stdDev (0.5 = half a standard deviation) */
-		suggestionHeadroom: 0.5
+		suggestionHeadroom: 0.5,
+		/** Percent threshold for "approaching" status (e.g., 80 = 80%) */
+		approachingThresholdPercent: 80,
+		/** Percent below 100% to treat as "at budget" (e.g., 1 = 99%+) */
+		atBudgetUnderTolerancePercent: 1,
+		/** Minimum dollar amount over budget to still be "at budget" */
+		atBudgetOverToleranceMin: 2,
+		/** Percent of budget over to still be "at budget" (e.g., 1 = 1%) */
+		atBudgetOverTolerancePercent: 1
 	},
 
 	/**

@@ -16,6 +16,7 @@
 	import { getAvailableMonths } from '$lib/stores/transactions';
 	import { toast } from '$lib/stores/toast';
 	import { formatCurrencyWhole } from '$lib/utils/format-helpers';
+	import { getBudgetStatus } from '$lib/utils/budget-status';
 	import { Sparkles, Copy, AlertTriangle, X } from 'lucide-svelte';
 	import HeaderNav from '$lib/components/HeaderNav.svelte';
 	import MonthPicker from '$lib/components/MonthPicker.svelte';
@@ -349,24 +350,20 @@
 					</div>
 
 					{#if totalBudgeted > 0}
+						{@const overallStatus = getBudgetStatus(Math.round(budgetedSpent), Math.round(totalBudgeted))}
 						<div class="mt-4 pt-4 border-t border-dashed border-theme-dashed">
 							<div class="flex justify-between text-xs text-charcoal-muted mb-2">
 								<span>Overall Progress</span>
 								<span class="font-mono">
-									{Math.round((budgetedSpent / totalBudgeted) * 100)}% of budgeted
+									{Math.round(overallStatus.percentSpent)}% of budgeted
 								</span>
 							</div>
 							<div
 								class="h-2.5 bg-surface-alt rounded-full overflow-hidden shadow-[inset_0_1px_2px_rgba(45,42,38,0.08)]"
 							>
 								<div
-									class="h-full rounded-full transition-all duration-500 ease-out {budgetedSpent >
-									totalBudgeted
-										? 'bg-gradient-to-r from-danger-300 to-danger-500'
-										: budgetedSpent > totalBudgeted * 0.8
-											? 'bg-gradient-to-r from-warning-300 to-warning-500'
-											: 'bg-gradient-to-r from-success-200 to-success-500'}"
-									style="width: {Math.min(100, (budgetedSpent / totalBudgeted) * 100)}%"
+									class="h-full rounded-full transition-all duration-500 ease-out {overallStatus.colorClass}"
+									style="width: {overallStatus.displayPercent}%"
 								></div>
 							</div>
 						</div>
