@@ -102,6 +102,7 @@ ledger/
 │   │   │       ├── velocity.ts
 │   │   │       ├── top-merchant.ts
 │   │   │       ├── ytd-stats.ts
+│   │   │       ├── month-review.ts   # End-of-month spending review calculations
 │   │   │       └── stats.ts          # Shared statistical helpers (stdDev, zScore)
 │   │   ├── components/
 │   │   │   ├── SideNav.svelte         # Collapsible sidebar
@@ -151,17 +152,25 @@ ledger/
 │   │   │       ├── SavingsRateChart.svelte
 │   │   │       └── CalendarHeatmap.svelte
 │   │   ├── utils/
-│   │   │   ├── currency.ts        # Currency/percentage utilities (rounding, comparison)
-│   │   │   ├── budget-status.ts   # Budget status calculation (under/approaching/at/over)
-│   │   │   ├── import.ts          # Excel import
-│   │   │   ├── export.ts          # CSV/JSON export
+│   │   │   ├── currency.ts            # Currency/percentage utilities (rounding, comparison)
+│   │   │   ├── budget-status.ts       # Budget status calculation (under/approaching/at/over)
+│   │   │   ├── budget-alerts.ts       # Budget alert message generation
+│   │   │   ├── format-helpers.ts      # Currency/percentage display formatting
+│   │   │   ├── import.ts              # Excel import
+│   │   │   ├── export.ts              # CSV/JSON export
 │   │   │   ├── category-helpers.ts
-│   │   │   ├── chart-theme.ts     # Chart.js theme configuration
+│   │   │   ├── chart-theme.ts         # Chart.js theme configuration
 │   │   │   ├── date-helpers.ts
-│   │   │   ├── debug.ts           # Debugging utilities
 │   │   │   ├── string-helpers.ts
-│   │   │   ├── focus-trap.ts      # Modal focus trapping utility
-│   │   │   └── form-validation.ts # Shared form validation helpers
+│   │   │   ├── focus-trap.ts          # Modal focus trapping utility
+│   │   │   ├── form-validation.ts     # Shared form validation helpers
+│   │   │   ├── transaction-validation.ts  # Transaction data validation
+│   │   │   ├── transaction-grouping.ts    # Group transactions by date/category
+│   │   │   ├── trie.ts                # Trie for merchant autocomplete
+│   │   │   ├── pagination.ts          # List pagination utilities
+│   │   │   ├── retry.ts               # Async retry with backoff
+│   │   │   ├── errors.ts              # Error handling utilities
+│   │   │   └── debug.ts               # Debugging utilities
 │   │   └── assets/
 │   │       └── favicon.svg
 │   ├── routes/
