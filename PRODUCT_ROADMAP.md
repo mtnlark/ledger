@@ -85,39 +85,34 @@ This document outlines feature ideas and implementation considerations for futur
   - Modified: `src/lib/stores/settings.ts` (dismiss/reset functions)
   - Modified: `src/routes/+page.svelte` (integrated banner and modal)
 
+### Quick Insights Dashboard Widget
+- **Status**: Shipped
+- **Implementation**: Single rotating insight widget above CashFlowCard
+- **Features**:
+  - Priority-based insight selection (first matching wins):
+    1. Budget alert (over/approaching) - uses same `getBudgetStatus()` as Budget page
+    2. Pace warning (mid-month, projected to exceed income)
+    3. Positive reinforcement (all budgeted categories on track)
+    4. Transaction count fallback
+  - Clickable navigation to Budget or Insights page
+  - 24-hour dismiss via localStorage
+  - Configurable thresholds in `config.dashboardInsight`
+  - Consistent with Budget page status logic (no false alerts for "at budget")
+- **Design decisions**:
+  - Skipped anomaly detection for MVP (requires loading all historical transactions)
+  - Uses warning colors (yellow) for approaching, danger colors (red) for over budget
+  - Race condition protection with sequence numbering for async calculations
+- **Files touched**:
+  - New: `src/lib/utils/dashboard-insight.ts`, `src/lib/components/DashboardInsightWidget.svelte`
+  - Modified: `src/lib/config/index.ts` (added `dashboardInsight` config section)
+  - Modified: `src/routes/+page.svelte` (integrated widget above CashFlowCard)
+  - Modified: `CLAUDE.md` (documentation)
+
 ---
 
 ## High Priority Features
 
-### 1. Quick Insights Widget (formerly #2)
-
-**Problem**: Users have to navigate to Insights page to see important information.
-
-**Proposed Solution**: Single rotating insight on dashboard
-
-**Priority Logic** (show first matching):
-1. **Budget alert** (any category >90%): "Restaurants at 95% of budget"
-2. **Anomaly detected** (z-score > 2): "Coffee spending unusually high this week"
-3. **Pace warning** (mid-month, on track to exceed income): "On pace to spend $4,200 by month end"
-4. **Positive reinforcement** (all categories under budget): "All 8 budgeted categories on track"
-5. **Neutral fallback**: "12 transactions logged this month"
-
-**UI Design**:
-- Compact card above or below CashFlowCard
-- Subtle, not alarming (use muted colors except for budget alerts)
-- Tap/click to navigate to relevant detail (Insights or Budget page)
-- "Dismiss" option that hides for 24 hours
-
-**Technical Considerations**:
-- Create `DashboardInsight` component
-- Reuse calculations from InsightsEngine
-- Add `dismissedInsightUntil` to localStorage for temporary dismissal
-
-**Complexity**: Low-Medium (1-2 days)
-
----
-
-### 2. Budget Rollover
+### 1. Budget Rollover
 
 **Problem**: YNAB-style "roll with the punches" budgeting - underspending in one category should carry forward.
 
@@ -150,7 +145,7 @@ interface CategoryBudget {
 
 ---
 
-### 3. Tags / Notes Enhancement
+### 2. Tags / Notes Enhancement
 
 **Problem**: Users want flexible categorization beyond fixed categories.
 
@@ -180,7 +175,7 @@ function extractTags(notes: string): string[] {
 
 ---
 
-### 4. Reports Export (PDF)
+### 3. Reports Export (PDF)
 
 **Problem**: Users want to generate reports for personal records, tax preparation, or sharing with financial advisors.
 
@@ -447,8 +442,8 @@ interface SavingsGoal {
 | Feature | User Value | Effort | Priority |
 |---------|------------|--------|----------|
 | ~~Recurring Auto-Entry~~ | ~~High~~ | ~~Medium~~ | **Shipped** |
-| Quick Insights Widget | Medium | Low | **P0** |
-| Budget Rollover | High | Medium | **P1** |
+| ~~Quick Insights Widget~~ | ~~Medium~~ | ~~Low~~ | **Shipped** |
+| Budget Rollover | High | Medium | **P0** |
 | Tags/Notes | Medium | Low | **P1** |
 | Reports Export | Medium | Medium | **P1** |
 | Dashboard Budget Viz | Low | Low | **P2** |
