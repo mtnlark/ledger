@@ -85,6 +85,18 @@ export const config = {
 	/**
 	 * Insights and smart takeaways thresholds
 	 */
+	/**
+	 * Dashboard insight widget settings
+	 */
+	dashboardInsight: {
+		/** Percent threshold for budget alerts (show if spending > this %) */
+		budgetAlertThreshold: 90,
+		/** Minimum day of month to show pace warnings */
+		paceWarningMinDay: 10,
+		/** Dismiss duration in hours */
+		dismissDurationHours: 24
+	},
+
 	insights: {
 		/** Anomaly detection settings */
 		anomaly: {
