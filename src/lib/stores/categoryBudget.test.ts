@@ -84,6 +84,20 @@ describe('CategoryBudget Operations', () => {
 			expect(budget?.createdAt).toBeInstanceOf(Date);
 			expect(budget?.updatedAt).toBeInstanceOf(Date);
 		});
+
+		it('throws error for negative budget amount', async () => {
+			await expect(saveCategoryBudget(1, '2024-06', -100)).rejects.toThrow(
+				'Budget amount cannot be negative'
+			);
+		});
+
+		it('accepts zero budget amount', async () => {
+			// User may want to set a $0 budget for tracking purposes
+			await saveCategoryBudget(1, '2024-06', 0);
+
+			const budget = await getCategoryBudget(1, '2024-06');
+			expect(budget?.budgetAmount).toBe(0);
+		});
 	});
 
 	describe('deleteCategoryBudget', () => {

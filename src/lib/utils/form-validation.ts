@@ -2,7 +2,8 @@
  * Shared form validation utilities for transaction forms
  */
 
-import { roundCurrency } from './currency';
+// Re-export calculateSplitShares from format-helpers (canonical implementation with clamping flags)
+export { calculateSplitShares, type SplitSharesResult } from './format-helpers';
 
 /**
  * Validates a split value for shared expenses
@@ -45,32 +46,6 @@ export function isFutureDateStr(dateStr: string): boolean {
 	today.setHours(0, 0, 0, 0);
 
 	return selected > today;
-}
-
-/**
- * Calculates split shares for a shared expense
- * @param amount - Total transaction amount
- * @param splitType - Type of split ('percentage' or 'fixed')
- * @param splitValue - The split value (0-1 for percentage, dollar amount for fixed)
- * @returns Object with partnerShare and yourShare
- */
-export function calculateSplitShares(
-	amount: number,
-	splitType: 'percentage' | 'fixed',
-	splitValue: number
-): { partnerShare: number; yourShare: number } {
-	let partnerShare: number;
-
-	if (splitType === 'percentage') {
-		partnerShare = roundCurrency(amount * splitValue);
-	} else {
-		partnerShare = Math.min(Math.max(splitValue, 0), amount);
-	}
-
-	return {
-		partnerShare,
-		yourShare: roundCurrency(amount - partnerShare)
-	};
 }
 
 /**

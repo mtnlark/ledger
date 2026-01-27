@@ -45,6 +45,10 @@ export async function saveCategoryBudget(
 	month: string,
 	budgetAmount: number
 ): Promise<void> {
+	if (budgetAmount < 0) {
+		throw new Error('Budget amount cannot be negative');
+	}
+
 	const existing = await getCategoryBudget(categoryId, month);
 	const now = new Date();
 

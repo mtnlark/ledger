@@ -2,6 +2,7 @@
 	import { X, Trash2 } from 'lucide-svelte';
 	import type { SavingsAccount, SavingsAccountType } from '$lib/db';
 	import { focusTrap } from '$lib/utils/focus-trap';
+	import { cleanNumberInput } from '$lib/utils/form-validation';
 	import { updateSavingsAccount, deleteSavingsAccount } from '$lib/stores/savingsAccounts';
 	import { toast } from '$lib/stores/toast';
 
@@ -35,11 +36,6 @@
 		}
 	});
 
-	// Clean number input
-	function cleanNumberInput(value: string): string {
-		return value.replace(/[^0-9.]/g, '');
-	}
-
 	function handleBalanceInput(e: Event) {
 		const input = e.target as HTMLInputElement;
 		currentBalanceStr = cleanNumberInput(input.value);
@@ -65,6 +61,7 @@
 			onSave();
 		} catch (error) {
 			console.error('Failed to update account:', error);
+			toast.error('Failed to save changes. Please try again.');
 			isSubmitting = false;
 		}
 	}
