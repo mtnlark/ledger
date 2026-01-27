@@ -7,7 +7,8 @@ import {
 	computeCategoryStandout,
 	computeNeedsPercent,
 	computeMonthlyTotals,
-	computeMonthReview
+	computeMonthReview,
+	computeSavingsReview
 } from './month-review';
 import type { Transaction, Category } from '$lib/db';
 
@@ -454,5 +455,177 @@ describe('computeMonthReview (orchestrator)', () => {
 		expect(result.biggestPurchase).toBeNull();
 		expect(result.mostVisitedMerchant).toBeNull();
 		expect(result.needsPercent).toBeNull();
+	});
+});
+
+// Helper to create contribution objects
+function makeContribution(date: Date, amount: number, source: string = 'bank_transfer') {
+	return { date, amount, source };
+}
+
+describe('computeSavingsReview', () => {
+	describe('basic behavior', () => {
+		it('returns null when no contributions', () => {
+			const result = computeSavingsReview('2025-06', [], [], 5000, []);
+			expect(result).toBeNull();
+		});
+
+		it('returns null when only payroll deduction contributions (not affecting available)', () => {
+			const contributions = [
+				makeContribution(new Date('2025-06-15'), 500, 'payroll_deduction')
+			];
+			const result = computeSavingsReview('2025-06', contributions, contributions, 5000, []);
+			expect(result).toBeNull();
+		});
+
+		it('includes bank_transfer and other sources', () => {
+			const contributions = [
+				makeContribution(new Date('2025-06-15'), 500, 'bank_transfer'),
+				makeContribution(new Date('2025-06-20'), 200, 'other')
+			];
+			const result = computeSavingsReview('2025-06', contributions, contributions, 5000, []);
+			expect(result).not.toBeNull();
+			expect(result!.totalSaved).toBe(700);
+		});
+
+		it('excludes interest and employer_match contributions', () => {
+			const contributions = [
+				makeContribution(new Date('2025-06-15'), 500, 'bank_transfer'),
+				makeContribution(new Date('2025-06-20'), 100, 'interest'),
+				makeContribution(new Date('2025-06-25'), 200, 'employer_match')
+			];
+			const result = computeSavingsReview('2025-06', contributions, contributions, 5000, []);
+			expect(result!.totalSaved).toBe(500); // Only bank_transfer counts
+		});
+	});
+
+	describe('savings rate calculation', () => {
+		it('calculates savings rate correctly', () => {
+			const contributions = [
+				makeContribution(new Date('2025-06-15'), 1000, 'bank_transfer')
+			];
+			const result = computeSavingsReview('2025-06', contributions, contributions, 5000, []);
+			expect(result!.savingsRate).toBe(0.2); // 1000/5000 = 20%
+		});
+
+		it('returns null savings rate when no income', () => {
+			const contributions = [
+				makeContribution(new Date('2025-06-15'), 500, 'bank_transfer')
+			];
+			const result = computeSavingsReview('2025-06', contributions, contributions, null, []);
+			expect(result!.savingsRate).toBeNull();
+		});
+
+		it('returns null savings rate when income is 0', () => {
+			const contributions = [
+				makeContribution(new Date('2025-06-15'), 500, 'bank_transfer')
+			];
+			const result = computeSavingsReview('2025-06', contributions, contributions, 0, []);
+			expect(result!.savingsRate).toBeNull();
+		});
+	});
+
+	describe('highest month detection', () => {
+		it('detects when current month is highest savings month', () => {
+			const allContributions = [
+				makeContribution(new Date('2025-04-15'), 500, 'bank_transfer'),
+				makeContribution(new Date('2025-05-15'), 600, 'bank_transfer'),
+				makeContribution(new Date('2025-06-15'), 800, 'bank_transfer')
+			];
+			const currentContributions = [
+				makeContribution(new Date('2025-06-15'), 800, 'bank_transfer')
+			];
+			const result = computeSavingsReview('2025-06', currentContributions, allContributions, 5000, []);
+			expect(result!.isHighestMonth).toBe(true);
+		});
+
+		it('returns false when not highest month', () => {
+			const allContributions = [
+				makeContribution(new Date('2025-04-15'), 1000, 'bank_transfer'),
+				makeContribution(new Date('2025-05-15'), 600, 'bank_transfer'),
+				makeContribution(new Date('2025-06-15'), 500, 'bank_transfer')
+			];
+			const currentContributions = [
+				makeContribution(new Date('2025-06-15'), 500, 'bank_transfer')
+			];
+			const result = computeSavingsReview('2025-06', currentContributions, allContributions, 5000, []);
+			expect(result!.isHighestMonth).toBe(false);
+		});
+
+		it('requires at least 2 months for highest month comparison', () => {
+			const contributions = [
+				makeContribution(new Date('2025-06-15'), 500, 'bank_transfer')
+			];
+			const result = computeSavingsReview('2025-06', contributions, contributions, 5000, []);
+			expect(result!.isHighestMonth).toBe(false);
+		});
+	});
+
+	describe('vs average comparison (positive only)', () => {
+		it('reports when savings rate is above average', () => {
+			const allContributions = [
+				makeContribution(new Date('2025-04-15'), 400, 'bank_transfer'), // 8%
+				makeContribution(new Date('2025-05-15'), 500, 'bank_transfer'), // 10%
+				makeContribution(new Date('2025-06-15'), 1000, 'bank_transfer') // 20%
+			];
+			const currentContributions = [
+				makeContribution(new Date('2025-06-15'), 1000, 'bank_transfer')
+			];
+			const allBudgets = [
+				{ month: '2025-04', income: 5000 },
+				{ month: '2025-05', income: 5000 },
+				{ month: '2025-06', income: 5000 }
+			];
+			const result = computeSavingsReview('2025-06', currentContributions, allContributions, 5000, allBudgets);
+			expect(result!.vsAverage).not.toBeNull();
+			expect(result!.vsAverage!.percentDiff).toBeGreaterThan(0);
+		});
+
+		it('NEVER reports when savings rate is below average (key constraint)', () => {
+			const allContributions = [
+				makeContribution(new Date('2025-04-15'), 1000, 'bank_transfer'), // 20%
+				makeContribution(new Date('2025-05-15'), 1000, 'bank_transfer'), // 20%
+				makeContribution(new Date('2025-06-15'), 400, 'bank_transfer') // 8% - below average
+			];
+			const currentContributions = [
+				makeContribution(new Date('2025-06-15'), 400, 'bank_transfer')
+			];
+			const allBudgets = [
+				{ month: '2025-04', income: 5000 },
+				{ month: '2025-05', income: 5000 },
+				{ month: '2025-06', income: 5000 }
+			];
+			const result = computeSavingsReview('2025-06', currentContributions, allContributions, 5000, allBudgets);
+			// Should NOT have vsAverage even though we're below average
+			expect(result!.vsAverage).toBeNull();
+		});
+
+		it('requires at least 10% above average to report', () => {
+			const allContributions = [
+				makeContribution(new Date('2025-04-15'), 500, 'bank_transfer'), // 10%
+				makeContribution(new Date('2025-05-15'), 500, 'bank_transfer'), // 10%
+				makeContribution(new Date('2025-06-15'), 525, 'bank_transfer') // 10.5% - only 5% above
+			];
+			const currentContributions = [
+				makeContribution(new Date('2025-06-15'), 525, 'bank_transfer')
+			];
+			const allBudgets = [
+				{ month: '2025-04', income: 5000 },
+				{ month: '2025-05', income: 5000 },
+				{ month: '2025-06', income: 5000 }
+			];
+			const result = computeSavingsReview('2025-06', currentContributions, allContributions, 5000, allBudgets);
+			// Should NOT report because less than 10% above average
+			expect(result!.vsAverage).toBeNull();
+		});
+
+		it('requires at least 2 budgets for comparison', () => {
+			const contributions = [
+				makeContribution(new Date('2025-06-15'), 1000, 'bank_transfer')
+			];
+			const allBudgets = [{ month: '2025-06', income: 5000 }];
+			const result = computeSavingsReview('2025-06', contributions, contributions, 5000, allBudgets);
+			expect(result!.vsAverage).toBeNull();
+		});
 	});
 });

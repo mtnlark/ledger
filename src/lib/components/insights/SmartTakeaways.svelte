@@ -1,10 +1,11 @@
 <script lang="ts">
-	import { TrendingUp, TrendingDown, AlertTriangle, Gauge, Receipt, Store, BarChart3 } from 'lucide-svelte';
+	import { TrendingUp, TrendingDown, AlertTriangle, Gauge, Receipt, Store, BarChart3, PiggyBank } from 'lucide-svelte';
 	import { getMonthKey, navigateMonth, parseMonthKey } from '$lib/db';
-	import type { Transaction, Category, MonthlyBudget } from '$lib/db';
+	import type { Transaction, Category, MonthlyBudget, SavingsContribution } from '$lib/db';
 	import { config } from '$lib/config';
 	import { getInsightsEngine } from '$lib/insights';
 	import { computeStdDev } from '$lib/insights/calculations/stats';
+	import { computeSavingsReview } from '$lib/insights/calculations/month-review';
 
 	interface Props {
 		currentMonthTransactions: Transaction[];
@@ -13,10 +14,23 @@
 		availableMonths: string[];
 		budget: MonthlyBudget | null;
 		selectedMonth: string;
+		// Savings data (optional for backwards compatibility)
+		contributions?: SavingsContribution[];
+		allContributions?: SavingsContribution[];
+		allBudgets?: MonthlyBudget[];
 	}
 
-	let { currentMonthTransactions, allTransactions, categories, availableMonths, budget, selectedMonth }: Props =
-		$props();
+	let {
+		currentMonthTransactions,
+		allTransactions,
+		categories,
+		availableMonths,
+		budget,
+		selectedMonth,
+		contributions = [],
+		allContributions = [],
+		allBudgets = []
+	}: Props = $props();
 
 	const engine = getInsightsEngine();
 
@@ -165,9 +179,21 @@
 		);
 	});
 
+	// Compute savings review (positive insights only)
+	let savingsReview = $derived.by(() => {
+		if (contributions.length === 0) return null;
+		return computeSavingsReview(
+			selectedMonth,
+			contributions,
+			allContributions,
+			budget?.income ?? null,
+			allBudgets
+		);
+	});
+
 	// Build takeaways list
 	interface Takeaway {
-		type: 'anomaly' | 'pace' | 'shift' | 'needsWants' | 'monthComparison' | 'topMerchant' | 'rank' | 'vsAverage' | 'biggestPurchase' | 'categoryStandout' | 'mostVisited';
+		type: 'anomaly' | 'pace' | 'shift' | 'needsWants' | 'monthComparison' | 'topMerchant' | 'rank' | 'vsAverage' | 'biggestPurchase' | 'categoryStandout' | 'mostVisited' | 'savingsHighest' | 'savingsAboveAvg' | 'savingsTotal';
 		icon: typeof AlertTriangle;
 		iconColor: string;
 		text: string;
@@ -216,6 +242,28 @@
 						? `${topShift.name} up $${Math.abs(topShift.diff).toLocaleString()} from last month`
 						: `${topShift.name} down $${Math.abs(topShift.diff).toLocaleString()} from last month`
 				});
+			}
+
+			// Add positive savings insights (never flag low rates)
+			if (savingsReview) {
+				// Highest savings month is most impressive
+				if (savingsReview.isHighestMonth && savingsReview.totalSaved > 0) {
+					items.push({
+						type: 'savingsHighest',
+						icon: PiggyBank,
+						iconColor: 'text-success-500',
+						text: `Your highest savings month! $${savingsReview.totalSaved.toLocaleString()} saved`
+					});
+				}
+				// Above average savings rate
+				else if (savingsReview.vsAverage) {
+					items.push({
+						type: 'savingsAboveAvg',
+						icon: PiggyBank,
+						iconColor: 'text-success-500',
+						text: `Saving ${savingsReview.vsAverage.percentDiff}% more than usual this month`
+					});
+				}
 			}
 
 			// Add fallbacks to reach max count
@@ -323,6 +371,42 @@
 						icon: Receipt,
 						iconColor: 'text-primary-500',
 						text: `${monthReview.needsPercent}% needs, ${100 - monthReview.needsPercent}% wants`
+					});
+				}
+			}
+
+			// Add positive savings insights for retrospective (never flag low rates)
+			if (savingsReview) {
+				// Highest savings month
+				if (savingsReview.isHighestMonth && savingsReview.totalSaved > 0) {
+					items.push({
+						type: 'savingsHighest',
+						icon: PiggyBank,
+						iconColor: 'text-success-500',
+						text: `Your highest savings month! $${savingsReview.totalSaved.toLocaleString()} saved`
+					});
+				}
+				// Above average savings rate
+				else if (savingsReview.vsAverage) {
+					const ratePercent = savingsReview.savingsRate !== null
+						? Math.round(savingsReview.savingsRate * 100)
+						: null;
+					items.push({
+						type: 'savingsAboveAvg',
+						icon: PiggyBank,
+						iconColor: 'text-success-500',
+						text: ratePercent !== null
+							? `${ratePercent}% savings rate - ${savingsReview.vsAverage.percentDiff}% above your average`
+							: `Saved ${savingsReview.vsAverage.percentDiff}% more than usual`
+					});
+				}
+				// Fallback: Just show total saved if substantial
+				else if (savingsReview.totalSaved >= 100) {
+					items.push({
+						type: 'savingsTotal',
+						icon: PiggyBank,
+						iconColor: 'text-success-500',
+						text: `Saved $${savingsReview.totalSaved.toLocaleString()} this month`
 					});
 				}
 			}

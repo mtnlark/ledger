@@ -14,6 +14,17 @@ import {
 	computeWeightedStdDev
 } from './stats';
 
+export interface SavingsReviewResult {
+	/** Total saved this month */
+	totalSaved: number;
+	/** Savings rate as decimal (0.25 = 25%) - null if no income */
+	savingsRate: number | null;
+	/** Comparison to historical average - only populated when ABOVE average */
+	vsAverage: { percentDiff: number; averageRate: number } | null;
+	/** True if this is the highest savings month on record */
+	isHighestMonth: boolean;
+}
+
 export interface MonthReviewResult {
 	historicalRank: { rank: number; total: number; direction: 'highest' | 'lowest' } | null;
 	vsAverage: { percentDiff: number; isAbove: boolean; withinOneSigma: boolean } | null;
@@ -21,6 +32,7 @@ export interface MonthReviewResult {
 	mostVisitedMerchant: { merchant: string; count: number } | null;
 	categoryStandout: { name: string; icon: string; diff: number; isIncrease: boolean } | null;
 	needsPercent: number | null;
+	savings: SavingsReviewResult | null;
 }
 
 /**
@@ -247,6 +259,90 @@ export function computeMonthlyTotals(allTransactions: Transaction[]): Map<string
 	return totals;
 }
 
+/** Sources that count toward savings rate (reduce available to spend) */
+const SOURCES_AFFECTING_AVAILABLE = new Set(['bank_transfer', 'other']);
+
+/**
+ * Compute savings review for a completed month.
+ * IMPORTANT: Only surfaces positive insights (above average, highest month).
+ * Never flags low savings rates to avoid false alarms from mid-month paycheck timing.
+ *
+ * @param selectedMonth The month being reviewed (YYYY-MM)
+ * @param contributions All contributions for the selected month
+ * @param allContributions All contributions across all months (for comparison)
+ * @param income The income for the selected month (null if not set)
+ * @param allBudgets All monthly budgets (for historical rate comparison)
+ */
+export function computeSavingsReview(
+	selectedMonth: string,
+	contributions: { date: Date; amount: number; source: string }[],
+	allContributions: { date: Date; amount: number; source: string }[],
+	income: number | null,
+	allBudgets: { month: string; income: number }[]
+): SavingsReviewResult | null {
+	// Filter to contributions that affect available (bank_transfer, other)
+	const relevantContributions = contributions.filter((c) =>
+		SOURCES_AFFECTING_AVAILABLE.has(c.source)
+	);
+
+	// Calculate total saved this month
+	const totalSaved = relevantContributions.reduce((sum, c) => sum + c.amount, 0);
+
+	// If no savings this month, nothing to report
+	if (totalSaved === 0) return null;
+
+	// Calculate savings rate (if income is available)
+	const savingsRate = income && income > 0 ? totalSaved / income : null;
+
+	// Group all contributions by month for historical comparison
+	const savedByMonth = new Map<string, number>();
+	for (const c of allContributions) {
+		if (!SOURCES_AFFECTING_AVAILABLE.has(c.source)) continue;
+		const month = getMonthKey(new Date(c.date));
+		savedByMonth.set(month, (savedByMonth.get(month) || 0) + c.amount);
+	}
+
+	// Check if this is the highest savings month
+	const allTotals = [...savedByMonth.values()];
+	const isHighestMonth = allTotals.length >= 2 && totalSaved >= Math.max(...allTotals);
+
+	// Calculate historical savings rates for comparison (only if we have current rate)
+	let vsAverage: SavingsReviewResult['vsAverage'] = null;
+	if (savingsRate !== null && allBudgets.length >= 2) {
+		const historicalRates: number[] = [];
+
+		for (const budget of allBudgets) {
+			if (budget.month === selectedMonth) continue; // Exclude current month
+			if (budget.income <= 0) continue;
+
+			const monthSaved = savedByMonth.get(budget.month) || 0;
+			if (monthSaved > 0) {
+				historicalRates.push(monthSaved / budget.income);
+			}
+		}
+
+		if (historicalRates.length >= 1) {
+			const averageRate = historicalRates.reduce((a, b) => a + b, 0) / historicalRates.length;
+
+			// Only report if ABOVE average (never flag low rates)
+			if (savingsRate > averageRate) {
+				const percentDiff = Math.round(((savingsRate - averageRate) / averageRate) * 100);
+				// Only show if meaningfully above (at least 10% higher)
+				if (percentDiff >= 10) {
+					vsAverage = { percentDiff, averageRate };
+				}
+			}
+		}
+	}
+
+	return {
+		totalSaved,
+		savingsRate,
+		vsAverage,
+		isHighestMonth
+	};
+}
+
 /**
  * Orchestrator: compute all month review superlatives.
  */
@@ -266,6 +362,8 @@ export function computeMonthReview(
 		biggestPurchase: computeBiggestPurchase(selectedMonthTransactions, categories),
 		mostVisitedMerchant: computeMostVisitedMerchant(selectedMonthTransactions),
 		categoryStandout: computeCategoryStandout(selectedMonthTransactions, previousMonthTransactions, categories),
-		needsPercent: computeNeedsPercent(selectedMonthTransactions)
+		needsPercent: computeNeedsPercent(selectedMonthTransactions),
+		// Savings computed separately in SmartTakeaways with contributions data
+		savings: null
 	};
 }

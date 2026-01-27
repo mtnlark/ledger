@@ -166,6 +166,9 @@
 				{availableMonths}
 				{budget}
 				{selectedMonth}
+				contributions={selectedMonthContributions}
+				{allContributions}
+				{allBudgets}
 			/>
 
 			<!-- Spending This Month -->
