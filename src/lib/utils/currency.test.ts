@@ -6,6 +6,7 @@ import {
 	isZeroCurrency,
 	sumCurrency,
 	isSplitBalanced,
+	roundCoefficient,
 	calculatePercent,
 	percentExceeds,
 	percentMeetsOrExceeds
@@ -189,6 +190,32 @@ describe('isSplitBalanced', () => {
 		// $100 with only $99 allocated
 		const remaining = 100 - 99;
 		expect(isSplitBalanced(remaining)).toBe(false);
+	});
+});
+
+describe('roundCoefficient', () => {
+	it('should round to 4 decimal places by default', () => {
+		expect(roundCoefficient(0.05234)).toBe(0.0523);
+		expect(roundCoefficient(0.05235)).toBe(0.0524);
+		expect(roundCoefficient(0.12345678)).toBe(0.1235);
+	});
+
+	it('should support custom decimal places', () => {
+		expect(roundCoefficient(0.12345678, 2)).toBe(0.12);
+		expect(roundCoefficient(0.12345678, 6)).toBe(0.123457);
+		expect(roundCoefficient(0.12345678, 0)).toBe(0);
+	});
+
+	it('should handle small coefficients correctly', () => {
+		// Variance/coefficient of variation values
+		expect(roundCoefficient(0.0001)).toBe(0.0001);
+		expect(roundCoefficient(0.00001)).toBe(0);
+		expect(roundCoefficient(0.00005)).toBe(0.0001);
+	});
+
+	it('should handle coefficients greater than 1', () => {
+		expect(roundCoefficient(1.5234)).toBe(1.5234);
+		expect(roundCoefficient(2.123456, 3)).toBe(2.123);
 	});
 });
 

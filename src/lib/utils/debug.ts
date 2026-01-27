@@ -4,10 +4,27 @@
  * These functions are for diagnosing and fixing data issues.
  * They are NOT part of the normal application flow and should
  * only be used when troubleshooting problems.
+ *
+ * All functions check for DEV mode and warn if called in production.
  */
 
 import { db } from '$lib/db';
 import { persistData } from '$lib/storage';
+
+/**
+ * Warn if debug utilities are being used in production.
+ * Returns true if in production (caller should consider returning early).
+ */
+function warnIfProduction(functionName: string): boolean {
+	if (!import.meta.env.DEV) {
+		console.warn(
+			`[Debug] ${functionName}() should only be called in development. ` +
+				'These utilities may have performance implications in production.'
+		);
+		return true;
+	}
+	return false;
+}
 
 /**
  * Diagnostic function to understand how dates are stored
@@ -31,6 +48,7 @@ export async function diagnoseDates(): Promise<{
 		dayOfMonth: number;
 	}>;
 }> {
+	warnIfProduction('diagnoseDates');
 	const transactions = await db.transactions.toArray();
 	const samples = transactions.slice(0, 10).map((t) => {
 		const date = new Date(t.date);
@@ -77,6 +95,7 @@ export async function fixTransactionDates(): Promise<{
 	checked: number;
 	details: string[];
 }> {
+	warnIfProduction('fixTransactionDates');
 	const transactions = await db.transactions.toArray();
 	let fixed = 0;
 	const details: string[] = [];
@@ -131,6 +150,7 @@ export async function repairCategoryIds(): Promise<{
 	fixed: number;
 	details: string[];
 }> {
+	warnIfProduction('repairCategoryIds');
 	const transactions = await db.transactions.toArray();
 	const categories = await db.categories.toArray();
 

@@ -66,6 +66,40 @@ export type ContributionSource =
 	| 'employer_match'
 	| 'other';
 
+/**
+ * Contribution source metadata - single source of truth for labels and behavior
+ */
+export const CONTRIBUTION_SOURCES: Record<
+	ContributionSource,
+	{ label: string; description: string; affectsAvailable: boolean }
+> = {
+	payroll_deduction: {
+		label: 'Payroll Deduction',
+		description: 'Pre-tax (401k, etc.)',
+		affectsAvailable: false
+	},
+	bank_transfer: {
+		label: 'Bank Transfer',
+		description: 'From checking account',
+		affectsAvailable: true
+	},
+	interest: {
+		label: 'Interest',
+		description: 'Interest earned',
+		affectsAvailable: false
+	},
+	employer_match: {
+		label: 'Employer Match',
+		description: '401k match, etc.',
+		affectsAvailable: false
+	},
+	other: {
+		label: 'Other',
+		description: 'Other source',
+		affectsAvailable: true
+	}
+} as const;
+
 export interface SavingsAccount {
 	id?: number;
 	name: string;
@@ -250,14 +284,14 @@ export async function initializeDatabase(): Promise<void> {
 	const categoryCount = await db.categories.count();
 	if (categoryCount === 0) {
 		await db.categories.bulkAdd(DEFAULT_CATEGORIES as Category[]);
-		console.log('Seeded default categories');
+		if (import.meta.env.DEV) console.log('Seeded default categories');
 	}
 
 	// Seed default settings if empty
 	const settings = await db.settings.get(1);
 	if (!settings) {
 		await db.settings.add(DEFAULT_SETTINGS);
-		console.log('Initialized default settings');
+		if (import.meta.env.DEV) console.log('Initialized default settings');
 	}
 
 	// Run all migrations (each is idempotent)

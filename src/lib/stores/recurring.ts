@@ -7,7 +7,7 @@ import {
 	computeWeightedMean,
 	computeWeightedStdDev
 } from '$lib/insights/calculations/stats';
-import { roundCurrency } from '$lib/utils/currency';
+import { roundCurrency, roundCoefficient } from '$lib/utils/currency';
 
 export interface DetectedRecurring {
 	merchant: string;
@@ -277,7 +277,7 @@ export async function detectRecurringExpenses(): Promise<DetectedRecurring[]> {
 			dayOfMonth: pattern.dayOfMonth,
 			occurrenceCount: transactions.length,
 			amountType,
-			variance: roundCurrency(variance),
+			variance: roundCoefficient(variance),
 			isShared
 		});
 	}

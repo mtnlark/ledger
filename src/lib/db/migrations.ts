@@ -38,7 +38,7 @@ async function migrateCategoryColors(): Promise<void> {
 
 	if (updates.length > 0) {
 		await db.categories.bulkPut(updates);
-		console.log('Migration: Updated category colors to Warm Ledger palette');
+		if (import.meta.env.DEV) console.log('Migration: Updated category colors to Warm Ledger palette');
 	}
 }
 
@@ -59,7 +59,7 @@ async function migrateCategoryEssential(): Promise<void> {
 
 	if (updates.length > 0) {
 		await db.categories.bulkPut(updates);
-		console.log('Migration: Added isEssential field to categories');
+		if (import.meta.env.DEV) console.log('Migration: Added isEssential field to categories');
 	}
 }
 
@@ -70,7 +70,7 @@ async function migrateSettingsDismissedRecurring(): Promise<void> {
 	const settings = await db.settings.get(1);
 	if (settings && settings.dismissedRecurring === undefined) {
 		await db.settings.update(1, { dismissedRecurring: [] });
-		console.log('Migration: Added dismissedRecurring field to settings');
+		if (import.meta.env.DEV) console.log('Migration: Added dismissedRecurring field to settings');
 	}
 }
 
@@ -100,7 +100,7 @@ async function migrateTransactionEssential(): Promise<void> {
 	}));
 
 	await db.transactions.bulkPut(updates);
-	console.log(`Migration: Added isEssential field to ${updates.length} transactions`);
+	if (import.meta.env.DEV) console.log(`Migration: Added isEssential field to ${updates.length} transactions`);
 }
 
 /**
@@ -124,7 +124,7 @@ async function migrateTransactionSubscription(): Promise<void> {
 	}));
 
 	await db.transactions.bulkPut(updates);
-	console.log(`Migration: Added isSubscription field to ${updates.length} transactions`);
+	if (import.meta.env.DEV) console.log(`Migration: Added isSubscription field to ${updates.length} transactions`);
 }
 
 /**
@@ -166,7 +166,7 @@ async function migrateTransactionDates(): Promise<void> {
 
 	if (updates.length > 0) {
 		await db.transactions.bulkPut(updates);
-		console.log(`Migration: Fixed ${updates.length} transaction dates (UTC midnight shift)`);
+		if (import.meta.env.DEV) console.log(`Migration: Fixed ${updates.length} transaction dates (UTC midnight shift)`);
 	}
 }
 
@@ -186,7 +186,7 @@ async function migrateSeedSavingsAccounts(): Promise<void> {
 	}));
 
 	await db.savingsAccounts.bulkAdd(accountsToAdd);
-	console.log('Migration: Seeded default savings accounts');
+	if (import.meta.env.DEV) console.log('Migration: Seeded default savings accounts');
 }
 
 /**

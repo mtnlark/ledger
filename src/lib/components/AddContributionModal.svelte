@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { format } from 'date-fns';
-	import type { SavingsAccount } from '$lib/db';
+	import { CONTRIBUTION_SOURCES, type SavingsAccount, type ContributionSource } from '$lib/db';
 	import { parseLocalDate, formatDateForInput } from '$lib/utils/date-helpers';
 	import { cleanNumberInput } from '$lib/utils/form-validation';
 	import { addContribution } from '$lib/stores/savingsContributions';
@@ -68,14 +68,10 @@
 		}
 	}
 
-	// Source options with labels
-	const sourceOptions = [
-		{ value: 'bank_transfer', label: 'Bank Transfer', description: 'From checking account' },
-		{ value: 'payroll_deduction', label: 'Payroll Deduction', description: 'Pre-tax (401k, etc.)' },
-		{ value: 'interest', label: 'Interest', description: 'Interest earned' },
-		{ value: 'employer_match', label: 'Employer Match', description: '401k match, etc.' },
-		{ value: 'other', label: 'Other', description: 'Other source' }
-	] as const;
+	// Derive source options from central constant
+	const sourceOptions = (Object.entries(CONTRIBUTION_SOURCES) as [ContributionSource, typeof CONTRIBUTION_SOURCES[ContributionSource]][]).map(
+		([value, meta]) => ({ value, label: meta.label, description: meta.description })
+	);
 </script>
 
 <ModalContainer {isOpen} title="Add Contribution" titleId="add-contribution-title" {onClose}>

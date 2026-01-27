@@ -84,6 +84,27 @@ export function isSplitBalanced(remaining: number): boolean {
 }
 
 // ============================================================================
+// Coefficient/Ratio Utilities
+// ============================================================================
+
+/**
+ * Round a coefficient or ratio to a specified number of decimal places.
+ * Unlike currency (always 2 decimals), coefficients may need more precision.
+ *
+ * @param value - The coefficient value to round
+ * @param decimals - Number of decimal places (default: 4)
+ * @returns Value rounded to specified decimal places
+ *
+ * @example
+ * roundCoefficient(0.05234) // 0.0523
+ * roundCoefficient(0.12345678, 6) // 0.123457
+ */
+export function roundCoefficient(value: number, decimals = 4): number {
+	const factor = Math.pow(10, decimals);
+	return Math.round(value * factor) / factor;
+}
+
+// ============================================================================
 // Percentage Utilities
 // ============================================================================
 
