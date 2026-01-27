@@ -86,9 +86,11 @@ Per-category spending limits.
 | `id` | number (auto) | Primary key |
 | `month` | string | Month key ("YYYY-MM") |
 | `categoryId` | number | Foreign key to categories |
-| `budgetAmount` | number | Target spending limit |
+| `budgetAmount` | number | Target spending limit (must be >= 0) |
 | `createdAt` | Date | Record creation timestamp |
 | `updatedAt` | Date | Last update timestamp |
+
+**Validation**: `budgetAmount` cannot be negative (throws error).
 
 **Indexes**: `id`, `[month+categoryId]` (unique compound)
 
@@ -145,6 +147,8 @@ Individual contributions to savings accounts.
 | `interest` | No | Interest earned |
 | `employer_match` | No | 401(k) employer match |
 | `other` | Yes | Other source |
+
+> **Tip**: Use the `CONTRIBUTION_SOURCES` constant from `$lib/db` for labels, descriptions, and `affectsAvailable` flags.
 
 **Indexes**: `id`, `date`, `accountId`, `source`, `[accountId+date]`
 

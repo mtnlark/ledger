@@ -180,6 +180,36 @@ myTable: EntityTable<MyItem, 'id'>;
 </style>
 ```
 
+### New Modal
+
+Use `ModalContainer` for consistent modal behavior (focus trap, backdrop click, escape key):
+
+```svelte
+<script lang="ts">
+  import ModalContainer from '$lib/components/ModalContainer.svelte';
+
+  interface Props {
+    isOpen: boolean;
+    onClose: () => void;
+  }
+
+  let { isOpen, onClose }: Props = $props();
+</script>
+
+<ModalContainer {isOpen} title="My Modal" titleId="my-modal-title" {onClose}>
+  <form class="p-6 space-y-4">
+    <!-- Modal content here -->
+  </form>
+</ModalContainer>
+```
+
+`ModalContainer` provides:
+- Focus trap (keyboard navigation stays in modal)
+- Escape key to close
+- Click outside to close
+- Configurable max-width (`sm`, `md`, `lg`, `xl`)
+- Optional close button via `showCloseButton` prop
+
 ### New Route
 
 1. Create `src/routes/mypage/+page.svelte`:
@@ -257,9 +287,9 @@ npm run test:coverage  # With coverage
 Always use utilities from `src/lib/utils/currency.ts`:
 
 ```typescript
-import { roundCurrency, currencyEquals, sumCurrency } from '$lib/utils/currency';
+import { roundCurrency, currencyEquals, sumCurrency, roundCoefficient } from '$lib/utils/currency';
 
-// Round to 2 decimals
+// Round to 2 decimals (currency values)
 roundCurrency(33.333);  // 33.33
 
 // Compare with tolerance
@@ -267,7 +297,12 @@ currencyEquals(10.0, 10.001);  // true
 
 // Sum array with rounding
 sumCurrency([0.1, 0.2, 0.3]);  // 0.60
+
+// Round coefficients/ratios (default 4 decimals)
+roundCoefficient(0.12345);  // 0.1235
 ```
+
+**Important**: Use `roundCoefficient()` for ratios, variance, and decimal percentages—NOT `roundCurrency()`.
 
 ---
 

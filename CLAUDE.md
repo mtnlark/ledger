@@ -132,6 +132,7 @@ ledger/
 │   │   │   ├── MonthPicker.svelte
 │   │   │   ├── MerchantAutocomplete.svelte
 │   │   │   ├── ConfirmDialog.svelte
+│   │   │   ├── ModalContainer.svelte     # Reusable modal wrapper (focus trap, backdrop)
 │   │   │   ├── ToastContainer.svelte
 │   │   │   ├── EmptyState.svelte
 │   │   │   ├── Skeleton.svelte
@@ -171,6 +172,7 @@ ledger/
 │   │   │   ├── date-helpers.ts
 │   │   │   ├── string-helpers.ts
 │   │   │   ├── focus-trap.ts          # Modal focus trapping utility
+│   │   │   ├── modal-helpers.ts       # Modal event handlers (backdrop click, escape key)
 │   │   │   ├── form-validation.ts     # Shared form validation helpers
 │   │   │   ├── transaction-validation.ts  # Transaction data validation
 │   │   │   ├── transaction-grouping.ts    # Group transactions by date/category
@@ -260,6 +262,9 @@ type ContributionSource =
   | 'interest'             // Interest earned (doesn't affect available)
   | 'employer_match'       // 401k match (doesn't affect available)
   | 'other';               // Other source (affects available)
+
+// CONTRIBUTION_SOURCES constant provides labels, descriptions, and affectsAvailable flags
+// Use: import { CONTRIBUTION_SOURCES } from '$lib/db';
 
 interface SavingsAccount {
   id?: number;
@@ -406,7 +411,7 @@ To avoid floating-point precision issues, use the utilities in `src/lib/utils/cu
 
 ### Currency Functions
 ```typescript
-import { roundCurrency, currencyEquals, isZeroCurrency, sumCurrency, isSplitBalanced } from '$lib/utils/currency';
+import { roundCurrency, currencyEquals, isZeroCurrency, sumCurrency, isSplitBalanced, roundCoefficient } from '$lib/utils/currency';
 
 // Round to 2 decimal places
 roundCurrency(33.333)     // 33.33
@@ -422,6 +427,10 @@ sumCurrency([0.1, 0.2])   // 0.30
 
 // Validate split transactions
 isSplitBalanced(remaining) // true if ~0
+
+// Round coefficients/ratios (default 4 decimals)
+roundCoefficient(0.12345678)     // 0.1235
+roundCoefficient(0.12345678, 2)  // 0.12
 ```
 
 ### Percentage Functions
@@ -443,6 +452,7 @@ percentMeetsOrExceeds(80, 100, 80)  // true (80% >= 80%)
 3. For threshold comparisons, compare raw values first, then round for display
 4. Use `CURRENCY_EPSILON` (0.005) for tolerance-based comparisons
 5. When displayed values don't match internal calculations, round both to the same precision
+6. Use `roundCoefficient()` for ratios/coefficients (variance, percentages as decimals) - NOT `roundCurrency()`
 
 ---
 
