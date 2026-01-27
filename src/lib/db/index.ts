@@ -56,6 +56,39 @@ export interface CancelledSubscription {
 	cancelledDate: string; // ISO date string
 }
 
+// Savings account types
+export type SavingsAccountType = 'savings' | 'retirement' | 'investment';
+
+export type ContributionSource =
+	| 'payroll_deduction'
+	| 'bank_transfer'
+	| 'interest'
+	| 'employer_match'
+	| 'other';
+
+export interface SavingsAccount {
+	id?: number;
+	name: string;
+	accountType: SavingsAccountType;
+	icon?: string;
+	color?: string;
+	sortOrder: number;
+	currentBalance?: number; // Only tracked for 'savings' type
+	createdAt: Date;
+	updatedAt: Date;
+}
+
+export interface SavingsContribution {
+	id?: number;
+	date: Date;
+	accountId: number;
+	amount: number;
+	source: ContributionSource;
+	notes?: string;
+	createdAt: Date;
+	updatedAt: Date;
+}
+
 export interface Settings {
 	id: number; // Always 1 (singleton)
 	partnerName: string;
@@ -76,6 +109,8 @@ class LedgerDB extends Dexie {
 	monthlyBudgets!: EntityTable<MonthlyBudget, 'id'>;
 	categoryBudgets!: EntityTable<CategoryBudget, 'id'>;
 	settings!: EntityTable<Settings, 'id'>;
+	savingsAccounts!: EntityTable<SavingsAccount, 'id'>;
+	savingsContributions!: EntityTable<SavingsContribution, 'id'>;
 
 	constructor() {
 		super('LedgerDB');
@@ -102,6 +137,17 @@ class LedgerDB extends Dexie {
 			monthlyBudgets: '++id, &month',
 			categoryBudgets: '++id, month, categoryId, [month+categoryId]',
 			settings: 'id'
+		});
+
+		// Version 4: Add savings accounts and contributions tables
+		this.version(4).stores({
+			transactions: '++id, date, merchant, categoryId, isShared, isSettled, parentTransactionId, [date+merchant+amount]',
+			categories: '++id, name, isActive, sortOrder',
+			monthlyBudgets: '++id, &month',
+			categoryBudgets: '++id, month, categoryId, [month+categoryId]',
+			settings: 'id',
+			savingsAccounts: '++id, name, accountType, sortOrder',
+			savingsContributions: '++id, date, accountId, source, [accountId+date]'
 		});
 	}
 }
@@ -188,6 +234,15 @@ export const DEFAULT_SETTINGS: Settings = {
 	confirmedActiveSubscriptions: [],
 	iCloudBackupEnabled: false
 };
+
+// Default savings accounts
+export const DEFAULT_SAVINGS_ACCOUNTS: Omit<SavingsAccount, 'id' | 'createdAt' | 'updatedAt'>[] = [
+	{ name: 'Emergency Fund', accountType: 'savings', icon: '☔', color: '#5B8C5A', sortOrder: 1, currentBalance: 0 },
+	{ name: 'High-Yield Savings', accountType: 'savings', icon: '🌱', color: '#D4915D', sortOrder: 2, currentBalance: 0 },
+	{ name: '401(k)', accountType: 'retirement', icon: '🌅', color: '#C45D3A', sortOrder: 3 },
+	{ name: 'Roth IRA', accountType: 'retirement', icon: '🌳', color: '#7B9E87', sortOrder: 4 },
+	{ name: 'Brokerage', accountType: 'investment', icon: '🪴', color: '#8B7355', sortOrder: 5 }
+];
 
 // Initialize database with defaults and run migrations
 export async function initializeDatabase(): Promise<void> {

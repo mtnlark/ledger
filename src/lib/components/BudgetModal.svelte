@@ -1,29 +1,29 @@
 <script lang="ts">
-	import { X } from 'lucide-svelte';
+	import { X, ArrowRight } from 'lucide-svelte';
 	import type { MonthlyBudget } from '$lib/db';
 	import { focusTrap } from '$lib/utils/focus-trap';
+	import { formatCurrency } from '$lib/utils/format-helpers';
 
 	interface Props {
 		isOpen: boolean;
 		budget: MonthlyBudget | null;
+		savedFromContributions: number;
 		month: string;
 		monthDisplay: string;
-		onSave: (data: { income: number; savedAmount: number; notes?: string }) => void;
+		onSave: (data: { income: number; notes?: string }) => void;
 		onClose: () => void;
 	}
 
-	let { isOpen, budget, month, monthDisplay, onSave, onClose }: Props = $props();
+	let { isOpen, budget, savedFromContributions, month, monthDisplay, onSave, onClose }: Props = $props();
 
 	// Form state - initialize from existing budget or defaults
 	let incomeStr = $state('');
-	let savedStr = $state('');
 	let notes = $state('');
 
 	// Reset form when modal opens or budget changes
 	$effect(() => {
 		if (isOpen) {
 			incomeStr = budget?.income?.toString() ?? '';
-			savedStr = budget?.savedAmount?.toString() ?? '';
 			notes = budget?.notes ?? '';
 		}
 	});
@@ -39,20 +39,12 @@
 		incomeStr = cleanNumberInput(input.value);
 	}
 
-	// Handle paste/input for saved field
-	function handleSavedInput(e: Event) {
-		const input = e.target as HTMLInputElement;
-		savedStr = cleanNumberInput(input.value);
-	}
-
 	function handleSubmit(e: Event) {
 		e.preventDefault();
 		const income = parseFloat(cleanNumberInput(incomeStr)) || 0;
-		const savedAmount = parseFloat(cleanNumberInput(savedStr)) || 0;
 
 		onSave({
 			income,
-			savedAmount,
 			notes: notes.trim() || undefined
 		});
 	}
@@ -126,24 +118,25 @@
 					<p class="mt-1.5 text-xs text-charcoal-muted">Your total income for this month</p>
 				</div>
 
-				<!-- Saved -->
+				<!-- Saved (read-only, from contributions) -->
 				<div>
-					<label for="saved" class="block text-sm font-medium text-charcoal-soft mb-1.5">
+					<span class="block text-sm font-medium text-charcoal-soft mb-1.5">
 						Amount Saved
-					</label>
-					<div class="relative">
-						<span class="absolute left-3 top-1/2 -translate-y-1/2 text-charcoal-muted font-mono">$</span>
-						<input
-							type="text"
-							inputmode="decimal"
-							id="saved"
-							value={savedStr}
-							oninput={handleSavedInput}
-							placeholder="0.00"
-							class="w-full pl-7 pr-3 py-2.5 bg-surface-alt border border-theme rounded-lg focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-colors font-mono placeholder:text-charcoal-muted"
-						/>
+					</span>
+					<div class="px-3 py-2.5 bg-surface-alt border border-theme rounded-lg">
+						<span class="font-mono text-charcoal">{formatCurrency(savedFromContributions)}</span>
 					</div>
-					<p class="mt-1.5 text-xs text-charcoal-muted">Amount set aside for savings this month</p>
+					<div class="mt-1.5 flex items-center justify-between">
+						<p class="text-xs text-charcoal-muted">From savings contributions this month</p>
+						<a
+							href="/savings"
+							class="inline-flex items-center gap-1 text-xs text-primary-600 hover:text-primary-700 font-medium"
+							onclick={onClose}
+						>
+							Manage savings
+							<ArrowRight size={12} />
+						</a>
+					</div>
 				</div>
 
 				<!-- Notes -->
@@ -161,16 +154,15 @@
 				</div>
 
 				<!-- Preview -->
-				{#if incomeStr || savedStr}
+				{#if incomeStr}
 					{@const income = parseFloat(cleanNumberInput(incomeStr)) || 0}
-					{@const saved = parseFloat(cleanNumberInput(savedStr)) || 0}
-					{@const available = income - saved}
+					{@const available = income - savedFromContributions}
 					<div class="bg-surface-alt rounded-lg p-4 border border-dashed border-theme-dashed">
 						<div class="flex items-baseline text-charcoal-soft">
 							<span class="text-sm">Available to spend:</span>
 							<span class="ledger-line"></span>
 							<span class="font-mono font-medium text-charcoal text-lg">
-								${available.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+								{formatCurrency(available)}
 							</span>
 						</div>
 					</div>

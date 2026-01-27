@@ -81,6 +81,8 @@ ledger/
 │   │   │   ├── settings.ts
 │   │   │   ├── budget.ts
 │   │   │   ├── categoryBudget.ts   # Per-category budget tracking
+│   │   │   ├── savingsAccounts.ts  # Savings account CRUD
+│   │   │   ├── savingsContributions.ts  # Contribution tracking
 │   │   │   ├── merchants.ts
 │   │   │   ├── recurring.ts
 │   │   │   ├── selectedMonth.ts    # UI state for month selection
@@ -137,6 +139,11 @@ ledger/
 │   │   │   ├── SharedExpenseFields.svelte  # Shared expense toggle + split options
 │   │   │   ├── EssentialToggle.svelte      # Needs vs wants toggle
 │   │   │   ├── SubscriptionFields.svelte   # Subscription toggle + frequency
+│   │   │   ├── SavingsAccountCard.svelte   # Individual savings account display
+│   │   │   ├── AddContributionModal.svelte # Add savings contribution
+│   │   │   ├── EditContributionModal.svelte # Edit/delete contribution
+│   │   │   ├── AddAccountModal.svelte      # Add savings account
+│   │   │   ├── EditAccountModal.svelte     # Edit savings account/balance
 │   │   │   └── insights/              # Insight components
 │   │   │       ├── InsightGroup.svelte
 │   │   │       ├── InsightMetric.svelte
@@ -149,7 +156,8 @@ ledger/
 │   │   │       ├── CategoryDeepDives.svelte
 │   │   │       ├── CategoryComparison.svelte
 │   │   │       ├── CategoryTrendsChart.svelte
-│   │   │       ├── SavingsRateChart.svelte
+│   │   │       ├── SavingsInsights.svelte      # Savings breakdown and trends
+│   │   │       ├── SavingsRateTrendChart.svelte # Savings rate over time
 │   │   │       └── CalendarHeatmap.svelte
 │   │   ├── utils/
 │   │   │   ├── currency.ts            # Currency/percentage utilities (rounding, comparison)
@@ -178,6 +186,7 @@ ledger/
 │   │   ├── +layout.ts
 │   │   ├── +page.svelte      # Dashboard
 │   │   ├── budget/+page.svelte
+│   │   ├── savings/+page.svelte  # Savings tracking
 │   │   ├── insights/+page.svelte
 │   │   ├── shared/+page.svelte
 │   │   └── settings/+page.svelte
@@ -239,8 +248,40 @@ interface MonthlyBudget {
   id?: number;
   month: string;           // "YYYY-MM" format
   income: number;
-  savedAmount: number;
+  savedAmount: number;     // DEPRECATED: Use SavingsContribution instead
   notes?: string;
+}
+
+type SavingsAccountType = 'savings' | 'retirement' | 'investment';
+
+type ContributionSource =
+  | 'payroll_deduction'    // Pre-tax (doesn't affect available)
+  | 'bank_transfer'        // From checking (affects available)
+  | 'interest'             // Interest earned (doesn't affect available)
+  | 'employer_match'       // 401k match (doesn't affect available)
+  | 'other';               // Other source (affects available)
+
+interface SavingsAccount {
+  id?: number;
+  name: string;
+  accountType: SavingsAccountType;
+  icon?: string;           // Emoji
+  color?: string;          // Hex color
+  sortOrder: number;
+  currentBalance?: number; // Only tracked for 'savings' type
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+interface SavingsContribution {
+  id?: number;
+  date: Date;
+  accountId: number;       // References SavingsAccount.id
+  amount: number;
+  source: ContributionSource;
+  notes?: string;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 interface CategoryBudget {
@@ -278,6 +319,7 @@ interface Settings {
 **Collapsible Sidebar:**
 - Dashboard (home)
 - Budget (category budgets)
+- Savings (contribution tracking)
 - Insights (charts & trends)
 - Shared (settlement tracking)
 - Settings (categories, import/export)
@@ -303,6 +345,15 @@ Sidebar state persists to localStorage (`ledger-sidebar-expanded`).
 - Summary card with total budgeted, spent, and remaining
 - Alerts for categories approaching or over budget
 - Month picker for viewing different months
+
+### Savings
+- Track contributions to savings, retirement, and investment accounts
+- Multiple account types: savings (balance tracked), retirement, investment
+- Contribution sources: bank transfer, payroll deduction, interest, employer match
+- Only bank transfers and "other" reduce available to spend
+- Account cards with contribution history
+- Savings rate calculation based on contributions
+- Integration with Dashboard (available = income - savings contributions)
 
 ### Insights
 - Smart takeaways with AI-generated highlights

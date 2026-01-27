@@ -1,10 +1,11 @@
 <script lang="ts">
 	import type { Transaction, MonthlyBudget } from '$lib/db';
 	import { parseMonthKey, getMonthKey } from '$lib/db';
-	import { format } from 'date-fns';
+	import { format, getDaysInMonth, getDate } from 'date-fns';
+	import { TrendingUp, TrendingDown, Minus } from 'lucide-svelte';
 	import { getInsightsEngine } from '$lib/insights';
+	import { calculateVelocityComparison } from '$lib/insights/calculations/velocity';
 	import InsightGroup from './InsightGroup.svelte';
-	import SavingsRateChart from './SavingsRateChart.svelte';
 	import MonthlyTrendsChart from '../MonthlyTrendsChart.svelte';
 
 	interface Props {
@@ -34,14 +35,41 @@
 	// Calculate totals
 	let totalSpent = $derived(engine.getTotalSpent(transactions, currentMonth));
 
-	// Current savings rate
-	let currentSavingsRate = $derived(
-		budget && budget.income > 0 ? budget.savedAmount / budget.income : null
-	);
-
 	// Quick stats
 	let sharedCount = $derived(transactions.filter((t) => t.isShared).length);
 	let avgTransaction = $derived(transactions.length > 0 ? totalSpent / transactions.length : 0);
+
+	// Spending velocity comparison
+	let velocityComparison = $derived.by(() => {
+		// Get previous month key
+		const currentDate = parseMonthKey(currentMonth);
+		const prevDate = new Date(currentDate);
+		prevDate.setMonth(prevDate.getMonth() - 1);
+		const prevMonthKey = getMonthKey(prevDate);
+
+		// Get previous month's total from trends
+		const prevTotal = monthlyTrends.get(prevMonthKey);
+		if (prevTotal === undefined) return null;
+
+		// Calculate days
+		const isViewingCurrentMonth = currentMonth === getMonthKey(new Date());
+		const currentDays = isViewingCurrentMonth
+			? getDate(new Date()) // Days elapsed so far this month
+			: getDaysInMonth(currentDate); // Full month if viewing past
+		const prevDays = getDaysInMonth(prevDate);
+
+		// Get historical totals for adaptive threshold
+		const historicalTotals = Array.from(monthlyTrends.values());
+
+		return calculateVelocityComparison(
+			totalSpent,
+			prevTotal,
+			currentDays,
+			prevDays,
+			10, // 10% minimum threshold
+			historicalTotals
+		);
+	});
 </script>
 
 <InsightGroup
@@ -59,12 +87,21 @@
 					{transactions.length} transaction{transactions.length !== 1 ? 's' : ''}
 				</p>
 			</div>
-			{#if currentSavingsRate !== null}
-				<div class="text-right">
-					<p class="font-mono text-lg font-medium text-success-600">
-						{(currentSavingsRate * 100).toFixed(0)}%
-					</p>
-					<p class="text-sm text-charcoal-muted">savings rate</p>
+			{#if velocityComparison}
+				<div class="text-right flex items-center gap-2">
+					{#if velocityComparison.isUp}
+						<TrendingUp size={18} class="text-warning-500" />
+					{:else}
+						<TrendingDown size={18} class="text-success-500" />
+					{/if}
+					<div>
+						<p class="font-mono text-lg font-medium {velocityComparison.isUp ? 'text-warning-600' : 'text-success-600'}">
+							{Math.abs(velocityComparison.percentChange)}%
+						</p>
+						<p class="text-sm text-charcoal-muted">
+							{velocityComparison.isUp ? 'faster' : 'slower'}
+						</p>
+					</div>
 				</div>
 			{/if}
 		</div>
@@ -95,11 +132,35 @@
 				</div>
 			{/if}
 
-			<!-- Savings Rate Over Time -->
-			{#if allBudgets.length > 0}
-				<div>
-					<h3 class="text-sm font-medium text-charcoal-soft mb-3">Savings Rate Over Time</h3>
-					<SavingsRateChart budgets={allBudgets} />
+			<!-- Spending Velocity -->
+			{#if velocityComparison}
+				<div class="bg-surface-alt rounded-lg p-4 border border-theme">
+					<h3 class="text-sm font-medium text-charcoal-soft mb-3">Spending Pace</h3>
+					<div class="flex items-center gap-4">
+						<div class="w-12 h-12 rounded-full flex items-center justify-center {velocityComparison.isUp ? 'bg-warning-100' : 'bg-success-100'}">
+							{#if velocityComparison.isUp}
+								<TrendingUp size={24} class="text-warning-600" />
+							{:else}
+								<TrendingDown size={24} class="text-success-600" />
+							{/if}
+						</div>
+						<div>
+							<p class="text-charcoal">
+								<span class="font-medium {velocityComparison.isUp ? 'text-warning-600' : 'text-success-600'}">
+									{Math.abs(velocityComparison.percentChange)}% {velocityComparison.isUp ? 'faster' : 'slower'}
+								</span>
+								than last month
+							</p>
+							<p class="text-sm text-charcoal-muted mt-0.5">
+								${velocityComparison.currentDailyAvg.toFixed(0)}/day vs ${velocityComparison.prevDailyAvg.toFixed(0)}/day last month
+							</p>
+						</div>
+					</div>
+				</div>
+			{:else if monthlyTrends.size < 2}
+				<div class="bg-surface-alt rounded-lg p-4 border border-theme text-center">
+					<Minus size={20} class="text-charcoal-muted mx-auto mb-2" />
+					<p class="text-sm text-charcoal-muted">Need more data to compare spending pace</p>
 				</div>
 			{/if}
 

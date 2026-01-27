@@ -6,7 +6,9 @@
 		type Transaction,
 		type Category,
 		type MonthlyBudget,
-		type CancelledSubscription
+		type CancelledSubscription,
+		type SavingsAccount,
+		type SavingsContribution
 	} from '$lib/db';
 	import { initializeStorage } from '$lib/storage';
 	import {
@@ -17,11 +19,14 @@
 	} from '$lib/stores/transactions';
 	import { getAllCategories } from '$lib/stores/categories';
 	import { getBudgetForMonth, getAllBudgets } from '$lib/stores/budget';
+	import { getAllSavingsAccounts } from '$lib/stores/savingsAccounts';
+	import { getAllContributionsForMonth, getAllContributions } from '$lib/stores/savingsContributions';
 	import HeaderNav from '$lib/components/HeaderNav.svelte';
 	import Skeleton from '$lib/components/Skeleton.svelte';
 	import MonthPicker from '$lib/components/MonthPicker.svelte';
 	import SmartTakeaways from '$lib/components/insights/SmartTakeaways.svelte';
 	import SpendingThisMonth from '$lib/components/insights/SpendingThisMonth.svelte';
+	import SavingsInsights from '$lib/components/insights/SavingsInsights.svelte';
 	import CategoryDeepDives from '$lib/components/insights/CategoryDeepDives.svelte';
 	import YTDSummary from '$lib/components/insights/YTDSummary.svelte';
 	import RecurringInsights from '$lib/components/insights/RecurringInsights.svelte';
@@ -42,6 +47,9 @@
 	let recurring = $state<DetectedRecurring[]>([]);
 	let cancelledSubscriptions = $state<CancelledSubscription[]>([]);
 	let confirmedActiveSubscriptions = $state<string[]>([]);
+	let savingsAccounts = $state<SavingsAccount[]>([]);
+	let selectedMonthContributions = $state<SavingsContribution[]>([]);
+	let allContributions = $state<SavingsContribution[]>([]);
 
 	// Load data
 	async function loadData() {
@@ -56,9 +64,13 @@
 			recurring = await detectRecurringExpenses();
 			cancelledSubscriptions = await getCancelledSubscriptions();
 			confirmedActiveSubscriptions = await getConfirmedActiveSubscriptions();
+			// Load savings data
+			savingsAccounts = await getAllSavingsAccounts();
+			allContributions = await getAllContributions();
 			// Load selected month data
 			selectedMonthTransactions = await getTransactionsByMonth(selectedMonth);
 			budget = await getBudgetForMonth(selectedMonth);
+			selectedMonthContributions = await getAllContributionsForMonth(selectedMonth);
 			// Get trends for all available months
 			monthlyTrends = await getMonthlySpendingTrends(availableMonths);
 		} catch (error) {
@@ -72,13 +84,15 @@
 	// Handle month change - update transactions and budget for selected month
 	// Fetch data first, then update all state atomically to prevent UI mismatch
 	async function handleMonthChange(month: string) {
-		const [txns, monthBudget] = await Promise.all([
+		const [txns, monthBudget, monthContributions] = await Promise.all([
 			getTransactionsByMonth(month),
-			getBudgetForMonth(month)
+			getBudgetForMonth(month),
+			getAllContributionsForMonth(month)
 		]);
 		selectedMonth = month;
 		selectedMonthTransactions = txns;
 		budget = monthBudget;
+		selectedMonthContributions = monthContributions;
 	}
 
 	// Reload subscription-related data when subscriptions change
@@ -161,6 +175,16 @@
 				{budget}
 				{allBudgets}
 				{monthlyTrends}
+			/>
+
+			<!-- Savings This Month -->
+			<SavingsInsights
+				currentMonth={selectedMonth}
+				contributions={selectedMonthContributions}
+				accounts={savingsAccounts}
+				{budget}
+				{allContributions}
+				{allBudgets}
 			/>
 
 			<!-- Category Deep Dives -->

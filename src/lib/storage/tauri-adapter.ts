@@ -9,7 +9,9 @@ import {
 	db,
 	DEFAULT_SETTINGS,
 	DEFAULT_CATEGORIES,
-	type Category
+	DEFAULT_SAVINGS_ACCOUNTS,
+	type Category,
+	type SavingsAccount
 } from '$lib/db';
 import { parseStoredDate } from '$lib/utils/date-helpers';
 import type { StoredData } from './index';
@@ -272,13 +274,15 @@ export async function initializeTauriStorage(): Promise<void> {
 async function loadDataIntoDexie(data: StoredData): Promise<void> {
 	await db.transaction(
 		'rw',
-		[db.transactions, db.categories, db.monthlyBudgets, db.categoryBudgets, db.settings],
+		[db.transactions, db.categories, db.monthlyBudgets, db.categoryBudgets, db.settings, db.savingsAccounts, db.savingsContributions],
 		async () => {
 			// Clear existing data
 			await db.transactions.clear();
 			await db.categories.clear();
 			await db.monthlyBudgets.clear();
 			await db.categoryBudgets.clear();
+			await db.savingsAccounts.clear();
+			await db.savingsContributions.clear();
 
 			// Load categories
 			if (data.categories && data.categories.length > 0) {
@@ -314,6 +318,28 @@ async function loadDataIntoDexie(data: StoredData): Promise<void> {
 					settledDate: t.settledDate ? new Date(t.settledDate) : undefined
 				}));
 				await db.transactions.bulkPut(transactions);
+			}
+
+			// Load savings accounts
+			if (data.savingsAccounts && data.savingsAccounts.length > 0) {
+				const savingsAccounts = data.savingsAccounts.map((sa) => ({
+					...sa,
+					createdAt: new Date(sa.createdAt),
+					updatedAt: new Date(sa.updatedAt)
+				}));
+				await db.savingsAccounts.bulkPut(savingsAccounts);
+			}
+			// Note: Default savings accounts are seeded by migration, not here
+
+			// Load savings contributions (convert date strings to Date objects)
+			if (data.savingsContributions && data.savingsContributions.length > 0) {
+				const savingsContributions = data.savingsContributions.map((sc) => ({
+					...sc,
+					date: parseStoredDate(sc.date),
+					createdAt: new Date(sc.createdAt),
+					updatedAt: new Date(sc.updatedAt)
+				}));
+				await db.savingsContributions.bulkPut(savingsContributions);
 			}
 
 			// Load settings
@@ -371,12 +397,14 @@ export async function saveToFile(): Promise<void> {
 	}
 
 	// Get all data from Dexie
-	const [transactions, categories, monthlyBudgets, categoryBudgets, settings] = await Promise.all([
+	const [transactions, categories, monthlyBudgets, categoryBudgets, settings, savingsAccounts, savingsContributions] = await Promise.all([
 		db.transactions.toArray(),
 		db.categories.toArray(),
 		db.monthlyBudgets.toArray(),
 		db.categoryBudgets.toArray(),
-		db.settings.get(1)
+		db.settings.get(1),
+		db.savingsAccounts.toArray(),
+		db.savingsContributions.toArray()
 	]);
 
 	const data: StoredData = {
@@ -386,7 +414,9 @@ export async function saveToFile(): Promise<void> {
 		categories,
 		monthlyBudgets,
 		categoryBudgets,
-		settings: settings ?? DEFAULT_SETTINGS
+		settings: settings ?? DEFAULT_SETTINGS,
+		savingsAccounts,
+		savingsContributions
 	};
 
 	try {

@@ -7,6 +7,8 @@
 	import { getAllCategories } from '$lib/stores/categories';
 	import { getSettings, cancelSubscription } from '$lib/stores/settings';
 	import { getBudgetForMonth, saveBudget } from '$lib/stores/budget';
+	import { getContributionsAffectingAvailable } from '$lib/stores/savingsContributions';
+	import { sumCurrency } from '$lib/utils/currency';
 	import { getSelectedMonth, setSelectedMonth } from '$lib/stores/selectedMonth';
 	import { toast } from '$lib/stores/toast';
 	import { formatCurrency } from '$lib/utils/format-helpers';
@@ -36,6 +38,7 @@
 	let allTransactions = $state<Transaction[]>([]); // All transactions (for filtering)
 	let settings = $state<Settings>(DEFAULT_SETTINGS);
 	let budget = $state<MonthlyBudget | null>(null);
+	let savedFromContributions = $state(0);
 	let showBudgetModal = $state(false);
 	let editingTransaction = $state<Transaction | null>(null);
 	let splittingTransaction = $state<Transaction | null>(null);
@@ -173,6 +176,9 @@
 			transactions = await getTransactionsByMonth(currentMonth);
 			budget = await getBudgetForMonth(currentMonth);
 			availableMonths = await getAvailableMonths();
+			// Load savings contributions that affect available to spend
+			const contributions = await getContributionsAffectingAvailable(currentMonth);
+			savedFromContributions = sumCurrency(contributions.map(c => c.amount));
 		} catch (error) {
 			console.error('Failed to load data:', error);
 		} finally {
@@ -185,22 +191,25 @@
 	async function handleMonthChange(month: string) {
 		setSelectedMonth(month);
 		try {
-			const [txns, monthBudget] = await Promise.all([
+			const [txns, monthBudget, contributions] = await Promise.all([
 				getTransactionsByMonth(month),
-				getBudgetForMonth(month)
+				getBudgetForMonth(month),
+				getContributionsAffectingAvailable(month)
 			]);
 			currentMonth = month;
 			transactions = txns;
 			budget = monthBudget;
+			savedFromContributions = sumCurrency(contributions.map(c => c.amount));
 		} catch (error) {
 			console.error('Failed to load month data:', error);
 		}
 	}
 
 	// Handle budget save
-	async function handleSaveBudget(data: { income: number; savedAmount: number; notes?: string }) {
+	async function handleSaveBudget(data: { income: number; notes?: string }) {
 		try {
-			await saveBudget(currentMonth, data);
+			// Keep existing savedAmount for backward compatibility (not used in calculations anymore)
+			await saveBudget(currentMonth, { ...data, savedAmount: budget?.savedAmount ?? 0 });
 			budget = await getBudgetForMonth(currentMonth);
 			showBudgetModal = false;
 			toast.success('Budget saved');
@@ -489,6 +498,7 @@
 			<CashFlowCard
 				{budget}
 				{totalSpent}
+				{savedFromContributions}
 				{monthDisplay}
 				onEditBudget={() => showBudgetModal = true}
 			/>
@@ -555,6 +565,7 @@
 <BudgetModal
 	isOpen={showBudgetModal}
 	{budget}
+	{savedFromContributions}
 	month={currentMonth}
 	{monthDisplay}
 	onSave={handleSaveBudget}

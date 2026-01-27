@@ -9,8 +9,10 @@ import {
 	db,
 	type Category,
 	type Transaction,
+	type SavingsAccount,
 	CATEGORY_COLORS,
-	CATEGORY_ESSENTIAL
+	CATEGORY_ESSENTIAL,
+	DEFAULT_SAVINGS_ACCOUNTS
 } from './index';
 
 /**
@@ -169,6 +171,25 @@ async function migrateTransactionDates(): Promise<void> {
 }
 
 /**
+ * Migration: Seed default savings accounts if table is empty
+ * Only runs on first time after upgrade to v4 schema
+ */
+async function migrateSeedSavingsAccounts(): Promise<void> {
+	const count = await db.savingsAccounts.count();
+	if (count > 0) return; // Already has accounts
+
+	const now = new Date();
+	const accountsToAdd: SavingsAccount[] = DEFAULT_SAVINGS_ACCOUNTS.map((account) => ({
+		...account,
+		createdAt: now,
+		updatedAt: now
+	}));
+
+	await db.savingsAccounts.bulkAdd(accountsToAdd);
+	console.log('Migration: Seeded default savings accounts');
+}
+
+/**
  * Run all database migrations
  * Each migration is idempotent and checks if it needs to run
  */
@@ -179,4 +200,5 @@ export async function runMigrations(): Promise<void> {
 	await migrateTransactionEssential();
 	await migrateTransactionSubscription();
 	await migrateTransactionDates();
+	await migrateSeedSavingsAccounts();
 }

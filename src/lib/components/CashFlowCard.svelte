@@ -11,12 +11,13 @@
 	interface Props {
 		budget: MonthlyBudget | null;
 		totalSpent: number;
+		savedFromContributions: number;
 		monthDisplay: string;
 		onEditBudget?: () => void;
 		defaultExpanded?: boolean;
 	}
 
-	let { budget, totalSpent, monthDisplay, onEditBudget, defaultExpanded = true }: Props = $props();
+	let { budget, totalSpent, savedFromContributions, monthDisplay, onEditBudget, defaultExpanded = true }: Props = $props();
 
 	// Animation state
 	let mounted = $state(false);
@@ -38,7 +39,7 @@
 
 	// Computed values
 	let income = $derived(budget?.income ?? 0);
-	let saved = $derived(budget?.savedAmount ?? 0);
+	let saved = $derived(savedFromContributions);
 	let available = $derived(income - saved);
 	let surplus = $derived(available - totalSpent);
 

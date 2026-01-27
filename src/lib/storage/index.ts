@@ -12,6 +12,8 @@ import {
 	type MonthlyBudget,
 	type CategoryBudget,
 	type Settings,
+	type SavingsAccount,
+	type SavingsContribution,
 	DEFAULT_SETTINGS
 } from '$lib/db';
 import { parseStoredDate } from '$lib/utils/date-helpers';
@@ -25,6 +27,8 @@ export interface StoredData {
 	monthlyBudgets: MonthlyBudget[];
 	categoryBudgets: CategoryBudget[];
 	settings: Settings;
+	savingsAccounts?: SavingsAccount[];
+	savingsContributions?: SavingsContribution[];
 }
 
 // Track if storage has been initialized
@@ -136,12 +140,14 @@ export async function withPersistence<T>(operation: () => Promise<T>): Promise<T
  * Get all current data (useful for export/backup)
  */
 export async function getAllData(): Promise<StoredData> {
-	const [transactions, categories, monthlyBudgets, categoryBudgets, settings] = await Promise.all([
+	const [transactions, categories, monthlyBudgets, categoryBudgets, settings, savingsAccounts, savingsContributions] = await Promise.all([
 		db.transactions.toArray(),
 		db.categories.toArray(),
 		db.monthlyBudgets.toArray(),
 		db.categoryBudgets.toArray(),
-		db.settings.get(1)
+		db.settings.get(1),
+		db.savingsAccounts.toArray(),
+		db.savingsContributions.toArray()
 	]);
 
 	return {
@@ -151,7 +157,9 @@ export async function getAllData(): Promise<StoredData> {
 		categories,
 		monthlyBudgets,
 		categoryBudgets,
-		settings: settings ?? DEFAULT_SETTINGS
+		settings: settings ?? DEFAULT_SETTINGS,
+		savingsAccounts,
+		savingsContributions
 	};
 }
 
@@ -161,12 +169,14 @@ export async function getAllData(): Promise<StoredData> {
 export async function replaceAllData(data: StoredData): Promise<void> {
 	await db.transaction(
 		'rw',
-		[db.transactions, db.categories, db.monthlyBudgets, db.categoryBudgets, db.settings],
+		[db.transactions, db.categories, db.monthlyBudgets, db.categoryBudgets, db.settings, db.savingsAccounts, db.savingsContributions],
 		async () => {
 			await db.transactions.clear();
 			await db.categories.clear();
 			await db.monthlyBudgets.clear();
 			await db.categoryBudgets.clear();
+			await db.savingsAccounts.clear();
+			await db.savingsContributions.clear();
 
 			if (data.categories.length > 0) {
 				await db.categories.bulkPut(data.categories);
@@ -197,6 +207,27 @@ export async function replaceAllData(data: StoredData): Promise<void> {
 					settledDate: t.settledDate ? new Date(t.settledDate) : undefined
 				}));
 				await db.transactions.bulkPut(transactions);
+			}
+
+			if (data.savingsAccounts && data.savingsAccounts.length > 0) {
+				// Convert date strings back to Date objects
+				const savingsAccounts = data.savingsAccounts.map((sa) => ({
+					...sa,
+					createdAt: new Date(sa.createdAt),
+					updatedAt: new Date(sa.updatedAt)
+				}));
+				await db.savingsAccounts.bulkPut(savingsAccounts);
+			}
+
+			if (data.savingsContributions && data.savingsContributions.length > 0) {
+				// Convert date strings back to Date objects
+				const savingsContributions = data.savingsContributions.map((sc) => ({
+					...sc,
+					date: parseStoredDate(sc.date),
+					createdAt: new Date(sc.createdAt),
+					updatedAt: new Date(sc.updatedAt)
+				}));
+				await db.savingsContributions.bulkPut(savingsContributions);
 			}
 
 			if (data.settings) {
