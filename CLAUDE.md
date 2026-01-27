@@ -85,6 +85,7 @@ ledger/
 │   │   │   ├── savingsContributions.ts  # Contribution tracking
 │   │   │   ├── merchants.ts
 │   │   │   ├── recurring.ts
+│   │   │   ├── recurringSuggestions.ts  # Monthly recurring transaction suggestions
 │   │   │   ├── selectedMonth.ts    # UI state for month selection
 │   │   │   ├── theme.ts            # Light/dark/system theme
 │   │   │   └── toast.ts            # Toast notification system
@@ -145,6 +146,8 @@ ledger/
 │   │   │   ├── EditContributionModal.svelte # Edit/delete contribution
 │   │   │   ├── AddAccountModal.svelte      # Add savings account
 │   │   │   ├── EditAccountModal.svelte     # Edit savings account/balance
+│   │   │   ├── RecurringSuggestionsBanner.svelte  # Banner for recurring suggestions
+│   │   │   ├── RecurringSuggestionsModal.svelte   # Modal to review/add recurring
 │   │   │   └── insights/              # Insight components
 │   │   │       ├── InsightGroup.svelte
 │   │   │       ├── InsightMetric.svelte
@@ -314,6 +317,7 @@ interface Settings {
   cancelledSubscriptions: CancelledSubscription[];
   confirmedActiveSubscriptions: string[]; // Override staleness detection
   iCloudBackupEnabled: boolean;           // Copy backups to iCloud Drive
+  lastAutoSuggestedMonth?: string;        // "YYYY-MM" - tracks recurring suggestion dismissal
 }
 ```
 
@@ -343,6 +347,11 @@ Sidebar state persists to localStorage (`ledger-sidebar-expanded`).
 - Edit/split transaction modals
 - Bulk action toolbar for multi-select operations
 - Month picker for navigating between months
+- **Recurring suggestions banner**: Prompts to add expected recurring transactions at start of month
+  - Two-step flow: selection → confirmation with editable dates/amounts
+  - Merges detected recurring with user-tagged subscriptions
+  - Filters by frequency (monthly/semi-annual/annual)
+  - Persists until all added or user defers to next month
 
 ### Budget
 - Per-category budget tracking

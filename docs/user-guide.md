@@ -50,6 +50,27 @@ Shows your monthly financial summary:
 - Use the checkbox to select multiple for bulk actions
 - Search by merchant name using the search bar
 
+### Recurring Suggestions
+
+At the start of each month, Ledger shows a banner if you have expected recurring transactions:
+
+**How it works:**
+1. Click "Review" on the banner to open the suggestions modal
+2. Select which transactions to add (all selected by default)
+3. Click "Continue" to review dates and amounts
+4. Adjust dates/amounts if needed
+5. Click "Add Transactions" to create them
+
+**Sources of suggestions:**
+- **Detected recurring** - Auto-detected from your transaction history (2+ occurrences ~30 days apart)
+- **Tagged subscriptions** - Transactions you've marked as subscriptions
+
+**Behavior:**
+- Banner appears when current month differs from when you last reviewed
+- Annual subscriptions only appear in their expected month
+- Transactions already added this month (matched by merchant name) are filtered out
+- Click "Remind me next month" to defer without adding
+
 ### Filtering
 
 - **Month Picker** - Navigate between months
