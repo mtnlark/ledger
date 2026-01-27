@@ -35,8 +35,41 @@ export interface MonthReviewResult {
 	savings: SavingsReviewResult | null;
 }
 
+/** Default rolling window for historical comparisons (12 months) */
+const ROLLING_WINDOW_MONTHS = 12;
+
 /**
- * Compute the historical spending rank of a month among all months.
+ * Filter monthly totals to only include months within a rolling window.
+ * @param allMonthlyTotals Map of month keys to totals
+ * @param selectedMonth The reference month (YYYY-MM)
+ * @param windowMonths Number of months to include (default 12)
+ * @returns Filtered map containing only months within the window
+ */
+function filterToRollingWindow(
+	allMonthlyTotals: Map<string, number>,
+	selectedMonth: string,
+	windowMonths: number = ROLLING_WINDOW_MONTHS
+): Map<string, number> {
+	// Get all months sorted descending (most recent first)
+	const sortedMonths = [...allMonthlyTotals.keys()].sort((a, b) => b.localeCompare(a));
+
+	// Find the position of selected month
+	const selectedIndex = sortedMonths.indexOf(selectedMonth);
+	if (selectedIndex === -1) return new Map();
+
+	// Include months from selected month back windowMonths months
+	const filtered = new Map<string, number>();
+	for (let i = selectedIndex; i < sortedMonths.length && filtered.size < windowMonths; i++) {
+		const month = sortedMonths[i];
+		filtered.set(month, allMonthlyTotals.get(month)!);
+	}
+
+	return filtered;
+}
+
+/**
+ * Compute the historical spending rank of a month among recent months.
+ * Uses a rolling 12-month window for comparison.
  * Returns whichever of "Nth highest" or "Nth lowest" has the smaller rank number.
  */
 export function computeHistoricalRank(
@@ -44,11 +77,14 @@ export function computeHistoricalRank(
 	allMonthlyTotals: Map<string, number>,
 	selectedMonth: string
 ): MonthReviewResult['historicalRank'] {
-	if (allMonthlyTotals.size < 2) return null;
-	if (!allMonthlyTotals.has(selectedMonth)) return null;
+	// Filter to rolling window
+	const windowTotals = filterToRollingWindow(allMonthlyTotals, selectedMonth);
 
-	const totals = [...allMonthlyTotals.values()].sort((a, b) => b - a); // descending
-	const total = allMonthlyTotals.size;
+	if (windowTotals.size < 2) return null;
+	if (!windowTotals.has(selectedMonth)) return null;
+
+	const totals = [...windowTotals.values()].sort((a, b) => b - a); // descending
+	const total = windowTotals.size;
 
 	// Rank from highest (1 = highest spending)
 	// Use findIndex to count how many values are strictly greater, avoiding
@@ -65,22 +101,29 @@ export function computeHistoricalRank(
 
 /**
  * Compare the selected month's total to the historical mean and σ.
- * Uses exponential decay weighting so recent months have more influence
- * on the baseline—making the comparison more relevant to current lifestyle.
+ * Uses a rolling 12-month window with exponential decay weighting so
+ * recent months have more influence on the baseline.
  *
  * @param selectedMonthTotal The spending total for the month being reviewed
  * @param allMonthlyTotals Map of month keys to spending totals
+ * @param selectedMonth The month being reviewed (for rolling window calculation)
  * @param decay Decay factor per month (default 0.9 = 10% decay, gentler than other uses)
  */
 export function computeVsAverage(
 	selectedMonthTotal: number,
 	allMonthlyTotals: Map<string, number>,
+	selectedMonth?: string,
 	decay = 0.9
 ): MonthReviewResult['vsAverage'] {
-	if (allMonthlyTotals.size < 2) return null;
+	// Apply rolling window if selectedMonth is provided
+	const totalsToUse = selectedMonth
+		? filterToRollingWindow(allMonthlyTotals, selectedMonth)
+		: allMonthlyTotals;
+
+	if (totalsToUse.size < 2) return null;
 
 	// Sort months chronologically (oldest first) for proper weighting
-	const sortedEntries = [...allMonthlyTotals.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+	const sortedEntries = [...totalsToUse.entries()].sort((a, b) => a[0].localeCompare(b[0]));
 	const values = sortedEntries.map(([, v]) => v);
 
 	// Generate decay weights (most recent month = 1.0)
@@ -370,7 +413,7 @@ export function computeMonthReview(
 
 	return {
 		historicalRank: computeHistoricalRank(selectedMonthTotal, monthlyTotals, selectedMonth),
-		vsAverage: computeVsAverage(selectedMonthTotal, monthlyTotals),
+		vsAverage: computeVsAverage(selectedMonthTotal, monthlyTotals, selectedMonth),
 		biggestPurchase: computeBiggestPurchase(selectedMonthTransactions, categories),
 		mostVisitedMerchant: computeMostVisitedMerchant(selectedMonthTransactions),
 		categoryStandout: computeCategoryStandout(selectedMonthTransactions, previousMonthTransactions, categories),

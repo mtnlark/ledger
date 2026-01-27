@@ -356,14 +356,19 @@ Sidebar state persists to localStorage (`ledger-sidebar-expanded`).
 - Integration with Dashboard (available = income - savings contributions)
 
 ### Insights
-- Smart takeaways with AI-generated highlights
+- **Highlights** (current month): Forward-looking takeaways (pace projection, anomalies, category shifts)
+- **Month in Review** (past months): Hero stat + expandable grouped insights
+  - Hero stat: Most important insight (rank, savings milestone, vs-average)
+  - Grouped sections: Spending, Savings, Highlights
+  - Uses 12-month rolling window for historical comparisons
+  - Positive-only savings insights (never flags low rates due to paycheck timing)
 - Category breakdown chart (pie/donut)
 - Monthly spending trends
 - Needs vs wants analysis
 - Year-to-date summary and statistics
 - Recurring expense detection with subscription tracking
 - Category deep dives and comparisons
-- Savings rate visualization
+- Savings insights with rate trends
 - Calendar heatmap of daily spending
 
 ### Shared Expenses

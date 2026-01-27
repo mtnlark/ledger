@@ -68,28 +68,42 @@ describe('computeHistoricalRank', () => {
 	});
 
 	it('picks highest direction when highest rank is smaller', () => {
-		// 500 is the highest out of 5 months
+		// 500 is the highest out of 5 months (selected month is most recent)
 		const totals = new Map([
-			['2025-01', 500],
-			['2025-02', 400],
+			['2025-01', 200],
+			['2025-02', 250],
 			['2025-03', 300],
-			['2025-04', 250],
-			['2025-05', 200]
+			['2025-04', 400],
+			['2025-05', 500]
 		]);
-		const result = computeHistoricalRank(500, totals, '2025-01');
+		const result = computeHistoricalRank(500, totals, '2025-05');
 		expect(result).toEqual({ rank: 1, total: 5, direction: 'highest' });
 	});
 
 	it('picks highest when rank ties (middle of pack)', () => {
 		// 300 is 3rd highest and 3rd lowest out of 5 — defaults to highest
+		// Use recent month so all 5 months are in the rolling window
 		const totals = new Map([
-			['2025-01', 500],
-			['2025-02', 400],
+			['2025-01', 100],
+			['2025-02', 200],
 			['2025-03', 300],
-			['2025-04', 200],
-			['2025-05', 100]
+			['2025-04', 400],
+			['2025-05', 500]
 		]);
-		const result = computeHistoricalRank(300, totals, '2025-03');
+		// Selecting 2025-05 but checking rank of 300 (which would be 2025-03's value)
+		// We need to select the month with value 300
+		// With window from 2025-05: includes all 5 months
+		// But 2025-03 selected would only have 3 months in window
+		// Let's test a different scenario: select most recent, middle value
+		const totals2 = new Map([
+			['2025-01', 100],
+			['2025-02', 200],
+			['2025-03', 400],
+			['2025-04', 500],
+			['2025-05', 300] // selected month is middle value
+		]);
+		const result = computeHistoricalRank(300, totals2, '2025-05');
+		// 300 is 3rd highest (500, 400, 300) and 3rd lowest (100, 200, 300) — defaults to highest
 		expect(result).toEqual({ rank: 3, total: 5, direction: 'highest' });
 	});
 
@@ -104,8 +118,8 @@ describe('computeHistoricalRank', () => {
 			['2025-07', 700],
 			['2025-08', 500]
 		]);
-		// 250 is 2nd lowest out of 8
-		const result = computeHistoricalRank(250, totals, '2025-06');
+		// 250 is 2nd lowest in the 8-month window ending at 2025-08
+		const result = computeHistoricalRank(250, totals, '2025-08');
 		expect(result).toEqual({ rank: 2, total: 8, direction: 'lowest' });
 	});
 });
