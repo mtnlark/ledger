@@ -66,42 +66,30 @@ This document outlines feature ideas and implementation considerations for futur
   - `Cmd+/` - Show shortcuts help modal
   - `Esc` - Close modals / blur inputs
 
+### Recurring Transaction Auto-Entry
+- **Status**: Shipped
+- **Implementation**: Banner + modal suggestion system for expected recurring transactions
+- **Features**:
+  - Dashboard banner appears at start of each month when suggestions available
+  - Two-step modal flow: selection (checkboxes) → confirmation (editable dates/amounts)
+  - Merges auto-detected recurring expenses with user-tagged subscriptions
+  - Frequency-aware filtering: monthly items always shown, annual/semi-annual only in due months
+  - Filters out already-added transactions by merchant name (handles price changes)
+  - Uses most recent transaction amount (not average) for accuracy
+  - "Remind me next month" defers without adding
+  - Banner persists until all suggestions added or explicitly deferred
+- **Files touched**:
+  - New: `src/lib/stores/recurringSuggestions.ts`, `recurringSuggestions.test.ts`
+  - New: `src/lib/components/RecurringSuggestionsBanner.svelte`, `RecurringSuggestionsModal.svelte`
+  - Modified: `src/lib/db/index.ts` (added `lastAutoSuggestedMonth` to Settings)
+  - Modified: `src/lib/stores/settings.ts` (dismiss/reset functions)
+  - Modified: `src/routes/+page.svelte` (integrated banner and modal)
+
 ---
 
 ## High Priority Features
 
-### 1. Recurring Transaction Auto-Entry
-
-**Problem**: Users manually re-enter the same recurring expenses (rent, subscriptions, utilities) every month.
-
-**Proposed Solution**: Suggestion-based approach (not fully automatic)
-
-**UX Flow**:
-1. On the 1st of each month (or first app open), show a dismissible banner: "3 expected transactions this month"
-2. List shows: merchant, expected amount, expected date, category
-3. User can:
-   - "Add All" - bulk create with one click
-   - Individual checkboxes to select/deselect
-   - "Dismiss" - hide until next month
-   - Edit amount before adding (for variable bills)
-
-**Technical Considerations**:
-- Leverage existing `RecurringInsights` detection logic in `src/lib/stores/recurring.ts`
-- Create new `PendingRecurring` data structure (not persisted, computed on app load)
-- Add `lastAutoSuggestedMonth` to Settings to track when banner was shown
-- Consider variance in amounts: fixed subscriptions vs. variable utilities
-
-**UI Location**: Dashboard, above CashFlowCard (dismissible banner)
-
-**Complexity**: Medium (2-3 days)
-
-**Open Questions**:
-- Should we allow users to convert a recurring detection into a permanent "template"?
-- How to handle subscriptions that change in amount (annual price increases)?
-
----
-
-### 2. Quick Insights Widget
+### 1. Quick Insights Widget (formerly #2)
 
 **Problem**: Users have to navigate to Insights page to see important information.
 
@@ -129,7 +117,7 @@ This document outlines feature ideas and implementation considerations for futur
 
 ---
 
-### 3. Budget Rollover
+### 2. Budget Rollover
 
 **Problem**: YNAB-style "roll with the punches" budgeting - underspending in one category should carry forward.
 
@@ -162,7 +150,7 @@ interface CategoryBudget {
 
 ---
 
-### 4. Tags / Notes Enhancement
+### 3. Tags / Notes Enhancement
 
 **Problem**: Users want flexible categorization beyond fixed categories.
 
@@ -192,7 +180,7 @@ function extractTags(notes: string): string[] {
 
 ---
 
-### 5. Reports Export (PDF)
+### 4. Reports Export (PDF)
 
 **Problem**: Users want to generate reports for personal records, tax preparation, or sharing with financial advisors.
 
@@ -458,7 +446,7 @@ interface SavingsGoal {
 
 | Feature | User Value | Effort | Priority |
 |---------|------------|--------|----------|
-| Recurring Auto-Entry | High | Medium | **P0** |
+| ~~Recurring Auto-Entry~~ | ~~High~~ | ~~Medium~~ | **Shipped** |
 | Quick Insights Widget | Medium | Low | **P0** |
 | Budget Rollover | High | Medium | **P1** |
 | Tags/Notes | Medium | Low | **P1** |
