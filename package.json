@@ -16,7 +16,8 @@
 		"test:coverage": "vitest run --coverage",
 		"tauri": "tauri",
 		"tauri:dev": "tauri dev",
-		"tauri:build": "tauri build"
+		"tauri:build": "tauri build",
+		"docs": "npx serve docs -p 3000"
 	},
 	"devDependencies": {
 		"@sveltejs/adapter-static": "^3.0.10",
