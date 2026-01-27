@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Search, Filter, X, ChevronDown, ChevronUp } from 'lucide-svelte';
+	import { Search, Filter, X, ChevronDown, ChevronUp, Globe } from 'lucide-svelte';
 	import { slide } from 'svelte/transition';
 	import type { Category } from '$lib/db';
 
@@ -8,6 +8,7 @@
 		categoryId: number | null;
 		dateFrom: string;
 		dateTo: string;
+		searchAllTime: boolean;
 	}
 
 	interface Props {
@@ -16,9 +17,18 @@
 		onFilterChange: (filters: FilterState) => void;
 		resultCount?: number;
 		totalCount?: number;
+		allTimeCount?: number;
+		onSearchInputRef?: (el: HTMLInputElement | null) => void;
 	}
 
-	let { categories, filters, onFilterChange, resultCount, totalCount }: Props = $props();
+	let { categories, filters, onFilterChange, resultCount, totalCount, allTimeCount, onSearchInputRef }: Props = $props();
+
+	let searchInput = $state<HTMLInputElement | null>(null);
+
+	// Report the search input ref to parent when it changes
+	$effect(() => {
+		onSearchInputRef?.(searchInput);
+	});
 
 	// Local UI state
 	let showAdvanced = $state(false);
@@ -28,7 +38,8 @@
 		filters.searchQuery.trim() !== '' ||
 		filters.categoryId !== null ||
 		filters.dateFrom !== '' ||
-		filters.dateTo !== ''
+		filters.dateTo !== '' ||
+		filters.searchAllTime
 	);
 
 	let hasAdvancedFilters = $derived(
@@ -65,8 +76,13 @@
 			searchQuery: '',
 			categoryId: null,
 			dateFrom: '',
-			dateTo: ''
+			dateTo: '',
+			searchAllTime: false
 		});
+	}
+
+	function toggleSearchAllTime() {
+		onFilterChange({ ...filters, searchAllTime: !filters.searchAllTime });
 	}
 
 	function clearSearch() {
@@ -77,23 +93,37 @@
 <div class="bg-surface rounded-xl shadow-md shadow-[var(--color-shadow)] overflow-hidden">
 	<!-- Search Bar -->
 	<div class="px-4 py-3">
-		<div class="relative">
-			<Search size={18} class="absolute left-3 top-1/2 -translate-y-1/2 text-charcoal-muted" />
-			<input
-				type="text"
-				placeholder="Search transactions..."
-				value={filters.searchQuery}
-				oninput={(e) => handleSearchInput(e.currentTarget.value)}
-				class="w-full pl-10 pr-10 py-2.5 bg-cream rounded-lg border border-transparent focus:border-primary-300 focus:ring-2 focus:ring-primary-100 focus:bg-surface transition-all text-charcoal placeholder:text-charcoal-muted/60"
-			/>
-			{#if filters.searchQuery}
-				<button
-					onclick={clearSearch}
-					class="absolute right-3 top-1/2 -translate-y-1/2 text-charcoal-muted hover:text-charcoal transition-colors"
-				>
-					<X size={18} />
-				</button>
-			{/if}
+		<div class="flex gap-2">
+			<div class="relative flex-1">
+				<Search size={18} class="absolute left-3 top-1/2 -translate-y-1/2 text-charcoal-muted" />
+				<input
+					type="text"
+					bind:this={searchInput}
+					placeholder={filters.searchAllTime ? "Search all transactions..." : "Search transactions..."}
+					value={filters.searchQuery}
+					oninput={(e) => handleSearchInput(e.currentTarget.value)}
+					class="w-full pl-10 pr-10 py-2.5 bg-cream rounded-lg border border-transparent focus:border-primary-300 focus:ring-2 focus:ring-primary-100 focus:bg-surface transition-all text-charcoal placeholder:text-charcoal-muted/60"
+				/>
+				{#if filters.searchQuery}
+					<button
+						onclick={clearSearch}
+						class="absolute right-3 top-1/2 -translate-y-1/2 text-charcoal-muted hover:text-charcoal transition-colors"
+					>
+						<X size={18} />
+					</button>
+				{/if}
+			</div>
+			<!-- All Time Toggle -->
+			<button
+				onclick={toggleSearchAllTime}
+				title={filters.searchAllTime ? "Searching all time" : "Search all time"}
+				class="flex items-center gap-1.5 px-3 py-2.5 rounded-lg border transition-all text-sm font-medium whitespace-nowrap {filters.searchAllTime
+					? 'bg-primary-100 border-primary-300 text-primary-700'
+					: 'bg-cream border-transparent text-charcoal-muted hover:text-charcoal hover:border-primary-200'}"
+			>
+				<Globe size={16} />
+				<span class="hidden sm:inline">All Time</span>
+			</button>
 		</div>
 	</div>
 
@@ -169,8 +199,14 @@
 	{#if hasActiveFilters}
 		<div class="px-4 py-2.5 bg-cream/50 border-t border-dashed border-theme-dashed flex items-center justify-between">
 			<span class="text-sm text-charcoal-muted">
-				{#if resultCount !== undefined && totalCount !== undefined}
-					Showing <span class="font-mono font-medium text-charcoal">{resultCount}</span> of {totalCount} transactions
+				{#if resultCount !== undefined}
+					{#if filters.searchAllTime && allTimeCount !== undefined}
+						Showing <span class="font-mono font-medium text-charcoal">{resultCount}</span> of {allTimeCount} total transactions
+					{:else if totalCount !== undefined}
+						Showing <span class="font-mono font-medium text-charcoal">{resultCount}</span> of {totalCount} transactions
+					{:else}
+						<span class="font-mono font-medium text-charcoal">{resultCount}</span> transactions found
+					{/if}
 				{:else}
 					Filters applied
 				{/if}

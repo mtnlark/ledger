@@ -23,11 +23,14 @@
 	import TransactionListSkeleton from '$lib/components/TransactionListSkeleton.svelte';
 	import TransactionFilters, { type FilterState } from '$lib/components/TransactionFilters.svelte';
 	import QuickAddFAB, { type QuickAddData } from '$lib/components/QuickAddFAB.svelte';
+	import KeyboardShortcuts from '$lib/components/KeyboardShortcuts.svelte';
 	import { Square } from 'lucide-svelte';
 
 	// State
 	let isLoading = $state(true);
 	let isSelectionMode = $state(false);
+	let quickAddOpen = $state(false);
+	let searchInputRef = $state<HTMLInputElement | null>(null);
 	let categories = $state<Category[]>([]);
 	let transactions = $state<Transaction[]>([]); // Current month's transactions
 	let allTransactions = $state<Transaction[]>([]); // All transactions (for filtering)
@@ -87,14 +90,19 @@
 		searchQuery: '',
 		categoryId: null,
 		dateFrom: '',
-		dateTo: ''
+		dateTo: '',
+		searchAllTime: false
 	});
 
-	// Check if we're using date filters (which require all transactions)
-	let hasDateFilters = $derived(filters.dateFrom !== '' || filters.dateTo !== '');
+	// Check if we're using filters that require all transactions
+	let needsAllTransactions = $derived(
+		filters.dateFrom !== '' ||
+		filters.dateTo !== '' ||
+		filters.searchAllTime
+	);
 
 	// Determine which transaction set to filter from
-	let baseTransactions = $derived(hasDateFilters ? allTransactions : transactions);
+	let baseTransactions = $derived(needsAllTransactions ? allTransactions : transactions);
 
 	// Filtered transactions
 	let filteredTransactions = $derived.by(() => {
@@ -126,9 +134,9 @@
 	});
 
 	async function handleFilterChange(newFilters: FilterState) {
-		// If date filters are being applied, load all transactions
-		const needsAllTransactions = newFilters.dateFrom !== '' || newFilters.dateTo !== '';
-		if (needsAllTransactions && allTransactions.length === 0) {
+		// If all-time search or date filters are being applied, load all transactions
+		const needsAll = newFilters.dateFrom !== '' || newFilters.dateTo !== '' || newFilters.searchAllTime;
+		if (needsAll && allTransactions.length === 0) {
 			allTransactions = await getAllTransactions();
 		}
 		filters = newFilters;
@@ -422,6 +430,22 @@
 			settings = await getSettings();
 		}
 	});
+
+	// Keyboard shortcut handlers
+	function handleOpenQuickAdd() {
+		if (!isLoading) {
+			quickAddOpen = true;
+		}
+	}
+
+	function handleFocusSearch() {
+		searchInputRef?.focus();
+	}
+
+	// Expose ref setter for TransactionFilters to use
+	function setSearchInputRef(el: HTMLInputElement | null) {
+		searchInputRef = el;
+	}
 </script>
 
 <svelte:head>
@@ -484,13 +508,17 @@
 				onFilterChange={handleFilterChange}
 				resultCount={filteredTransactions.length}
 				totalCount={transactions.length}
+				allTimeCount={allTransactions.length}
+				onSearchInputRef={setSearchInputRef}
 			/>
 
 			<!-- Transaction List -->
 			<div>
 				<div class="flex items-center justify-between mb-4">
 					<h2 class="font-display text-xl font-medium text-charcoal">
-						{#if filters.searchQuery || filters.categoryId !== null || filters.dateFrom || filters.dateTo}
+						{#if filters.searchAllTime}
+							All Transactions
+						{:else if filters.searchQuery || filters.categoryId !== null || filters.dateFrom || filters.dateTo}
 							Filtered Transactions
 						{:else}
 							Recent Transactions
@@ -571,5 +599,12 @@
 		{categories}
 		{settings}
 		onSubmit={handleQuickAdd}
+		bind:isOpen={quickAddOpen}
 	/>
 {/if}
+
+<!-- Keyboard Shortcuts -->
+<KeyboardShortcuts
+	onOpenQuickAdd={handleOpenQuickAdd}
+	onFocusSearch={handleFocusSearch}
+/>

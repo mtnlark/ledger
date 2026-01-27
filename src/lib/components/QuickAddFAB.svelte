@@ -10,6 +10,7 @@
 		categories: Category[];
 		settings: Settings;
 		onSubmit: (data: QuickAddData) => void | Promise<void>;
+		isOpen?: boolean;
 	}
 
 	export interface QuickAddData {
@@ -25,9 +26,16 @@
 		isSubscription: boolean;
 	}
 
-	let { categories, settings, onSubmit }: Props = $props();
+	let { categories, settings, onSubmit, isOpen = $bindable(false) }: Props = $props();
 
+	// Sync internal expanded state with bindable isOpen prop
 	let isExpanded = $state(false);
+
+	$effect(() => {
+		if (isOpen && !isExpanded) {
+			open();
+		}
+	});
 	let merchant = $state('');
 	let amountStr = $state('');
 	let categoryId = $state(0);
@@ -63,6 +71,7 @@
 
 	function close() {
 		isExpanded = false;
+		isOpen = false;
 		resetForm();
 	}
 
