@@ -67,6 +67,14 @@ export const config = {
 	},
 
 	/**
+	 * Recurring suggestions auto-entry
+	 */
+	recurringSuggestions: {
+		/** Tolerance for matching existing transactions (15% = allow 15% amount difference) */
+		amountTolerance: 0.15
+	},
+
+	/**
 	 * Date parsing configuration
 	 */
 	date: {

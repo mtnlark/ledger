@@ -134,6 +134,7 @@ export interface Settings {
 	cancelledSubscriptions: CancelledSubscription[]; // Subscriptions user has marked as cancelled
 	confirmedActiveSubscriptions: string[]; // Normalized merchant names user confirmed are still active (override staleness)
 	iCloudBackupEnabled: boolean; // Whether to copy backups to iCloud Drive
+	lastAutoSuggestedMonth?: string; // "YYYY-MM" format - tracks when recurring suggestions were last shown
 }
 
 // Database class

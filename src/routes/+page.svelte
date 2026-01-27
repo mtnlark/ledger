@@ -5,9 +5,10 @@
 	import { initializeStorage } from '$lib/storage';
 	import { addTransaction, updateTransaction, deleteTransaction, bulkDeleteTransactions, bulkUpdateCategory, splitTransaction, getTransactionsByMonth, getAllTransactions, getAvailableMonths } from '$lib/stores/transactions';
 	import { getAllCategories } from '$lib/stores/categories';
-	import { getSettings, cancelSubscription } from '$lib/stores/settings';
+	import { getSettings, cancelSubscription, dismissRecurringSuggestionsForMonth } from '$lib/stores/settings';
 	import { getBudgetForMonth, saveBudget } from '$lib/stores/budget';
 	import { getContributionsAffectingAvailable } from '$lib/stores/savingsContributions';
+	import { getRecurringSuggestions, shouldShowRecurringBanner, type RecurringSuggestion } from '$lib/stores/recurringSuggestions';
 	import { sumCurrency } from '$lib/utils/currency';
 	import { getSelectedMonth, setSelectedMonth } from '$lib/stores/selectedMonth';
 	import { toast } from '$lib/stores/toast';
@@ -26,6 +27,8 @@
 	import TransactionFilters, { type FilterState } from '$lib/components/TransactionFilters.svelte';
 	import QuickAddFAB, { type QuickAddData } from '$lib/components/QuickAddFAB.svelte';
 	import KeyboardShortcuts from '$lib/components/KeyboardShortcuts.svelte';
+	import RecurringSuggestionsBanner from '$lib/components/RecurringSuggestionsBanner.svelte';
+	import RecurringSuggestionsModal from '$lib/components/RecurringSuggestionsModal.svelte';
 	import { Square } from 'lucide-svelte';
 
 	// State
@@ -44,6 +47,11 @@
 	let splittingTransaction = $state<Transaction | null>(null);
 	let currentMonth = $state(getMonthKey(new Date()));
 	let availableMonths = $state<string[]>([getMonthKey(new Date())]);
+
+	// Recurring suggestions state
+	let showRecurringBanner = $state(false);
+	let showRecurringSuggestionsModal = $state(false);
+	let recurringSuggestions = $state<RecurringSuggestion[]>([]);
 
 	// Confirm dialog state
 	let confirmDialog = $state<{
@@ -179,6 +187,14 @@
 			// Load savings contributions that affect available to spend
 			const contributions = await getContributionsAffectingAvailable(currentMonth);
 			savedFromContributions = sumCurrency(contributions.map(c => c.amount));
+
+			// Check for recurring suggestions
+			if (shouldShowRecurringBanner(currentMonth, settings.lastAutoSuggestedMonth)) {
+				recurringSuggestions = await getRecurringSuggestions(currentMonth);
+				showRecurringBanner = recurringSuggestions.length > 0;
+			} else {
+				showRecurringBanner = false;
+			}
 		} catch (error) {
 			console.error('Failed to load data:', error);
 		} finally {
@@ -429,6 +445,65 @@
 		}
 	}
 
+	// Handle adding selected recurring suggestions
+	async function handleAddSelectedSuggestions(items: Array<RecurringSuggestion & { date: Date }>) {
+		try {
+			for (const item of items) {
+				await addTransaction({
+					date: item.date,
+					merchant: item.merchant,
+					amount: item.expectedAmount,
+					categoryId: item.categoryId,
+					isShared: item.isShared,
+					isSettled: false,
+					splitType: item.splitType,
+					splitValue: item.splitValue,
+					isEssential: item.isEssential,
+					isSubscription: item.isSubscription,
+					subscriptionFrequency: item.frequency === 'annual' ? 'annual' : 'monthly'
+				});
+			}
+
+			// Reload transactions
+			transactions = await getTransactionsByMonth(currentMonth);
+			availableMonths = await getAvailableMonths();
+			if (allTransactions.length > 0) {
+				allTransactions = await getAllTransactions();
+			}
+
+			// Refresh suggestions (remove added ones)
+			recurringSuggestions = await getRecurringSuggestions(currentMonth);
+
+			// Only dismiss if all suggestions have been added
+			if (recurringSuggestions.length === 0) {
+				await dismissRecurringSuggestionsForMonth(currentMonth);
+				settings = await getSettings();
+			}
+
+			showRecurringBanner = recurringSuggestions.length > 0;
+			showRecurringSuggestionsModal = false;
+
+			toast.success(items.length === 1
+				? 'Transaction added'
+				: `${items.length} transactions added`);
+		} catch (error) {
+			console.error('Failed to add recurring suggestions:', error);
+			toast.error('Failed to add transactions');
+		}
+	}
+
+	// Handle dismissing recurring suggestions for this month
+	async function handleDismissRecurringSuggestions() {
+		try {
+			await dismissRecurringSuggestionsForMonth(currentMonth);
+			settings = await getSettings();
+			showRecurringBanner = false;
+			showRecurringSuggestionsModal = false;
+		} catch (error) {
+			console.error('Failed to dismiss recurring suggestions:', error);
+		}
+	}
+
 	// Refresh categories/settings when navigating back to this page
 	// This ensures changes made on Settings page are picked up without full reload
 	afterNavigate(async () => {
@@ -470,6 +545,17 @@
 			onMonthChange={handleMonthChange}
 		/>
 	</HeaderNav>
+
+	<!-- Recurring Suggestions Banner -->
+	{#if showRecurringBanner && !isLoading}
+		<div class="max-w-4xl mx-auto px-4 pt-4">
+			<RecurringSuggestionsBanner
+				suggestionCount={recurringSuggestions.length}
+				onReview={() => showRecurringSuggestionsModal = true}
+				onDismiss={handleDismissRecurringSuggestions}
+			/>
+		</div>
+	{/if}
 
 	<!-- Main Content -->
 	<main class="max-w-4xl mx-auto px-4 py-6 space-y-6">
@@ -602,6 +688,18 @@
 	variant={confirmDialog.variant}
 	onConfirm={handleConfirm}
 	onCancel={closeConfirmDialog}
+/>
+
+<!-- Recurring Suggestions Modal -->
+<RecurringSuggestionsModal
+	isOpen={showRecurringSuggestionsModal}
+	suggestions={recurringSuggestions}
+	{categories}
+	{settings}
+	{currentMonth}
+	onAddSelected={handleAddSelectedSuggestions}
+	onDismiss={handleDismissRecurringSuggestions}
+	onClose={() => showRecurringSuggestionsModal = false}
 />
 
 <!-- Quick Add FAB -->

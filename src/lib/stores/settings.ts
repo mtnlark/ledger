@@ -90,3 +90,15 @@ export async function updateICloudBackup(enabled: boolean): Promise<void> {
 	await db.settings.update(1, { iCloudBackupEnabled: enabled });
 	await persistData();
 }
+
+// Dismiss recurring suggestions for the current month
+export async function dismissRecurringSuggestionsForMonth(month: string): Promise<void> {
+	await db.settings.update(1, { lastAutoSuggestedMonth: month });
+	await persistData();
+}
+
+// Reset recurring suggestions dismissal (for testing/debugging)
+export async function resetRecurringSuggestionsDismissal(): Promise<void> {
+	await db.settings.update(1, { lastAutoSuggestedMonth: undefined });
+	await persistData();
+}
