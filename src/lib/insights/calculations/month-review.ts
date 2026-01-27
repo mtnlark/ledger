@@ -267,6 +267,10 @@ const SOURCES_AFFECTING_AVAILABLE = new Set(['bank_transfer', 'other']);
  * IMPORTANT: Only surfaces positive insights (above average, highest month).
  * Never flags low savings rates to avoid false alarms from mid-month paycheck timing.
  *
+ * Note: totalSaved includes ALL contributions (retirement, investment, etc.)
+ * for consistency with the Savings tab. savingsRate only uses contributions
+ * that affect available to spend (bank_transfer, other).
+ *
  * @param selectedMonth The month being reviewed (YYYY-MM)
  * @param contributions All contributions for the selected month
  * @param allContributions All contributions across all months (for comparison)
@@ -280,31 +284,39 @@ export function computeSavingsReview(
 	income: number | null,
 	allBudgets: { month: string; income: number }[]
 ): SavingsReviewResult | null {
-	// Filter to contributions that affect available (bank_transfer, other)
-	const relevantContributions = contributions.filter((c) =>
-		SOURCES_AFFECTING_AVAILABLE.has(c.source)
-	);
-
-	// Calculate total saved this month
-	const totalSaved = relevantContributions.reduce((sum, c) => sum + c.amount, 0);
+	// Total saved includes ALL contributions (for consistency with Savings tab)
+	const totalSaved = contributions.reduce((sum, c) => sum + c.amount, 0);
 
 	// If no savings this month, nothing to report
 	if (totalSaved === 0) return null;
 
-	// Calculate savings rate (if income is available)
-	const savingsRate = income && income > 0 ? totalSaved / income : null;
+	// For savings rate, only count contributions that affect available to spend
+	const affectingAvailable = contributions.filter((c) =>
+		SOURCES_AFFECTING_AVAILABLE.has(c.source)
+	);
+	const totalAffectingAvailable = affectingAvailable.reduce((sum, c) => sum + c.amount, 0);
 
-	// Group all contributions by month for historical comparison
-	const savedByMonth = new Map<string, number>();
+	// Calculate savings rate (if income is available)
+	const savingsRate = income && income > 0 ? totalAffectingAvailable / income : null;
+
+	// Group ALL contributions by month for "highest month" comparison
+	const allSavedByMonth = new Map<string, number>();
+	for (const c of allContributions) {
+		const month = getMonthKey(new Date(c.date));
+		allSavedByMonth.set(month, (allSavedByMonth.get(month) || 0) + c.amount);
+	}
+
+	// Check if this is the highest savings month (using ALL contributions)
+	const allTotals = [...allSavedByMonth.values()];
+	const isHighestMonth = allTotals.length >= 2 && totalSaved >= Math.max(...allTotals);
+
+	// For savings rate comparison, group only affecting-available contributions
+	const rateByMonth = new Map<string, number>();
 	for (const c of allContributions) {
 		if (!SOURCES_AFFECTING_AVAILABLE.has(c.source)) continue;
 		const month = getMonthKey(new Date(c.date));
-		savedByMonth.set(month, (savedByMonth.get(month) || 0) + c.amount);
+		rateByMonth.set(month, (rateByMonth.get(month) || 0) + c.amount);
 	}
-
-	// Check if this is the highest savings month
-	const allTotals = [...savedByMonth.values()];
-	const isHighestMonth = allTotals.length >= 2 && totalSaved >= Math.max(...allTotals);
 
 	// Calculate historical savings rates for comparison (only if we have current rate)
 	let vsAverage: SavingsReviewResult['vsAverage'] = null;
@@ -315,7 +327,7 @@ export function computeSavingsReview(
 			if (budget.month === selectedMonth) continue; // Exclude current month
 			if (budget.income <= 0) continue;
 
-			const monthSaved = savedByMonth.get(budget.month) || 0;
+			const monthSaved = rateByMonth.get(budget.month) || 0;
 			if (monthSaved > 0) {
 				historicalRates.push(monthSaved / budget.income);
 			}

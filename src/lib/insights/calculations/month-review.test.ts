@@ -470,32 +470,40 @@ describe('computeSavingsReview', () => {
 			expect(result).toBeNull();
 		});
 
-		it('returns null when only payroll deduction contributions (not affecting available)', () => {
+		it('includes payroll deductions in totalSaved (for consistency with Savings tab)', () => {
 			const contributions = [
 				makeContribution(new Date('2025-06-15'), 500, 'payroll_deduction')
 			];
 			const result = computeSavingsReview('2025-06', contributions, contributions, 5000, []);
-			expect(result).toBeNull();
+			expect(result).not.toBeNull();
+			expect(result!.totalSaved).toBe(500);
+			// But savings rate should be null since payroll doesn't affect available
+			expect(result!.savingsRate).toBe(0); // 0/5000 = 0
 		});
 
-		it('includes bank_transfer and other sources', () => {
+		it('includes ALL contribution sources in totalSaved', () => {
 			const contributions = [
 				makeContribution(new Date('2025-06-15'), 500, 'bank_transfer'),
-				makeContribution(new Date('2025-06-20'), 200, 'other')
+				makeContribution(new Date('2025-06-20'), 200, 'other'),
+				makeContribution(new Date('2025-06-22'), 100, 'interest'),
+				makeContribution(new Date('2025-06-25'), 150, 'employer_match'),
+				makeContribution(new Date('2025-06-28'), 300, 'payroll_deduction')
 			];
 			const result = computeSavingsReview('2025-06', contributions, contributions, 5000, []);
 			expect(result).not.toBeNull();
-			expect(result!.totalSaved).toBe(700);
+			// Total should include ALL contributions
+			expect(result!.totalSaved).toBe(1250); // 500+200+100+150+300
 		});
 
-		it('excludes interest and employer_match contributions', () => {
+		it('only counts bank_transfer and other toward savings rate', () => {
 			const contributions = [
 				makeContribution(new Date('2025-06-15'), 500, 'bank_transfer'),
 				makeContribution(new Date('2025-06-20'), 100, 'interest'),
 				makeContribution(new Date('2025-06-25'), 200, 'employer_match')
 			];
 			const result = computeSavingsReview('2025-06', contributions, contributions, 5000, []);
-			expect(result!.totalSaved).toBe(500); // Only bank_transfer counts
+			expect(result!.totalSaved).toBe(800); // All contributions
+			expect(result!.savingsRate).toBe(0.1); // Only 500/5000 = 10%
 		});
 	});
 
@@ -526,14 +534,14 @@ describe('computeSavingsReview', () => {
 	});
 
 	describe('highest month detection', () => {
-		it('detects when current month is highest savings month', () => {
+		it('detects when current month is highest savings month (all sources)', () => {
 			const allContributions = [
 				makeContribution(new Date('2025-04-15'), 500, 'bank_transfer'),
-				makeContribution(new Date('2025-05-15'), 600, 'bank_transfer'),
-				makeContribution(new Date('2025-06-15'), 800, 'bank_transfer')
+				makeContribution(new Date('2025-05-15'), 600, 'payroll_deduction'), // includes all sources
+				makeContribution(new Date('2025-06-15'), 800, 'employer_match')
 			];
 			const currentContributions = [
-				makeContribution(new Date('2025-06-15'), 800, 'bank_transfer')
+				makeContribution(new Date('2025-06-15'), 800, 'employer_match')
 			];
 			const result = computeSavingsReview('2025-06', currentContributions, allContributions, 5000, []);
 			expect(result!.isHighestMonth).toBe(true);
@@ -541,7 +549,7 @@ describe('computeSavingsReview', () => {
 
 		it('returns false when not highest month', () => {
 			const allContributions = [
-				makeContribution(new Date('2025-04-15'), 1000, 'bank_transfer'),
+				makeContribution(new Date('2025-04-15'), 1000, 'payroll_deduction'),
 				makeContribution(new Date('2025-05-15'), 600, 'bank_transfer'),
 				makeContribution(new Date('2025-06-15'), 500, 'bank_transfer')
 			];
@@ -557,6 +565,22 @@ describe('computeSavingsReview', () => {
 				makeContribution(new Date('2025-06-15'), 500, 'bank_transfer')
 			];
 			const result = computeSavingsReview('2025-06', contributions, contributions, 5000, []);
+			expect(result!.isHighestMonth).toBe(false);
+		});
+
+		it('compares total saved across all sources for highest month', () => {
+			// April: 1000 (500 bank + 500 payroll)
+			// June: 800 bank_transfer only
+			const allContributions = [
+				makeContribution(new Date('2025-04-15'), 500, 'bank_transfer'),
+				makeContribution(new Date('2025-04-20'), 500, 'payroll_deduction'),
+				makeContribution(new Date('2025-06-15'), 800, 'bank_transfer')
+			];
+			const currentContributions = [
+				makeContribution(new Date('2025-06-15'), 800, 'bank_transfer')
+			];
+			const result = computeSavingsReview('2025-06', currentContributions, allContributions, 5000, []);
+			// April total (1000) > June total (800), so not highest
 			expect(result!.isHighestMonth).toBe(false);
 		});
 	});
