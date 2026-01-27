@@ -10,6 +10,48 @@ This document outlines feature ideas and implementation considerations for futur
 
 ## Recently Shipped
 
+### Savings Tracking
+- **Status**: Shipped
+- **Implementation**: Complete savings module with accounts, contributions, and insights
+- **Features**:
+  - Track contributions to savings, retirement, and investment accounts
+  - Default accounts: Emergency Fund, High-Yield Savings, 401(k), Roth IRA, Brokerage
+  - Contribution sources: payroll deduction, bank transfer, interest, employer match, other
+  - Balance tracking for savings-type accounts only
+  - Savings rate calculation (only bank_transfer/other reduce "available to spend")
+  - New Savings page between Budget and Insights in navigation
+  - SavingsInsights card on Insights page with totals and trends
+  - Integration with CashFlowCard for accurate "available to spend" calculation
+- **Files touched**:
+  - New: `src/lib/stores/savingsAccounts.ts`, `savingsContributions.ts`, `src/routes/savings/+page.svelte`
+  - New: `src/lib/components/insights/SavingsInsights.svelte`
+  - Modified: `src/lib/db/index.ts` (schema v4), `SideNav.svelte`, `CashFlowCard.svelte`
+
+### Month in Review Redesign
+- **Status**: Shipped
+- **Implementation**: Hero stat + expandable grouped insights for completed months
+- **UX improvements**:
+  - Hero stat displays most impactful insight at top (rank superlative or savings achievement)
+  - "See more" toggle expands all grouped insights
+  - Insights grouped by: Spending, Savings, Highlights
+  - Narrative-style labels ("Biggest purchase:", "Most visited merchant:")
+  - Consistent subcopy format ("out of X months")
+  - Icons: Flame for high spending, Trophy for savings achievements, TrendingDown for low spending
+- **Files touched**: `src/lib/components/insights/SmartTakeaways.svelte`
+
+### 12-Month Rolling Window for Historical Comparisons
+- **Status**: Shipped
+- **Implementation**: Historical rank and vs-average calculations now use rolling 12-month window
+- **Rationale**: Prevents ancient history from skewing comparisons; more relevant baseline
+- **Files touched**: `src/lib/insights/calculations/month-review.ts`, `month-review.test.ts`
+
+### Savings Insights in SmartTakeaways
+- **Status**: Shipped
+- **Implementation**: Positive-only savings insights integrated into Month in Review
+- **Design decision**: Never flag low savings rates (avoids false alarms from bimonthly paycheck timing)
+- **Insights shown**: Highest savings month, savings rate above average (10%+ threshold)
+- **Files touched**: `src/lib/insights/calculations/month-review.ts` (computeSavingsReview)
+
 ### Search Across All Time
 - **Status**: Shipped
 - **Implementation**: Added "All Time" toggle to TransactionFilters component
