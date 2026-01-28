@@ -120,4 +120,19 @@ describe('computeYTDStats', () => {
 		expect(result.dailySpending.get('2025-03-15')).toBe(80);
 		expect(result.dailySpending.get('2025-03-16')).toBe(25);
 	});
+
+	it('excludes future-dated transactions from spend days count', () => {
+		// System time is March 20, 2025
+		// Transaction on March 15 (past) and March 25 (future)
+		const txs = [
+			makeTx({ date: new Date(2025, 2, 15, 12) }), // past
+			makeTx({ date: new Date(2025, 2, 25, 12) }) // future (5 days from now)
+		];
+
+		const result = computeYTDStats(txs, 2025);
+		// Should only count the past transaction, not the future one
+		expect(result.spendDays).toBe(1);
+		expect(result.daysInYearSoFar).toBe(79); // March 20 = day 79
+		expect(result.noSpendDays).toBe(78); // 79 - 1 = 78
+	});
 });

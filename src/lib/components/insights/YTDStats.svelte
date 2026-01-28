@@ -87,11 +87,15 @@
 		return max.merchant ? max : null;
 	});
 
-	// No-spend days calculation
+	// No-spend days calculation (only count days up to today)
 	let spendDays = $derived.by(() => {
+		const today = format(new Date(), 'yyyy-MM-dd');
 		const days = new Set<string>();
 		for (const t of ytdTransactions) {
-			days.add(format(new Date(t.date), 'yyyy-MM-dd'));
+			const dateKey = format(new Date(t.date), 'yyyy-MM-dd');
+			if (dateKey <= today) {
+				days.add(dateKey);
+			}
 		}
 		return days;
 	});

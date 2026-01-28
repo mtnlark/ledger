@@ -36,15 +36,19 @@ export function computeYTDStats(allTransactions: Transaction[], year?: number): 
 		totalSpent += getUserAmount(t);
 	}
 
-	// Spend days
-	const spendDaySet = new Set<string>();
-	for (const t of ytdTransactions) {
-		spendDaySet.add(format(new Date(t.date), 'yyyy-MM-dd'));
-	}
-	const spendDays = spendDaySet.size;
-
 	// Days in year so far (use UTC to avoid DST-related partial-day errors)
 	const now = new Date();
+	const todayKey = format(now, 'yyyy-MM-dd');
+
+	// Spend days (only count days up to today, excluding future-dated transactions)
+	const spendDaySet = new Set<string>();
+	for (const t of ytdTransactions) {
+		const dateKey = format(new Date(t.date), 'yyyy-MM-dd');
+		if (dateKey <= todayKey) {
+			spendDaySet.add(dateKey);
+		}
+	}
+	const spendDays = spendDaySet.size;
 	const startUTC = Date.UTC(currentYear, 0, 1);
 	const todayUTC = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
 	const daysInYearSoFar =
