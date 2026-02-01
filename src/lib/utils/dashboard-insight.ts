@@ -15,6 +15,7 @@ import { getAllCategories } from '$lib/stores/categories';
 import { getBudgetStatus } from '$lib/utils/budget-status';
 import { config } from '$lib/config';
 import { formatCurrency } from '$lib/utils/format-helpers';
+import { filterUpToDate } from '$lib/utils/date-helpers';
 import type { ComponentType } from 'svelte';
 import { AlertTriangle, TrendingUp, Gauge, CheckCircle, BarChart3 } from 'lucide-svelte';
 
@@ -219,8 +220,11 @@ function checkPaceWarning(
 	if (currentDay < config.dashboardInsight.paceWarningMinDay) return null;
 	if (!budget || budget.income <= 0) return null;
 
+	// Exclude future-dated transactions (e.g. auto-added recurring) from pace calculation
+	const pastTransactions = filterUpToDate(transactions);
+
 	// Calculate total spent (user's portion)
-	const totalSpent = transactions.reduce((sum, t) => {
+	const totalSpent = pastTransactions.reduce((sum, t) => {
 		const userAmount = t.isShared ? t.amount - t.partnerShare : t.amount;
 		return sum + userAmount;
 	}, 0);

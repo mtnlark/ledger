@@ -83,6 +83,25 @@ export function formatDateForInput(date: Date): string {
 }
 
 /**
+ * Filter items to only those with a date on or before the given reference date.
+ * Compares calendar dates only (time-of-day is ignored).
+ * Useful for excluding future-dated transactions from pace/velocity calculations.
+ *
+ * @param items Array of objects with a `date` property (Date or ISO string)
+ * @param asOf Reference date (defaults to now). Items on this date are included.
+ */
+export function filterUpToDate<T extends { date: Date | string }>(items: T[], asOf?: Date): T[] {
+	const ref = asOf ?? new Date();
+	// Compare calendar dates: normalize both to midnight for date-only comparison
+	const refDay = new Date(ref.getFullYear(), ref.getMonth(), ref.getDate()).getTime();
+	return items.filter((item) => {
+		const d = item.date instanceof Date ? item.date : new Date(item.date);
+		const itemDay = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+		return itemDay <= refDay;
+	});
+}
+
+/**
  * Get start and end dates for a month given a month key (YYYY-MM)
  * Returns dates in local timezone
  */

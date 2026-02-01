@@ -7,6 +7,7 @@
 	import { computeStdDev } from '$lib/insights/calculations/stats';
 	import { computeSavingsReview } from '$lib/insights/calculations/month-review';
 	import { formatCurrency } from '$lib/utils/format-helpers';
+	import { filterUpToDate } from '$lib/utils/date-helpers';
 
 	interface Props {
 		currentMonthTransactions: Transaction[];
@@ -90,13 +91,16 @@
 		return engine.getAnomalies(currentSpending, categoryStats, categories, config.insights.anomaly, selectedMonth);
 	});
 
+	// Transactions up to today (excludes future-dated recurring entries) for pace calculations
+	let pastTransactions = $derived(isCurrentMonth ? filterUpToDate(currentMonthTransactions) : []);
+
 	// Calculate pace projection (only meaningful for current month)
 	let paceProjection = $derived.by(() => {
 		if (!isCurrentMonth) return null;
 		const today = new Date();
 		const currentDay = today.getDate();
 		const daysInMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
-		const totalSpent = engine.getTotalSpent(currentMonthTransactions, selectedMonth);
+		const totalSpent = engine.getTotalSpent(pastTransactions, selectedMonth);
 		return engine.getPaceProjection(totalSpent, budget, currentDay, daysInMonth, selectedMonth);
 	});
 
@@ -152,7 +156,7 @@
 
 		const today = new Date();
 		const currentDay = today.getDate();
-		const currentTotal = engine.getTotalSpent(currentMonthTransactions, selectedMonth);
+		const currentTotal = engine.getTotalSpent(pastTransactions, selectedMonth);
 
 		const prevMonthDate = parseMonthKey(previousMonthKey);
 		const daysInPrevMonth = new Date(prevMonthDate.getFullYear(), prevMonthDate.getMonth() + 1, 0).getDate();

@@ -5,7 +5,8 @@ import {
 	parseDateString,
 	excelDateToJS,
 	formatDateForInput,
-	getMonthDateRange
+	getMonthDateRange,
+	filterUpToDate
 } from './date-helpers';
 
 describe('Date Helpers', () => {
@@ -186,6 +187,59 @@ describe('Date Helpers', () => {
 			expect(parsed.getFullYear()).toBe(original.getFullYear());
 			expect(parsed.getMonth()).toBe(original.getMonth());
 			expect(parsed.getDate()).toBe(original.getDate());
+		});
+	});
+
+	describe('filterUpToDate', () => {
+		const asOf = new Date(2026, 1, 15); // Feb 15, 2026
+
+		it('returns empty array for empty input', () => {
+			expect(filterUpToDate([], asOf)).toEqual([]);
+		});
+
+		it('includes items on or before the reference date', () => {
+			const items = [
+				{ date: new Date(2026, 1, 10) }, // Feb 10
+				{ date: new Date(2026, 1, 14) }, // Feb 14
+				{ date: new Date(2026, 1, 15) }  // Feb 15 (same day)
+			];
+			expect(filterUpToDate(items, asOf)).toHaveLength(3);
+		});
+
+		it('excludes items after the reference date', () => {
+			const items = [
+				{ date: new Date(2026, 1, 10) }, // Feb 10 - included
+				{ date: new Date(2026, 1, 16) }, // Feb 16 - excluded
+				{ date: new Date(2026, 1, 28) }  // Feb 28 - excluded
+			];
+			const result = filterUpToDate(items, asOf);
+			expect(result).toHaveLength(1);
+			expect(result[0].date).toEqual(new Date(2026, 1, 10));
+		});
+
+		it('handles string dates (ISO format)', () => {
+			const items = [
+				{ date: '2026-02-10T00:00:00.000Z' }, // Feb 10
+				{ date: '2026-02-20T00:00:00.000Z' }  // Feb 20
+			];
+			const result = filterUpToDate(items, asOf);
+			expect(result).toHaveLength(1);
+		});
+
+		it('preserves all properties on filtered items', () => {
+			const items = [
+				{ date: new Date(2026, 1, 10), merchant: 'Store A', amount: 50 }
+			];
+			const result = filterUpToDate(items, asOf);
+			expect(result[0]).toEqual(items[0]);
+		});
+
+		it('compares calendar dates only (ignores time)', () => {
+			// Item at end of day on Feb 15 should still be included
+			const items = [
+				{ date: new Date(2026, 1, 15, 23, 59, 59) }
+			];
+			expect(filterUpToDate(items, asOf)).toHaveLength(1);
 		});
 	});
 
