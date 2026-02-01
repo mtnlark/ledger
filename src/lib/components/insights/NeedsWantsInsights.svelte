@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { Transaction, Category } from '$lib/db';
+	import { goto } from '$app/navigation';
 	import { formatCurrencyWhole } from '$lib/utils/format-helpers';
 	import { getInsightsEngine } from '$lib/insights';
 	import InsightGroup from './InsightGroup.svelte';
@@ -77,6 +78,12 @@
 				<p class="text-sm text-charcoal-muted mt-1">
 					Add transactions to see your needs vs wants breakdown
 				</p>
+				<button
+					onclick={() => goto('/')}
+					class="mt-3 px-4 py-2 bg-primary-500 text-white text-sm font-medium rounded-lg hover:bg-primary-600 transition-colors"
+				>
+					Add Transaction
+				</button>
 			</div>
 		{:else}
 			<!-- Visual Bar -->

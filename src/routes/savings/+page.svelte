@@ -174,7 +174,7 @@
 		<MonthPicker {currentMonth} {availableMonths} onMonthChange={handleMonthChange} />
 	</HeaderNav>
 
-	<main class="pt-20 pb-8 px-6 max-w-4xl mx-auto">
+	<main class="pt-20 pb-8 px-6 max-w-4xl mx-auto" aria-live="polite">
 		{#if isLoading}
 			<!-- Loading Skeleton -->
 			<div class="space-y-6">

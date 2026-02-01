@@ -8,6 +8,7 @@
 		title: string;
 		titleId?: string;
 		maxWidth?: 'sm' | 'md' | 'lg' | 'xl';
+		zIndex?: number;
 		showCloseButton?: boolean;
 		onClose: () => void;
 		children: Snippet;
@@ -18,6 +19,7 @@
 		title,
 		titleId,
 		maxWidth = 'md',
+		zIndex = 50,
 		showCloseButton = true,
 		onClose,
 		children
@@ -41,7 +43,7 @@
 	}
 
 	function handleKeydown(e: KeyboardEvent) {
-		if (e.key === 'Escape') {
+		if (isOpen && e.key === 'Escape') {
 			onClose();
 		}
 	}
@@ -50,11 +52,13 @@
 <svelte:window onkeydown={handleKeydown} />
 
 {#if isOpen}
+
 	<!-- Backdrop -->
 	<!-- svelte-ignore a11y_click_events_have_key_events -->
 	<!-- svelte-ignore a11y_no_static_element_interactions -->
 	<div
-		class="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4 backdrop-blur-sm"
+		class="fixed inset-0 bg-black/40 flex items-center justify-center p-4 backdrop-blur-sm"
+		style="z-index: {zIndex};"
 		onclick={handleBackdropClick}
 	>
 		<!-- Modal -->

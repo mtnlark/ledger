@@ -1,10 +1,10 @@
 <script lang="ts">
-	import { X, Trash2 } from 'lucide-svelte';
+	import { Trash2 } from 'lucide-svelte';
 	import type { SavingsAccount, SavingsAccountType } from '$lib/db';
-	import { focusTrap } from '$lib/utils/focus-trap';
 	import { cleanNumberInput } from '$lib/utils/form-validation';
 	import { updateSavingsAccount, deleteSavingsAccount } from '$lib/stores/savingsAccounts';
 	import { toast } from '$lib/stores/toast';
+	import ModalContainer from './ModalContainer.svelte';
 
 	interface Props {
 		isOpen: boolean;
@@ -80,18 +80,6 @@
 		}
 	}
 
-	function handleBackdropClick(e: MouseEvent) {
-		if (e.target === e.currentTarget) {
-			onClose();
-		}
-	}
-
-	function handleKeydown(e: KeyboardEvent) {
-		if (e.key === 'Escape') {
-			onClose();
-		}
-	}
-
 	// Icon suggestions by type
 	const iconSuggestions: Record<SavingsAccountType, string[]> = {
 		savings: ['💰', '☔', '🌱', '🏦', '💵', '🐷'],
@@ -112,42 +100,8 @@
 	];
 </script>
 
-<svelte:window onkeydown={handleKeydown} />
-
-{#if isOpen && account}
-	<!-- Backdrop -->
-	<!-- svelte-ignore a11y_click_events_have_key_events -->
-	<!-- svelte-ignore a11y_no_static_element_interactions -->
-	<div
-		class="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4 backdrop-blur-sm"
-		onclick={handleBackdropClick}
-	>
-		<!-- Modal -->
-		<div
-			class="bg-surface rounded-xl shadow-xl shadow-[var(--color-shadow)] max-w-md w-full max-h-[90vh] overflow-y-auto animate-enter"
-			role="dialog"
-			aria-modal="true"
-			aria-labelledby="edit-account-title"
-			tabindex="-1"
-			onclick={(e) => e.stopPropagation()}
-			use:focusTrap
-		>
-			<!-- Header -->
-			<div
-				class="px-6 py-4 border-b border-dashed border-theme-dashed flex items-center justify-between"
-			>
-				<h2 id="edit-account-title" class="font-display text-xl font-medium text-charcoal">
-					Edit Account
-				</h2>
-				<button
-					onclick={onClose}
-					class="text-charcoal-muted hover:text-charcoal p-1.5 hover:bg-surface-hover rounded-lg transition-colors"
-					aria-label="Close"
-				>
-					<X size={20} />
-				</button>
-			</div>
-
+<ModalContainer isOpen={isOpen && !!account} title="Edit Account" maxWidth="md" onClose={onClose}>
+	{#if account}
 			<!-- Form -->
 			<form onsubmit={handleSubmit} class="p-6 space-y-4">
 				<!-- Name -->
@@ -335,6 +289,5 @@
 					</button>
 				</div>
 			</form>
-		</div>
-	</div>
-{/if}
+	{/if}
+</ModalContainer>

@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { RefreshCw, X, Calendar, Zap, AlertCircle } from 'lucide-svelte';
+	import { goto } from '$app/navigation';
 	import type { Category, Transaction, CancelledSubscription } from '$lib/db';
 	import { createCategoryHelpers } from '$lib/utils/category-helpers';
 	import { formatCurrencyWhole, formatCurrency } from '$lib/utils/format-helpers';
@@ -285,6 +286,12 @@
 				<p class="text-sm text-charcoal-muted mt-1">
 					Tag transactions as subscriptions or add more to detect patterns
 				</p>
+				<button
+					onclick={() => goto('/')}
+					class="mt-3 px-4 py-2 bg-primary-500 text-white text-sm font-medium rounded-lg hover:bg-primary-600 transition-colors"
+				>
+					Add Transaction
+				</button>
 			</div>
 		{:else}
 			<!-- Summary Cards -->

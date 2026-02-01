@@ -2,6 +2,7 @@
 	import type { ChartConfiguration } from 'chart.js/auto';
 	import type { ComponentType } from 'svelte';
 	import { PieChart } from 'lucide-svelte';
+	import { goto } from '$app/navigation';
 	import ChartWrapper from './ChartWrapper.svelte';
 	import EmptyState from './EmptyState.svelte';
 	import type { Transaction, Category } from '$lib/db';
@@ -102,6 +103,8 @@
 				icon={PieChart as ComponentType}
 				title="No spending data yet"
 				description="Add some transactions to see your category breakdown"
+				actionLabel="Add Transaction"
+				onAction={() => goto('/')}
 			/>
 		{:else}
 			<div class="grid grid-cols-1 md:grid-cols-2 gap-6">

@@ -5,12 +5,14 @@
 		endOfMonth,
 		eachDayOfInterval,
 		getDay,
+		getDate,
 		isFuture,
 		isToday,
 		eachMonthOfInterval,
 		startOfYear,
 		endOfYear
 	} from 'date-fns';
+	import { ChevronLeft } from 'lucide-svelte';
 
 	interface Props {
 		dailySpending: Map<string, number>;
@@ -19,6 +21,17 @@
 	}
 
 	let { dailySpending, year = new Date().getFullYear(), compact = false }: Props = $props();
+
+	// Zoom state: null = overview, index = zoomed into that month
+	let selectedMonth = $state<number | null>(null);
+
+	function handleMonthClick(index: number) {
+		selectedMonth = selectedMonth === index ? null : index;
+	}
+
+	function backToOverview() {
+		selectedMonth = null;
+	}
 
 	// Get all months of the year
 	let months = $derived.by(() => {
@@ -110,45 +123,104 @@
 </script>
 
 <div class="space-y-4">
-	<!-- Month grid -->
-	<div class="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
-		{#each monthsData as monthData}
-			<div class="bg-surface-hover rounded-lg p-2">
-				<!-- Month label -->
-				<div class="text-xs font-medium text-charcoal-soft mb-2 text-center">
-					{monthData.label}
-				</div>
-
-				<!-- Days grid (7 columns for Sun-Sat) -->
-				<div class="flex flex-col items-center" style="gap: {gap}px;">
-					{#each monthData.grid as row}
-						<div class="flex" style="gap: {gap}px;">
-							{#each row as day}
-								{#if day.date === null}
-									<!-- Empty placeholder -->
-									<div style="width: {cellSize}px; height: {cellSize}px;"></div>
-								{:else if day.isFutureDay}
-									<!-- Future day - grey -->
-									<div
-										class="bg-surface-alt rounded-sm"
-										style="width: {cellSize}px; height: {cellSize}px;"
-										title={format(day.date, 'MMM d, yyyy')}
-									></div>
-								{:else}
-									<!-- Past/today with spending data -->
-									<div
-										class="{intensityColors[day.intensity]} rounded-sm cursor-pointer hover:ring-1 hover:ring-charcoal-muted {isToday(day.date) ? 'ring-2 ring-primary-400' : ''}"
-										style="width: {cellSize}px; height: {cellSize}px;"
-										title="{format(day.date, 'MMM d, yyyy')}: ${day.amount.toLocaleString()}"
-									></div>
-								{/if}
-							{/each}
-						</div>
-					{/each}
-				</div>
+	{#if selectedMonth !== null}
+		{@const monthData = monthsData[selectedMonth]}
+		<!-- Zoomed single-month view -->
+		<div>
+			<!-- Back button + month title -->
+			<div class="flex items-center gap-2 mb-4">
+				<button
+					type="button"
+					onclick={backToOverview}
+					class="flex items-center gap-1 text-sm font-medium text-primary-600 hover:text-primary-700 transition-colors"
+				>
+					<ChevronLeft size={16} />
+					<span>All months</span>
+				</button>
+				<span class="text-charcoal-muted">·</span>
+				<span class="text-sm font-medium text-charcoal">{format(monthData.month, 'MMMM yyyy')}</span>
 			</div>
-		{/each}
-	</div>
+
+			<!-- Day-of-week headers -->
+			<div class="grid grid-cols-7 gap-1 mb-1">
+				{#each ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as dayLabel}
+					<div class="text-xs text-charcoal-muted text-center font-medium">{dayLabel}</div>
+				{/each}
+			</div>
+
+			<!-- Zoomed days grid -->
+			<div class="grid grid-cols-7 gap-1">
+				{#each monthData.grid as row}
+					{#each row as day}
+						{#if day.date === null}
+							<div class="w-full aspect-square"></div>
+						{:else if day.isFutureDay}
+							<div
+								class="w-full aspect-square bg-surface-alt rounded-md flex flex-col items-center justify-center"
+								title={format(day.date, 'MMM d, yyyy')}
+							>
+								<span class="text-xs text-charcoal-muted/50">{getDate(day.date)}</span>
+							</div>
+						{:else}
+							<div
+								class="{intensityColors[day.intensity]} rounded-md flex flex-col items-center justify-center cursor-pointer hover:ring-1 hover:ring-charcoal-muted {isToday(day.date) ? 'ring-2 ring-primary-400' : ''} w-full aspect-square"
+								title="{format(day.date, 'MMM d, yyyy')}: ${day.amount.toLocaleString()}"
+							>
+								<span class="text-xs font-medium {day.intensity >= 3 ? 'text-white' : 'text-charcoal-soft'}">{getDate(day.date)}</span>
+								{#if day.amount > 0}
+									<span class="text-[10px] font-mono {day.intensity >= 3 ? 'text-white/80' : 'text-charcoal-muted'}">${Math.round(day.amount)}</span>
+								{/if}
+							</div>
+						{/if}
+					{/each}
+				{/each}
+			</div>
+		</div>
+	{:else}
+		<!-- Overview: 12-month grid -->
+		<div class="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+			{#each monthsData as monthData, index}
+				<button
+					type="button"
+					onclick={() => handleMonthClick(index)}
+					class="bg-surface-hover rounded-lg p-2 hover:ring-2 hover:ring-primary-300 transition-all cursor-pointer text-left"
+				>
+					<!-- Month label -->
+					<div class="text-xs font-medium text-charcoal-soft mb-2 text-center">
+						{monthData.label}
+					</div>
+
+					<!-- Days grid (7 columns for Sun-Sat) -->
+					<div class="flex flex-col items-center" style="gap: {gap}px;">
+						{#each monthData.grid as row}
+							<div class="flex" style="gap: {gap}px;">
+								{#each row as day}
+									{#if day.date === null}
+										<!-- Empty placeholder -->
+										<div style="width: {cellSize}px; height: {cellSize}px;"></div>
+									{:else if day.isFutureDay}
+										<!-- Future day - grey -->
+										<div
+											class="bg-surface-alt rounded-sm"
+											style="width: {cellSize}px; height: {cellSize}px;"
+											title={format(day.date, 'MMM d, yyyy')}
+										></div>
+									{:else}
+										<!-- Past/today with spending data -->
+										<div
+											class="{intensityColors[day.intensity]} rounded-sm {isToday(day.date) ? 'ring-2 ring-primary-400' : ''}"
+											style="width: {cellSize}px; height: {cellSize}px;"
+											title="{format(day.date, 'MMM d, yyyy')}: ${day.amount.toLocaleString()}"
+										></div>
+									{/if}
+								{/each}
+							</div>
+						{/each}
+					</div>
+				</button>
+			{/each}
+		</div>
+	{/if}
 
 	<!-- Legend -->
 	{#if !compact}

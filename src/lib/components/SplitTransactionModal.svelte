@@ -1,10 +1,10 @@
 <script lang="ts">
-	import { X, Plus, Trash2 } from 'lucide-svelte';
+	import { Plus, Trash2 } from 'lucide-svelte';
 	import type { Category, Transaction } from '$lib/db';
 	import { createCategoryHelpers } from '$lib/utils/category-helpers';
 	import { formatCurrency } from '$lib/utils/format-helpers';
 	import { isSplitBalanced, roundCurrency } from '$lib/utils/currency';
-	import { focusTrap } from '$lib/utils/focus-trap';
+	import ModalContainer from './ModalContainer.svelte';
 
 	interface Props {
 		isOpen: boolean;
@@ -75,45 +75,9 @@
 	}
 </script>
 
-{#if isOpen && transaction}
-	<!-- Backdrop -->
-	<div
-		class="fixed inset-0 bg-black/40 z-50 backdrop-blur-sm"
-		onclick={onClose}
-		onkeydown={(e) => e.key === 'Escape' && onClose()}
-		role="button"
-		tabindex="-1"
-		aria-label="Close modal"
-	></div>
-
-	<!-- Modal -->
-	<div class="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
-		<div
-			class="bg-surface rounded-xl shadow-xl shadow-[var(--color-shadow)] w-full max-w-lg max-h-[90vh] overflow-y-auto animate-enter pointer-events-auto"
-			role="dialog"
-			aria-modal="true"
-			aria-labelledby="split-modal-title"
-			tabindex="-1"
-			use:focusTrap
-		>
+<ModalContainer isOpen={isOpen && !!transaction} title="Split by Category" maxWidth="lg" zIndex={60} onClose={onClose}>
+	{#if transaction}
 			<form onsubmit={handleSubmit}>
-				<!-- Header -->
-				<div
-					class="flex items-center justify-between px-6 py-4 border-b border-dashed border-theme-dashed"
-				>
-					<h2 id="split-modal-title" class="font-display text-xl font-medium text-charcoal">
-						Split by Category
-					</h2>
-					<button
-						type="button"
-						onclick={onClose}
-						class="p-2 text-charcoal-muted hover:text-charcoal hover:bg-surface-hover rounded-lg transition-colors"
-						aria-label="Close"
-					>
-						<X size={20} />
-					</button>
-				</div>
-
 				<!-- Body -->
 				<div class="p-6 space-y-4">
 					<!-- Original Transaction Summary -->
@@ -245,6 +209,5 @@
 					</button>
 				</div>
 			</form>
-		</div>
-	</div>
-{/if}
+	{/if}
+</ModalContainer>

@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { afterNavigate } from '$app/navigation';
-	import { Upload, Download, Database, FileSpreadsheet, Sun, Moon, Monitor, Cloud, CloudOff } from 'lucide-svelte';
+	import { Upload, Download, Database, FileSpreadsheet, Sun, Moon, Monitor, Cloud, CloudOff, Command } from 'lucide-svelte';
 	import { type Settings, type Category, type Transaction, DEFAULT_SETTINGS } from '$lib/db';
 	import { initializeStorage } from '$lib/storage';
 	import { getSettings, updateSettings, updateTheme, updateICloudBackup } from '$lib/stores/settings';
@@ -92,6 +92,19 @@
 		{ value: 'light' as const, label: 'Light', icon: Sun },
 		{ value: 'dark' as const, label: 'Dark', icon: Moon },
 		{ value: 'system' as const, label: 'System', icon: Monitor }
+	];
+
+	// Keyboard shortcuts list for display
+	const shortcutList = [
+		{ keys: ['⌘', 'K'], description: 'Focus search' },
+		{ keys: ['⌘', 'N'], description: 'Quick add transaction' },
+		{ keys: ['⌘', '/'], description: 'Show keyboard shortcuts' },
+		{ keys: ['⌘', '1'], description: 'Go to Dashboard' },
+		{ keys: ['⌘', '2'], description: 'Go to Budget' },
+		{ keys: ['⌘', '3'], description: 'Go to Savings' },
+		{ keys: ['⌘', '4'], description: 'Go to Insights' },
+		{ keys: ['⌘', '5'], description: 'Go to Shared' },
+		{ keys: ['Esc'], description: 'Close modals / Clear selection' }
 	];
 
 	async function handleThemeChange(theme: 'light' | 'dark' | 'system') {
@@ -371,6 +384,34 @@
 									{option.label}
 								</span>
 							</button>
+						{/each}
+					</div>
+				</div>
+			</div>
+
+			<!-- Keyboard Shortcuts -->
+			<div class="bg-surface rounded-xl shadow-md shadow-[var(--color-shadow)] overflow-hidden">
+				<div class="px-6 py-4 border-b border-dashed border-theme-dashed">
+					<h2 class="font-display text-xl font-medium text-charcoal flex items-center gap-2">
+						<Command size={20} class="text-primary-500" />
+						Keyboard Shortcuts
+					</h2>
+					<p class="text-sm text-charcoal-muted mt-1">Navigate faster with keyboard shortcuts</p>
+				</div>
+
+				<div class="p-6">
+					<div class="space-y-3">
+						{#each shortcutList as shortcut}
+							<div class="flex items-center justify-between">
+								<span class="text-sm text-charcoal-soft">{shortcut.description}</span>
+								<div class="flex items-center gap-1">
+									{#each shortcut.keys as key}
+										<kbd class="inline-flex items-center justify-center min-w-[28px] h-7 px-2 bg-cream border border-theme-muted rounded-md text-xs font-mono font-medium text-charcoal-muted shadow-sm">
+											{key}
+										</kbd>
+									{/each}
+								</div>
+							</div>
 						{/each}
 					</div>
 				</div>

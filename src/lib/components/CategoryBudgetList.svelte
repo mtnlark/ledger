@@ -1,7 +1,10 @@
 <script lang="ts">
+	import type { ComponentType } from 'svelte';
 	import { slide } from 'svelte/transition';
-	import { ChevronDown, ChevronUp } from 'lucide-svelte';
+	import { ChevronDown, ChevronUp, LayoutGrid } from 'lucide-svelte';
+	import { goto } from '$app/navigation';
 	import CategoryBudgetCard from './CategoryBudgetCard.svelte';
+	import EmptyState from './EmptyState.svelte';
 	import type { Category, CategoryBudget } from '$lib/db';
 
 	interface Props {
@@ -147,8 +150,12 @@
 
 	<!-- Empty State -->
 	{#if groupedCategories.withBudgets.length === 0 && groupedCategories.unbudgetedWithSpending.length === 0 && groupedCategories.noActivity.length === 0}
-		<div class="text-center py-12 text-charcoal-muted">
-			<p>No categories available</p>
-		</div>
+		<EmptyState
+			icon={LayoutGrid as ComponentType}
+			title="No categories available"
+			description="Add categories in Settings to start budgeting"
+			actionLabel="Go to Settings"
+			onAction={() => goto('/settings')}
+		/>
 	{/if}
 </div>

@@ -470,7 +470,7 @@
 </script>
 
 {#if hasContent}
-	<div class="bg-surface rounded-xl overflow-hidden card-primary">
+	<div class="{isCurrentMonth ? 'bg-surface' : 'bg-primary-50/40'} rounded-xl overflow-hidden card-primary">
 		<div class="px-6 py-4">
 			<h2 class="font-display text-lg font-medium text-charcoal mb-3">{title}</h2>
 

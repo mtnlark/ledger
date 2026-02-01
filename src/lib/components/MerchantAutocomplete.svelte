@@ -9,6 +9,7 @@
 		placeholder?: string;
 		onInput: (value: string) => void;
 		onSelect?: (merchant: string, categoryId: number | null) => void;
+		onBlur?: () => void;
 		class?: string;
 		inputId?: string;
 	}
@@ -19,6 +20,7 @@
 		placeholder = 'e.g., Shell, Amazon',
 		onInput,
 		onSelect,
+		onBlur,
 		class: className = '',
 		inputId = 'merchant'
 	}: Props = $props();
@@ -103,6 +105,7 @@
 			showSuggestions = false;
 			selectedIndex = -1;
 		}, 150);
+		onBlur?.();
 	}
 
 	function getCategoryLabel(categoryId: number): string {

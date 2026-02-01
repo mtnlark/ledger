@@ -131,7 +131,7 @@
 	<HeaderNav title="Insights" showBack={true} />
 
 	<!-- Main Content -->
-	<main class="max-w-4xl mx-auto px-4 py-6 space-y-6">
+	<main class="max-w-4xl mx-auto px-4 py-6 space-y-6" aria-live="polite">
 		{#if isLoading}
 			<!-- Loading skeletons -->
 			{#each Array(3) as _}

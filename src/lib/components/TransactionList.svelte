@@ -16,11 +16,12 @@
 		onDelete?: (id: number) => void;
 		onBulkDelete?: (ids: number[]) => void;
 		onBulkCategoryChange?: (ids: number[], categoryId: number) => void;
+		onAddTransaction?: () => void;
 		selectionMode?: boolean;
 		onSelectionModeChange?: (mode: boolean) => void;
 	}
 
-	let { transactions, categories, settings, onEdit, onDelete, onBulkDelete, onBulkCategoryChange, selectionMode = false, onSelectionModeChange }: Props = $props();
+	let { transactions, categories, settings, onEdit, onDelete, onBulkDelete, onBulkCategoryChange, onAddTransaction, selectionMode = false, onSelectionModeChange }: Props = $props();
 
 	// Selection mode state - use prop if provided, otherwise internal state
 	let internalSelectionMode = $state(false);
@@ -117,6 +118,8 @@
 			icon={Receipt as ComponentType}
 			title="No transactions yet"
 			description="Add your first expense to start tracking your budget"
+			actionLabel={onAddTransaction ? 'Add Transaction' : undefined}
+			onAction={onAddTransaction}
 		/>
 	{:else}
 		<!-- Selection mode controls (only shown when in selection mode) -->

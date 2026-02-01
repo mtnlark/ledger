@@ -562,7 +562,7 @@
 	{/if}
 
 	<!-- Main Content -->
-	<main class="max-w-4xl mx-auto px-4 py-6 space-y-6">
+	<main class="max-w-4xl mx-auto px-4 py-6 space-y-6" aria-live="polite">
 		{#if isLoading}
 			<!-- Skeleton loading states -->
 			<CashFlowCardSkeleton />
@@ -653,6 +653,7 @@
 					onDelete={handleDelete}
 					onBulkDelete={handleBulkDelete}
 					onBulkCategoryChange={handleBulkCategoryChange}
+					onAddTransaction={handleOpenQuickAdd}
 					selectionMode={isSelectionMode}
 					onSelectionModeChange={(mode) => isSelectionMode = mode}
 				/>

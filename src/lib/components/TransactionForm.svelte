@@ -7,6 +7,7 @@
 	import { parseLocalDate } from '$lib/utils/date-helpers';
 	import { formatCurrency } from '$lib/utils/format-helpers';
 	import { isSplitBalanced, roundCurrency } from '$lib/utils/currency';
+	import { validateTransactionForm } from '$lib/utils/transaction-validation';
 	import CategoryCombobox from './CategoryCombobox.svelte';
 	import MerchantAutocomplete from './MerchantAutocomplete.svelte';
 	import SharedExpenseFields from './SharedExpenseFields.svelte';
@@ -91,6 +92,45 @@
 	let isSubscription = $state(false);
 	let subscriptionFrequency = $state<'monthly' | 'annual'>('monthly');
 	let futureDateConfirmed = $state(false);
+
+	// Validation state
+	let touched = $state(new Set<string>());
+	let errors = $state<Record<string, string>>({});
+
+	function handleBlur(field: string) {
+		touched = new Set([...touched, field]);
+		const result = validateTransactionForm({
+			merchant,
+			amount,
+			categoryId,
+			isSplitMode,
+			splits: splitLines,
+			isFutureDate,
+			futureDateConfirmed
+		});
+		// Only update the error for the blurred field
+		if (result.errors[field]) {
+			errors = { ...errors, [field]: result.errors[field] };
+		} else {
+			const { [field]: _, ...rest } = errors;
+			errors = rest;
+		}
+	}
+
+	function validateAllFields(): boolean {
+		touched = new Set(['merchant', 'amount', 'category']);
+		const result = validateTransactionForm({
+			merchant,
+			amount,
+			categoryId,
+			isSplitMode,
+			splits: splitLines,
+			isFutureDate,
+			futureDateConfirmed
+		});
+		errors = result.errors;
+		return result.isValid;
+	}
 
 	// Future date detection
 	let isFutureDate = $derived.by(() => {
@@ -198,7 +238,7 @@
 	function handleSubmit(e: Event) {
 		e.preventDefault();
 
-		if (!merchant.trim() || amount <= 0) {
+		if (!validateAllFields()) {
 			return;
 		}
 
@@ -261,6 +301,8 @@
 		isSplitMode = false;
 		splitLines = [];
 		futureDateConfirmed = false;
+		touched = new Set();
+		errors = {};
 	}
 
 	// Handle merchant selection from autocomplete
@@ -355,8 +397,12 @@
 					placeholder="e.g., Shell, Amazon, MOM's"
 					onInput={handleMerchantInput}
 					onSelect={handleMerchantSelect}
+					onBlur={() => handleBlur('merchant')}
 					inputId="merchant"
 				/>
+				{#if touched.has('merchant') && errors.merchant}
+					<p class="text-xs text-danger-500 mt-1">{errors.merchant}</p>
+				{/if}
 			</div>
 		</div>
 
@@ -370,12 +416,16 @@
 						type="number"
 						id="amount"
 						bind:value={amountStr}
+						onblur={() => handleBlur('amount')}
 						step="0.01"
 						min="0"
 						placeholder="0.00"
 						class="w-full pl-7 pr-3 py-2.5 bg-surface-alt border border-theme rounded-lg focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-colors font-mono placeholder:text-charcoal-muted"
 					/>
 				</div>
+				{#if touched.has('amount') && errors.amount}
+					<p class="text-xs text-danger-500 mt-1">{errors.amount}</p>
+				{/if}
 			</div>
 			{#if !isSplitMode}
 				<div>
@@ -383,8 +433,11 @@
 					<CategoryCombobox
 						{categories}
 						value={categoryId}
-						onSelect={handleCategoryChange}
+						onSelect={(id) => { handleCategoryChange(id); handleBlur('category'); }}
 					/>
+				{#if touched.has('category') && errors.category}
+					<p class="text-xs text-danger-500 mt-1">{errors.category}</p>
+				{/if}
 				</div>
 			{/if}
 		</div>

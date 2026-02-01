@@ -1,10 +1,11 @@
 <script lang="ts">
 	import { format } from 'date-fns';
-	import { X, Scissors } from 'lucide-svelte';
+	import { Scissors } from 'lucide-svelte';
 	import type { Category, Settings, Transaction } from '$lib/db';
 	import { parseLocalDate } from '$lib/utils/date-helpers';
 	import { formatCurrency, calculateSplitShares } from '$lib/utils/format-helpers';
-	import { focusTrap } from '$lib/utils/focus-trap';
+	import { validateTransactionForm } from '$lib/utils/transaction-validation';
+	import ModalContainer from './ModalContainer.svelte';
 	import CategoryCombobox from './CategoryCombobox.svelte';
 	import SharedExpenseFields from './SharedExpenseFields.svelte';
 	import EssentialToggle from './EssentialToggle.svelte';
@@ -69,6 +70,42 @@
 	// Get selected category for essential default display
 	let selectedCategory = $derived(categories.find((c) => c.id === categoryId));
 
+	// Validation state
+	let touched = $state(new Set<string>());
+	let errors = $state<Record<string, string>>({});
+
+	function handleBlur(field: string) {
+		touched = new Set([...touched, field]);
+		const result = validateTransactionForm({
+			merchant,
+			amount,
+			categoryId,
+			isSplitMode: false,
+			isFutureDate,
+			futureDateConfirmed
+		});
+		if (result.errors[field]) {
+			errors = { ...errors, [field]: result.errors[field] };
+		} else {
+			const { [field]: _, ...rest } = errors;
+			errors = rest;
+		}
+	}
+
+	function validateAllFields(): boolean {
+		touched = new Set(['merchant', 'amount', 'category']);
+		const result = validateTransactionForm({
+			merchant,
+			amount,
+			categoryId,
+			isSplitMode: false,
+			isFutureDate,
+			futureDateConfirmed
+		});
+		errors = result.errors;
+		return result.isValid;
+	}
+
 	// Reset form when transaction changes
 	$effect(() => {
 		if (transaction && isOpen) {
@@ -86,6 +123,8 @@
 			subscriptionFrequency = transaction.subscriptionFrequency ?? 'monthly';
 			showCancelConfirm = false;
 			futureDateConfirmed = false;
+			touched = new Set();
+			errors = {};
 		}
 	});
 
@@ -135,7 +174,7 @@
 	function handleSubmit(e: Event) {
 		e.preventDefault();
 
-		if (!transaction?.id || !merchant.trim() || amount <= 0 || !categoryId) {
+		if (!transaction?.id || !validateAllFields()) {
 			return;
 		}
 
@@ -164,41 +203,9 @@
 	}
 </script>
 
-{#if isOpen && transaction}
-	<!-- Backdrop -->
-	<div
-		class="fixed inset-0 bg-black/40 z-40 backdrop-blur-sm"
-		onclick={handleClose}
-		onkeydown={(e) => e.key === 'Escape' && handleClose()}
-		role="button"
-		tabindex="-1"
-		aria-label="Close modal"
-	></div>
-
-	<!-- Modal -->
-	<div class="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
-		<div
-			class="bg-surface rounded-xl shadow-xl shadow-[var(--color-shadow)] w-full max-w-lg max-h-[90vh] overflow-y-auto animate-enter pointer-events-auto"
-			role="dialog"
-			aria-modal="true"
-			aria-labelledby="edit-modal-title"
-			tabindex="-1"
-			use:focusTrap
-		>
+<ModalContainer isOpen={isOpen && !!transaction} title="Edit Transaction" maxWidth="lg" onClose={handleClose}>
+	{#if transaction}
 			<form onsubmit={handleSubmit}>
-				<!-- Header -->
-				<div class="flex items-center justify-between px-6 py-4 border-b border-dashed border-theme-dashed">
-					<h2 id="edit-modal-title" class="font-display text-xl font-medium text-charcoal">Edit Transaction</h2>
-					<button
-						type="button"
-						onclick={handleClose}
-						class="p-2 text-charcoal-muted hover:text-charcoal hover:bg-surface-hover rounded-lg transition-colors"
-						aria-label="Close"
-					>
-						<X size={20} />
-					</button>
-				</div>
-
 				<!-- Body -->
 				<div class="p-6 space-y-4">
 					<!-- Date & Merchant Row -->
@@ -230,9 +237,13 @@
 								type="text"
 								id="edit-merchant"
 								bind:value={merchant}
+								onblur={() => handleBlur('merchant')}
 								placeholder="e.g., Shell, Amazon, MOM's"
 								class="w-full px-3 py-2.5 bg-surface-alt border border-theme rounded-lg focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-colors placeholder:text-charcoal-muted"
 							/>
+							{#if touched.has('merchant') && errors.merchant}
+								<p class="text-xs text-danger-500 mt-1">{errors.merchant}</p>
+							{/if}
 						</div>
 					</div>
 
@@ -246,20 +257,27 @@
 									type="number"
 									id="edit-amount"
 									bind:value={amountStr}
+									onblur={() => handleBlur('amount')}
 									step="0.01"
 									min="0"
 									placeholder="0.00"
 									class="w-full pl-7 pr-3 py-2.5 bg-surface-alt border border-theme rounded-lg focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-colors font-mono placeholder:text-charcoal-muted"
 								/>
 							</div>
+							{#if touched.has('amount') && errors.amount}
+								<p class="text-xs text-danger-500 mt-1">{errors.amount}</p>
+							{/if}
 						</div>
 						<div>
 							<label for="edit-category" class="block text-sm font-medium text-charcoal-soft mb-1.5">Category</label>
 							<CategoryCombobox
 								{categories}
 								value={categoryId}
-								onSelect={(id) => (categoryId = id)}
+								onSelect={(id) => { categoryId = id; handleBlur('category'); }}
 							/>
+							{#if touched.has('category') && errors.category}
+								<p class="text-xs text-danger-500 mt-1">{errors.category}</p>
+							{/if}
 						</div>
 					</div>
 
@@ -332,6 +350,5 @@
 					</button>
 				</div>
 			</form>
-		</div>
-	</div>
-{/if}
+	{/if}
+</ModalContainer>

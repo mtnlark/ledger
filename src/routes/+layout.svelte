@@ -30,12 +30,19 @@
 	<link rel="icon" href={favicon} />
 </svelte:head>
 
+<a
+	href="#main-content"
+	class="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-[100] focus:px-4 focus:py-2 focus:bg-primary-500 focus:text-white focus:rounded-lg focus:font-medium focus:text-sm focus:shadow-lg"
+>
+	Skip to content
+</a>
+
 <div class="flex min-h-screen">
 	<!-- Sidebar navigation -->
 	<SideNav />
 
 	<!-- Main content -->
-	<div class="flex-1">
+	<div class="flex-1" id="main-content">
 		{@render children()}
 	</div>
 </div>

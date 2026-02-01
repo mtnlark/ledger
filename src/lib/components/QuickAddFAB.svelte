@@ -2,6 +2,7 @@
 	import { Plus, X, Check } from 'lucide-svelte';
 	import { scale, fly } from 'svelte/transition';
 	import { getMostCommonCategory } from '$lib/stores/merchants';
+	import { validateTransactionForm } from '$lib/utils/transaction-validation';
 	import MerchantAutocomplete from './MerchantAutocomplete.svelte';
 	import CategoryCombobox from './CategoryCombobox.svelte';
 	import type { Category, Settings } from '$lib/db';
@@ -53,6 +54,38 @@
 	let amount = $derived(parseFloat(amountStr) || 0);
 	let isValid = $derived(merchant.trim() !== '' && amount > 0 && categoryId > 0);
 
+	// Validation state
+	let touched = $state(new Set<string>());
+	let errors = $state<Record<string, string>>({});
+
+	function handleFieldBlur(field: string) {
+		touched = new Set([...touched, field]);
+		const result = validateTransactionForm({
+			merchant,
+			amount,
+			categoryId,
+			isSplitMode: false
+		});
+		if (result.errors[field]) {
+			errors = { ...errors, [field]: result.errors[field] };
+		} else {
+			const { [field]: _, ...rest } = errors;
+			errors = rest;
+		}
+	}
+
+	function validateAllFields(): boolean {
+		touched = new Set(['merchant', 'amount', 'category']);
+		const result = validateTransactionForm({
+			merchant,
+			amount,
+			categoryId,
+			isSplitMode: false
+		});
+		errors = result.errors;
+		return result.isValid;
+	}
+
 	function toggle() {
 		if (isExpanded) {
 			close();
@@ -83,6 +116,8 @@
 		isSettled = false;
 		isEssential = false;
 		isSubmitting = false;
+		touched = new Set();
+		errors = {};
 	}
 
 	// Handle category change - update isEssential to match category default
@@ -114,7 +149,7 @@
 
 	async function handleSubmit(e: Event) {
 		e.preventDefault();
-		if (!isValid || isSubmitting) return;
+		if (!validateAllFields() || isSubmitting) return;
 
 		isSubmitting = true;
 
@@ -195,6 +230,7 @@
 								id="quick-amount"
 								bind:value={amountStr}
 								bind:this={amountInput}
+								onblur={() => handleFieldBlur('amount')}
 								step="0.01"
 								min="0"
 								placeholder="0.00"
@@ -202,6 +238,9 @@
 								class="w-full pl-7 pr-3 py-3 bg-surface-alt border border-theme rounded-lg focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-colors font-mono text-lg placeholder:text-charcoal-muted"
 							/>
 						</div>
+						{#if touched.has('amount') && errors.amount}
+							<p class="text-xs text-danger-500 mt-1">{errors.amount}</p>
+						{/if}
 					</div>
 
 					<!-- Merchant with Autocomplete -->
@@ -215,8 +254,12 @@
 							placeholder="Start typing..."
 							onInput={handleMerchantInput}
 							onSelect={handleMerchantSelect}
+							onBlur={() => handleFieldBlur('merchant')}
 							inputId="quick-merchant"
 						/>
+						{#if touched.has('merchant') && errors.merchant}
+							<p class="text-xs text-danger-500 mt-1">{errors.merchant}</p>
+						{/if}
 					</div>
 
 					<!-- Category -->
@@ -230,8 +273,11 @@
 						<CategoryCombobox
 							{categories}
 							value={categoryId}
-							onSelect={handleCategoryChange}
+							onSelect={(id) => { handleCategoryChange(id); handleFieldBlur('category'); }}
 						/>
+						{#if touched.has('category') && errors.category}
+							<p class="text-xs text-danger-500 mt-1">{errors.category}</p>
+						{/if}
 					</div>
 
 					<!-- Essential Toggle -->

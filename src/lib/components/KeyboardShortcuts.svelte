@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { X, Command } from 'lucide-svelte';
 	import { slide, fade } from 'svelte/transition';
+	import { goto } from '$app/navigation';
 
 	interface Props {
 		onOpenQuickAdd?: () => void;
@@ -15,7 +16,12 @@
 		{ keys: ['⌘', 'K'], description: 'Focus search', action: 'search' },
 		{ keys: ['⌘', 'N'], description: 'Quick add transaction', action: 'quickadd' },
 		{ keys: ['⌘', '/'], description: 'Show keyboard shortcuts', action: 'help' },
-		{ keys: ['Esc'], description: 'Close modals / Clear selection', action: 'escape' }
+		{ keys: ['Esc'], description: 'Close modals / Clear selection', action: 'escape' },
+		{ keys: ['⌘', '1'], description: 'Go to Dashboard', action: 'nav' },
+		{ keys: ['⌘', '2'], description: 'Go to Budget', action: 'nav' },
+		{ keys: ['⌘', '3'], description: 'Go to Savings', action: 'nav' },
+		{ keys: ['⌘', '4'], description: 'Go to Insights', action: 'nav' },
+		{ keys: ['⌘', '5'], description: 'Go to Shared', action: 'nav' }
 	];
 
 	function handleKeydown(e: KeyboardEvent) {
@@ -33,6 +39,14 @@
 		if (isInput) return;
 
 		const isMeta = e.metaKey || e.ctrlKey;
+
+		// Page navigation shortcuts
+		const navRoutes: Record<string, string> = { '1': '/', '2': '/budget', '3': '/savings', '4': '/insights', '5': '/shared' };
+		if (isMeta && navRoutes[e.key]) {
+			e.preventDefault();
+			goto(navRoutes[e.key]);
+			return;
+		}
 
 		if (isMeta && e.key === 'k') {
 			e.preventDefault();

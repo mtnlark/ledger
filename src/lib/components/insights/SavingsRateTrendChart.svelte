@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { format } from 'date-fns';
 	import { type ChartConfiguration } from 'chart.js/auto';
+	import { goto } from '$app/navigation';
 	import ChartWrapper from '../ChartWrapper.svelte';
 	import { parseMonthKey, getMonthKey, type MonthlyBudget, type SavingsContribution } from '$lib/db';
 	import { sumCurrency } from '$lib/utils/currency';
@@ -148,6 +149,12 @@
 	<div class="text-center py-8 text-charcoal-muted">
 		<p>No savings data available</p>
 		<p class="text-sm mt-1">Add contributions to track your savings rate</p>
+		<button
+			onclick={() => goto('/savings')}
+			class="mt-3 px-4 py-2 bg-primary-500 text-white text-sm font-medium rounded-lg hover:bg-primary-600 transition-colors"
+		>
+			Go to Savings
+		</button>
 	</div>
 {:else if savingsData.length === 1}
 	<div class="text-center py-8">
