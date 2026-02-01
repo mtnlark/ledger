@@ -160,7 +160,7 @@ View spending patterns, trends, and smart takeaways.
 ### Current Month (Highlights)
 
 Forward-looking insights for the current month:
-- **Pace Projection** - Where you'll end up if spending continues
+- **Pace Projection** - Where you'll end up if spending continues at the current daily rate (only counts transactions up to today — future-dated recurring entries are excluded)
 - **Spending Anomalies** - Unusual spending in categories
 - **Category Shifts** - Changes vs. previous month
 - **Top Merchants** - Where you spend most

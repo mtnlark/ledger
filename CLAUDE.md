@@ -174,7 +174,7 @@ ledger/
 │   │   │   ├── export.ts              # CSV/JSON export
 │   │   │   ├── category-helpers.ts
 │   │   │   ├── chart-theme.ts         # Chart.js theme configuration
-│   │   │   ├── date-helpers.ts
+│   │   │   ├── date-helpers.ts        # Date parsing, filterUpToDate
 │   │   │   ├── string-helpers.ts
 │   │   │   ├── focus-trap.ts          # Modal focus trapping utility
 │   │   │   ├── modal-helpers.ts       # Modal event handlers (backdrop click, escape key)
@@ -378,6 +378,8 @@ Sidebar state persists to localStorage (`ledger-sidebar-expanded`).
 
 ### Insights
 - **Highlights** (current month): Forward-looking takeaways (pace projection, anomalies, category shifts)
+  - Pace projection and velocity exclude future-dated transactions (e.g. auto-added recurring)
+    via `filterUpToDate()` — only spending up to today counts toward daily rate
 - **Month in Review** (past months): Hero stat + expandable grouped insights
   - Hero stat: Most important insight (rank, savings milestone, vs-average)
   - Grouped sections: Spending, Savings, Highlights
@@ -389,6 +391,8 @@ Sidebar state persists to localStorage (`ledger-sidebar-expanded`).
 - Year-to-date summary and statistics
 - Recurring expense detection with subscription tracking
 - Category deep dives and comparisons
+  - Variability classification (Steady/Moderate/Variable) uses only completed months
+    — current calendar month excluded to prevent partial-month distortion of weighted stats
 - Savings insights with rate trends
 - Calendar heatmap of daily spending
 
