@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
 	import { format } from 'date-fns';
-	import { parseMonthKey, navigateMonth } from '$lib/db';
+	import { getMonthKey, parseMonthKey, navigateMonth } from '$lib/db';
 	import type { Transaction, Category } from '$lib/db';
 	import { getCategoryTrends, getTransactionsByMonth } from '$lib/stores/transactions';
 	import { getInsightsEngine } from '$lib/insights';
@@ -38,12 +38,16 @@
 		});
 	}
 
-	// Compute category stats (mean + stdDev) from ALL available months using weighted calculation.
+	// Exclude the current (incomplete) calendar month from stats to prevent partial-month
+	// spending from distorting variability classification and range. The current month gets
+	// weight 1.0 from decay weighting, so even late in the month it has outsized influence.
+	let completedMonths = $derived(availableMonths.filter((m) => m !== getMonthKey(new Date())));
+
+	// Compute category stats (mean + stdDev) from completed months using weighted calculation.
 	// Uses exponential decay weighting so recent months have more influence than older ones.
 	let categoryStats = $derived.by(() => {
-		if (availableMonths.length < 2) return new Map<number, { mean: number; stdDev: number; sampleCount: number }>();
-		// Use all available months for better statistical stability
-		return engine.getWeightedCategoryStats(getTransactionsForMonth, availableMonths, 'deep-dive-stats', { decay: 0.85 });
+		if (completedMonths.length < 2) return new Map<number, { mean: number; stdDev: number; sampleCount: number }>();
+		return engine.getWeightedCategoryStats(getTransactionsForMonth, completedMonths, 'deep-dive-stats', { decay: 0.85 });
 	});
 
 	// Stats for the selected category

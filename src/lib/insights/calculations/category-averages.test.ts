@@ -282,6 +282,44 @@ describe('computeWeightedCategoryStats', () => {
 		expect(result.get(1)!.mean).toBeCloseTo(242.86, 0);
 	});
 
+	it('excluding incomplete current month preserves stats stability', () => {
+		// Simulate: 3 complete months of steady $200 grocery spending,
+		// plus a partial current month where only $50 has been spent so far.
+		// The partial month gets weight 1.0 (most recent) and distorts stats.
+		const data: Record<string, Transaction[]> = {
+			'2025-10': [makeTx({ categoryId: 1, amount: 200 })],
+			'2025-11': [makeTx({ categoryId: 1, amount: 200 })],
+			'2025-12': [makeTx({ categoryId: 1, amount: 200 })],
+			'2026-01': [makeTx({ categoryId: 1, amount: 50 })]  // partial month
+		};
+
+		const withPartial = computeWeightedCategoryStats(
+			(month) => data[month] || [],
+			['2025-10', '2025-11', '2025-12', '2026-01'],
+			{ decay: 0.85 }
+		);
+
+		const withoutPartial = computeWeightedCategoryStats(
+			(month) => data[month] || [],
+			['2025-10', '2025-11', '2025-12'],
+			{ decay: 0.85 }
+		);
+
+		// Without partial: steady $200, mean ≈ 200, stdDev ≈ 0
+		expect(withoutPartial.get(1)!.mean).toBeCloseTo(200, 0);
+		expect(withoutPartial.get(1)!.stdDev).toBeCloseTo(0, 0);
+
+		// With partial: $50 at weight 1.0 pulls mean down and inflates stdDev
+		expect(withPartial.get(1)!.mean).toBeLessThan(withoutPartial.get(1)!.mean);
+		expect(withPartial.get(1)!.stdDev).toBeGreaterThan(withoutPartial.get(1)!.stdDev);
+
+		// CV changes from ~0 (Steady) to significant (would flip classification)
+		const cvWithout = withoutPartial.get(1)!.stdDev / withoutPartial.get(1)!.mean;
+		const cvWith = withPartial.get(1)!.stdDev / withPartial.get(1)!.mean;
+		expect(cvWithout).toBeLessThan(0.01); // essentially zero → Steady
+		expect(cvWith).toBeGreaterThan(0.2);   // significant → no longer Steady
+	});
+
 	it('uses default decay of 0.85', () => {
 		const data: Record<string, Transaction[]> = {
 			'2025-01': [makeTx({ categoryId: 1, amount: 100 })],
