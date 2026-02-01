@@ -62,8 +62,8 @@
 				<div class="flex gap-1">
 					{#each Array.from(recentDailySpending.entries()) as [dateKey, amount]}
 						{@const maxAmount = Math.max(...Array.from(recentDailySpending.values()))}
-						{@const intensity = amount === 0 ? 0 : Math.min(4, Math.ceil((amount / (maxAmount || 1)) * 4))}
-						{@const colors = ['bg-surface-alt', 'bg-success-200', 'bg-success-300', 'bg-success-400', 'bg-success-600']}
+						{@const intensity = amount === 0 ? 0 : Math.min(6, Math.max(1, Math.ceil((Math.log(amount + 1) / Math.log(maxAmount + 1)) * 6)))}
+						{@const colors = ['bg-surface-alt', 'bg-success-100', 'bg-success-200', 'bg-success-300', 'bg-success-400', 'bg-success-500', 'bg-success-700']}
 						<div
 							class="{colors[intensity]} rounded-sm"
 							style="width: 8px; height: 8px;"

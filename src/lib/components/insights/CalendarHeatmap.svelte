@@ -40,35 +40,30 @@
 		return eachMonthOfInterval({ start, end });
 	});
 
-	// Calculate intensity levels based on spending amounts
-	let intensityLevels = $derived.by(() => {
+	// Max spending for log-scale normalization
+	let maxSpending = $derived.by(() => {
 		const amounts = Array.from(dailySpending.values()).filter((v) => v > 0);
-		if (amounts.length === 0) return { p25: 50, p50: 100, p75: 200 };
-
-		amounts.sort((a, b) => a - b);
-		const p25 = amounts[Math.floor(amounts.length * 0.25)] || 50;
-		const p50 = amounts[Math.floor(amounts.length * 0.5)] || 100;
-		const p75 = amounts[Math.floor(amounts.length * 0.75)] || 200;
-
-		return { p25, p50, p75 };
+		if (amounts.length === 0) return 100;
+		return Math.max(...amounts);
 	});
 
-	// Get intensity level for a day (0-4)
+	// Get intensity level for a day (0-6) using logarithmic scale
+	// Log scale prevents outliers from compressing the rest of the range
 	function getIntensity(amount: number): number {
 		if (amount === 0) return 0;
-		if (amount <= intensityLevels.p25) return 1;
-		if (amount <= intensityLevels.p50) return 2;
-		if (amount <= intensityLevels.p75) return 3;
-		return 4;
+		const normalized = Math.log(amount + 1) / Math.log(maxSpending + 1);
+		return Math.min(6, Math.max(1, Math.ceil(normalized * 6)));
 	}
 
-	// Color classes for each intensity level
+	// Color classes for each intensity level (7 levels for finer gradation)
 	const intensityColors = [
 		'bg-surface-alt', // 0 - no spending
-		'bg-success-200', // 1 - low
-		'bg-success-300', // 2 - medium-low
-		'bg-success-400', // 3 - medium-high
-		'bg-success-600' // 4 - high
+		'bg-success-100', // 1 - minimal
+		'bg-success-200', // 2 - low
+		'bg-success-300', // 3 - medium-low
+		'bg-success-400', // 4 - medium
+		'bg-success-500', // 5 - medium-high
+		'bg-success-700'  // 6 - high
 	];
 
 	// Build data for each month
@@ -166,9 +161,9 @@
 								class="{intensityColors[day.intensity]} rounded-md flex flex-col items-center justify-center cursor-pointer hover:ring-1 hover:ring-charcoal-muted {isToday(day.date) ? 'ring-2 ring-primary-400' : ''} w-full aspect-square"
 								title="{format(day.date, 'MMM d, yyyy')}: ${day.amount.toLocaleString()}"
 							>
-								<span class="text-xs font-medium {day.intensity >= 3 ? 'text-white' : 'text-charcoal-soft'}">{getDate(day.date)}</span>
+								<span class="text-xs font-medium {day.intensity >= 5 ? 'text-white' : 'text-charcoal-soft'}">{getDate(day.date)}</span>
 								{#if day.amount > 0}
-									<span class="text-[10px] font-mono {day.intensity >= 3 ? 'text-white/80' : 'text-charcoal-muted'}">${Math.round(day.amount)}</span>
+									<span class="text-[10px] font-mono {day.intensity >= 5 ? 'text-white/80' : 'text-charcoal-muted'}">${Math.round(day.amount)}</span>
 								{/if}
 							</div>
 						{/if}

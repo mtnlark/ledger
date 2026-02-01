@@ -30,7 +30,7 @@
 	import RecurringSuggestionsBanner from '$lib/components/RecurringSuggestionsBanner.svelte';
 	import RecurringSuggestionsModal from '$lib/components/RecurringSuggestionsModal.svelte';
 	import DashboardInsightWidget from '$lib/components/DashboardInsightWidget.svelte';
-	import { Square } from 'lucide-svelte';
+	import { Plus, Square } from 'lucide-svelte';
 	import { getDaysInMonth } from 'date-fns';
 
 	// State
@@ -49,6 +49,9 @@
 	let splittingTransaction = $state<Transaction | null>(null);
 	let currentMonth = $state(getMonthKey(new Date()));
 	let availableMonths = $state<string[]>([getMonthKey(new Date())]);
+
+	// Transaction form state
+	let formExpanded = $state(false);
 
 	// Recurring suggestions state
 	let showRecurringBanner = $state(false);
@@ -607,6 +610,7 @@
 			<TransactionForm
 				{categories}
 				{settings}
+				bind:isExpanded={formExpanded}
 				onSubmit={handleAddTransaction}
 				onSplitSubmit={handleSplitSubmit}
 			/>
@@ -634,16 +638,28 @@
 							Recent Transactions
 						{/if}
 					</h2>
-					{#if filteredTransactions.length > 0 && !isSelectionMode}
-						<button
-							type="button"
-							onclick={() => isSelectionMode = true}
-							class="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg transition-colors text-charcoal-muted hover:text-charcoal hover:bg-cream"
-						>
-							<Square size={16} />
-							<span>Select</span>
-						</button>
-					{/if}
+					<div class="flex items-center gap-2">
+						{#if !formExpanded}
+							<button
+								type="button"
+								onclick={() => formExpanded = true}
+								class="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg transition-colors text-primary-600 hover:text-primary-700 hover:bg-primary-50"
+							>
+								<Plus size={16} />
+								<span>Add</span>
+							</button>
+						{/if}
+						{#if filteredTransactions.length > 0 && !isSelectionMode}
+							<button
+								type="button"
+								onclick={() => isSelectionMode = true}
+								class="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg transition-colors text-charcoal-muted hover:text-charcoal hover:bg-cream"
+							>
+								<Square size={16} />
+								<span>Select</span>
+							</button>
+						{/if}
+					</div>
 				</div>
 				<TransactionList
 					transactions={filteredTransactions}

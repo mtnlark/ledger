@@ -20,6 +20,7 @@
 	interface Props {
 		categories: Category[];
 		settings: Settings;
+		isExpanded?: boolean;
 		onSubmit: (data: TransactionFormData) => void;
 		onSplitSubmit?: (data: SplitTransactionFormData) => void;
 		onCancel?: () => void;
@@ -58,23 +59,30 @@
 		amount: number;
 	}
 
-	let { categories, settings, onSubmit, onSplitSubmit, onCancel }: Props = $props();
+	let { categories, settings, isExpanded = $bindable(false), onSubmit, onSplitSubmit, onCancel }: Props = $props();
 
 	// Animation state
 	let mounted = $state(false);
-	let isExpanded = $state(false);
+	let initializedFromStorage = false;
 
 	onMount(() => {
 		const stored = localStorage.getItem(STORAGE_KEY);
 		if (stored !== null) {
 			isExpanded = stored === 'true';
 		}
+		initializedFromStorage = true;
 		setTimeout(() => mounted = true, 100);
+	});
+
+	// Persist expanded state to localStorage after initial load
+	$effect(() => {
+		if (initializedFromStorage) {
+			localStorage.setItem(STORAGE_KEY, String(isExpanded));
+		}
 	});
 
 	function toggleExpanded() {
 		isExpanded = !isExpanded;
-		localStorage.setItem(STORAGE_KEY, String(isExpanded));
 	}
 
 	// Form state
@@ -335,30 +343,30 @@
 	}
 </script>
 
-<div
-	class="bg-surface rounded-xl shadow-md shadow-[var(--color-shadow)] overflow-hidden transition-all duration-500 {mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-3'}"
-	style="transition-timing-function: cubic-bezier(0.16, 1, 0.3, 1);"
->
-	<!-- Collapsible Header -->
-	<button
-		type="button"
-		onclick={toggleExpanded}
-		class="w-full px-6 py-4 flex items-center justify-between hover:bg-surface-hover transition-colors"
+{#if isExpanded}
+	<!-- Expanded: full card with form -->
+	<div
+		class="bg-surface rounded-xl shadow-md shadow-[var(--color-shadow)] overflow-hidden transition-all duration-500 {mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-3'}"
+		style="transition-timing-function: cubic-bezier(0.16, 1, 0.3, 1);"
 	>
-		<div class="flex items-center gap-3">
-			<div class="w-8 h-8 rounded-lg bg-primary-100 flex items-center justify-center">
-				<Plus size={18} class="text-primary-600" />
+		<!-- Card Header -->
+		<button
+			type="button"
+			onclick={toggleExpanded}
+			class="w-full px-6 py-4 flex items-center justify-between hover:bg-surface-hover transition-colors"
+		>
+			<div class="flex items-center gap-3">
+				<div class="w-8 h-8 rounded-lg bg-primary-100 flex items-center justify-center">
+					<Plus size={18} class="text-primary-600" />
+				</div>
+				<h2 class="font-display text-xl font-medium text-charcoal">Add Transaction</h2>
 			</div>
-			<h2 class="font-display text-xl font-medium text-charcoal">Add Transaction</h2>
-		</div>
-		<ChevronDown
-			size={20}
-			class="text-charcoal-muted transition-transform duration-200 {isExpanded ? 'rotate-180' : ''}"
-		/>
-	</button>
+			<ChevronDown
+				size={20}
+				class="text-charcoal-muted transition-transform duration-200 rotate-180"
+			/>
+		</button>
 
-	<!-- Collapsible Content -->
-	{#if isExpanded}
 		<form onsubmit={handleSubmit} transition:slide={{ duration: 200 }}>
 			<div class="px-6 pb-6 space-y-4">
 		<!-- Date & Merchant Row -->
@@ -582,5 +590,5 @@
 			</div>
 			</div>
 		</form>
-	{/if}
-</div>
+	</div>
+{/if}
