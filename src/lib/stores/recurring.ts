@@ -8,6 +8,10 @@ import {
 	computeWeightedStdDev
 } from '$lib/insights/calculations/stats';
 import { roundCurrency, roundCoefficient } from '$lib/utils/currency';
+import { getCachedRecurring, setCachedRecurring } from './recurringCache';
+
+// Re-export cache functions for backward compatibility
+export { invalidateRecurringCache, getRecurringCacheVersion } from './recurringCache';
 
 export interface DetectedRecurring {
 	merchant: string;
@@ -25,26 +29,6 @@ export interface DetectedRecurring {
 	variance: number;
 	/** Whether this recurring expense is typically shared */
 	isShared: boolean;
-}
-
-// Cache for recurring detection results - invalidated when transactions change
-let cachedRecurringExpenses: DetectedRecurring[] | null = null;
-let cacheVersion = 0;
-
-/**
- * Invalidate the recurring detection cache
- * Call this when transactions are added, updated, or deleted
- */
-export function invalidateRecurringCache(): void {
-	cachedRecurringExpenses = null;
-	cacheVersion++;
-}
-
-/**
- * Get the current cache version (for testing/debugging)
- */
-export function getRecurringCacheVersion(): number {
-	return cacheVersion;
 }
 
 /**
@@ -192,14 +176,15 @@ function detectRecurringPattern(transactions: Transaction[]): PatternResult | nu
  */
 export async function detectRecurringExpenses(): Promise<DetectedRecurring[]> {
 	// Return cached results if available
-	if (cachedRecurringExpenses !== null) {
-		return cachedRecurringExpenses;
+	const cached = getCachedRecurring();
+	if (cached !== null) {
+		return cached;
 	}
 
 	const allTransactions = await db.transactions.toArray();
 
 	if (allTransactions.length === 0) {
-		cachedRecurringExpenses = [];
+		setCachedRecurring([]);
 		return [];
 	}
 
@@ -286,7 +271,7 @@ export async function detectRecurringExpenses(): Promise<DetectedRecurring[]> {
 	detected.sort((a, b) => b.averageAmount - a.averageAmount);
 
 	// Cache the results
-	cachedRecurringExpenses = detected;
+	setCachedRecurring(detected);
 	return detected;
 }
 

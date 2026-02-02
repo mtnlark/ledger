@@ -1,7 +1,7 @@
 import { db, type Settings, DEFAULT_SETTINGS } from '$lib/db';
 import { liveQuery } from 'dexie';
 import { persistData } from '$lib/storage';
-import { invalidateRecurringCache } from './recurring';
+import { invalidateRecurringCache } from './recurringCache';
 import { normalizeMerchant } from '$lib/utils/string-helpers';
 
 // Re-export subscription functions for backward compatibility
