@@ -71,9 +71,11 @@ ledger/
 │   ├── lib/
 │   │   ├── db/
 │   │   │   ├── index.ts      # Dexie schema & defaults
+│   │   │   ├── constants.ts  # Type definitions & default data
 │   │   │   └── migrations.ts # Database migration logic
 │   │   ├── storage/
 │   │   │   ├── index.ts      # Storage abstraction layer
+│   │   │   ├── types.ts      # StoredData interface
 │   │   │   └── tauri-adapter.ts  # File persistence
 │   │   ├── stores/           # Data operations
 │   │   │   ├── transactions.ts
@@ -85,7 +87,9 @@ ledger/
 │   │   │   ├── savingsContributions.ts  # Contribution tracking
 │   │   │   ├── merchants.ts
 │   │   │   ├── recurring.ts
+│   │   │   ├── recurringCache.ts       # Recurring detection cache management
 │   │   │   ├── recurringSuggestions.ts  # Monthly recurring transaction suggestions
+│   │   │   ├── dashboardActions.ts     # Dashboard transaction CRUD operations
 │   │   │   ├── selectedMonth.ts    # UI state for month selection
 │   │   │   ├── theme.ts            # Light/dark/system theme
 │   │   │   └── toast.ts            # Toast notification system
@@ -184,7 +188,8 @@ ledger/
 │   │   │   ├── trie.ts                # Trie for merchant autocomplete
 │   │   │   ├── pagination.ts          # List pagination utilities
 │   │   │   ├── retry.ts               # Async retry with backoff
-│   │   │   ├── errors.ts              # Error handling utilities
+│   │   │   ├── errors.ts              # Error class definitions & type guards
+│   │   │   ├── error-handler.ts       # Centralized error handler (logging + toast)
 │   │   │   └── debug.ts               # Debugging utilities
 │   │   └── assets/
 │   │       └── favicon.svg
