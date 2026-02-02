@@ -12,6 +12,7 @@
 	import { sumCurrency } from '$lib/utils/currency';
 	import { getSelectedMonth, setSelectedMonth } from '$lib/stores/selectedMonth';
 	import { toast } from '$lib/stores/toast';
+	import { handleError } from '$lib/utils/error-handler';
 	import { formatCurrency } from '$lib/utils/format-helpers';
 	import TransactionList from '$lib/components/TransactionList.svelte';
 	import TransactionForm, { type TransactionFormData, type SplitTransactionFormData } from '$lib/components/TransactionForm.svelte';
@@ -203,7 +204,7 @@
 				showRecurringBanner = false;
 			}
 		} catch (error) {
-			console.error('Failed to load data:', error);
+			handleError(error, { context: 'loadData', showToast: false });
 		} finally {
 			isLoading = false;
 		}
@@ -224,7 +225,7 @@
 			budget = monthBudget;
 			savedFromContributions = sumCurrency(contributions.map(c => c.amount));
 		} catch (error) {
-			console.error('Failed to load month data:', error);
+			handleError(error, { context: 'handleMonthChange', showToast: false });
 		}
 	}
 
@@ -237,8 +238,7 @@
 			showBudgetModal = false;
 			toast.success('Budget saved');
 		} catch (error) {
-			console.error('Failed to save budget:', error);
-			toast.error('Failed to save budget');
+			handleError(error, { context: 'handleSaveBudget', userMessage: 'Failed to save budget' });
 		}
 	}
 
@@ -258,8 +258,7 @@
 			}
 			toast.success('Transaction added');
 		} catch (error) {
-			console.error('Failed to add transaction:', error);
-			toast.error('Failed to add transaction');
+			handleError(error, { context: 'handleAddTransaction', userMessage: 'Failed to add transaction' });
 		}
 	}
 
@@ -279,8 +278,7 @@
 			}
 			toast.success('Transaction added');
 		} catch (error) {
-			console.error('Failed to add transaction:', error);
-			toast.error('Failed to add transaction');
+			handleError(error, { context: 'handleQuickAdd', userMessage: 'Failed to add transaction' });
 		}
 	}
 
@@ -312,8 +310,7 @@
 			}
 			toast.success(`${data.splits.length} transactions added`);
 		} catch (error) {
-			console.error('Failed to add split transactions:', error);
-			toast.error('Failed to add transactions');
+			handleError(error, { context: 'handleSplitSubmit', userMessage: 'Failed to add transactions' });
 		}
 	}
 
@@ -335,8 +332,7 @@
 			editingTransaction = null;
 			toast.success('Transaction updated');
 		} catch (error) {
-			console.error('Failed to update transaction:', error);
-			toast.error('Failed to update transaction');
+			handleError(error, { context: 'handleSaveEdit', userMessage: 'Failed to update transaction' });
 		}
 	}
 
@@ -346,8 +342,7 @@
 			await cancelSubscription(merchant);
 			toast.success(`${merchant} marked as cancelled`);
 		} catch (error) {
-			console.error('Failed to cancel subscription:', error);
-			toast.error('Failed to cancel subscription');
+			handleError(error, { context: 'handleCancelSubscription', userMessage: 'Failed to cancel subscription' });
 		}
 	}
 
@@ -366,8 +361,7 @@
 					availableMonths = await getAvailableMonths();
 					toast.success('Transaction deleted');
 				} catch (error) {
-					console.error('Failed to delete transaction:', error);
-					toast.error('Failed to delete transaction');
+					handleError(error, { context: 'handleDelete', userMessage: 'Failed to delete transaction' });
 				}
 			}
 		});
@@ -398,8 +392,7 @@
 					}
 					toast.success(ids.length === 1 ? 'Transaction deleted' : `${ids.length} transactions deleted`);
 				} catch (error) {
-					console.error('Failed to delete transactions:', error);
-					toast.error('Failed to delete transactions');
+					handleError(error, { context: 'handleBulkDelete', userMessage: 'Failed to delete transactions' });
 				}
 			}
 		});
@@ -423,8 +416,7 @@
 				? `Category changed to ${categoryName}`
 				: `${ids.length} transactions moved to ${categoryName}`);
 		} catch (error) {
-			console.error('Failed to update categories:', error);
-			toast.error('Failed to update categories');
+			handleError(error, { context: 'handleBulkCategoryChange', userMessage: 'Failed to update categories' });
 		}
 	}
 
@@ -447,8 +439,10 @@
 			splittingTransaction = null;
 			toast.success(`Transaction split into ${splits.length} parts`);
 		} catch (error) {
-			console.error('Failed to split transaction:', error);
-			toast.error(error instanceof Error ? error.message : 'Failed to split transaction');
+			handleError(error, {
+				context: 'handleSplitTransaction',
+				userMessage: error instanceof Error ? error.message : 'Failed to split transaction'
+			});
 		}
 	}
 
@@ -494,8 +488,7 @@
 				? 'Transaction added'
 				: `${items.length} transactions added`);
 		} catch (error) {
-			console.error('Failed to add recurring suggestions:', error);
-			toast.error('Failed to add transactions');
+			handleError(error, { context: 'handleAddSelectedSuggestions', userMessage: 'Failed to add transactions' });
 		}
 	}
 
@@ -507,7 +500,7 @@
 			showRecurringBanner = false;
 			showRecurringSuggestionsModal = false;
 		} catch (error) {
-			console.error('Failed to dismiss recurring suggestions:', error);
+			handleError(error, { context: 'handleDismissRecurringSuggestions', showToast: false });
 		}
 	}
 
