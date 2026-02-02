@@ -14,7 +14,7 @@ import {
 	type SavingsAccount
 } from '$lib/db';
 import { parseStoredDate } from '$lib/utils/date-helpers';
-import type { StoredData } from './index';
+import type { StoredData } from './types';
 
 // Tauri API modules - loaded once during initialization
 let fs: typeof import('@tauri-apps/plugin-fs');

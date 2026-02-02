@@ -5,31 +5,11 @@
  * JSON file persistence in the app data directory.
  */
 
-import {
-	db,
-	type Transaction,
-	type Category,
-	type MonthlyBudget,
-	type CategoryBudget,
-	type Settings,
-	type SavingsAccount,
-	type SavingsContribution,
-	DEFAULT_SETTINGS
-} from '$lib/db';
+import { db, DEFAULT_SETTINGS } from '$lib/db';
 import { parseStoredDate } from '$lib/utils/date-helpers';
+import type { StoredData } from './types';
 
-// Data structure for file storage
-export interface StoredData {
-	version: string;
-	exportedAt: string;
-	transactions: Transaction[];
-	categories: Category[];
-	monthlyBudgets: MonthlyBudget[];
-	categoryBudgets: CategoryBudget[];
-	settings: Settings;
-	savingsAccounts?: SavingsAccount[];
-	savingsContributions?: SavingsContribution[];
-}
+export type { StoredData } from './types';
 
 // Track if storage has been initialized
 let initialized = false;
