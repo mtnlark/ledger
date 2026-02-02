@@ -5,15 +5,15 @@
  * Optimized to use bulk operations for better performance with large datasets.
  */
 
+import { db } from './index';
 import {
-	db,
 	type Category,
 	type Transaction,
 	type SavingsAccount,
 	CATEGORY_COLORS,
 	CATEGORY_ESSENTIAL,
 	DEFAULT_SAVINGS_ACCOUNTS
-} from './index';
+} from './constants';
 
 /**
  * Migration: Update category colors to Warm Ledger palette
