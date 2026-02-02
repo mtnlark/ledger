@@ -12,10 +12,12 @@
 		copyBudgetsFromMonth
 	} from '$lib/stores/categoryBudget';
 	import { getBudgetForMonth } from '$lib/stores/budget';
+	import { getContributionsAffectingAvailable } from '$lib/stores/savingsContributions';
 	import { getSelectedMonth, setSelectedMonth } from '$lib/stores/selectedMonth';
 	import { getAvailableMonths } from '$lib/stores/transactions';
 	import { toast } from '$lib/stores/toast';
 	import { formatCurrencyWhole } from '$lib/utils/format-helpers';
+	import { sumCurrency, roundCurrency } from '$lib/utils/currency';
 	import { getBudgetStatus } from '$lib/utils/budget-status';
 	import { Sparkles, Copy, AlertTriangle, X } from 'lucide-svelte';
 	import HeaderNav from '$lib/components/HeaderNav.svelte';
@@ -32,27 +34,36 @@
 	let spending = $state<Map<number, number>>(new Map());
 	let suggestions = $state<Map<number, number>>(new Map());
 	let monthlyBudget = $state<MonthlyBudget | null>(null);
+	let totalSaved = $state(0);
 	let currentMonth = $state(getMonthKey(new Date()));
 	let availableMonths = $state<string[]>([getMonthKey(new Date())]);
 
-	// Summary calculations
+	// Summary calculations — scoped to budgeted categories only
 	let totalBudgeted = $derived(
-		Array.from(budgets.values()).reduce((sum, b) => sum + b.budgetAmount, 0)
+		sumCurrency(Array.from(budgets.values()).map((b) => b.budgetAmount))
 	);
-	let totalSpent = $derived(Array.from(spending.values()).reduce((sum, s) => sum + s, 0));
 	let budgetedSpent = $derived(
-		Array.from(budgets.keys()).reduce((sum, categoryId) => sum + (spending.get(categoryId) || 0), 0)
+		sumCurrency(Array.from(budgets.keys()).map((categoryId) => spending.get(categoryId) || 0))
 	);
-	let unbudgetedSpent = $derived(totalSpent - budgetedSpent);
+	let budgetRemaining = $derived(roundCurrency(totalBudgeted - budgetedSpent));
 
-	// Calculate remaining to spend from monthly budget (income - saved - spent)
+	// Income allocation
 	let income = $derived(monthlyBudget?.income ?? 0);
-	let saved = $derived(monthlyBudget?.savedAmount ?? 0);
-	let available = $derived(income - saved);
-	let remaining = $derived(available - totalSpent);
+	let unallocated = $derived(roundCurrency(income - totalSaved - totalBudgeted));
 
-	// Calculate unallocated: available money not assigned to any budget category
-	let unallocated = $derived(available - totalBudgeted);
+	// Unbudgeted spending tracking (categories with spending but no budget set)
+	let unbudgetedSpent = $derived(
+		sumCurrency(
+			Array.from(spending.entries())
+				.filter(([categoryId]) => !budgets.has(categoryId))
+				.map(([, amount]) => amount)
+		)
+	);
+	let unbudgetedCategoryCount = $derived(
+		Array.from(spending.entries())
+			.filter(([categoryId, amount]) => !budgets.has(categoryId) && amount > 0)
+			.length
+	);
 
 	// Check if there are suggestions to apply (categories with suggestions but no budget)
 	let hasSuggestionsToApply = $derived.by(() => {
@@ -143,11 +154,12 @@
 
 	// Fetch data for a month, then update all state atomically to prevent UI mismatch
 	async function loadMonthData(month: string) {
-		const [budgetList, spendingMap, suggestionMap, monthBudget] = await Promise.all([
+		const [budgetList, spendingMap, suggestionMap, monthBudget, contributions] = await Promise.all([
 			getCategoryBudgetsForMonth(month),
 			getAllCategorySpending(month),
 			generateAllSuggestions(month),
-			getBudgetForMonth(month)
+			getBudgetForMonth(month),
+			getContributionsAffectingAvailable(month)
 		]);
 
 		// Update all state atomically
@@ -157,6 +169,7 @@
 		spending = spendingMap;
 		suggestions = suggestionMap;
 		monthlyBudget = monthBudget;
+		totalSaved = sumCurrency(contributions.map((c) => c.amount));
 	}
 
 	async function handleMonthChange(month: string) {
@@ -276,95 +289,127 @@
 				<!-- Summary Card -->
 				<div class="bg-surface rounded-xl shadow-md shadow-theme p-6">
 					<h2 class="font-display text-lg font-medium text-charcoal mb-4">Budget Summary</h2>
-					<div class="flex flex-wrap gap-x-8 gap-y-4">
-						{#if monthlyBudget}
+					{#if totalBudgeted > 0}
+						{@const overallStatus = getBudgetStatus(Math.round(budgetedSpent), Math.round(totalBudgeted))}
+						<div class="flex flex-wrap gap-x-8 gap-y-4 items-start">
 							<div>
-								<span class="text-sm text-charcoal-muted">Remaining to Spend</span>
+								<span class="text-sm text-charcoal-muted">Total Budgeted</span>
+								<p class="font-mono text-xl font-medium text-charcoal">
+									{formatCurrencyWhole(totalBudgeted)}
+								</p>
+							</div>
+							<div class="border-l border-theme pl-8">
+								<span class="text-sm text-charcoal-muted">Spent</span>
+								<p class="font-mono text-xl font-medium text-charcoal">
+									{formatCurrencyWhole(budgetedSpent)}
+								</p>
+								<p class="text-xs text-charcoal-muted font-mono">
+									{Math.round(overallStatus.percentSpent)}% of budget
+								</p>
+							</div>
+							<div class="border-l border-theme pl-8">
+								<span class="text-sm text-charcoal-muted">Remaining</span>
 								<p
-									class="font-mono text-xl font-medium {remaining >= 0
+									class="font-mono text-xl font-medium {budgetRemaining >= 0
 										? 'text-success-600'
 										: 'text-danger-500'}"
 								>
-									{formatCurrencyWhole(remaining)}
-								</p>
-							</div>
-							<div class="border-l border-theme pl-8">
-								<span class="text-sm text-charcoal-muted">Total Budgeted</span>
-								<p class="font-mono text-xl font-medium text-charcoal">
-									{formatCurrencyWhole(totalBudgeted)}
-								</p>
-							</div>
-						{:else}
-							<div>
-								<span class="text-sm text-charcoal-muted">Total Budgeted</span>
-								<p class="font-mono text-xl font-medium text-charcoal">
-									{formatCurrencyWhole(totalBudgeted)}
-								</p>
-							</div>
-						{/if}
-						<div>
-							<span class="text-sm text-charcoal-muted">Total Spent</span>
-							<p class="font-mono text-xl font-medium text-charcoal">
-								{formatCurrencyWhole(totalSpent)}
-							</p>
-							{#if unbudgetedSpent > 0}
-								<p class="text-xs text-charcoal-muted mt-0.5">
-									incl. {formatCurrencyWhole(unbudgetedSpent)} unbudgeted
-								</p>
-							{/if}
-						</div>
-						{#if monthlyBudget}
-							<div class="border-l border-theme pl-8">
-								<span class="text-sm text-charcoal-muted">Unallocated</span>
-								<p
-									class="font-mono text-xl font-medium {unallocated >= 0
-										? 'text-charcoal'
-										: 'text-warning-600'}"
-								>
-									{formatCurrencyWhole(Math.abs(unallocated))}
-									{#if unallocated < 0}
-										<span class="text-sm font-sans font-normal text-warning-600">
-											over-allocated
-										</span>
+									{#if budgetRemaining < 0}
+										{formatCurrencyWhole(Math.abs(budgetRemaining))}
+										<span class="text-sm font-sans font-normal text-danger-500">over</span>
+									{:else}
+										{formatCurrencyWhole(budgetRemaining)}
 									{/if}
 								</p>
 							</div>
-						{/if}
-						{#if totalBudgeted > 0}
-							<div class="border-l border-theme pl-8">
-								<span class="text-sm text-charcoal-muted">Budget Status</span>
-								<p
-									class="font-mono text-xl font-medium {budgetedSpent <= totalBudgeted
-										? 'text-success-600'
-										: 'text-danger-500'}"
+							<div class="flex-1 self-center min-w-[120px]">
+								<div
+									class="h-2 bg-surface-alt rounded-full overflow-hidden shadow-[inset_0_1px_2px_rgba(45,42,38,0.08)]"
 								>
-									{formatCurrencyWhole(Math.abs(totalBudgeted - budgetedSpent))}
-									<span class="text-sm font-sans font-normal {budgetedSpent <= totalBudgeted
-										? 'text-success-600'
-										: 'text-danger-500'}">
-										{budgetedSpent <= totalBudgeted ? 'under' : 'over'}
-									</span>
+									<div
+										class="h-full rounded-full transition-all duration-500 ease-out {overallStatus.colorClass}"
+										style="width: {overallStatus.displayPercent}%"
+									></div>
+								</div>
+							</div>
+						</div>
+					{:else}
+						<div class="flex flex-wrap gap-x-8 gap-y-4">
+							<div>
+								<span class="text-sm text-charcoal-muted">Total Budgeted</span>
+								<p class="font-mono text-xl font-medium text-charcoal">
+									{formatCurrencyWhole(totalBudgeted)}
 								</p>
 							</div>
-						{/if}
-					</div>
+							<div class="border-l border-theme pl-8">
+								<span class="text-sm text-charcoal-muted">Spent</span>
+								<p class="font-mono text-xl font-medium text-charcoal">
+									{formatCurrencyWhole(budgetedSpent)}
+								</p>
+							</div>
+						</div>
+					{/if}
 
-					{#if totalBudgeted > 0}
-						{@const overallStatus = getBudgetStatus(Math.round(budgetedSpent), Math.round(totalBudgeted))}
+					{#if unbudgetedCategoryCount > 0}
+						<p class="text-xs text-charcoal-muted mt-3">
+							{formatCurrencyWhole(unbudgetedSpent)} spent in {unbudgetedCategoryCount} unbudgeted {unbudgetedCategoryCount === 1 ? 'category' : 'categories'}
+						</p>
+					{:else if totalBudgeted > 0}
+						<p class="text-xs text-charcoal-muted mt-3">
+							All categories with spending have budgets set
+						</p>
+					{/if}
+
+					{#if income > 0}
+						{@const savingsPct = Math.min((totalSaved / income) * 100, 100)}
+						{@const budgetedPct = Math.min((totalBudgeted / income) * 100, 100 - savingsPct)}
+						{@const unallocatedPct = Math.max(0, 100 - savingsPct - budgetedPct)}
 						<div class="mt-4 pt-4 border-t border-dashed border-theme-dashed">
 							<div class="flex justify-between text-xs text-charcoal-muted mb-2">
-								<span>Overall Progress</span>
-								<span class="font-mono">
-									{Math.round(overallStatus.percentSpent)}% of budgeted
-								</span>
+								<span>Income Allocation</span>
+								<span class="font-mono">{formatCurrencyWhole(income)} income</span>
 							</div>
 							<div
-								class="h-2.5 bg-surface-alt rounded-full overflow-hidden shadow-[inset_0_1px_2px_rgba(45,42,38,0.08)]"
+								class="h-4 bg-surface-alt rounded-full overflow-hidden shadow-[inset_0_1px_2px_rgba(45,42,38,0.08)] flex"
 							>
-								<div
-									class="h-full rounded-full transition-all duration-500 ease-out {overallStatus.colorClass}"
-									style="width: {overallStatus.displayPercent}%"
-								></div>
+								{#if savingsPct > 0}
+									<div
+										class="h-full bg-success-400 transition-all duration-500 ease-out {budgetedPct === 0 && unallocatedPct === 0 ? 'rounded-full' : 'rounded-l-full'}"
+										style="width: {savingsPct}%"
+									></div>
+								{/if}
+								{#if budgetedPct > 0}
+									<div
+										class="h-full bg-primary-400 transition-all duration-500 ease-out {savingsPct === 0 && unallocatedPct === 0 ? 'rounded-full' : savingsPct === 0 ? 'rounded-l-full' : ''} {unallocatedPct === 0 && savingsPct > 0 ? 'rounded-r-full' : ''}"
+										style="width: {budgetedPct}%"
+									></div>
+								{/if}
+								{#if unallocatedPct > 0}
+									<div
+										class="h-full bg-warning-300 transition-all duration-500 ease-out rounded-r-full {savingsPct === 0 && budgetedPct === 0 ? 'rounded-l-full' : ''}"
+										style="width: {unallocatedPct}%"
+									></div>
+								{/if}
+							</div>
+							<div class="flex justify-between mt-2 text-xs">
+								{#if totalSaved > 0}
+									<span class="flex items-center gap-1 text-charcoal-muted">
+										<span class="inline-block w-2 h-2 rounded-full bg-success-400"></span>
+										Savings {formatCurrencyWhole(totalSaved)}
+									</span>
+								{/if}
+								<span class="flex items-center gap-1 text-charcoal-muted">
+									<span class="inline-block w-2 h-2 rounded-full bg-primary-400"></span>
+									Budgeted {formatCurrencyWhole(totalBudgeted)}
+								</span>
+								<span class="flex items-center gap-1 {unallocated >= 0 ? 'text-charcoal-muted' : 'text-warning-600 font-medium'}">
+									<span class="inline-block w-2 h-2 rounded-full {unallocated >= 0 ? 'bg-warning-300' : 'bg-warning-500'}"></span>
+									{#if unallocated >= 0}
+										Unallocated {formatCurrencyWhole(unallocated)}
+									{:else}
+										Over-allocated {formatCurrencyWhole(Math.abs(unallocated))}
+									{/if}
+								</span>
 							</div>
 						</div>
 					{/if}

@@ -368,7 +368,11 @@ Sidebar state persists to localStorage (`ledger-sidebar-expanded`).
 ### Budget
 - Per-category budget tracking
 - Visual progress bars showing spending vs budget
-- Summary card with total budgeted, spent, and remaining
+- Summary card scoped to budgeted categories: total budgeted, spent (with % of budget), remaining
+  - Inline progress bar fills remaining horizontal space in the metrics row
+  - Unbudgeted spending callout (count + amount of categories without budgets)
+  - Income allocation stacked bar (savings, budgeted, unallocated) — shown when income is set
+  - Uses `sumCurrency()`/`roundCurrency()` for all aggregations
 - Alerts for categories approaching or over budget
 - Month picker for viewing different months
 
