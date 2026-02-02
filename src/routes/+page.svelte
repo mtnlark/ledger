@@ -3,9 +3,10 @@
 	import { format, startOfDay, parseISO } from 'date-fns';
 	import { getMonthKey, parseMonthKey, type Transaction, type Category, type Settings, type MonthlyBudget, DEFAULT_SETTINGS } from '$lib/db';
 	import { initializeStorage } from '$lib/storage';
-	import { addTransaction, updateTransaction, deleteTransaction, bulkDeleteTransactions, bulkUpdateCategory, splitTransaction, getTransactionsByMonth, getAllTransactions, getAvailableMonths } from '$lib/stores/transactions';
+	import { addTransaction, getTransactionsByMonth, getAllTransactions, getAvailableMonths } from '$lib/stores/transactions';
+	import { setupDashboardActions } from '$lib/stores/dashboardActions';
 	import { getAllCategories } from '$lib/stores/categories';
-	import { getSettings, cancelSubscription, dismissRecurringSuggestionsForMonth } from '$lib/stores/settings';
+	import { getSettings, dismissRecurringSuggestionsForMonth } from '$lib/stores/settings';
 	import { getBudgetForMonth, saveBudget } from '$lib/stores/budget';
 	import { getContributionsAffectingAvailable } from '$lib/stores/savingsContributions';
 	import { getRecurringSuggestions, shouldShowRecurringBanner, type RecurringSuggestion } from '$lib/stores/recurringSuggestions';
@@ -13,9 +14,8 @@
 	import { getSelectedMonth, setSelectedMonth } from '$lib/stores/selectedMonth';
 	import { toast } from '$lib/stores/toast';
 	import { handleError } from '$lib/utils/error-handler';
-	import { formatCurrency } from '$lib/utils/format-helpers';
 	import TransactionList from '$lib/components/TransactionList.svelte';
-	import TransactionForm, { type TransactionFormData, type SplitTransactionFormData } from '$lib/components/TransactionForm.svelte';
+	import TransactionForm from '$lib/components/TransactionForm.svelte';
 	import CashFlowCard from '$lib/components/CashFlowCard.svelte';
 	import BudgetModal from '$lib/components/BudgetModal.svelte';
 	import EditTransactionModal, { type TransactionUpdateData } from '$lib/components/EditTransactionModal.svelte';
@@ -26,7 +26,7 @@
 	import CashFlowCardSkeleton from '$lib/components/CashFlowCardSkeleton.svelte';
 	import TransactionListSkeleton from '$lib/components/TransactionListSkeleton.svelte';
 	import TransactionFilters, { type FilterState } from '$lib/components/TransactionFilters.svelte';
-	import QuickAddFAB, { type QuickAddData } from '$lib/components/QuickAddFAB.svelte';
+	import QuickAddFAB from '$lib/components/QuickAddFAB.svelte';
 	import KeyboardShortcuts from '$lib/components/KeyboardShortcuts.svelte';
 	import RecurringSuggestionsBanner from '$lib/components/RecurringSuggestionsBanner.svelte';
 	import RecurringSuggestionsModal from '$lib/components/RecurringSuggestionsModal.svelte';
@@ -58,6 +58,19 @@
 	let showRecurringBanner = $state(false);
 	let showRecurringSuggestionsModal = $state(false);
 	let recurringSuggestions = $state<RecurringSuggestion[]>([]);
+
+	// Transaction CRUD actions (extracted module)
+	const actions = setupDashboardActions({
+		getCurrentMonth: () => currentMonth,
+		hasAllTransactions: () => allTransactions.length > 0,
+		reload: (data) => {
+			transactions = data.transactions;
+			availableMonths = data.availableMonths;
+			if (data.allTransactions) {
+				allTransactions = data.allTransactions;
+			}
+		}
+	});
 
 	// Confirm dialog state
 	let confirmDialog = $state<{
@@ -242,132 +255,29 @@
 		}
 	}
 
-	// Handle form submission
-	async function handleAddTransaction(data: TransactionFormData) {
-		try {
-			await addTransaction({
-				...data,
-				isSettled: data.isSettled
-			});
-			// Reload transactions and available months (in case new month was added)
-			transactions = await getTransactionsByMonth(currentMonth);
-			availableMonths = await getAvailableMonths();
-			// Also refresh allTransactions if we have it loaded
-			if (allTransactions.length > 0) {
-				allTransactions = await getAllTransactions();
-			}
-			toast.success('Transaction added');
-		} catch (error) {
-			handleError(error, { context: 'handleAddTransaction', userMessage: 'Failed to add transaction' });
-		}
-	}
-
-	// Handle quick add (from FAB)
-	async function handleQuickAdd(data: QuickAddData) {
-		try {
-			await addTransaction({
-				...data,
-				isSettled: data.isSettled
-			});
-			// Reload transactions and available months
-			transactions = await getTransactionsByMonth(currentMonth);
-			availableMonths = await getAvailableMonths();
-			// Also refresh allTransactions if we have it loaded
-			if (allTransactions.length > 0) {
-				allTransactions = await getAllTransactions();
-			}
-			toast.success('Transaction added');
-		} catch (error) {
-			handleError(error, { context: 'handleQuickAdd', userMessage: 'Failed to add transaction' });
-		}
-	}
-
-	// Handle split transaction submission from form (creates multiple transactions)
-	async function handleSplitSubmit(data: SplitTransactionFormData) {
-		try {
-			// Create each split as a separate transaction
-			for (const split of data.splits) {
-				await addTransaction({
-					date: data.date,
-					merchant: data.merchant,
-					amount: split.amount,
-					categoryId: split.categoryId,
-					isShared: data.isShared,
-					isSettled: data.isSettled,
-					splitType: data.splitType,
-					splitValue: data.splitValue,
-					isEssential: data.isEssential,
-					isSubscription: data.isSubscription,
-					subscriptionFrequency: data.subscriptionFrequency
-				});
-			}
-			// Reload transactions and available months
-			transactions = await getTransactionsByMonth(currentMonth);
-			availableMonths = await getAvailableMonths();
-			// Also refresh allTransactions if we have it loaded
-			if (allTransactions.length > 0) {
-				allTransactions = await getAllTransactions();
-			}
-			toast.success(`${data.splits.length} transactions added`);
-		} catch (error) {
-			handleError(error, { context: 'handleSplitSubmit', userMessage: 'Failed to add transactions' });
-		}
-	}
-
 	// Handle edit - open modal
 	function handleEdit(transaction: Transaction) {
 		editingTransaction = transaction;
 	}
 
-	// Handle save edit
+	// Handle save edit — delegates to actions, then clears editing state on success
 	async function handleSaveEdit(id: number, data: TransactionUpdateData) {
-		try {
-			await updateTransaction(id, {
-				...data,
-				isSettled: editingTransaction?.isSettled ?? false
-			});
-			// Reload transactions and available months (in case date changed)
-			transactions = await getTransactionsByMonth(currentMonth);
-			availableMonths = await getAvailableMonths();
-			editingTransaction = null;
-			toast.success('Transaction updated');
-		} catch (error) {
-			handleError(error, { context: 'handleSaveEdit', userMessage: 'Failed to update transaction' });
-		}
+		const success = await actions.saveEdit(id, data, editingTransaction?.isSettled ?? false);
+		if (success) editingTransaction = null;
 	}
 
-	// Handle cancel subscription
-	async function handleCancelSubscription(merchant: string) {
-		try {
-			await cancelSubscription(merchant);
-			toast.success(`${merchant} marked as cancelled`);
-		} catch (error) {
-			handleError(error, { context: 'handleCancelSubscription', userMessage: 'Failed to cancel subscription' });
-		}
-	}
-
-	// Handle delete
+	// Handle delete — wraps the action in a confirm dialog
 	function handleDelete(id: number) {
 		showConfirmDialog({
 			title: 'Delete Transaction',
 			message: 'Are you sure you want to delete this transaction?',
 			confirmText: 'Delete',
 			variant: 'danger',
-			onConfirm: async () => {
-				try {
-					await deleteTransaction(id);
-					// Reload transactions and available months (in case month is now empty)
-					transactions = await getTransactionsByMonth(currentMonth);
-					availableMonths = await getAvailableMonths();
-					toast.success('Transaction deleted');
-				} catch (error) {
-					handleError(error, { context: 'handleDelete', userMessage: 'Failed to delete transaction' });
-				}
-			}
+			onConfirm: () => actions.deleteTransaction(id)
 		});
 	}
 
-	// Handle bulk delete
+	// Handle bulk delete — wraps the action in a confirm dialog
 	function handleBulkDelete(ids: number[]) {
 		if (ids.length === 0) return;
 
@@ -380,44 +290,14 @@
 			message,
 			confirmText: 'Delete',
 			variant: 'danger',
-			onConfirm: async () => {
-				try {
-					await bulkDeleteTransactions(ids);
-					// Reload transactions and available months
-					transactions = await getTransactionsByMonth(currentMonth);
-					availableMonths = await getAvailableMonths();
-					// Also refresh allTransactions if we have it loaded
-					if (allTransactions.length > 0) {
-						allTransactions = await getAllTransactions();
-					}
-					toast.success(ids.length === 1 ? 'Transaction deleted' : `${ids.length} transactions deleted`);
-				} catch (error) {
-					handleError(error, { context: 'handleBulkDelete', userMessage: 'Failed to delete transactions' });
-				}
-			}
+			onConfirm: () => actions.bulkDelete(ids)
 		});
 	}
 
-	// Handle bulk category change
+	// Handle bulk category change — delegates to actions with categories for toast
 	async function handleBulkCategoryChange(ids: number[], categoryId: number) {
 		if (ids.length === 0) return;
-
-		try {
-			await bulkUpdateCategory(ids, categoryId);
-			// Reload transactions
-			transactions = await getTransactionsByMonth(currentMonth);
-			// Also refresh allTransactions if we have it loaded
-			if (allTransactions.length > 0) {
-				allTransactions = await getAllTransactions();
-			}
-			const category = categories.find(c => c.id === categoryId);
-			const categoryName = category?.name || 'selected category';
-			toast.success(ids.length === 1
-				? `Category changed to ${categoryName}`
-				: `${ids.length} transactions moved to ${categoryName}`);
-		} catch (error) {
-			handleError(error, { context: 'handleBulkCategoryChange', userMessage: 'Failed to update categories' });
-		}
+		await actions.bulkCategoryChange(ids, categoryId, categories);
 	}
 
 	// Handle opening split modal from edit modal
@@ -426,24 +306,10 @@
 		splittingTransaction = transaction; // Open split modal
 	}
 
-	// Handle split transaction
+	// Handle split transaction — delegates to actions, then clears splitting state on success
 	async function handleSplitTransaction(id: number, splits: { categoryId: number; amount: number }[]) {
-		try {
-			await splitTransaction(id, splits);
-			// Reload transactions
-			transactions = await getTransactionsByMonth(currentMonth);
-			// Also refresh allTransactions if we have it loaded
-			if (allTransactions.length > 0) {
-				allTransactions = await getAllTransactions();
-			}
-			splittingTransaction = null;
-			toast.success(`Transaction split into ${splits.length} parts`);
-		} catch (error) {
-			handleError(error, {
-				context: 'handleSplitTransaction',
-				userMessage: error instanceof Error ? error.message : 'Failed to split transaction'
-			});
-		}
+		const success = await actions.splitTransaction(id, splits);
+		if (success) splittingTransaction = null;
 	}
 
 	// Handle adding selected recurring suggestions
@@ -604,8 +470,8 @@
 				{categories}
 				{settings}
 				bind:isExpanded={formExpanded}
-				onSubmit={handleAddTransaction}
-				onSplitSubmit={handleSplitSubmit}
+				onSubmit={actions.addTransaction}
+				onSplitSubmit={actions.addSplitTransactions}
 			/>
 
 			<!-- Transaction Search & Filters -->
@@ -690,7 +556,7 @@
 	{settings}
 	onSave={handleSaveEdit}
 	onSplit={handleOpenSplit}
-	onCancelSubscription={handleCancelSubscription}
+	onCancelSubscription={actions.cancelSubscription}
 	onClose={() => editingTransaction = null}
 />
 
@@ -731,7 +597,7 @@
 	<QuickAddFAB
 		{categories}
 		{settings}
-		onSubmit={handleQuickAdd}
+		onSubmit={actions.addTransaction}
 		bind:isOpen={quickAddOpen}
 	/>
 {/if}
