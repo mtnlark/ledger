@@ -34,7 +34,9 @@ vi.mock('@tauri-apps/plugin-fs', () => ({
 	mkdir: vi.fn(() => Promise.resolve()),
 	readTextFile: vi.fn(() => Promise.resolve('{}')),
 	writeTextFile: vi.fn(() => Promise.resolve()),
-	readDir: vi.fn(() => Promise.resolve([]))
+	readDir: vi.fn(() => Promise.resolve([])),
+	remove: vi.fn(() => Promise.resolve()),
+	rename: vi.fn(() => Promise.resolve())
 }));
 
 // Mock storage persistence
