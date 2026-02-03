@@ -7,6 +7,23 @@ Use test-driven development (TDD) best practices when adding new code. Update CL
 
 ---
 
+## Active Development
+
+See `PRODUCT_ROADMAP.md` for the current development plan. Work is organized into 8 groups:
+
+1. **Data Integrity Hardening** — Backup recovery, atomic writes, checksums
+2. **Savings Goals** — Extend savings accounts with goal tracking
+3. **Tags System** — Hashtag-based tagging via notes field
+4. **Notifications** — Daily reminders, weekly review, monthly budget setup
+5. **Insights Page Redesign** — Tab-based navigation for better UX
+6. **Undo System** — Recoverable deletions
+7. **Design Polish** — Accessibility, dark mode, loading states
+8. **Performance & Tech Debt** — Query optimization, test coverage
+
+Groups are ordered by engineering dependencies. Check the roadmap before starting new feature work.
+
+---
+
 ## Technology Stack
 
 ### Framework: **SvelteKit + Tauri**

@@ -12,6 +12,7 @@ import type {
 export interface StoredData {
 	version: string;
 	exportedAt: string;
+	checksum?: string; // SHA-256 hash of data content (excludes checksum field itself)
 	transactions: Transaction[];
 	categories: Category[];
 	monthlyBudgets: MonthlyBudget[];
@@ -20,3 +21,19 @@ export interface StoredData {
 	savingsAccounts?: SavingsAccount[];
 	savingsContributions?: SavingsContribution[];
 }
+
+/**
+ * Result of attempting to read and validate the data file
+ */
+export type ReadDataResult =
+	| { status: 'success'; data: StoredData }
+	| { status: 'not_found' }
+	| { status: 'corrupted'; error: string }
+	| { status: 'checksum_mismatch'; data: StoredData };
+
+/**
+ * Result of attempting to recover from backups
+ */
+export type RecoveryResult =
+	| { status: 'recovered'; data: StoredData; backupName: string }
+	| { status: 'no_valid_backup' };

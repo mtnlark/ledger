@@ -14,7 +14,7 @@ import {
 	type SavingsAccount
 } from '$lib/db';
 import { parseStoredDate } from '$lib/utils/date-helpers';
-import type { StoredData } from './types';
+import type { StoredData, ReadDataResult, RecoveryResult } from './types';
 
 // Tauri API modules - loaded once during initialization
 let fs: typeof import('@tauri-apps/plugin-fs');
@@ -37,6 +37,40 @@ const ICLOUD_APP_FOLDER = 'Ledger';
 // Backup debouncing - track last backup time
 let lastBackupTime = 0;
 const BACKUP_DEBOUNCE_MS = 60000; // 1 minute
+
+// Temp file suffix for atomic writes
+const TEMP_SUFFIX = '.tmp';
+
+/**
+ * Calculate SHA-256 checksum of data content (excluding checksum field)
+ */
+async function calculateChecksum(data: StoredData): Promise<string> {
+	// Create a copy without the checksum field for hashing
+	const { checksum: _, ...dataWithoutChecksum } = data;
+	const content = JSON.stringify(dataWithoutChecksum);
+
+	// Use Web Crypto API (available in Tauri/WebView)
+	const encoder = new TextEncoder();
+	const dataBuffer = encoder.encode(content);
+	const hashBuffer = await crypto.subtle.digest('SHA-256', dataBuffer);
+
+	// Convert to hex string
+	const hashArray = Array.from(new Uint8Array(hashBuffer));
+	return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+/**
+ * Verify that data checksum matches (if checksum field is present)
+ * Returns true if checksum is valid or not present (for backwards compatibility)
+ */
+async function verifyChecksum(data: StoredData): Promise<boolean> {
+	if (!data.checksum) {
+		// No checksum = legacy data, accept it
+		return true;
+	}
+	const calculated = await calculateChecksum(data);
+	return calculated === data.checksum;
+}
 
 /**
  * Load Tauri APIs and cache paths - called once during initialization
@@ -91,31 +125,127 @@ async function ensureDirectories(): Promise<void> {
 }
 
 /**
- * Read data from JSON file
+ * Read data from JSON file with validation
  */
-async function readDataFile(): Promise<StoredData | null> {
+async function readDataFile(): Promise<ReadDataResult> {
 	ensureInitialized();
 
 	if (!(await fs.exists(cachedDataPath))) {
-		return null;
+		return { status: 'not_found' };
 	}
 
+	let content: string;
 	try {
-		const content = await fs.readTextFile(cachedDataPath);
-		return JSON.parse(content) as StoredData;
+		content = await fs.readTextFile(cachedDataPath);
 	} catch (error) {
+		const message = error instanceof Error ? error.message : String(error);
 		console.error('Failed to read data file:', error);
-		return null;
+		return { status: 'corrupted', error: `File read error: ${message}` };
 	}
+
+	let data: StoredData;
+	try {
+		data = JSON.parse(content) as StoredData;
+	} catch (error) {
+		const message = error instanceof Error ? error.message : String(error);
+		console.error('Failed to parse data file JSON:', error);
+		return { status: 'corrupted', error: `JSON parse error: ${message}` };
+	}
+
+	// Verify checksum if present
+	const checksumValid = await verifyChecksum(data);
+	if (!checksumValid) {
+		console.error('Data file checksum mismatch - possible corruption');
+		return { status: 'checksum_mismatch', data };
+	}
+
+	return { status: 'success', data };
 }
 
 /**
- * Write data to JSON file
+ * Attempt to recover data from backups
+ * Tries each backup from newest to oldest until one parses successfully
+ */
+async function recoverFromBackups(): Promise<RecoveryResult> {
+	ensureInitialized();
+
+	if (!(await fs.exists(cachedBackupsDir))) {
+		return { status: 'no_valid_backup' };
+	}
+
+	const entries = await fs.readDir(cachedBackupsDir);
+	const backupFiles = entries
+		.filter((e) => e.isFile && e.name?.startsWith('data-') && e.name?.endsWith('.json'))
+		.map((e) => e.name!)
+		.sort()
+		.reverse(); // Most recent first
+
+	for (const backupName of backupFiles) {
+		try {
+			const backupPath = await path.join(cachedBackupsDir, backupName);
+			const content = await fs.readTextFile(backupPath);
+			const data = JSON.parse(content) as StoredData;
+
+			// Verify checksum if present (but don't reject legacy backups without checksums)
+			if (data.checksum) {
+				const valid = await verifyChecksum(data);
+				if (!valid) {
+					console.warn(`Backup ${backupName} has invalid checksum, trying next...`);
+					continue;
+				}
+			}
+
+			console.log(`Successfully recovered from backup: ${backupName}`);
+			return { status: 'recovered', data, backupName };
+		} catch (error) {
+			console.warn(`Backup ${backupName} is invalid, trying next...`, error);
+			continue;
+		}
+	}
+
+	return { status: 'no_valid_backup' };
+}
+
+/**
+ * Write data to JSON file using atomic write pattern
+ *
+ * 1. Calculate checksum and add to data
+ * 2. Write to temp file (.tmp)
+ * 3. Rename existing file to .bak (immediate backup)
+ * 4. Rename temp file to final name
+ *
+ * This ensures data.json is always in a complete, valid state.
  */
 async function writeDataFile(data: StoredData): Promise<void> {
 	ensureInitialized();
-	const content = JSON.stringify(data, null, 2);
-	await fs.writeTextFile(cachedDataPath, content);
+
+	// Calculate and add checksum
+	const checksum = await calculateChecksum(data);
+	const dataWithChecksum: StoredData = { ...data, checksum };
+
+	const content = JSON.stringify(dataWithChecksum, null, 2);
+	const tempPath = cachedDataPath + TEMP_SUFFIX;
+	const backupPath = cachedDataPath + '.bak';
+
+	// Step 1: Write to temp file
+	await fs.writeTextFile(tempPath, content);
+
+	// Step 2: If main file exists, rename to .bak (overwrites any existing .bak)
+	if (await fs.exists(cachedDataPath)) {
+		try {
+			// Remove existing .bak if present
+			if (await fs.exists(backupPath)) {
+				await fs.remove(backupPath);
+			}
+			await fs.rename(cachedDataPath, backupPath);
+		} catch (error) {
+			// If backup rename fails, still try to complete the write
+			console.error('Failed to create .bak file:', error);
+		}
+	}
+
+	// Step 3: Rename temp to final (atomic on most filesystems)
+	await fs.rename(tempPath, cachedDataPath);
 }
 
 /**
@@ -234,10 +364,25 @@ async function copyBackupToICloud(backupContent: string, backupName: string): Pr
 }
 
 /**
+ * Result of storage initialization
+ */
+export type InitializationResult =
+	| { status: 'loaded' }
+	| { status: 'recovered'; backupName: string }
+	| { status: 'initialized_fresh' }
+	| { status: 'initialized_after_unrecoverable_corruption' };
+
+/**
  * Initialize storage from file on app startup
  * Clears any stale IndexedDB data and loads fresh from JSON file
+ *
+ * Recovery behavior:
+ * - If data.json is valid: load it
+ * - If data.json is corrupted/invalid: try to recover from backups
+ * - If recovery succeeds: load recovered data, notify user
+ * - If recovery fails: initialize with defaults, warn user about data loss
  */
-export async function initializeTauriStorage(): Promise<void> {
+export async function initializeTauriStorage(): Promise<InitializationResult> {
 	// Load APIs and cache paths first
 	await initializeApis();
 	await ensureDirectories();
@@ -251,19 +396,52 @@ export async function initializeTauriStorage(): Promise<void> {
 		throw new Error(`Failed to initialize database: ${error}`);
 	}
 
-	const storedData = await readDataFile();
+	const readResult = await readDataFile();
 
-	if (storedData) {
-		// Load data from file into Dexie
-		await loadDataIntoDexie(storedData);
-	} else {
-		// First run - initialize with defaults
-		await initializeDefaults();
-		// Save initial state
-		await saveToFile();
+	// Handle successful read
+	if (readResult.status === 'success') {
+		await loadDataIntoDexie(readResult.data);
+		await runMigrationsIfNeeded();
+		return { status: 'loaded' };
 	}
 
-	// Run migrations (idempotent, includes date normalization)
+	// Handle first run (no data file)
+	if (readResult.status === 'not_found') {
+		await initializeDefaults();
+		await saveToFile();
+		await runMigrationsIfNeeded();
+		return { status: 'initialized_fresh' };
+	}
+
+	// Handle corruption or checksum mismatch - attempt recovery
+	console.error(`Data file issue: ${readResult.status}`);
+	if (readResult.status === 'corrupted') {
+		console.error(`Corruption details: ${readResult.error}`);
+	}
+
+	const recoveryResult = await recoverFromBackups();
+
+	if (recoveryResult.status === 'recovered') {
+		console.log(`Recovered from backup: ${recoveryResult.backupName}`);
+		await loadDataIntoDexie(recoveryResult.data);
+		// Save recovered data as new main file
+		await saveToFile();
+		await runMigrationsIfNeeded();
+		return { status: 'recovered', backupName: recoveryResult.backupName };
+	}
+
+	// No valid backup - must initialize fresh (data loss)
+	console.error('No valid backup found. Initializing with defaults. DATA HAS BEEN LOST.');
+	await initializeDefaults();
+	await saveToFile();
+	await runMigrationsIfNeeded();
+	return { status: 'initialized_after_unrecoverable_corruption' };
+}
+
+/**
+ * Run migrations if needed (extracted for clarity)
+ */
+async function runMigrationsIfNeeded(): Promise<void> {
 	const { runMigrations } = await import('$lib/db/migrations');
 	await runMigrations();
 }

@@ -18,7 +18,7 @@ vi.mock('$lib/stores/settings', () => ({
 }));
 
 vi.mock('$lib/stores/toast', () => ({
-	toast: { success: vi.fn(), error: vi.fn() }
+	toast: { success: vi.fn(), error: vi.fn(), warning: vi.fn() }
 }));
 
 vi.mock('$lib/utils/error-handler', () => ({
@@ -199,9 +199,13 @@ describe('dashboardActions', () => {
 			expect(toast.success).toHaveBeenCalledWith('2 transactions added');
 		});
 
-		it('calls handleError on failure', async () => {
+		it('calls handleError when all splits fail', async () => {
 			const error = new Error('split fail');
-			vi.mocked(addTransaction).mockRejectedValueOnce(error);
+			// All splits must fail to trigger handleError (vs partial success warning)
+			// Use mockRejectedValueOnce for each split to avoid persisting across tests
+			vi.mocked(addTransaction)
+				.mockRejectedValueOnce(error)
+				.mockRejectedValueOnce(error);
 
 			await actions.addSplitTransactions(splitData);
 
@@ -209,6 +213,23 @@ describe('dashboardActions', () => {
 				context: 'addSplitTransactions',
 				userMessage: 'Failed to add transactions'
 			});
+		});
+
+		it('shows warning on partial success', async () => {
+			const error = new Error('partial fail');
+			// First succeeds, second fails
+			vi.mocked(addTransaction)
+				.mockResolvedValueOnce(1)
+				.mockRejectedValueOnce(error);
+
+			await actions.addSplitTransactions(splitData);
+
+			// Should NOT call handleError for partial success
+			expect(handleError).not.toHaveBeenCalled();
+			// Should show warning toast
+			expect(toast.warning).toHaveBeenCalledWith(
+				'1 of 2 transactions added. 1 failed.'
+			);
 		});
 	});
 

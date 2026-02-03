@@ -1,458 +1,568 @@
 # Ledger Product Roadmap
 
-**Author**: Head of Product
-**Date**: January 2026
-**Status**: Planning Document for Engineering Review
+**Last Updated**: February 2026
 
-This document outlines feature ideas and implementation considerations for future development. Items are organized by priority and complexity.
+This document organizes planned work by logical groupings and engineering dependencies. Items within each group should be implemented together; groups are ordered by what needs to land first.
 
 ---
 
-## Recently Shipped
+## Group 1: Data Integrity Hardening
 
-### Savings Tracking
-- **Status**: Shipped
-- **Implementation**: Complete savings module with accounts, contributions, and insights
-- **Features**:
-  - Track contributions to savings, retirement, and investment accounts
-  - Default accounts: Emergency Fund, High-Yield Savings, 401(k), Roth IRA, Brokerage
-  - Contribution sources: payroll deduction, bank transfer, interest, employer match, other
-  - Balance tracking for savings-type accounts only
-  - Savings rate calculation (only bank_transfer/other reduce "available to spend")
-  - New Savings page between Budget and Insights in navigation
-  - SavingsInsights card on Insights page with totals and trends
-  - Integration with CashFlowCard for accurate "available to spend" calculation
-- **Files touched**:
-  - New: `src/lib/stores/savingsAccounts.ts`, `savingsContributions.ts`, `src/routes/savings/+page.svelte`
-  - New: `src/lib/components/insights/SavingsInsights.svelte`
-  - Modified: `src/lib/db/index.ts` (schema v4), `SideNav.svelte`, `CashFlowCard.svelte`
+**Why first**: Everything else depends on reliable persistence. These changes protect against data loss and should land before adding new features that create more data.
 
-### Month in Review Redesign
-- **Status**: Shipped
-- **Implementation**: Hero stat + expandable grouped insights for completed months
-- **UX improvements**:
-  - Hero stat displays most impactful insight at top (rank superlative or savings achievement)
-  - "See more" toggle expands all grouped insights
-  - Insights grouped by: Spending, Savings, Highlights
-  - Narrative-style labels ("Biggest purchase:", "Most visited merchant:")
-  - Consistent subcopy format ("out of X months")
-  - Icons: Flame for high spending, Trophy for savings achievements, TrendingDown for low spending
-- **Files touched**: `src/lib/components/insights/SmartTakeaways.svelte`
+**Dependencies**: None (foundational)
 
-### 12-Month Rolling Window for Historical Comparisons
-- **Status**: Shipped
-- **Implementation**: Historical rank and vs-average calculations now use rolling 12-month window
-- **Rationale**: Prevents ancient history from skewing comparisons; more relevant baseline
-- **Files touched**: `src/lib/insights/calculations/month-review.ts`, `month-review.test.ts`
+### 1.1 Backup Recovery on Corruption
 
-### Savings Insights in SmartTakeaways
-- **Status**: Shipped
-- **Implementation**: Positive-only savings insights integrated into Month in Review
-- **Design decision**: Never flag low savings rates (avoids false alarms from bimonthly paycheck timing)
-- **Insights shown**: Highest savings month, savings rate above average (10%+ threshold)
-- **Files touched**: `src/lib/insights/calculations/month-review.ts` (computeSavingsReview)
+**Problem**: If `data.json` becomes corrupted (power failure, crash during write), the app silently initializes defaults and the user loses all data. The backup system exists but is never consulted during recovery.
 
-### Search Across All Time
-- **Status**: Shipped
-- **Implementation**: Added "All Time" toggle to TransactionFilters component
-- **Files touched**: `TransactionFilters.svelte`, `+page.svelte` (dashboard)
+**Solution**:
+- In `tauri-adapter.ts`, when JSON parse fails, attempt to restore from the most recent backup in `backups/`
+- Show user notification: "Data file was corrupted. Restored from backup (timestamp)."
+- If no valid backup exists, warn user before initializing defaults
+- Log recovery events for debugging
 
-### Keyboard Shortcuts
-- **Status**: Shipped
-- **Implementation**: New `KeyboardShortcuts.svelte` component with global listener
-- **Shortcuts implemented**:
-  - `Cmd+K` - Focus search input
-  - `Cmd+N` - Open quick add transaction
-  - `Cmd+/` - Show shortcuts help modal
-  - `Esc` - Close modals / blur inputs
+**Files**: `src/lib/storage/tauri-adapter.ts`
 
-### Recurring Transaction Auto-Entry
-- **Status**: Shipped
-- **Implementation**: Banner + modal suggestion system for expected recurring transactions
-- **Features**:
-  - Dashboard banner appears at start of each month when suggestions available
-  - Two-step modal flow: selection (checkboxes) → confirmation (editable dates/amounts)
-  - Merges auto-detected recurring expenses with user-tagged subscriptions
-  - Frequency-aware filtering: monthly items always shown, annual/semi-annual only in due months
-  - Filters out already-added transactions by merchant name (handles price changes)
-  - Uses most recent transaction amount (not average) for accuracy
-  - "Remind me next month" defers without adding
-  - Banner persists until all suggestions added or explicitly deferred
-- **Files touched**:
-  - New: `src/lib/stores/recurringSuggestions.ts`, `recurringSuggestions.test.ts`
-  - New: `src/lib/components/RecurringSuggestionsBanner.svelte`, `RecurringSuggestionsModal.svelte`
-  - Modified: `src/lib/db/index.ts` (added `lastAutoSuggestedMonth` to Settings)
-  - Modified: `src/lib/stores/settings.ts` (dismiss/reset functions)
-  - Modified: `src/routes/+page.svelte` (integrated banner and modal)
+### 1.2 Atomic Writes
 
-### Quick Insights Dashboard Widget
-- **Status**: Shipped
-- **Implementation**: Single rotating insight widget above CashFlowCard
-- **Features**:
-  - Priority-based insight selection (first matching wins):
-    1. Budget alert (over/approaching) - uses same `getBudgetStatus()` as Budget page
-    2. Pace warning (mid-month, projected to exceed income)
-    3. Positive reinforcement (all budgeted categories on track)
-    4. Transaction count fallback
-  - Clickable navigation to Budget or Insights page
-  - 24-hour dismiss via localStorage
-  - Configurable thresholds in `config.dashboardInsight`
-  - Consistent with Budget page status logic (no false alerts for "at budget")
-- **Design decisions**:
-  - Skipped anomaly detection for MVP (requires loading all historical transactions)
-  - Uses warning colors (yellow) for approaching, danger colors (red) for over budget
-  - Race condition protection with sequence numbering for async calculations
-- **Files touched**:
-  - New: `src/lib/utils/dashboard-insight.ts`, `src/lib/components/DashboardInsightWidget.svelte`
-  - Modified: `src/lib/config/index.ts` (added `dashboardInsight` config section)
-  - Modified: `src/routes/+page.svelte` (integrated widget above CashFlowCard)
-  - Modified: `CLAUDE.md` (documentation)
+**Problem**: Writing directly to `data.json` risks partial writes if the process crashes mid-write.
+
+**Solution**:
+- Write to `data.json.tmp` first
+- Rename `data.json` → `data.json.bak` (immediate backup of previous state)
+- Rename `data.json.tmp` → `data.json`
+- This ensures `data.json` is always in a complete state
+
+**Files**: `src/lib/storage/tauri-adapter.ts`
+
+### 1.3 Data File Checksums
+
+**Problem**: No way to detect partial or corrupted writes without attempting to parse.
+
+**Solution**:
+- Add `checksum` field to `StoredData` interface (hash of stringified content excluding checksum field)
+- Verify checksum on load; if mismatch, treat as corruption and trigger recovery flow
+- Update checksum on every save
+
+**Files**: `src/lib/storage/types.ts`, `src/lib/storage/tauri-adapter.ts`
+
+### 1.4 Fix Partial Success in Split Transactions
+
+**Problem**: `addSplitTransactions` in dashboardActions adds transactions sequentially. If transaction 2 of 5 fails, transactions 1-4 may be added but user sees generic "Failed" error.
+
+**Solution**:
+- Use `Promise.allSettled()` pattern
+- Report mixed success: "4 of 5 transactions added. 1 failed."
+- Consider whether to roll back partial success (probably not — user can delete manually)
+
+**Files**: `src/lib/stores/dashboardActions.ts`
+
+### 1.5 Storage Layer Tests
+
+**Problem**: `tauri-adapter.ts` has zero test coverage despite being the critical persistence layer.
+
+**Solution**:
+- Test backup creation and rotation
+- Test recovery flow when data.json is corrupted
+- Test atomic write behavior
+- Test checksum validation
+- Mock Tauri FS APIs for unit testing
+
+**Files**: Create `src/lib/storage/tauri-adapter.test.ts`
 
 ---
 
-## High Priority Features
+## Group 2: Savings Goals
 
-### 1. Budget Rollover
+**Why here**: High-value feature that extends existing infrastructure. Schema change should happen early so subsequent work can build on it.
 
-**Problem**: YNAB-style "roll with the punches" budgeting - underspending in one category should carry forward.
+**Dependencies**: Group 1 (don't add new data types until persistence is solid)
 
-**Proposed Solution**: Simple rollover with manual control
+### 2.1 Schema Extension
 
-**Data Model Changes**:
+**Changes to `SavingsAccount`**:
 ```typescript
-interface CategoryBudget {
-  // ... existing fields
-  rolledOver?: number;  // Amount rolled from previous month
+interface SavingsAccount {
+  // ... existing fields ...
+  targetAmount?: number;      // Goal target (e.g., $10,000)
+  targetDate?: Date;          // Goal deadline (e.g., Dec 31, 2026)
 }
 ```
 
-**UX Flow**:
-1. End of month: Show "Month Summary" with surplus/deficit per category
-2. "Roll Forward" button on categories with surplus
-3. Next month: "Available" = budgetAmount + rolledOver
-4. Progress bar shows both base budget and rolled amount visually
+**Migration**: Existing accounts get `undefined` for new fields (no goal set).
 
-**Key Decisions**:
-- **No negative rollover**: Overspending resets to 0 (simplifies mental model)
-- **Manual opt-in**: User chooses which categories to roll (not automatic)
-- **Copy forward behavior**: "Copy from Last Month" includes rolled amounts
+**Files**: `src/lib/db/constants.ts`, `src/lib/db/migrations.ts`
 
-**Complexity**: Medium (2-3 days)
+### 2.2 Goal Projection Calculations
 
-**Edge Cases**:
-- What if user deletes a category that has rolled amount?
-- How to display on Budget page (separate line or combined)?
+**New functions in savingsContributions.ts or new file**:
+
+```typescript
+// Calculate average monthly contribution for an account
+function getAverageMonthlyContribution(accountId: number, months: number): Promise<number>
+
+// Project when goal will be reached at current pace
+function projectGoalCompletion(
+  currentBalance: number,
+  targetAmount: number,
+  averageMonthlyContribution: number
+): Date | null
+
+// Check if on track to hit target by target date
+function isOnTrackForGoal(
+  accountId: number,
+  currentBalance: number,
+  targetAmount: number,
+  targetDate: Date
+): Promise<{ isOnTrack: boolean; shortfall: number; recommendedMonthly: number }>
+```
+
+**Files**: `src/lib/stores/savingsContributions.ts` or create `src/lib/stores/savingsGoals.ts`
+
+### 2.3 Goal Progress UI
+
+**Update `SavingsAccountCard.svelte`**:
+- Show progress bar when `targetAmount` is set: "$5,200 / $10,000 (52%)"
+- Show projected completion: "On track to complete by Nov 2026"
+- Show shortfall alert if off-track: "Increase to $450/month to hit your goal"
+- Add edit flow to set/update goal target and date
+
+**New component considerations**:
+- `GoalProgressBar.svelte` — reusable progress visualization
+- Extend `EditAccountModal.svelte` with goal fields
+
+**Files**: `src/lib/components/SavingsAccountCard.svelte`, `src/lib/components/EditAccountModal.svelte`
+
+### 2.4 Goal Insights Integration
+
+**Add to Savings insights**:
+- "2 of 3 goals on track"
+- Alert for goals that are behind pace
+- Celebration state when goal is reached
+
+**Files**: `src/lib/components/insights/SavingsInsights.svelte`
+
+### 2.5 Tests for Goal Calculations
+
+Cover projection edge cases:
+- Zero contributions (can't project)
+- Already exceeded goal
+- Target date in the past
+- Negative contribution average (withdrawals)
+
+**Files**: Create tests alongside implementation
 
 ---
 
-### 2. Tags / Notes Enhancement
+## Group 3: Tags System
 
-**Problem**: Users want flexible categorization beyond fixed categories.
+**Why here**: Self-contained feature with no schema changes (uses existing `notes` field). Good candidate for parallel work.
 
-**Proposed Solution**: Hashtag-based tagging in existing notes field
+**Dependencies**: None (can be worked on alongside Group 2)
 
-**Implementation**:
-- Notes field already exists in schema (`notes?: string`)
-- Parse hashtags from notes: "Business dinner #work #reimbursable"
-- Build tag index on app load (in-memory, not persisted)
-- Add tag filter to TransactionFilters (alongside category filter)
+### 3.1 Tag Parsing Utility
 
-**UI Changes**:
-- Add "Add note" link below transaction form (expands to show notes field)
-- In transaction list, show tags as small pills: `#work` `#reimbursable`
-- In filters, add tag autocomplete dropdown
-
-**Technical Approach**:
+**Create `src/lib/utils/tags.ts`**:
 ```typescript
-function extractTags(notes: string): string[] {
-  return (notes.match(/#\w+/g) || []).map(t => t.toLowerCase());
+// Extract hashtags from notes field
+function extractTags(notes: string | undefined): string[]
+// Returns lowercase, deduplicated: ["work", "reimbursable"]
+
+// Check if transaction matches a tag filter
+function matchesTag(transaction: Transaction, tag: string): boolean
+```
+
+**Files**: Create `src/lib/utils/tags.ts`, `src/lib/utils/tags.test.ts`
+
+### 3.2 Tag Index
+
+**Build in-memory tag index on app load**:
+- `Map<string, Set<number>>` mapping tag → transaction IDs
+- Rebuild when transactions change (hook into cache invalidation)
+- Function: `getTagSuggestions(prefix: string): string[]` for autocomplete
+
+**Files**: Create `src/lib/stores/tags.ts`
+
+### 3.3 Tag Filter UI
+
+**Update `TransactionFilters.svelte`**:
+- Add tag autocomplete dropdown (similar to category filter)
+- Filter transactions by selected tag(s)
+- Show active tag filters as dismissible chips
+
+**Files**: `src/lib/components/TransactionFilters.svelte`
+
+### 3.4 Tag Display in Transaction List
+
+**Update `TransactionList.svelte`**:
+- Parse tags from notes field
+- Display as small pills below transaction: `#work` `#reimbursable`
+- Clicking a tag applies it as a filter
+
+**Files**: `src/lib/components/TransactionList.svelte`
+
+### 3.5 Notes Field Visibility
+
+**Improve notes entry UX**:
+- In `TransactionForm.svelte`, add expandable "Add note" link
+- Show tag autocomplete as user types `#`
+- In `TransactionList.svelte`, show truncated note preview (not just tags)
+
+**Files**: `src/lib/components/TransactionForm.svelte`, `src/lib/components/TransactionList.svelte`
+
+---
+
+## Group 4: Notifications
+
+**Why here**: Requires Tauri plugin integration. Self-contained infrastructure that multiple features build on.
+
+**Dependencies**: None (can be worked on alongside Groups 2-3)
+
+### 4.1 Tauri Notification Plugin Setup
+
+**Add `@tauri-apps/plugin-notification`**:
+- Install and configure in `src-tauri/`
+- Add capability permissions
+- Create `src/lib/notifications/index.ts` wrapper with permission request flow
+
+**Files**: `src-tauri/Cargo.toml`, `src-tauri/capabilities/default.json`, create `src/lib/notifications/`
+
+### 4.2 Notification Settings
+
+**Extend Settings schema**:
+```typescript
+interface Settings {
+  // ... existing ...
+  notifications: {
+    dailyReminder: boolean;
+    dailyReminderTime: string;  // "20:00" format
+    weeklyReview: boolean;      // Monday morning
+    monthlyBudgetSetup: boolean; // 1st of month
+  };
 }
 ```
 
-**Complexity**: Low-Medium (1-2 days)
+**Files**: `src/lib/db/constants.ts`, `src/routes/settings/+page.svelte`
 
-**Future Enhancement**: Tag suggestions based on merchant/category patterns
-
----
-
-### 3. Reports Export (PDF)
-
-**Problem**: Users want to generate reports for personal records, tax preparation, or sharing with financial advisors.
-
-**Proposed Solution**: Monthly report PDF generation
-
-**Report Contents**:
-1. **Header**: Month, date range, generated date
-2. **Summary**: Income, total spent, saved, surplus/deficit
-3. **Category Breakdown**: Table + pie chart
-4. **Needs vs Wants**: Split with percentages
-5. **Top Merchants**: Top 5 by spend amount
-6. **Budget Status**: Categories over/under budget
-7. **Transaction List**: Optional, paginated
-
-**Technical Options**:
-1. **jsPDF**: Pure JS, no server needed, but limited styling
-2. **html2pdf.js**: Better styling via HTML/CSS rendering
-3. **Tauri print-to-PDF**: Native macOS print dialog → Save as PDF
-
-**Recommendation**: Start with Tauri print-to-PDF (simplest), upgrade to jsPDF if users want direct file save.
-
-**UI Location**: Settings page → "Export" section → "Generate Monthly Report" button
-
-**Complexity**: Medium (2-3 days)
-
----
-
-## Medium Priority Features
-
-### 6. Category Budget Visualization on Dashboard
-
-**Problem**: Users don't see budget status without navigating to Budget page.
-
-**Proposed Solutions** (choose one):
-
-**Option A: Traffic Light Summary**
-```
-Budgets: 🟢🟢🟢🟡🔴 (3 on track, 1 approaching, 1 over)
-```
-- Compact, single line in CashFlowCard
-- Click to expand to full list
-
-**Option B: Summary Text**
-```
-"5 categories on track, 2 approaching limit"
-```
-- More readable, less visual noise
-- Link to Budget page
-
-**Option C: Mini Progress Bars**
-- Show top 3-5 categories with small progress bars
-- Color-coded (green/yellow/red)
-- Risk: Could feel cluttered
-
-**Recommendation**: Option B for cleanliness, with hover/tap to show Option A details
-
-**Complexity**: Low (0.5-1 day)
-
----
-
-### 7. Goals Feature
-
-**Problem**: Users want to track savings toward specific targets (vacation, emergency fund, big purchase).
-
-**Data Model**:
-```typescript
-interface SavingsGoal {
-  id?: number;
-  name: string;
-  targetAmount: number;
-  currentAmount: number;
-  targetDate?: Date;
-  linkedCategoryId?: number;  // Optional: link to a category
-  color?: string;
-  createdAt: Date;
-  updatedAt: Date;
-}
-```
-
-**Features**:
-- Create goal with name, target, optional deadline
-- Manual "Add funds" action (doesn't create transaction, just updates goal)
-- Visual progress bar with percentage
-- Optional: Link to category (auto-tracks spending in that category)
-- Celebrate when goal is reached (confetti? toast?)
-
-**UI Location Options**:
-1. **New "Goals" tab** in sidebar (5th nav item)
-2. **Section in Budget page** (collapsible, above category budgets)
-3. **Dashboard widget** (compact view of active goals)
-
-**Recommendation**: Start with Budget page section, promote to tab if users engage heavily
-
-**Complexity**: Medium-High (3-4 days)
-
----
-
-### 8. Time-Based Views Enhancement
-
-**Problem**: Insights are month-centric; users want to see longer trends.
-
-**Proposed Enhancements**:
-
-**Year View**:
-- Full 12-month calendar with spending intensity (heatmap already exists, expand it)
-- Monthly totals in a bar chart
-- Year-over-year comparison (if 2+ years of data)
-
-**Custom Date Range**:
-- "Custom" option in month picker
-- Date range selector (from/to)
-- Applies to all insights on page
-
-**Preset Ranges**:
-- "Last 90 days"
-- "This quarter"
-- "Year to date"
-
-**UI Location**: Insights page, add view toggle next to month picker
-
-**Complexity**: Medium (2-3 days)
-
----
-
-### 9. Daily Push Notifications
-
-**Problem**: Users forget to log transactions.
-
-**Proposed Solution**: Optional daily reminder
+### 4.3 Daily Expense Reminder
 
 **Implementation**:
-- Use Tauri's notification API (`@tauri-apps/plugin-notification`)
-- Settings toggle: "Daily reminder to log expenses"
-- Time picker: "Remind me at [8:00 PM]"
-- Notification text: "Don't forget to log today's expenses!"
-- Click notification → opens app
+- Check on app launch if reminder time has passed today and no transactions logged
+- Schedule notification for configured time
+- "Don't forget to log today's expenses!"
+- Clicking opens app
 
-**Complexity**: Low (1 day)
+**Files**: `src/lib/notifications/daily-reminder.ts`
 
-**Note**: Requires Tauri plugin addition
-
----
-
-### 10. Weekly Email Digest
-
-**Problem**: Users want a summary without opening the app.
-
-**Considerations**:
-- Requires email capture (privacy implications)
-- Needs server component (or third-party service like SendGrid)
-- Scope creep: local-first philosophy conflict
-
-**Alternative**: Weekly in-app summary notification
-- Shows when app is opened after 7+ days
-- "Your week in review: $342 spent across 18 transactions"
-
-**Recommendation**: Defer email digest, implement in-app weekly summary instead
-
-**Complexity**: Low for in-app (1 day), High for email (requires backend)
-
----
-
-## Lower Priority (Nice-to-Have)
-
-### 11. Bank Import via CSV/OFX
-
-**Problem**: Manual entry is tedious for high-volume users.
+### 4.4 Weekly Review Notification
 
 **Implementation**:
-- Support common bank export formats: CSV, OFX, QFX
-- Field mapping UI: "Which column is the amount?"
-- Duplicate detection: warn if transaction appears to already exist
-- Review screen before import
+- Monday morning notification (configurable time, default 9am)
+- "Your week in review is ready — you spent $X across Y transactions"
+- Links to Insights page
 
-**Complexity**: High (4-5 days)
+**Files**: `src/lib/notifications/weekly-review.ts`
 
----
-
-### 12. Receipt Scanning (OCR)
-
-**Problem**: Users want to capture receipts quickly.
-
-**Implementation Options**:
-1. **Tesseract.js**: Client-side OCR, no server needed
-2. **Cloud API** (Google Vision, AWS Textract): Better accuracy, requires account
-
-**MVP Approach**:
-- "Scan Receipt" button in quick add
-- Opens camera / file picker
-- Extracts: amount, merchant name (date if possible)
-- Pre-fills form, user confirms
-
-**Complexity**: High (5-7 days)
-
----
-
-### 13. Merchant Normalization
-
-**Problem**: "AMZN*1234XY" and "Amazon" are the same merchant.
+### 4.5 Monthly Budget Setup Notification
 
 **Implementation**:
-- Merchant alias table: `{ pattern: "AMZN*", canonical: "Amazon" }`
-- Auto-suggest normalization when detecting pattern
-- User can add custom aliases
+- 1st of each month
+- "Time to set up your [Month] budgets and review [Previous Month]"
+- Links to Budget page
 
-**Complexity**: Medium (2-3 days)
+**Files**: `src/lib/notifications/monthly-setup.ts`
 
 ---
 
-### 14. Multi-Currency Support
+## Group 5: Insights Page Redesign
 
-**Problem**: Users with international expenses need currency conversion.
+**Why here**: After core features (goals, tags), restructure how we surface data. This is a more ambitious redesign that provides flexibility for future power-user features.
+
+**Dependencies**: None, but benefits from Groups 2-3 being complete (more data to show)
+
+### 5.1 Tab-Based Architecture
+
+**Replace linear scroll with tabbed navigation**:
+
+| Tab | Contents |
+|-----|----------|
+| **Overview** | Smart Takeaways (headline insights, alerts, anomalies) |
+| **Spending** | Spending This Month + Category Deep Dives + Category Comparison |
+| **Savings** | Savings This Month + Savings Rate Trend + Goal Progress (from Group 2) |
+| **Recurring** | Recurring Expenses + Subscription breakdown + Stale subscription alerts |
+| **Year-to-Date** | Calendar Heatmap + YTD Stats + Needs vs Wants breakdown |
+
+**Benefits**:
+- Reduces cognitive load (one tab at a time)
+- Groups related insights logically
+- Month picker remains global, applies to all tabs
+- Each tab can be extended independently as we add features
+- Remembers last-viewed tab per session
 
 **Implementation**:
-- Add `currency` field to Transaction
-- Exchange rate API integration (Open Exchange Rates)
-- Display in home currency with original amount noted
+- Create `InsightTabs.svelte` component with tab state management
+- Refactor `insights/+page.svelte` to render content conditionally by tab
+- Move existing InsightGroup components into tab containers
+- Persist selected tab to localStorage
 
-**Complexity**: High (4-5 days)
+**Files**: `src/routes/insights/+page.svelte`, create `src/lib/components/insights/InsightTabs.svelte`
 
----
+### 5.2 Overview Tab Design
 
-## Technical Debt & Infrastructure
+**The "what do I need to know" view**:
+- Smart Takeaways expanded by default (the headlines)
+- Quick stats row: Total Spent | Budget Status | Savings Rate
+- Alert cards for anything needing attention (over budget, off-track goals, anomalies)
+- Links to relevant tabs for drill-down ("View spending details →")
 
-### Testing Coverage
-- Add integration tests for keyboard shortcuts
-- Add E2E tests for search all time flow
-- Component tests for new features
+**Files**: `src/lib/components/insights/SmartTakeaways.svelte`, new `InsightAlerts.svelte`
 
-### Performance
-- Consider virtual scrolling for transaction list (if >1000 transactions)
-- Profile insights calculations for large datasets
-- Lazy load insights components
+### 5.3 Spending Tab Consolidation
 
-### Accessibility
-- Audit keyboard navigation
-- Screen reader testing
-- Color contrast verification for budget status colors
+**Merge related spending views**:
+- Spending summary at top (total, daily average, pace projection)
+- Category breakdown pie chart
+- Category deep dive selector (click category → see trends)
+- Month-over-month comparison
+- All on one scrollable tab, no collapsible sections needed
 
----
+**Files**: Refactor existing `SpendingThisMonth.svelte`, `CategoryDeepDives.svelte`, `CategoryComparison.svelte`
 
-## Implementation Notes for Engineering
+### 5.4 Recurring Tab Enhancements
 
-### State Management Patterns
-- Use `$bindable()` for components that need external control (see QuickAddFAB)
-- Use localStorage for UI state that should persist across sessions
-- Use Svelte 5 `$effect()` for side effects, not `$derived()`
+**Dedicated space for subscription management**:
+- Active subscriptions with variance indicators (📌 Fixed vs 📊 Variable)
+- Stale/inactive subscriptions section
+- Total monthly recurring cost
+- Upcoming renewals (annual subscriptions due soon)
 
-### Data Flow
-- All writes go through store functions → persist to JSON → update Dexie
-- Reads prefer Dexie (in-memory) for performance
-- InsightsEngine handles memoization automatically
+**Files**: `src/lib/components/insights/RecurringInsights.svelte`
 
-### Component Conventions
-- Props interface at top of `<script>`
-- Exported types use `export interface`
-- Event handlers named `handle*` or `on*`
-- Derived state uses `$derived` or `$derived.by()`
+### 5.5 Year-to-Date Tab
 
----
+**Annual perspective**:
+- Calendar heatmap (daily spending intensity)
+- YTD totals by category
+- Needs vs Wants annual breakdown with trend line
+- Best/worst spending months comparison
 
-## Prioritization Matrix
+**Files**: Refactor existing `CalendarHeatmap.svelte`, `YTDStats.svelte`, `NeedsWantsInsights.svelte`
 
-| Feature | User Value | Effort | Priority |
-|---------|------------|--------|----------|
-| ~~Recurring Auto-Entry~~ | ~~High~~ | ~~Medium~~ | **Shipped** |
-| ~~Quick Insights Widget~~ | ~~Medium~~ | ~~Low~~ | **Shipped** |
-| Budget Rollover | High | Medium | **P0** |
-| Tags/Notes | Medium | Low | **P1** |
-| Reports Export | Medium | Medium | **P1** |
-| Dashboard Budget Viz | Low | Low | **P2** |
-| Goals | High | High | **P2** |
-| Time-Based Views | Medium | Medium | **P2** |
-| Push Notifications | Low | Low | **P3** |
-| Bank Import | High | High | **P3** |
-| Receipt Scanning | Medium | High | **P3** |
+### 5.6 Insight Enhancements (within new structure)
+
+**Improvements that fit into the new tabs**:
+
+- **Variance visibility** (Recurring tab): Show "📌 Fixed" vs "📊 Variable ($120 ± $15)" using existing `DetectedRecurring.variance` data
+- **Needs vs Wants trend** (YTD tab): "Oct: 68% Needs → Nov: 74% Needs — more conservative this month"
+- **Budget health** (Overview tab): "3/4 categories on track" with anomaly alerts
+
+**Files**: Various insight components
 
 ---
 
-*This document should be updated as features are shipped or requirements change.*
+## Group 6: Undo System
+
+**Why here**: Quality-of-life feature that's self-contained.
+
+**Dependencies**: None
+
+### 6.1 Undo Toast Component
+
+**Create `UndoToast.svelte`**:
+- Appears after destructive action (delete, bulk delete)
+- Shows "Transaction deleted. Undo?" with countdown (5 seconds)
+- Stores deleted item(s) temporarily
+- "Undo" button restores the item(s)
+- Auto-dismisses after timeout
+
+**Files**: Create `src/lib/components/UndoToast.svelte`
+
+### 6.2 Undo Store
+
+**Create undo state management**:
+- Store last deleted transaction(s) with timestamp
+- `undo()` function re-adds to database
+- Clear undo state after timeout or successful undo
+- Only track most recent deletion (not a full history)
+
+**Files**: Create `src/lib/stores/undo.ts`
+
+### 6.3 Integration with Delete Actions
+
+**Hook into existing delete flows**:
+- `dashboardActions.deleteTransaction` — soft delete, show undo toast
+- `dashboardActions.bulkDelete` — same pattern
+- After timeout, deletion is permanent (already reflected in DB, just clear undo state)
+
+**Files**: `src/lib/stores/dashboardActions.ts`
+
+---
+
+## Group 7: Design Polish
+
+**Why here**: After features are complete, polish the experience.
+
+**Dependencies**: Groups 2-6 complete (polish what's been built)
+
+### 7.1 Dark Mode Contrast Audit
+
+**Problem**: `--color-text-muted` (#8A847C) may fail WCAG contrast on dark backgrounds.
+
+**Solution**:
+- Audit all text colors against backgrounds in dark mode
+- Adjust muted text color for sufficient contrast (4.5:1 minimum)
+- Test with browser accessibility tools
+
+**Files**: `src/app.css`
+
+### 7.2 ARIA Labels Audit
+
+**Problem areas identified**:
+- `TransactionFilters.svelte` — search input missing `aria-label`
+- `BulkActionBar.svelte` — missing `role="toolbar"`, selection count not announced
+- `MonthPicker.svelte` — buttons missing `aria-disabled`
+- `SharedExpenseFields.svelte` — range slider missing `aria-label`
+
+**Solution**: Systematic audit and fix of all interactive elements.
+
+**Files**: Multiple components (see Design audit for full list)
+
+### 7.3 Loading and Success Feedback
+
+**Problems**:
+- Form submissions have no loading spinner (TransactionForm)
+- Month changes have no loading indicator
+- Edit/delete operations have no success feedback
+
+**Solution**:
+- Add loading spinners to all async form submissions
+- Show brief success toast after edit/save operations
+- Add loading state to month picker during data fetch
+
+**Files**: `TransactionForm.svelte`, `MonthPicker.svelte`, modal components
+
+### 7.4 Button Style Consistency
+
+**Problem**: Hover/active states vary across components. Some buttons lift on hover, others don't.
+
+**Solution**:
+- Standardize on one primary button style with consistent hover/active states
+- Add `active:scale-95` press feedback to all buttons
+- Consider creating a shared Button component or CSS utility classes
+
+**Files**: Multiple components, possibly `src/app.css`
+
+### 7.5 Skeleton Loader Theme Matching
+
+**Problem**: Skeletons use `bg-gray-200` instead of design system colors.
+
+**Solution**:
+- Update `Skeleton.svelte` to use `bg-surface-alt` or appropriate theme color
+- Ensure pulse animation works with new colors
+- Apply consistently across all loading states
+
+**Files**: `src/lib/components/Skeleton.svelte`, `CashFlowCardSkeleton.svelte`
+
+---
+
+## Group 8: Performance & Tech Debt
+
+**Why here**: Cleanup and optimization after features are stable.
+
+**Dependencies**: Groups 2-6 complete
+
+### 8.1 Fix N+1 Query in Recurring Suggestions
+
+**Problem**: `getLastOccurrence()` in `recurringSuggestions.ts` scans all transactions once per suggestion.
+
+**Solution**:
+- Batch the lookup: build `Map<merchant, lastDate>` in one pass
+- Replace per-suggestion DB queries with map lookups
+
+**Files**: `src/lib/stores/recurringSuggestions.ts`
+
+### 8.2 TransactionCache Version Tracking Fix
+
+**Problem**: Insights can go stale if cache version doesn't increment properly when cache wasn't initially loaded.
+
+**Solution**:
+- Ensure version always increments on mutation, regardless of cache load state
+- Add test coverage for this edge case
+
+**Files**: `src/lib/stores/transactionCache.ts`
+
+### 8.3 Extract Shared Statistics Utility
+
+**Problem**: `mode()` function is duplicated in `recurring.ts` and `recurringSuggestions.ts`.
+
+**Solution**:
+- Create `src/lib/utils/stats.ts` with shared statistical functions
+- Move `mode()`, consider consolidating other stats helpers
+
+**Files**: Create `src/lib/utils/stats.ts`, update `recurring.ts`, `recurringSuggestions.ts`
+
+### 8.4 Lazy-Load Insights Components
+
+**Problem**: Insights page loads all chart/calculation components upfront.
+
+**Solution**:
+- Use Svelte's `{#await import(...)}` for heavy components
+- Load chart components only when their section is expanded
+- Reduces initial bundle and speeds up page load
+
+**Files**: `src/routes/insights/+page.svelte`
+
+### 8.5 Import/Export Test Coverage
+
+**Problem**: `import.ts` and `export.ts` have zero tests despite handling user data.
+
+**Solution**:
+- Test Excel parsing edge cases (different formats, missing columns)
+- Test CSV/JSON export structure
+- Test round-trip: export → import → data unchanged
+
+**Files**: Create `src/lib/utils/import.test.ts`, `src/lib/utils/export.test.ts`
+
+---
+
+## Future Considerations (Not in Current Sprint)
+
+These are ideas that came up but aren't prioritized for immediate work:
+
+### Virtual Scrolling for Transaction List
+Large transaction lists (500+) could benefit from virtualization, but this adds complexity and may be premature optimization. Revisit if users report lag.
+
+### Transaction Rules / Automation
+A rules engine ("always categorize Shell as Gas") would reduce manual work. Current auto-fill based on historical usage covers 80% of the use case. Full rules system is a larger project.
+
+### Bank Import via CSV/OFX
+Direct bank statement import would reduce manual entry. High effort (format parsing, duplicate detection, field mapping UI). Consider after core features stabilize.
+
+### PDF Reports
+Monthly report generation for tax prep or sharing. Consider whether enhanced CSV export serves the same need with less effort.
+
+### Multi-Currency Support
+`Settings.currency` exists but is unused. Low priority unless user base expands internationally.
+
+### Year-over-Year Comparison
+Current insights compare to rolling averages but not same-month-last-year. Would require >12 months of data to be useful.
+
+---
+
+## Implementation Notes
+
+### Testing Strategy
+- Test what you build: add tests alongside each feature
+- Prioritize data layer tests (storage, import/export) for integrity
+- Component tests remain low priority (store/util coverage is more valuable)
+
+### Commit Granularity
+Each subsection (1.1, 1.2, etc.) should be a single atomic commit. This keeps changes reviewable and allows easy rollback if needed.
+
+### Migration Safety
+Schema changes (Goals, Notifications settings) need migrations. Test migrations with real data exports before deploying.
+
+---
+
+*This document should be updated as features ship or priorities change.*

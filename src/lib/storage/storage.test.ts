@@ -41,9 +41,12 @@ describe('Storage Layer', () => {
 
 		it('does not throw when called multiple times', async () => {
 			// First call
-			await initializeStorage();
-			// Second call should be a no-op (due to initialized flag)
-			await expect(initializeStorage()).resolves.toBeUndefined();
+			const result1 = await initializeStorage();
+			expect(result1.status).toBe('initialized_fresh');
+
+			// Second call should return cached result (due to initialized flag)
+			const result2 = await initializeStorage();
+			expect(result2.status).toBe('initialized_fresh');
 		});
 	});
 
@@ -426,7 +429,8 @@ describe('Storage Layer', () => {
 			resetStorageState();
 
 			// Should be able to initialize again
-			await expect(initializeStorage()).resolves.toBeUndefined();
+			const result = await initializeStorage();
+			expect(result.status).toBe('initialized_fresh');
 			expect(isStorageInitialized()).toBe(true);
 		});
 	});

@@ -136,30 +136,49 @@ export function setupDashboardActions(ctx: DashboardContext) {
 		/**
 		 * Add multiple split transactions from the form.
 		 * Creates each split as a separate transaction.
+		 * Uses Promise.allSettled to handle partial success gracefully.
 		 */
 		async addSplitTransactions(data: SplitTransactionFormData): Promise<void> {
-			try {
-				for (const split of data.splits) {
-					await storeAddTransaction({
-						date: data.date,
-						merchant: data.merchant,
-						amount: split.amount,
-						categoryId: split.categoryId,
-						isShared: data.isShared,
-						isSettled: data.isSettled,
-						splitType: data.splitType,
-						splitValue: data.splitValue,
-						isEssential: data.isEssential,
-						isSubscription: data.isSubscription,
-						subscriptionFrequency: data.subscriptionFrequency
-					});
-				}
-				await reloadAfterMutation();
-				toast.success(`${data.splits.length} transactions added`);
-			} catch (error) {
-				handleError(error, {
+			const promises = data.splits.map((split) =>
+				storeAddTransaction({
+					date: data.date,
+					merchant: data.merchant,
+					amount: split.amount,
+					categoryId: split.categoryId,
+					isShared: data.isShared,
+					isSettled: data.isSettled,
+					splitType: data.splitType,
+					splitValue: data.splitValue,
+					isEssential: data.isEssential,
+					isSubscription: data.isSubscription,
+					subscriptionFrequency: data.subscriptionFrequency
+				})
+			);
+
+			const results = await Promise.allSettled(promises);
+			const succeeded = results.filter((r) => r.status === 'fulfilled').length;
+			const failed = results.filter((r) => r.status === 'rejected').length;
+
+			// Always reload to reflect any successful additions
+			await reloadAfterMutation();
+
+			if (failed === 0) {
+				toast.success(`${succeeded} transactions added`);
+			} else if (succeeded === 0) {
+				// All failed - get first error for context
+				const firstError = results.find((r) => r.status === 'rejected') as PromiseRejectedResult;
+				handleError(firstError.reason, {
 					context: 'addSplitTransactions',
 					userMessage: 'Failed to add transactions'
+				});
+			} else {
+				// Partial success
+				toast.warning(`${succeeded} of ${data.splits.length} transactions added. ${failed} failed.`);
+				// Log the failures for debugging
+				results.forEach((r, i) => {
+					if (r.status === 'rejected') {
+						console.error(`Split transaction ${i + 1} failed:`, r.reason);
+					}
 				});
 			}
 		},

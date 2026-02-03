@@ -11,8 +11,20 @@ import type { StoredData } from './types';
 
 export type { StoredData } from './types';
 
+/**
+ * Result of storage initialization (exposed for UI feedback)
+ */
+export type StorageInitResult =
+	| { status: 'loaded' }
+	| { status: 'recovered'; backupName: string }
+	| { status: 'initialized_fresh' }
+	| { status: 'initialized_after_unrecoverable_corruption' };
+
 // Track if storage has been initialized
 let initialized = false;
+
+// Store the most recent init result for UI access
+let lastInitResult: StorageInitResult | null = null;
 
 // Check if running in Tauri (has __TAURI__ global)
 function isTauri(): boolean {
@@ -37,30 +49,76 @@ export class StorageInitError extends Error {
  * In Tauri: Loads data from JSON file into Dexie
  * In tests: Just initializes Dexie with defaults
  *
+ * Returns initialization result for UI feedback (recovery notifications, etc.)
+ *
  * @throws StorageInitError if initialization fails
  */
-export async function initializeStorage(): Promise<void> {
-	if (initialized) return;
+export async function initializeStorage(): Promise<StorageInitResult> {
+	if (initialized && lastInitResult) {
+		return lastInitResult;
+	}
 
 	try {
+		let result: StorageInitResult;
+
 		if (isTauri()) {
 			const { initializeTauriStorage } = await import('./tauri-adapter');
-			await initializeTauriStorage();
+			result = await initializeTauriStorage();
 		} else {
 			// Test/non-Tauri environment - just initialize Dexie defaults
 			const { initializeDatabase } = await import('$lib/db');
 			await initializeDatabase();
+			result = { status: 'initialized_fresh' };
 		}
 
 		initialized = true;
+		lastInitResult = result;
+
+		// Show user-facing notifications for recovery scenarios
+		await showInitializationFeedback(result);
+
+		return result;
 	} catch (error) {
 		// Reset flag so retry is possible
 		initialized = false;
+		lastInitResult = null;
 
 		// Wrap and rethrow with context
 		const message = error instanceof Error ? error.message : String(error);
 		throw new StorageInitError(`Failed to initialize storage: ${message}`, error);
 	}
+}
+
+/**
+ * Show toast notifications for recovery scenarios
+ */
+async function showInitializationFeedback(result: StorageInitResult): Promise<void> {
+	// Only show feedback for recovery scenarios, not normal load
+	if (result.status === 'loaded' || result.status === 'initialized_fresh') {
+		return;
+	}
+
+	// Lazy-import toast to avoid circular dependency
+	const { toast } = await import('$lib/stores/toast');
+
+	if (result.status === 'recovered') {
+		toast.warning(
+			`Data file was corrupted. Restored from backup (${result.backupName}).`,
+			10000 // Show for 10 seconds
+		);
+	} else if (result.status === 'initialized_after_unrecoverable_corruption') {
+		toast.error(
+			'Data file was corrupted and no valid backup was found. Starting fresh.',
+			15000 // Show for 15 seconds
+		);
+	}
+}
+
+/**
+ * Get the most recent initialization result (for UI checks)
+ */
+export function getLastInitResult(): StorageInitResult | null {
+	return lastInitResult;
 }
 
 /**
