@@ -101,7 +101,7 @@ ledger/
 │   │   │   ├── budget.ts
 │   │   │   ├── categoryBudget.ts   # Per-category budget tracking
 │   │   │   ├── savingsAccounts.ts  # Savings account CRUD
-│   │   │   ├── savingsContributions.ts  # Contribution tracking
+│   │   │   ├── savingsContributions.ts  # Contribution tracking + goal projections
 │   │   │   ├── merchants.ts
 │   │   │   ├── recurring.ts
 │   │   │   ├── recurringCache.ts       # Recurring detection cache management
@@ -301,6 +301,8 @@ interface SavingsAccount {
   color?: string;          // Hex color
   sortOrder: number;
   currentBalance?: number; // Only tracked for 'savings' type
+  targetAmount?: number;   // Goal target (e.g., $10,000)
+  targetDate?: Date;       // Goal deadline (e.g., Dec 31, 2026)
   createdAt: Date;
   updatedAt: Date;
 }
@@ -399,6 +401,11 @@ Sidebar state persists to localStorage (`ledger-sidebar-expanded`).
 - Contribution sources: bank transfer, payroll deduction, interest, employer match
 - Only bank transfers and "other" reduce available to spend
 - Account cards with contribution history
+- **Goal tracking**: Set target amount and target date for savings accounts
+  - Progress bar visualization with percentage complete
+  - Projected completion date based on average monthly contribution (6-month rolling)
+  - On-track/behind-pace status with recommended monthly contribution
+  - Goal insights integration showing X of Y goals on track
 - Savings rate calculation based on contributions
 - Integration with Dashboard (available = income - savings contributions)
 

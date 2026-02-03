@@ -251,6 +251,7 @@ export async function replaceAllData(data: StoredData): Promise<void> {
 				// Convert date strings back to Date objects
 				const savingsAccounts = data.savingsAccounts.map((sa) => ({
 					...sa,
+					targetDate: sa.targetDate ? new Date(sa.targetDate) : undefined,
 					createdAt: new Date(sa.createdAt),
 					updatedAt: new Date(sa.updatedAt)
 				}));

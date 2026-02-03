@@ -498,10 +498,11 @@ async function loadDataIntoDexie(data: StoredData): Promise<void> {
 				await db.transactions.bulkPut(transactions);
 			}
 
-			// Load savings accounts
+			// Load savings accounts (convert date strings to Date objects)
 			if (data.savingsAccounts && data.savingsAccounts.length > 0) {
 				const savingsAccounts = data.savingsAccounts.map((sa) => ({
 					...sa,
+					targetDate: sa.targetDate ? new Date(sa.targetDate) : undefined,
 					createdAt: new Date(sa.createdAt),
 					updatedAt: new Date(sa.updatedAt)
 				}));

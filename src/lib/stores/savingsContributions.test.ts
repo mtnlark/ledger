@@ -8,9 +8,12 @@ import {
 	getTotalSavedForMonth,
 	getYTDContributions,
 	updateContribution,
-	deleteContribution
+	deleteContribution,
+	getAverageMonthlyContribution,
+	projectGoalCompletion,
+	getGoalStatus
 } from './savingsContributions';
-import { addSavingsAccount, getSavingsAccount } from './savingsAccounts';
+import { addSavingsAccount, getSavingsAccount, updateSavingsAccount } from './savingsAccounts';
 
 describe('SavingsContribution Operations', () => {
 	let savingsAccountId: number;
@@ -532,6 +535,294 @@ describe('SavingsContribution Operations', () => {
 
 		it('handles non-existent ID gracefully', async () => {
 			await expect(deleteContribution(99999)).resolves.toBeUndefined();
+		});
+	});
+
+	// ============================================================================
+	// Goal Tracking Tests
+	// ============================================================================
+
+	describe('getAverageMonthlyContribution', () => {
+		it('returns 0 for account with no contributions', async () => {
+			const avg = await getAverageMonthlyContribution(savingsAccountId);
+			expect(avg).toBe(0);
+		});
+
+		it('calculates average over all contributions', async () => {
+			// Add contributions across 3 months
+			await addContribution({
+				date: new Date(2024, 0, 15), // Jan
+				accountId: savingsAccountId,
+				amount: 300,
+				source: 'bank_transfer'
+			});
+			await addContribution({
+				date: new Date(2024, 1, 15), // Feb
+				accountId: savingsAccountId,
+				amount: 600,
+				source: 'bank_transfer'
+			});
+			await addContribution({
+				date: new Date(2024, 2, 15), // Mar
+				accountId: savingsAccountId,
+				amount: 900,
+				source: 'bank_transfer'
+			});
+
+			// Total: 1800 over 3 months = 600/month
+			const avg = await getAverageMonthlyContribution(savingsAccountId);
+			expect(avg).toBe(600);
+		});
+
+		it('calculates average over specified number of months', async () => {
+			const now = new Date();
+			const currentMonth = now.getMonth();
+			const currentYear = now.getFullYear();
+
+			// Add a contribution 1 month ago
+			const oneMonthAgo = new Date(currentYear, currentMonth - 1, 15);
+			await addContribution({
+				date: oneMonthAgo,
+				accountId: savingsAccountId,
+				amount: 500,
+				source: 'bank_transfer'
+			});
+
+			// Add a contribution 7 months ago (outside 6-month window)
+			const sevenMonthsAgo = new Date(currentYear, currentMonth - 7, 15);
+			await addContribution({
+				date: sevenMonthsAgo,
+				accountId: savingsAccountId,
+				amount: 1000,
+				source: 'bank_transfer'
+			});
+
+			// 6-month window should only include the 500 contribution
+			const avg = await getAverageMonthlyContribution(savingsAccountId, 6);
+			// 500 over 6 months = 83.33
+			expect(avg).toBeCloseTo(83.33, 2);
+		});
+
+		it('handles multiple contributions in same month', async () => {
+			await addContribution({
+				date: new Date(2024, 0, 5), // Jan 5
+				accountId: savingsAccountId,
+				amount: 200,
+				source: 'bank_transfer'
+			});
+			await addContribution({
+				date: new Date(2024, 0, 15), // Jan 15
+				accountId: savingsAccountId,
+				amount: 300,
+				source: 'bank_transfer'
+			});
+			await addContribution({
+				date: new Date(2024, 1, 15), // Feb 15
+				accountId: savingsAccountId,
+				amount: 500,
+				source: 'bank_transfer'
+			});
+
+			// Total: 1000 over 2 months = 500/month
+			const avg = await getAverageMonthlyContribution(savingsAccountId);
+			expect(avg).toBe(500);
+		});
+	});
+
+	describe('projectGoalCompletion', () => {
+		it('returns current date if goal already achieved', () => {
+			const now = new Date();
+			const result = projectGoalCompletion(10000, 10000, 500);
+
+			expect(result).toBeInstanceOf(Date);
+			// Should be approximately now (within a few seconds)
+			expect(result!.getTime()).toBeCloseTo(now.getTime(), -3);
+		});
+
+		it('returns current date if already past goal', () => {
+			const now = new Date();
+			const result = projectGoalCompletion(12000, 10000, 500);
+
+			expect(result).toBeInstanceOf(Date);
+			expect(result!.getTime()).toBeCloseTo(now.getTime(), -3);
+		});
+
+		it('returns null for zero contribution rate', () => {
+			const result = projectGoalCompletion(5000, 10000, 0);
+			expect(result).toBeNull();
+		});
+
+		it('returns null for negative contribution rate', () => {
+			const result = projectGoalCompletion(5000, 10000, -100);
+			expect(result).toBeNull();
+		});
+
+		it('projects completion date correctly', () => {
+			const now = new Date();
+			// $5000 remaining, $500/month = 10 months
+			const result = projectGoalCompletion(5000, 10000, 500);
+
+			expect(result).toBeInstanceOf(Date);
+			const expectedMonth = new Date(now);
+			expectedMonth.setMonth(expectedMonth.getMonth() + 10);
+			expect(result!.getMonth()).toBe(expectedMonth.getMonth());
+		});
+
+		it('rounds up months needed', () => {
+			const now = new Date();
+			// $5001 remaining, $500/month = 10.002 months, rounds to 11
+			const result = projectGoalCompletion(4999, 10000, 500);
+
+			const expectedMonth = new Date(now);
+			expectedMonth.setMonth(expectedMonth.getMonth() + 11);
+			expect(result!.getMonth()).toBe(expectedMonth.getMonth());
+		});
+	});
+
+	describe('getGoalStatus', () => {
+		it('returns null for account without goal', async () => {
+			const status = await getGoalStatus(savingsAccountId);
+			expect(status).toBeNull();
+		});
+
+		it('returns on track for goal already achieved', async () => {
+			// Set up account with goal that's already met
+			await updateSavingsAccount(savingsAccountId, {
+				currentBalance: 10000,
+				targetAmount: 10000,
+				targetDate: new Date(2025, 11, 31) // Dec 31, 2025
+			});
+
+			const status = await getGoalStatus(savingsAccountId);
+			expect(status).not.toBeNull();
+			expect(status!.isOnTrack).toBe(true);
+			expect(status!.shortfall).toBe(0);
+			expect(status!.recommendedMonthly).toBe(0);
+		});
+
+		it('returns on track when current pace exceeds required pace', async () => {
+			const now = new Date();
+			const targetDate = new Date(now);
+			targetDate.setMonth(targetDate.getMonth() + 12); // 12 months from now
+
+			// Set up account: $5000 balance, $10000 target, need $5000 more
+			// Required: $5000 / 12 months ≈ $416.67/month
+			await updateSavingsAccount(savingsAccountId, {
+				currentBalance: 5000,
+				targetAmount: 10000,
+				targetDate
+			});
+
+			// Add contribution history showing $500/month average
+			for (let i = 1; i <= 6; i++) {
+				const date = new Date(now);
+				date.setMonth(date.getMonth() - i);
+				await addContribution({
+					date,
+					accountId: savingsAccountId,
+					amount: 500,
+					source: 'bank_transfer'
+				});
+			}
+
+			const status = await getGoalStatus(savingsAccountId);
+			expect(status).not.toBeNull();
+			expect(status!.isOnTrack).toBe(true);
+			expect(status!.shortfall).toBe(0);
+		});
+
+		it('returns off track when current pace is below required pace', async () => {
+			const now = new Date();
+			const targetDate = new Date(now);
+			targetDate.setMonth(targetDate.getMonth() + 6); // 6 months from now
+
+			// Set up account: $2000 balance, $10000 target, need $8000 more
+			// Required: $8000 / 6 months ≈ $1333.33/month
+			await updateSavingsAccount(savingsAccountId, {
+				currentBalance: 2000,
+				targetAmount: 10000,
+				targetDate
+			});
+
+			// Add contribution history showing only $300/month average
+			for (let i = 1; i <= 6; i++) {
+				const date = new Date(now);
+				date.setMonth(date.getMonth() - i);
+				await addContribution({
+					date,
+					accountId: savingsAccountId,
+					amount: 300,
+					source: 'bank_transfer'
+				});
+			}
+
+			const status = await getGoalStatus(savingsAccountId);
+			expect(status).not.toBeNull();
+			expect(status!.isOnTrack).toBe(false);
+			expect(status!.shortfall).toBeGreaterThan(0);
+			expect(status!.recommendedMonthly).toBeGreaterThan(300);
+		});
+
+		it('handles target date in the past', async () => {
+			const pastDate = new Date();
+			pastDate.setMonth(pastDate.getMonth() - 1);
+
+			await updateSavingsAccount(savingsAccountId, {
+				currentBalance: 5000,
+				targetAmount: 10000,
+				targetDate: pastDate
+			});
+
+			const status = await getGoalStatus(savingsAccountId);
+			expect(status).not.toBeNull();
+			expect(status!.isOnTrack).toBe(false);
+			expect(status!.monthsRemaining).toBe(0);
+			expect(status!.shortfall).toBe(5000); // Full remaining amount
+		});
+
+		it('handles goal without target date (no deadline)', async () => {
+			await updateSavingsAccount(savingsAccountId, {
+				currentBalance: 3000,
+				targetAmount: 10000
+				// No targetDate
+			});
+
+			// Add some contributions
+			const now = new Date();
+			for (let i = 1; i <= 3; i++) {
+				const date = new Date(now);
+				date.setMonth(date.getMonth() - i);
+				await addContribution({
+					date,
+					accountId: savingsAccountId,
+					amount: 500,
+					source: 'bank_transfer'
+				});
+			}
+
+			const status = await getGoalStatus(savingsAccountId);
+			expect(status).not.toBeNull();
+			expect(status!.isOnTrack).toBe(true); // No deadline = always on track
+			expect(status!.monthsRemaining).toBeNull();
+			expect(status!.projectedCompletion).toBeInstanceOf(Date);
+		});
+
+		it('handles zero contribution history', async () => {
+			const targetDate = new Date();
+			targetDate.setMonth(targetDate.getMonth() + 12);
+
+			await updateSavingsAccount(savingsAccountId, {
+				currentBalance: 1000,
+				targetAmount: 10000,
+				targetDate
+			});
+
+			// No contributions added
+
+			const status = await getGoalStatus(savingsAccountId);
+			expect(status).not.toBeNull();
+			expect(status!.isOnTrack).toBe(false);
+			expect(status!.projectedCompletion).toBeNull(); // Can't project with no history
 		});
 	});
 });

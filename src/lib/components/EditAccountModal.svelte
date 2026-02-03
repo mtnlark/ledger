@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { format } from 'date-fns';
 	import { Trash2 } from 'lucide-svelte';
 	import type { SavingsAccount, SavingsAccountType } from '$lib/db';
 	import { cleanNumberInput } from '$lib/utils/form-validation';
@@ -21,6 +22,8 @@
 	let icon = $state('');
 	let color = $state('#5B8C5A');
 	let currentBalanceStr = $state('');
+	let targetAmountStr = $state('');
+	let targetDateStr = $state('');
 	let isSubmitting = $state(false);
 	let showDeleteConfirm = $state(false);
 
@@ -31,6 +34,8 @@
 			icon = account.icon || '';
 			color = account.color || '#5B8C5A';
 			currentBalanceStr = account.currentBalance?.toString() || '';
+			targetAmountStr = account.targetAmount?.toString() || '';
+			targetDateStr = account.targetDate ? format(account.targetDate, 'yyyy-MM-dd') : '';
 			isSubmitting = false;
 			showDeleteConfirm = false;
 		}
@@ -39,6 +44,11 @@
 	function handleBalanceInput(e: Event) {
 		const input = e.target as HTMLInputElement;
 		currentBalanceStr = cleanNumberInput(input.value);
+	}
+
+	function handleTargetAmountInput(e: Event) {
+		const input = e.target as HTMLInputElement;
+		targetAmountStr = cleanNumberInput(input.value);
 	}
 
 	async function handleSubmit(e: Event) {
@@ -52,11 +62,21 @@
 					? parseFloat(cleanNumberInput(currentBalanceStr)) || 0
 					: undefined;
 
+			// Parse goal fields (empty string means clear the goal)
+			const targetAmount = targetAmountStr.trim()
+				? parseFloat(cleanNumberInput(targetAmountStr)) || undefined
+				: undefined;
+			const targetDate = targetDateStr.trim()
+				? new Date(targetDateStr + 'T00:00:00')
+				: undefined;
+
 			await updateSavingsAccount(account.id, {
 				name: name.trim(),
 				icon: icon || undefined,
 				color,
-				currentBalance
+				currentBalance,
+				targetAmount,
+				targetDate
 			});
 			onSave();
 		} catch (error) {
@@ -211,6 +231,61 @@
 						</div>
 						<p class="mt-1.5 text-xs text-charcoal-muted">
 							Update this to reflect your actual account balance
+						</p>
+					</div>
+				{/if}
+
+				<!-- Savings Goal Section (savings only) -->
+				{#if account.accountType === 'savings'}
+					<div class="border-t border-dashed border-theme-dashed pt-4">
+						<p class="text-sm font-medium text-charcoal-soft mb-3">
+							Savings Goal <span class="text-charcoal-muted font-normal">(optional)</span>
+						</p>
+
+						<div class="grid grid-cols-2 gap-4">
+							<!-- Target Amount -->
+							<div>
+								<label
+									for="edit-account-target"
+									class="block text-sm text-charcoal-muted mb-1.5"
+								>
+									Target Amount
+								</label>
+								<div class="relative">
+									<span class="absolute left-3 top-1/2 -translate-y-1/2 text-charcoal-muted font-mono"
+										>$</span
+									>
+									<input
+										type="text"
+										inputmode="decimal"
+										id="edit-account-target"
+										value={targetAmountStr}
+										oninput={handleTargetAmountInput}
+										placeholder="10,000"
+										class="w-full pl-7 pr-3 py-2.5 bg-surface-alt border border-theme rounded-lg focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-colors font-mono placeholder:text-charcoal-muted"
+									/>
+								</div>
+							</div>
+
+							<!-- Target Date -->
+							<div>
+								<label
+									for="edit-account-target-date"
+									class="block text-sm text-charcoal-muted mb-1.5"
+								>
+									Target Date
+								</label>
+								<input
+									type="date"
+									id="edit-account-target-date"
+									bind:value={targetDateStr}
+									class="w-full px-3 py-2.5 bg-surface-alt border border-theme rounded-lg focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-colors"
+								/>
+							</div>
+						</div>
+
+						<p class="mt-2 text-xs text-charcoal-muted">
+							Set a goal to track your progress. Leave blank to remove the goal.
 						</p>
 					</div>
 				{/if}

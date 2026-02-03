@@ -1,10 +1,11 @@
 <script lang="ts">
 	import { format } from 'date-fns';
-	import { Plus, ChevronDown, ChevronUp, MoreVertical, Pencil, Trash2 } from 'lucide-svelte';
+	import { Plus, ChevronDown, ChevronUp, MoreVertical, Pencil, Trash2, Target, TrendingUp, AlertTriangle } from 'lucide-svelte';
 	import type { SavingsAccount, SavingsContribution } from '$lib/db';
 	import { formatCurrency, formatCurrencyWhole } from '$lib/utils/format-helpers';
-	import { sumCurrency } from '$lib/utils/currency';
+	import { sumCurrency, calculatePercent } from '$lib/utils/currency';
 	import { updateSavingsAccount, deleteSavingsAccount } from '$lib/stores/savingsAccounts';
+	import { getGoalStatus, type GoalStatus } from '$lib/stores/savingsContributions';
 	import { toast } from '$lib/stores/toast';
 
 	interface Props {
@@ -25,6 +26,26 @@
 
 	// Total contributed this month
 	let monthTotal = $derived(sumCurrency(contributions.map((c) => c.amount)));
+
+	// Goal status (async, fetched on mount and when account changes)
+	let goalStatus = $state<GoalStatus | null>(null);
+	let hasGoal = $derived(account.targetAmount !== undefined && account.targetAmount > 0);
+	let goalProgress = $derived(
+		hasGoal && account.currentBalance !== undefined
+			? Math.min(100, calculatePercent(account.currentBalance, account.targetAmount!))
+			: 0
+	);
+
+	// Fetch goal status when account has a goal
+	$effect(() => {
+		if (hasGoal && account.id) {
+			getGoalStatus(account.id).then((status) => {
+				goalStatus = status;
+			});
+		} else {
+			goalStatus = null;
+		}
+	});
 
 	// Format contribution source for display
 	function formatSource(source: string): string {
@@ -96,11 +117,25 @@
 				>
 					{account.accountType}
 				</span>
+				{#if hasGoal}
+					<span class="text-xs px-2 py-0.5 rounded-full bg-primary-50 text-primary-700 flex items-center gap-1">
+						<Target size={12} />
+						Goal
+					</span>
+				{/if}
 			</div>
 			{#if account.accountType === 'savings' && account.currentBalance !== undefined}
-				<p class="text-sm text-charcoal-muted">
-					Balance: <span class="font-mono">{formatCurrency(account.currentBalance)}</span>
-				</p>
+				{#if hasGoal}
+					<p class="text-sm text-charcoal-muted">
+						<span class="font-mono">{formatCurrency(account.currentBalance)}</span>
+						<span class="text-charcoal-muted"> / </span>
+						<span class="font-mono">{formatCurrency(account.targetAmount!)}</span>
+					</p>
+				{:else}
+					<p class="text-sm text-charcoal-muted">
+						Balance: <span class="font-mono">{formatCurrency(account.currentBalance)}</span>
+					</p>
+				{/if}
 			{:else}
 				<p class="text-sm text-charcoal-muted">
 					This month: <span class="font-mono">{formatCurrencyWhole(monthTotal)}</span>
@@ -172,6 +207,59 @@
 			</div>
 		</div>
 	</div>
+
+	<!-- Goal Progress Section -->
+	{#if hasGoal && account.accountType === 'savings'}
+		<div class="px-4 pb-4 -mt-1">
+			<!-- Progress Bar -->
+			<div class="relative h-2 bg-surface-alt rounded-full overflow-hidden">
+				<div
+					class="absolute inset-y-0 left-0 rounded-full transition-all duration-300 {goalStatus?.isOnTrack ? 'bg-success-500' : 'bg-warning-500'}"
+					style="width: {goalProgress}%"
+				></div>
+			</div>
+
+			<!-- Goal Status -->
+			<div class="mt-2 flex items-center justify-between text-xs">
+				<span class="text-charcoal-muted font-mono">
+					{Math.round(goalProgress)}% complete
+				</span>
+
+				{#if goalStatus}
+					{#if goalProgress >= 100}
+						<span class="text-success-600 flex items-center gap-1">
+							🎉 Goal reached!
+						</span>
+					{:else if goalStatus.isOnTrack}
+						<span class="text-success-600 flex items-center gap-1">
+							<TrendingUp size={12} />
+							{#if goalStatus.projectedCompletion}
+								On track for {format(goalStatus.projectedCompletion, 'MMM yyyy')}
+							{:else}
+								On track
+							{/if}
+						</span>
+					{:else}
+						<span class="text-warning-600 flex items-center gap-1">
+							<AlertTriangle size={12} />
+							{#if goalStatus.recommendedMonthly > 0}
+								Save {formatCurrencyWhole(goalStatus.recommendedMonthly)}/mo to reach goal
+							{:else}
+								Behind pace
+							{/if}
+						</span>
+					{/if}
+				{/if}
+			</div>
+
+			<!-- Target Date -->
+			{#if account.targetDate}
+				<p class="mt-1 text-xs text-charcoal-muted">
+					Goal: {format(account.targetDate, 'MMMM d, yyyy')}
+				</p>
+			{/if}
+		</div>
+	{/if}
 
 	<!-- Contributions List (expanded) -->
 	{#if isExpanded && contributions.length > 0}

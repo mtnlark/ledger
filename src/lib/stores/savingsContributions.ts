@@ -129,3 +129,180 @@ export async function deleteContribution(id: number): Promise<void> {
 	await db.savingsContributions.delete(id);
 	await persistData();
 }
+
+// ============================================================================
+// Goal Tracking Functions
+// ============================================================================
+
+export interface GoalStatus {
+	isOnTrack: boolean;
+	shortfall: number; // How much short of target at current pace (0 if on track)
+	recommendedMonthly: number; // Monthly contribution needed to hit goal
+	projectedCompletion: Date | null; // When goal will be reached at current pace
+	monthsRemaining: number | null; // Months until target date (null if no date set)
+}
+
+/**
+ * Calculate average monthly contribution for an account over a period.
+ * @param accountId - The savings account ID
+ * @param months - Number of months to average over (default: all contributions)
+ * @returns Average monthly contribution amount
+ */
+export async function getAverageMonthlyContribution(
+	accountId: number,
+	months?: number
+): Promise<number> {
+	let contributions: SavingsContribution[];
+
+	if (months) {
+		// Get contributions from the last N months
+		const endDate = new Date();
+		const startDate = new Date();
+		startDate.setMonth(startDate.getMonth() - months);
+
+		contributions = await db.savingsContributions
+			.where('date')
+			.between(startDate, endDate, true, true)
+			.filter((c) => c.accountId === accountId)
+			.toArray();
+
+		// If no contributions in the period, return 0
+		if (contributions.length === 0) return 0;
+
+		// Sum contributions and divide by number of months
+		const total = sumCurrency(contributions.map((c) => c.amount));
+		return sumCurrency([total / months]);
+	} else {
+		// Get all contributions for this account
+		contributions = await db.savingsContributions
+			.where('accountId')
+			.equals(accountId)
+			.toArray();
+
+		if (contributions.length === 0) return 0;
+
+		// Find the date range
+		const dates = contributions.map((c) => c.date.getTime());
+		const earliest = new Date(Math.min(...dates));
+		const latest = new Date(Math.max(...dates));
+
+		// Calculate number of months between first and last contribution
+		const monthsDiff =
+			(latest.getFullYear() - earliest.getFullYear()) * 12 +
+			(latest.getMonth() - earliest.getMonth()) +
+			1; // +1 to include both months
+
+		const total = sumCurrency(contributions.map((c) => c.amount));
+		return sumCurrency([total / monthsDiff]);
+	}
+}
+
+/**
+ * Project when a goal will be reached at the current pace.
+ * @param currentBalance - Current account balance
+ * @param targetAmount - Goal target amount
+ * @param averageMonthlyContribution - Average monthly contribution
+ * @returns Projected completion date, or null if can't project (zero/negative rate)
+ */
+export function projectGoalCompletion(
+	currentBalance: number,
+	targetAmount: number,
+	averageMonthlyContribution: number
+): Date | null {
+	// Already at or past goal
+	if (currentBalance >= targetAmount) {
+		return new Date(); // Goal already achieved
+	}
+
+	// Can't project with zero or negative contribution rate
+	if (averageMonthlyContribution <= 0) {
+		return null;
+	}
+
+	const remaining = targetAmount - currentBalance;
+	const monthsNeeded = Math.ceil(remaining / averageMonthlyContribution);
+
+	const projected = new Date();
+	projected.setMonth(projected.getMonth() + monthsNeeded);
+	return projected;
+}
+
+/**
+ * Check if an account is on track to hit its goal by the target date.
+ * @param accountId - The savings account ID
+ * @returns GoalStatus with tracking info, or null if account has no goal
+ */
+export async function getGoalStatus(accountId: number): Promise<GoalStatus | null> {
+	const account = await getSavingsAccount(accountId);
+	if (!account || account.targetAmount === undefined) {
+		return null;
+	}
+
+	const currentBalance = account.currentBalance ?? 0;
+	const targetAmount = account.targetAmount;
+	const targetDate = account.targetDate;
+
+	// Get average monthly contribution (last 6 months for more recent accuracy)
+	const avgMonthly = await getAverageMonthlyContribution(accountId, 6);
+
+	// Project completion at current pace
+	const projectedCompletion = projectGoalCompletion(currentBalance, targetAmount, avgMonthly);
+
+	// If no target date, just return projection info
+	if (!targetDate) {
+		return {
+			isOnTrack: true, // No deadline = always on track
+			shortfall: 0,
+			recommendedMonthly: avgMonthly > 0 ? avgMonthly : 0,
+			projectedCompletion,
+			monthsRemaining: null
+		};
+	}
+
+	// Calculate months remaining until target date
+	const now = new Date();
+	const monthsRemaining = Math.max(
+		0,
+		(targetDate.getFullYear() - now.getFullYear()) * 12 +
+			(targetDate.getMonth() - now.getMonth())
+	);
+
+	// Already at or past goal
+	if (currentBalance >= targetAmount) {
+		return {
+			isOnTrack: true,
+			shortfall: 0,
+			recommendedMonthly: 0,
+			projectedCompletion: new Date(),
+			monthsRemaining
+		};
+	}
+
+	// Target date is in the past
+	if (monthsRemaining <= 0) {
+		const shortfall = targetAmount - currentBalance;
+		return {
+			isOnTrack: false,
+			shortfall,
+			recommendedMonthly: shortfall, // Would need entire shortfall in one month
+			projectedCompletion,
+			monthsRemaining: 0
+		};
+	}
+
+	// Calculate required monthly to hit goal
+	const remaining = targetAmount - currentBalance;
+	const recommendedMonthly = sumCurrency([remaining / monthsRemaining]);
+
+	// On track if current pace meets or exceeds required pace
+	const isOnTrack = avgMonthly >= recommendedMonthly;
+	const shortfall = isOnTrack ? 0 : sumCurrency([(recommendedMonthly - avgMonthly) * monthsRemaining]);
+
+	return {
+		isOnTrack,
+		shortfall,
+		recommendedMonthly,
+		projectedCompletion,
+		monthsRemaining
+	};
+}
