@@ -5,8 +5,10 @@
 	import { createCategoryHelpers } from '$lib/utils/category-helpers';
 	import { formatCurrency } from '$lib/utils/format-helpers';
 	import { createDateGroups, type DateGroup } from '$lib/utils/transaction-grouping';
+	import { extractTags, removeTags } from '$lib/utils/tags';
 	import EmptyState from './EmptyState.svelte';
 	import BulkActionBar from './BulkActionBar.svelte';
+	import TagPill from './TagPill.svelte';
 
 	interface Props {
 		transactions: Transaction[];
@@ -19,9 +21,10 @@
 		onAddTransaction?: () => void;
 		selectionMode?: boolean;
 		onSelectionModeChange?: (mode: boolean) => void;
+		onTagClick?: (tag: string) => void;
 	}
 
-	let { transactions, categories, settings, onEdit, onDelete, onBulkDelete, onBulkCategoryChange, onAddTransaction, selectionMode = false, onSelectionModeChange }: Props = $props();
+	let { transactions, categories, settings, onEdit, onDelete, onBulkDelete, onBulkCategoryChange, onAddTransaction, selectionMode = false, onSelectionModeChange, onTagClick }: Props = $props();
 
 	// Selection mode state - use prop if provided, otherwise internal state
 	let internalSelectionMode = $state(false);
@@ -156,6 +159,8 @@
 				<h3 class="text-sm font-medium text-charcoal-muted mb-3 px-1">{group.label}</h3>
 				<div class="space-y-2">
 					{#each group.transactions as transaction, txIndex (transaction.id)}
+						{@const tags = extractTags(transaction.notes)}
+						{@const cleanNotes = removeTags(transaction.notes)}
 						<!-- Use button in selection mode for proper keyboard/screen reader support -->
 						<svelte:element
 							this={isSelectionMode ? 'button' : 'div'}
@@ -220,8 +225,15 @@
 										</span>
 									{/if}
 								</div>
-								{#if transaction.notes}
-									<p class="text-xs text-charcoal-muted/70 mt-1 italic truncate">{transaction.notes}</p>
+								{#if cleanNotes || tags.length > 0}
+									<div class="mt-1 flex flex-wrap items-center gap-1">
+										{#if cleanNotes}
+											<p class="text-xs text-charcoal-muted/70 italic truncate mr-1">{cleanNotes}</p>
+										{/if}
+										{#each tags as tag (tag)}
+											<TagPill {tag} onClick={onTagClick} />
+										{/each}
+									</div>
 								{/if}
 							</div>
 
