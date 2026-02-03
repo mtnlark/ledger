@@ -2,6 +2,7 @@
 	import { Search, Filter, X, ChevronDown, ChevronUp, Globe } from 'lucide-svelte';
 	import { slide } from 'svelte/transition';
 	import type { Category } from '$lib/db';
+	import { tagIndex } from '$lib/stores/tags';
 
 	export interface FilterState {
 		searchQuery: string;
@@ -33,6 +34,9 @@
 
 	// Local UI state
 	let showAdvanced = $state(false);
+
+	// Available tags for filtering
+	let availableTags = $derived(tagIndex.getAllTags());
 
 	// Check if any filters are active (derived from props)
 	let hasActiveFilters = $derived(
@@ -171,6 +175,49 @@
 						</option>
 					{/each}
 				</select>
+			</div>
+
+			<!-- Tag Filter -->
+			<div>
+				<label for="tag-filter" class="block text-xs font-medium text-charcoal-muted mb-1">Tags</label>
+				<select
+					id="tag-filter"
+					value=""
+					onchange={(e) => {
+						const tag = e.currentTarget.value;
+						if (tag && !filters.tags.includes(tag)) {
+							onFilterChange({ ...filters, tags: [...filters.tags, tag] });
+						}
+						e.currentTarget.value = '';
+					}}
+					class="w-full px-3 py-2 bg-cream rounded-lg border border-transparent focus:border-primary-300 focus:ring-2 focus:ring-primary-100 focus:bg-surface transition-all text-charcoal"
+				>
+					<option value="">Add tag filter...</option>
+					{#each availableTags as tag (tag)}
+						{#if !filters.tags.includes(tag)}
+							<option value={tag}>
+								{tag} ({tagIndex.getTransactionCountForTag(tag)})
+							</option>
+						{/if}
+					{/each}
+				</select>
+
+				{#if filters.tags.length > 0}
+					<div class="flex flex-wrap gap-1 mt-2">
+						{#each filters.tags as tag (tag)}
+							<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-primary-100 text-primary-700">
+								{tag}
+								<button
+									type="button"
+									onclick={() => onFilterChange({ ...filters, tags: filters.tags.filter(t => t !== tag) })}
+									class="hover:text-primary-900"
+								>
+									<X size={12} />
+								</button>
+							</span>
+						{/each}
+					</div>
+				{/if}
 			</div>
 
 			<!-- Date Range -->
