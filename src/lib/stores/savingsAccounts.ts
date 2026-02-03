@@ -1,6 +1,7 @@
-import { db, type SavingsAccount } from '$lib/db';
+import { db, type SavingsAccount, type CompletedGoal } from '$lib/db';
 import { liveQuery } from 'dexie';
 import { persistData } from '$lib/storage';
+import { getSettings, updateSettings } from './settings';
 
 // Reactive savings accounts list
 export const savingsAccounts = liveQuery(() => db.savingsAccounts.orderBy('sortOrder').toArray());
@@ -78,4 +79,39 @@ export async function updateAccountBalance(id: number, delta: number): Promise<v
 		currentBalance: newBalance,
 		updatedAt: new Date()
 	});
+}
+
+/**
+ * Mark a savings goal as complete, archiving it to settings and clearing
+ * the goal fields from the account.
+ * @param accountId - The savings account ID with the completed goal
+ */
+export async function completeGoal(accountId: number): Promise<void> {
+	const account = await getSavingsAccount(accountId);
+	if (!account || account.targetAmount === undefined) {
+		return; // No goal to complete
+	}
+
+	// Archive the completed goal to settings
+	const settings = await getSettings();
+	const completedGoal: CompletedGoal = {
+		accountName: account.name,
+		targetAmount: account.targetAmount,
+		completedDate: new Date().toISOString(),
+		icon: account.icon,
+		color: account.color
+	};
+
+	await updateSettings({
+		completedGoals: [...(settings.completedGoals ?? []), completedGoal]
+	});
+
+	// Clear the goal from the account
+	await db.savingsAccounts.update(accountId, {
+		targetAmount: undefined,
+		targetDate: undefined,
+		updatedAt: new Date()
+	});
+
+	await persistData();
 }

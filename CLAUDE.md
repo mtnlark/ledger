@@ -332,6 +332,14 @@ interface CancelledSubscription {
   cancelledDate: string;   // ISO date string
 }
 
+interface CompletedGoal {
+  accountName: string;     // Name of the savings account
+  targetAmount: number;    // Goal target that was reached
+  completedDate: string;   // ISO date string
+  icon?: string;           // Preserved for display
+  color?: string;
+}
+
 interface Settings {
   id: 1;                   // Singleton
   partnerName: string;
@@ -344,6 +352,7 @@ interface Settings {
   confirmedActiveSubscriptions: string[]; // Override staleness detection
   iCloudBackupEnabled: boolean;           // Copy backups to iCloud Drive
   lastAutoSuggestedMonth?: string;        // "YYYY-MM" - tracks recurring suggestion dismissal
+  completedGoals: CompletedGoal[];        // Archived savings goals that have been completed
 }
 ```
 

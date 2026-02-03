@@ -8,7 +8,8 @@
 		type MonthlyBudget,
 		type CancelledSubscription,
 		type SavingsAccount,
-		type SavingsContribution
+		type SavingsContribution,
+		type Settings
 	} from '$lib/db';
 	import { initializeStorage } from '$lib/storage';
 	import {
@@ -31,7 +32,7 @@
 	import YTDSummary from '$lib/components/insights/YTDSummary.svelte';
 	import RecurringInsights from '$lib/components/insights/RecurringInsights.svelte';
 	import { detectRecurringExpenses, type DetectedRecurring } from '$lib/stores/recurring';
-	import { getCancelledSubscriptions, getConfirmedActiveSubscriptions } from '$lib/stores/settings';
+	import { getCancelledSubscriptions, getConfirmedActiveSubscriptions, getSettings } from '$lib/stores/settings';
 
 	// State
 	let isLoading = $state(true);
@@ -50,6 +51,7 @@
 	let savingsAccounts = $state<SavingsAccount[]>([]);
 	let selectedMonthContributions = $state<SavingsContribution[]>([]);
 	let allContributions = $state<SavingsContribution[]>([]);
+	let appSettings = $state<Settings | null>(null);
 
 	// Load data
 	async function loadData() {
@@ -67,6 +69,8 @@
 			// Load savings data
 			savingsAccounts = await getAllSavingsAccounts();
 			allContributions = await getAllContributions();
+			// Load settings for completed goals
+			appSettings = await getSettings();
 			// Load selected month data
 			selectedMonthTransactions = await getTransactionsByMonth(selectedMonth);
 			budget = await getBudgetForMonth(selectedMonth);
@@ -169,6 +173,7 @@
 				contributions={selectedMonthContributions}
 				{allContributions}
 				{allBudgets}
+				settings={appSettings}
 			/>
 
 			<!-- Spending This Month -->
@@ -205,7 +210,7 @@
 			/>
 
 			<!-- Year in Review -->
-			<YTDSummary transactions={allTransactions} />
+			<YTDSummary transactions={allTransactions} settings={appSettings} />
 		{/if}
 	</main>
 </div>

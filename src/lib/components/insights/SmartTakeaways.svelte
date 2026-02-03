@@ -1,7 +1,7 @@
 <script lang="ts">
-	import { TrendingUp, TrendingDown, AlertTriangle, Gauge, Receipt, Store, BarChart3, PiggyBank, ChevronDown, ChevronUp, Trophy, Flame } from 'lucide-svelte';
+	import { TrendingUp, TrendingDown, AlertTriangle, Gauge, Receipt, Store, BarChart3, PiggyBank, ChevronDown, ChevronUp, Trophy, Flame, PartyPopper } from 'lucide-svelte';
 	import { getMonthKey, navigateMonth, parseMonthKey } from '$lib/db';
-	import type { Transaction, Category, MonthlyBudget, SavingsContribution } from '$lib/db';
+	import type { Transaction, Category, MonthlyBudget, SavingsContribution, CompletedGoal, Settings } from '$lib/db';
 	import { config } from '$lib/config';
 	import { getInsightsEngine } from '$lib/insights';
 	import { computeStdDev } from '$lib/insights/calculations/stats';
@@ -20,6 +20,8 @@
 		contributions?: SavingsContribution[];
 		allContributions?: SavingsContribution[];
 		allBudgets?: MonthlyBudget[];
+		// Settings for completed goals
+		settings?: Settings | null;
 	}
 
 	let {
@@ -31,7 +33,8 @@
 		selectedMonth,
 		contributions = [],
 		allContributions = [],
-		allBudgets = []
+		allBudgets = [],
+		settings = null
 	}: Props = $props();
 
 	const engine = getInsightsEngine();
@@ -328,6 +331,11 @@
 		if (isCurrentMonth || !monthReview) return [] as GroupedInsight[];
 		const items: GroupedInsight[] = [];
 
+		// Goals completed this month
+		for (const goal of goalsCompletedThisMonth) {
+			items.push({ text: `🎉 Reached ${goal.accountName} goal!` });
+		}
+
 		// Biggest purchase
 		if (monthReview.biggestPurchase) {
 			const { merchant, amount } = monthReview.biggestPurchase;
@@ -353,9 +361,15 @@
 		spendingInsights.length > 0 || savingsInsights.length > 0 || highlightInsights.length > 0
 	);
 
+	// Get goals completed this month
+	let goalsCompletedThisMonth = $derived.by(() => {
+		if (!settings?.completedGoals) return [] as CompletedGoal[];
+		return settings.completedGoals.filter((g) => g.completedDate.startsWith(selectedMonth));
+	});
+
 	// Build takeaways list (for current month / Highlights mode only)
 	interface Takeaway {
-		type: 'anomaly' | 'pace' | 'shift' | 'needsWants' | 'monthComparison' | 'topMerchant' | 'savingsHighest' | 'savingsAboveAvg';
+		type: 'anomaly' | 'pace' | 'shift' | 'needsWants' | 'monthComparison' | 'topMerchant' | 'savingsHighest' | 'savingsAboveAvg' | 'goalCompleted';
 		icon: typeof AlertTriangle;
 		iconColor: string;
 		text: string;
@@ -367,7 +381,17 @@
 		const items: Takeaway[] = [];
 		const maxCount = config.insights.takeaways.maxCount;
 
-		// Add anomalies first (highest priority)
+		// Add goal completions first (highest priority - celebration!)
+		for (const goal of goalsCompletedThisMonth) {
+			items.push({
+				type: 'goalCompleted',
+				icon: PartyPopper,
+				iconColor: 'text-success-500',
+				text: `You reached your ${goal.accountName} goal!`
+			});
+		}
+
+		// Add anomalies (high priority)
 		for (const anomaly of anomalies) {
 			const percent = Math.round((anomaly.ratio - 1) * 100);
 			items.push({

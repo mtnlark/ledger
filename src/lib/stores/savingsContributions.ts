@@ -134,12 +134,22 @@ export async function deleteContribution(id: number): Promise<void> {
 // Goal Tracking Functions
 // ============================================================================
 
+export type GoalSeverity =
+	| 'completed' // >= 100% progress
+	| 'on_track' // Current pace meets required pace
+	| 'behind' // Behind pace, but required rate is < 2x current rate
+	| 'significantly_behind' // Way behind - would need to 2x+ savings rate
+	| 'deadline_passed'; // Target date is in the past (checked first)
+
 export interface GoalStatus {
 	isOnTrack: boolean;
 	shortfall: number; // How much short of target at current pace (0 if on track)
 	recommendedMonthly: number; // Monthly contribution needed to hit goal
 	projectedCompletion: Date | null; // When goal will be reached at current pace
 	monthsRemaining: number | null; // Months until target date (null if no date set)
+	severity: GoalSeverity; // Severity level for messaging
+	projectedDateAtCurrentPace: Date | null; // When goal will actually be reached at current pace
+	currentAverageMonthly: number; // Current average monthly contribution (for messaging)
 }
 
 /**
@@ -228,6 +238,57 @@ export function projectGoalCompletion(
 }
 
 /**
+ * Determine the severity level of goal progress.
+ * Priority order: deadline_passed → completed → on_track → significantly_behind → behind
+ */
+function computeGoalSeverity(
+	currentBalance: number,
+	targetAmount: number,
+	targetDate: Date | undefined,
+	avgMonthly: number,
+	recommendedMonthly: number
+): GoalSeverity {
+	const now = new Date();
+
+	// Check if target date has passed (if set)
+	if (targetDate) {
+		const deadlineDate = new Date(targetDate);
+		// Compare just the dates, not times
+		deadlineDate.setHours(0, 0, 0, 0);
+		const today = new Date();
+		today.setHours(0, 0, 0, 0);
+
+		if (deadlineDate < today) {
+			return 'deadline_passed';
+		}
+	}
+
+	// Check if goal is completed
+	if (currentBalance >= targetAmount) {
+		return 'completed';
+	}
+
+	// If no target date, we can still be "on track" based on having contributions
+	if (!targetDate) {
+		return avgMonthly > 0 ? 'on_track' : 'behind';
+	}
+
+	// Check if on track (current pace >= required pace)
+	if (avgMonthly >= recommendedMonthly) {
+		return 'on_track';
+	}
+
+	// Check if significantly behind (would need to 2x+ savings rate)
+	// If avgMonthly is 0 or very low, this is definitely significantly behind
+	if (avgMonthly <= 0 || recommendedMonthly >= avgMonthly * 2) {
+		return 'significantly_behind';
+	}
+
+	// Otherwise just behind (achievable with moderate increase)
+	return 'behind';
+}
+
+/**
  * Check if an account is on track to hit its goal by the target date.
  * @param accountId - The savings account ID
  * @returns GoalStatus with tracking info, or null if account has no goal
@@ -250,12 +311,16 @@ export async function getGoalStatus(accountId: number): Promise<GoalStatus | nul
 
 	// If no target date, just return projection info
 	if (!targetDate) {
+		const severity = computeGoalSeverity(currentBalance, targetAmount, undefined, avgMonthly, 0);
 		return {
-			isOnTrack: true, // No deadline = always on track
+			isOnTrack: severity === 'on_track' || severity === 'completed',
 			shortfall: 0,
 			recommendedMonthly: avgMonthly > 0 ? avgMonthly : 0,
 			projectedCompletion,
-			monthsRemaining: null
+			monthsRemaining: null,
+			severity,
+			projectedDateAtCurrentPace: projectedCompletion,
+			currentAverageMonthly: avgMonthly
 		};
 	}
 
@@ -274,7 +339,10 @@ export async function getGoalStatus(accountId: number): Promise<GoalStatus | nul
 			shortfall: 0,
 			recommendedMonthly: 0,
 			projectedCompletion: new Date(),
-			monthsRemaining
+			monthsRemaining,
+			severity: 'completed',
+			projectedDateAtCurrentPace: new Date(),
+			currentAverageMonthly: avgMonthly
 		};
 	}
 
@@ -286,7 +354,10 @@ export async function getGoalStatus(accountId: number): Promise<GoalStatus | nul
 			shortfall,
 			recommendedMonthly: shortfall, // Would need entire shortfall in one month
 			projectedCompletion,
-			monthsRemaining: 0
+			monthsRemaining: 0,
+			severity: 'deadline_passed',
+			projectedDateAtCurrentPace: projectedCompletion,
+			currentAverageMonthly: avgMonthly
 		};
 	}
 
@@ -298,11 +369,17 @@ export async function getGoalStatus(accountId: number): Promise<GoalStatus | nul
 	const isOnTrack = avgMonthly >= recommendedMonthly;
 	const shortfall = isOnTrack ? 0 : sumCurrency([(recommendedMonthly - avgMonthly) * monthsRemaining]);
 
+	// Compute severity
+	const severity = computeGoalSeverity(currentBalance, targetAmount, targetDate, avgMonthly, recommendedMonthly);
+
 	return {
 		isOnTrack,
 		shortfall,
 		recommendedMonthly,
 		projectedCompletion,
-		monthsRemaining
+		monthsRemaining,
+		severity,
+		projectedDateAtCurrentPace: projectedCompletion,
+		currentAverageMonthly: avgMonthly
 	};
 }

@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { format } from 'date-fns';
-	import { Trash2 } from 'lucide-svelte';
+	import { Trash2, X } from 'lucide-svelte';
 	import type { SavingsAccount, SavingsAccountType } from '$lib/db';
 	import { cleanNumberInput } from '$lib/utils/form-validation';
 	import { updateSavingsAccount, deleteSavingsAccount } from '$lib/stores/savingsAccounts';
@@ -41,6 +41,9 @@
 		}
 	});
 
+	// Check if goal has any values
+	let hasGoalValues = $derived(targetAmountStr.trim() !== '' || targetDateStr.trim() !== '');
+
 	function handleBalanceInput(e: Event) {
 		const input = e.target as HTMLInputElement;
 		currentBalanceStr = cleanNumberInput(input.value);
@@ -49,6 +52,11 @@
 	function handleTargetAmountInput(e: Event) {
 		const input = e.target as HTMLInputElement;
 		targetAmountStr = cleanNumberInput(input.value);
+	}
+
+	function handleRemoveGoal() {
+		targetAmountStr = '';
+		targetDateStr = '';
 	}
 
 	async function handleSubmit(e: Event) {
@@ -238,9 +246,21 @@
 				<!-- Savings Goal Section (savings only) -->
 				{#if account.accountType === 'savings'}
 					<div class="border-t border-dashed border-theme-dashed pt-4">
-						<p class="text-sm font-medium text-charcoal-soft mb-3">
-							Savings Goal <span class="text-charcoal-muted font-normal">(optional)</span>
-						</p>
+						<div class="flex items-center justify-between mb-3">
+							<p class="text-sm font-medium text-charcoal-soft">
+								Savings Goal <span class="text-charcoal-muted font-normal">(optional)</span>
+							</p>
+							{#if hasGoalValues}
+								<button
+									type="button"
+									onclick={handleRemoveGoal}
+									class="text-xs text-danger-600 hover:text-danger-700 font-medium flex items-center gap-1"
+								>
+									<X size={12} />
+									Remove Goal
+								</button>
+							{/if}
+						</div>
 
 						<div class="grid grid-cols-2 gap-4">
 							<!-- Target Amount -->
@@ -285,7 +305,7 @@
 						</div>
 
 						<p class="mt-2 text-xs text-charcoal-muted">
-							Set a goal to track your progress. Leave blank to remove the goal.
+							Set a goal to track your progress.
 						</p>
 					</div>
 				{/if}

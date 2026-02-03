@@ -53,6 +53,14 @@ export interface CancelledSubscription {
 	cancelledDate: string; // ISO date string
 }
 
+export interface CompletedGoal {
+	accountName: string;
+	targetAmount: number;
+	completedDate: string; // ISO date string
+	icon?: string; // Preserve for display
+	color?: string;
+}
+
 // Savings account types
 export type SavingsAccountType = 'savings' | 'retirement' | 'investment';
 
@@ -134,6 +142,7 @@ export interface Settings {
 	confirmedActiveSubscriptions: string[]; // Normalized merchant names user confirmed are still active (override staleness)
 	iCloudBackupEnabled: boolean; // Whether to copy backups to iCloud Drive
 	lastAutoSuggestedMonth?: string; // "YYYY-MM" format - tracks when recurring suggestions were last shown
+	completedGoals: CompletedGoal[]; // Archived savings goals that have been completed
 }
 
 // Default categories from your spreadsheets
@@ -183,7 +192,8 @@ export const DEFAULT_SETTINGS: Settings = {
 	dismissedRecurring: [],
 	cancelledSubscriptions: [],
 	confirmedActiveSubscriptions: [],
-	iCloudBackupEnabled: false
+	iCloudBackupEnabled: false,
+	completedGoals: []
 };
 
 // Default savings accounts

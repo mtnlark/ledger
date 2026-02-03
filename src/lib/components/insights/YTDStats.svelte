@@ -1,15 +1,16 @@
 <script lang="ts">
 	import { format } from 'date-fns';
 	import { parseMonthKey, getMonthKey } from '$lib/db';
-	import type { Transaction, Category } from '$lib/db';
+	import type { Transaction, Category, Settings } from '$lib/db';
 	import InsightMetric from './InsightMetric.svelte';
 
 	interface Props {
 		transactions: Transaction[];
 		categories: Category[];
+		settings?: Settings | null;
 	}
 
-	let { transactions, categories }: Props = $props();
+	let { transactions, categories, settings = null }: Props = $props();
 
 	// Filter to current year transactions
 	let currentYear = new Date().getFullYear();
@@ -108,6 +109,13 @@
 	});
 
 	let noSpendDays = $derived(daysInYearSoFar - spendDays.size);
+
+	// Goals completed this year
+	let goalsCompletedThisYear = $derived.by(() => {
+		if (!settings?.completedGoals) return 0;
+		const yearPrefix = String(currentYear);
+		return settings.completedGoals.filter((g) => g.completedDate.startsWith(yearPrefix)).length;
+	});
 </script>
 
 <div class="space-y-6">
@@ -130,6 +138,17 @@
 			/>
 		</div>
 	</div>
+
+	<!-- Goals completed (only show if any) -->
+	{#if goalsCompletedThisYear > 0}
+		<div class="bg-success-50 rounded-lg p-4 flex items-center gap-3">
+			<span class="text-2xl">🎯</span>
+			<div>
+				<p class="font-semibold text-success-700">{goalsCompletedThisYear} Goal{goalsCompletedThisYear !== 1 ? 's' : ''} Completed</p>
+				<p class="text-sm text-success-600">This year</p>
+			</div>
+		</div>
+	{/if}
 
 	<!-- Top categories -->
 	<div>

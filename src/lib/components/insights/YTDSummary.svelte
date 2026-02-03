@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { format } from 'date-fns';
-	import type { Transaction } from '$lib/db';
+	import type { Transaction, Settings } from '$lib/db';
 	import { formatCurrencyWhole } from '$lib/utils/format-helpers';
 	import { getInsightsEngine } from '$lib/insights';
 	import InsightGroup from './InsightGroup.svelte';
@@ -8,9 +8,10 @@
 
 	interface Props {
 		transactions: Transaction[];
+		settings?: Settings | null;
 	}
 
-	let { transactions }: Props = $props();
+	let { transactions, settings = null }: Props = $props();
 
 	const engine = getInsightsEngine();
 	let currentYear = new Date().getFullYear();
@@ -41,6 +42,13 @@
 
 	// All-time needs vs wants
 	let needsWantsStats = $derived(engine.getNeedsVsWantsFull(transactions, 'ytd-all-time'));
+
+	// Goals completed this year
+	let goalsCompletedThisYear = $derived.by(() => {
+		if (!settings?.completedGoals) return 0;
+		const yearPrefix = String(currentYear);
+		return settings.completedGoals.filter((g) => g.completedDate.startsWith(yearPrefix)).length;
+	});
 </script>
 
 <InsightGroup title="Year in Review" description="{currentYear} spending overview">
@@ -102,6 +110,17 @@
 					</div>
 				{/if}
 			</div>
+
+			<!-- Goals Completed This Year -->
+			{#if goalsCompletedThisYear > 0}
+				<div class="flex items-center gap-3 p-4 bg-success-50 rounded-lg border border-success-200">
+					<span class="text-2xl">🎯</span>
+					<div>
+						<p class="font-semibold text-success-700">{goalsCompletedThisYear} Savings Goal{goalsCompletedThisYear !== 1 ? 's' : ''} Completed</p>
+						<p class="text-sm text-success-600">This year</p>
+					</div>
+				</div>
+			{/if}
 
 			<!-- Needs vs Wants Summary (compact) -->
 			{#if needsWantsStats.total > 0}

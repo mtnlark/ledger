@@ -30,7 +30,8 @@ describe('Storage Types', () => {
 					dismissedRecurring: [],
 					cancelledSubscriptions: [],
 					confirmedActiveSubscriptions: [],
-					iCloudBackupEnabled: false
+					iCloudBackupEnabled: false,
+					completedGoals: []
 				}
 			};
 
@@ -56,7 +57,8 @@ describe('Storage Types', () => {
 					dismissedRecurring: [],
 					cancelledSubscriptions: [],
 					confirmedActiveSubscriptions: [],
-					iCloudBackupEnabled: false
+					iCloudBackupEnabled: false,
+					completedGoals: []
 				}
 			};
 
@@ -85,7 +87,8 @@ describe('Storage Types', () => {
 						dismissedRecurring: [],
 						cancelledSubscriptions: [],
 						confirmedActiveSubscriptions: [],
-						iCloudBackupEnabled: false
+						iCloudBackupEnabled: false,
+						completedGoals: []
 					}
 				}
 			};
@@ -136,7 +139,8 @@ describe('Storage Types', () => {
 						dismissedRecurring: [],
 						cancelledSubscriptions: [],
 						confirmedActiveSubscriptions: [],
-						iCloudBackupEnabled: false
+						iCloudBackupEnabled: false,
+						completedGoals: []
 					}
 				}
 			};
@@ -169,7 +173,8 @@ describe('Storage Types', () => {
 						dismissedRecurring: [],
 						cancelledSubscriptions: [],
 						confirmedActiveSubscriptions: [],
-						iCloudBackupEnabled: false
+						iCloudBackupEnabled: false,
+						completedGoals: []
 					}
 				},
 				backupName: 'data-2026-01-14T10-30-00-000Z.json'

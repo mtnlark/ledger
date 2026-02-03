@@ -18,6 +18,7 @@ export type {
 	MonthlyBudget,
 	CategoryBudget,
 	CancelledSubscription,
+	CompletedGoal,
 	SavingsAccountType,
 	ContributionSource,
 	SavingsAccount,

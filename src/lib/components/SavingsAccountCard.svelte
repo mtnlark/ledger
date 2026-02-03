@@ -1,11 +1,11 @@
 <script lang="ts">
 	import { format } from 'date-fns';
-	import { Plus, ChevronDown, ChevronUp, MoreVertical, Pencil, Trash2, Target, TrendingUp, AlertTriangle } from 'lucide-svelte';
+	import { Plus, ChevronDown, ChevronUp, MoreVertical, Pencil, Trash2, Target, TrendingUp, AlertTriangle, Lightbulb, PartyPopper, CheckCircle2 } from 'lucide-svelte';
 	import type { SavingsAccount, SavingsContribution } from '$lib/db';
 	import { formatCurrency, formatCurrencyWhole } from '$lib/utils/format-helpers';
 	import { sumCurrency, calculatePercent } from '$lib/utils/currency';
-	import { updateSavingsAccount, deleteSavingsAccount } from '$lib/stores/savingsAccounts';
-	import { getGoalStatus, type GoalStatus } from '$lib/stores/savingsContributions';
+	import { deleteSavingsAccount, completeGoal } from '$lib/stores/savingsAccounts';
+	import { getGoalStatus, type GoalStatus, type GoalSeverity } from '$lib/stores/savingsContributions';
 	import { toast } from '$lib/stores/toast';
 
 	interface Props {
@@ -82,6 +82,19 @@
 		} catch (error) {
 			console.error('Failed to delete account:', error);
 			toast.error('Failed to delete account');
+		}
+	}
+
+	async function handleMarkComplete() {
+		if (!account.id) return;
+
+		try {
+			await completeGoal(account.id);
+			onAccountUpdated();
+			toast.success('Goal completed! 🎉');
+		} catch (error) {
+			console.error('Failed to complete goal:', error);
+			toast.error('Failed to complete goal');
 		}
 	}
 
@@ -214,50 +227,79 @@
 			<!-- Progress Bar -->
 			<div class="relative h-2 bg-surface-alt rounded-full overflow-hidden">
 				<div
-					class="absolute inset-y-0 left-0 rounded-full transition-all duration-300 {goalStatus?.isOnTrack ? 'bg-success-500' : 'bg-warning-500'}"
+					class="absolute inset-y-0 left-0 rounded-full transition-all duration-300 {goalStatus?.severity === 'completed' || goalStatus?.severity === 'on_track' ? 'bg-success-500' : goalStatus?.severity === 'behind' ? 'bg-primary-400' : 'bg-warning-500'}"
 					style="width: {goalProgress}%"
 				></div>
 			</div>
 
 			<!-- Goal Status -->
 			<div class="mt-2 flex items-center justify-between text-xs">
-				<span class="text-charcoal-muted font-mono">
-					{Math.round(goalProgress)}% complete
-				</span>
+				<div class="text-charcoal-muted">
+					<span class="font-mono">{Math.round(goalProgress)}%</span> complete
+					{#if account.targetDate && goalStatus?.severity !== 'deadline_passed' && goalStatus?.severity !== 'completed'}
+						· Goal: {format(account.targetDate, 'MMM d, yyyy')}
+					{/if}
+				</div>
 
 				{#if goalStatus}
-					{#if goalProgress >= 100}
+					{#if goalStatus.severity === 'completed'}
 						<span class="text-success-600 flex items-center gap-1">
-							🎉 Goal reached!
+							<PartyPopper size={12} />
+							Goal reached!
 						</span>
-					{:else if goalStatus.isOnTrack}
+					{:else if goalStatus.severity === 'on_track'}
 						<span class="text-success-600 flex items-center gap-1">
-							<TrendingUp size={12} />
-							{#if goalStatus.projectedCompletion}
-								On track for {format(goalStatus.projectedCompletion, 'MMM yyyy')}
-							{:else}
-								On track
+							<CheckCircle2 size={12} />
+							On track
+							{#if goalStatus.recommendedMonthly > 0}
+								· {formatCurrencyWhole(goalStatus.recommendedMonthly)}/mo needed
 							{/if}
 						</span>
-					{:else}
+					{:else if goalStatus.severity === 'behind' || goalStatus.severity === 'significantly_behind'}
+						<span class="{goalStatus.severity === 'significantly_behind' ? 'text-warning-600' : 'text-charcoal-soft'} flex items-center gap-1">
+							{#if goalStatus.severity === 'significantly_behind'}
+								<AlertTriangle size={12} />
+							{:else}
+								<Lightbulb size={12} />
+							{/if}
+							{#if goalStatus.recommendedMonthly > 0}
+								{formatCurrencyWhole(goalStatus.recommendedMonthly)}/mo needed
+							{:else}
+								Start saving to track progress
+							{/if}
+						</span>
+					{:else if goalStatus.severity === 'deadline_passed'}
 						<span class="text-warning-600 flex items-center gap-1">
 							<AlertTriangle size={12} />
-							{#if goalStatus.recommendedMonthly > 0}
-								Save {formatCurrencyWhole(goalStatus.recommendedMonthly)}/mo to reach goal
-							{:else}
-								Behind pace
-							{/if}
+							Deadline passed
 						</span>
 					{/if}
 				{/if}
 			</div>
 
-			<!-- Target Date -->
-			{#if account.targetDate}
-				<p class="mt-1 text-xs text-charcoal-muted">
-					Goal: {format(account.targetDate, 'MMMM d, yyyy')}
-				</p>
+			<!-- Mark Complete Button (for completed goals) -->
+			{#if goalStatus?.severity === 'completed'}
+				<button
+					onclick={handleMarkComplete}
+					class="mt-2 w-full py-1.5 px-3 bg-success-50 text-success-700 text-xs font-medium rounded-lg hover:bg-success-100 transition-colors flex items-center justify-center gap-1.5"
+				>
+					<CheckCircle2 size={14} />
+					Mark Complete
+				</button>
 			{/if}
+		</div>
+	{/if}
+
+	<!-- Set Goal Link (for savings accounts without goals) -->
+	{#if !hasGoal && account.accountType === 'savings'}
+		<div class="px-4 pb-4 -mt-2">
+			<button
+				onclick={onEditAccount}
+				class="text-xs text-primary-600 hover:text-primary-700 font-medium flex items-center gap-1"
+			>
+				<Target size={12} />
+				Set a goal →
+			</button>
 		</div>
 	{/if}
 

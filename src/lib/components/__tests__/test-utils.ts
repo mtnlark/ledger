@@ -121,6 +121,7 @@ export function createMockSettings(overrides: Partial<Settings> = {}): Settings 
 		cancelledSubscriptions: [],
 		confirmedActiveSubscriptions: [],
 		iCloudBackupEnabled: false,
+		completedGoals: [],
 		...overrides
 	};
 }

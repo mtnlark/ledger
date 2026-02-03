@@ -190,6 +190,17 @@ async function migrateSeedSavingsAccounts(): Promise<void> {
 }
 
 /**
+ * Migration: Add completedGoals field to settings
+ */
+async function migrateSettingsCompletedGoals(): Promise<void> {
+	const settings = await db.settings.get(1);
+	if (settings && (settings as { completedGoals?: unknown[] }).completedGoals === undefined) {
+		await db.settings.update(1, { completedGoals: [] });
+		if (import.meta.env.DEV) console.log('Migration: Added completedGoals field to settings');
+	}
+}
+
+/**
  * Run all database migrations
  * Each migration is idempotent and checks if it needs to run
  */
@@ -201,4 +212,5 @@ export async function runMigrations(): Promise<void> {
 	await migrateTransactionSubscription();
 	await migrateTransactionDates();
 	await migrateSeedSavingsAccounts();
+	await migrateSettingsCompletedGoals();
 }
