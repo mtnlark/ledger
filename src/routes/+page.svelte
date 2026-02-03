@@ -121,7 +121,8 @@
 		categoryId: null,
 		dateFrom: '',
 		dateTo: '',
-		searchAllTime: false
+		searchAllTime: false,
+		tags: []
 	});
 
 	// Check if we're using filters that require all transactions

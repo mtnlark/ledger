@@ -9,6 +9,7 @@
 		dateFrom: string;
 		dateTo: string;
 		searchAllTime: boolean;
+		tags: string[];
 	}
 
 	interface Props {
@@ -39,13 +40,15 @@
 		filters.categoryId !== null ||
 		filters.dateFrom !== '' ||
 		filters.dateTo !== '' ||
-		filters.searchAllTime
+		filters.searchAllTime ||
+		filters.tags.length > 0
 	);
 
 	let hasAdvancedFilters = $derived(
 		filters.categoryId !== null ||
 		filters.dateFrom !== '' ||
-		filters.dateTo !== ''
+		filters.dateTo !== '' ||
+		filters.tags.length > 0
 	);
 
 	// Debounce search input
@@ -77,7 +80,8 @@
 			categoryId: null,
 			dateFrom: '',
 			dateTo: '',
-			searchAllTime: false
+			searchAllTime: false,
+			tags: []
 		});
 	}
 
