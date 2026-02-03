@@ -11,6 +11,7 @@
 	import { getContributionsAffectingAvailable } from '$lib/stores/savingsContributions';
 	import { getRecurringSuggestions, shouldShowRecurringBanner, type RecurringSuggestion } from '$lib/stores/recurringSuggestions';
 	import { sumCurrency } from '$lib/utils/currency';
+	import { matchesTag } from '$lib/utils/tags';
 	import { getSelectedMonth, setSelectedMonth } from '$lib/stores/selectedMonth';
 	import { toast } from '$lib/stores/toast';
 	import { handleError } from '$lib/utils/error-handler';
@@ -159,6 +160,11 @@
 		if (filters.dateTo) {
 			const toDate = startOfDay(parseISO(filters.dateTo));
 			result = result.filter(t => startOfDay(new Date(t.date)) <= toDate);
+		}
+
+		// Filter by tags (OR logic - show transactions with ANY selected tag)
+		if (filters.tags.length > 0) {
+			result = result.filter(tx => filters.tags.some(tag => matchesTag(tx, tag)));
 		}
 
 		return result;
@@ -532,6 +538,11 @@
 					onAddTransaction={handleOpenQuickAdd}
 					selectionMode={isSelectionMode}
 					onSelectionModeChange={(mode) => isSelectionMode = mode}
+					onTagClick={(tag) => {
+						if (!filters.tags.includes(tag)) {
+							filters = { ...filters, tags: [...filters.tags, tag] };
+						}
+					}}
 				/>
 			</div>
 		{/if}
