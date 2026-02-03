@@ -7,6 +7,7 @@ import { isSubscriptionCancelled, reactivateSubscription } from './subscriptionS
 import { getMonthDateRange } from '$lib/utils/date-helpers';
 import { getTransactionCache } from './transactionCache';
 import { sumCurrency } from '$lib/utils/currency';
+import { tagIndex } from './tags';
 import {
 	validateAmount,
 	validateMerchant,
@@ -130,6 +131,7 @@ export async function addTransaction(
 	const cache = getTransactionCache();
 	if (cache.isLoaded) {
 		cache.add({ ...newTransaction, id } as Transaction & { id: number });
+		tagIndex.rebuild(cache.getAll());
 	}
 
 	// Auto-reactivate if adding a subscription for a cancelled merchant
@@ -178,6 +180,7 @@ export async function updateTransaction(
 	const cache = getTransactionCache();
 	if (cache.isLoaded) {
 		cache.update(id, updatedFields);
+		tagIndex.rebuild(cache.getAll());
 	}
 
 	// Auto-reactivate if marking as subscription for a cancelled merchant
@@ -200,6 +203,7 @@ export async function deleteTransaction(id: number): Promise<void> {
 	const cache = getTransactionCache();
 	if (cache.isLoaded) {
 		cache.remove(id);
+		tagIndex.rebuild(cache.getAll());
 	}
 
 	invalidateTransactionCaches();
@@ -215,6 +219,7 @@ export async function bulkDeleteTransactions(ids: number[]): Promise<void> {
 	const cache = getTransactionCache();
 	if (cache.isLoaded) {
 		cache.bulkRemove(ids);
+		tagIndex.rebuild(cache.getAll());
 	}
 
 	invalidateTransactionCaches();
@@ -234,6 +239,7 @@ export async function bulkUpdateCategory(ids: number[], categoryId: number): Pro
 	const cache = getTransactionCache();
 	if (cache.isLoaded) {
 		cache.bulkUpdate(ids, { categoryId, updatedAt });
+		tagIndex.rebuild(cache.getAll());
 	}
 
 	invalidateTransactionCaches();
@@ -316,6 +322,7 @@ export async function splitTransaction(
 		for (const child of childTransactions) {
 			cache.add({ ...child, id: child.id! });
 		}
+		tagIndex.rebuild(cache.getAll());
 	}
 
 	invalidateTransactionCaches();
@@ -347,6 +354,7 @@ export async function markAsSettled(ids: number[]): Promise<void> {
 	const cache = getTransactionCache();
 	if (cache.isLoaded) {
 		cache.bulkUpdate(ids, { isSettled: true, settledDate: now, updatedAt: now });
+		tagIndex.rebuild(cache.getAll());
 	}
 
 	invalidateTransactionCaches();
@@ -453,9 +461,15 @@ export async function getAvailableMonths(): Promise<string[]> {
 // Filters out split parent transactions (they've been replaced by children)
 export async function getAllTransactions(): Promise<Transaction[]> {
 	const cache = getTransactionCache();
+	const wasLoaded = cache.isLoaded;
 
 	// Use async initialization with lock to prevent concurrent loads
 	await cache.initializeAsync(() => db.transactions.toArray());
+
+	// Rebuild tag index if cache was just initialized
+	if (!wasLoaded) {
+		tagIndex.rebuild(cache.getAll());
+	}
 
 	// Return filtered list (cache.getAll() filters split parents)
 	return cache.getAll();
