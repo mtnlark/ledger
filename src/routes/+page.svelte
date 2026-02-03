@@ -209,6 +209,9 @@
 			currentMonth = getSelectedMonth();
 			categories = await getAllCategories();
 			settings = await getSettings();
+			// Load all transactions first (populates cache and tag index)
+			allTransactions = await getAllTransactions();
+			// Then filter to current month for display
 			transactions = await getTransactionsByMonth(currentMonth);
 			budget = await getBudgetForMonth(currentMonth);
 			availableMonths = await getAvailableMonths();
