@@ -14,6 +14,7 @@
 	import EssentialToggle from './EssentialToggle.svelte';
 	import SubscriptionFields from './SubscriptionFields.svelte';
 	import { getMostCommonCategory } from '$lib/stores/merchants';
+	import TagAutocomplete from './TagAutocomplete.svelte';
 
 	const STORAGE_KEY = 'ledger-addform-expanded';
 
@@ -552,12 +553,11 @@
 			<label for="notes" class="block text-sm font-medium text-charcoal-soft mb-1.5">
 				Notes <span class="text-charcoal-muted font-normal">(optional)</span>
 			</label>
-			<input
-				type="text"
+			<TagAutocomplete
 				id="notes"
-				bind:value={notes}
-				placeholder="Any additional notes..."
-				class="w-full px-3 py-2.5 bg-surface-alt border border-theme rounded-lg focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-colors placeholder:text-charcoal-muted"
+				value={notes}
+				onInput={(v) => notes = v}
+				placeholder="Add notes... use #tags for filtering"
 			/>
 		</div>
 
