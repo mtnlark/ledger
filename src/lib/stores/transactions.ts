@@ -7,7 +7,7 @@ import { isSubscriptionCancelled, reactivateSubscription } from './subscriptionS
 import { getMonthDateRange } from '$lib/utils/date-helpers';
 import { getTransactionCache } from './transactionCache';
 import { sumCurrency } from '$lib/utils/currency';
-import { tagIndex } from './tags';
+import { tagIndex } from './tags.svelte';
 import {
 	validateAmount,
 	validateMerchant,

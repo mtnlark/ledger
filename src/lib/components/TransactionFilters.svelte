@@ -2,7 +2,7 @@
 	import { Search, Filter, X, ChevronDown, ChevronUp, Globe } from 'lucide-svelte';
 	import { slide } from 'svelte/transition';
 	import type { Category } from '$lib/db';
-	import { tagIndex } from '$lib/stores/tags';
+	import { tagIndex } from '$lib/stores/tags.svelte';
 
 	export interface FilterState {
 		searchQuery: string;

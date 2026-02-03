@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { tagIndex } from '$lib/stores/tags.js';
+	import { tagIndex } from '$lib/stores/tags.svelte';
 
 	interface Props {
 		value: string;
