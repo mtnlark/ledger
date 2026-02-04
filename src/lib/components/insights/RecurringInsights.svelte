@@ -158,6 +158,32 @@
 		activeSubscriptions.filter((s) => s.subscriptionFrequency === 'annual')
 	);
 
+	// Upcoming annual renewals (last charged 10-13 months ago)
+	let upcomingRenewals = $derived.by(() => {
+		const now = new Date();
+		return annualSubscriptions
+			.filter((sub) => {
+				const lastCharge = new Date(sub.date);
+				const monthsSince = (now.getFullYear() - lastCharge.getFullYear()) * 12
+					+ (now.getMonth() - lastCharge.getMonth());
+				return monthsSince >= 10 && monthsSince <= 13;
+			})
+			.map((sub) => {
+				const lastCharge = new Date(sub.date);
+				const expectedRenewal = new Date(lastCharge);
+				expectedRenewal.setFullYear(expectedRenewal.getFullYear() + 1);
+				const userAmount = sub.isShared ? sub.amount - sub.partnerShare : sub.amount;
+				return {
+					merchant: sub.merchant,
+					lastCharge,
+					expectedRenewal,
+					amount: userAmount,
+					categoryId: sub.categoryId
+				};
+			})
+			.sort((a, b) => a.expectedRenewal.getTime() - b.expectedRenewal.getTime());
+	});
+
 	// Calculate subscription totals (user's portion only, all non-cancelled subscriptions)
 	let allNonCancelledSubs = $derived(
 		allSubscriptions.filter((sub) => !isCancelled(sub.merchant, new Date(sub.date)))
@@ -370,6 +396,36 @@
 										</p>
 										<p class="text-xs text-charcoal-muted">
 											~{formatCurrency(monthlyEquiv)}/mo
+										</p>
+									</div>
+								</div>
+							{/each}
+						</div>
+					</div>
+				{/if}
+
+				<!-- Upcoming Annual Renewals -->
+				{#if upcomingRenewals.length > 0}
+					<div>
+						<h4 class="text-sm font-medium text-charcoal-muted mb-3 flex items-center gap-2">
+							<Calendar size={14} />
+							Coming Up
+							<span class="text-xs font-normal">({upcomingRenewals.length})</span>
+						</h4>
+
+						<div class="space-y-2">
+							{#each upcomingRenewals as renewal}
+								<div class="flex items-center gap-3 py-2 px-3 bg-primary-500/5 rounded-lg border border-primary-500/20">
+									<span class="text-lg">{getCategoryIcon(renewal.categoryId)}</span>
+									<div class="flex-1 min-w-0">
+										<p class="text-sm font-medium text-charcoal truncate">{renewal.merchant}</p>
+										<p class="text-xs text-charcoal-muted">
+											Renews ~{renewal.expectedRenewal.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
+										</p>
+									</div>
+									<div class="text-right flex-shrink-0">
+										<p class="font-mono text-sm font-medium text-charcoal">
+											{formatCurrency(renewal.amount)}/yr
 										</p>
 									</div>
 								</div>
