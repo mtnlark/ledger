@@ -107,6 +107,8 @@ ledger/
 │   │   │   ├── recurringCache.ts       # Recurring detection cache management
 │   │   │   ├── recurringSuggestions.ts  # Monthly recurring transaction suggestions
 │   │   │   ├── dashboardActions.ts     # Dashboard transaction CRUD operations
+│   │   │   ├── tags.ts              # TagIndex class for tag lookups
+│   │   │   ├── tags.svelte.ts       # Reactive TagIndex wrapper ($state version)
 │   │   │   ├── selectedMonth.ts    # UI state for month selection
 │   │   │   ├── theme.ts            # Light/dark/system theme
 │   │   │   └── toast.ts            # Toast notification system
@@ -170,6 +172,9 @@ ledger/
 │   │   │   ├── RecurringSuggestionsBanner.svelte  # Banner for recurring suggestions
 │   │   │   ├── RecurringSuggestionsModal.svelte   # Modal to review/add recurring
 │   │   │   ├── DashboardInsightWidget.svelte      # Quick insight widget for dashboard
+│   │   │   ├── TagPill.svelte             # Tag pill display with hover popover
+│   │   │   ├── TagPopover.svelte          # Tag hover popover (total + count)
+│   │   │   ├── TagAutocomplete.svelte     # Tag autocomplete for notes input
 │   │   │   └── insights/              # Insight components
 │   │   │       ├── InsightGroup.svelte
 │   │   │       ├── InsightMetric.svelte
@@ -205,6 +210,7 @@ ledger/
 │   │   │   ├── trie.ts                # Trie for merchant autocomplete
 │   │   │   ├── pagination.ts          # List pagination utilities
 │   │   │   ├── retry.ts               # Async retry with backoff
+│   │   │   ├── tags.ts                # Tag parsing, replace, strip, total calculation
 │   │   │   ├── errors.ts              # Error class definitions & type guards
 │   │   │   ├── error-handler.ts       # Centralized error handler (logging + toast)
 │   │   │   └── debug.ts               # Debugging utilities
@@ -449,6 +455,19 @@ Sidebar state persists to localStorage (`ledger-sidebar-expanded`).
 - Category management (add/edit/reorder)
 - Excel import / JSON export
 - iCloud backup toggle (copies backups to iCloud Drive when enabled)
+
+### Tags
+- Hashtag-based tagging in transaction notes field (e.g. `#vacation`, `#italy-trip`)
+- Tag format: letters, numbers, hyphens; must start with letter or number
+- Tag pills displayed on transactions with click-to-filter behavior
+- **Tag popover**: Hover a tag pill to see total spent (user's share) and transaction count
+- **Tag filtering**: Filter transactions by one or more tags in the advanced filters panel
+- **Manage tags**: Inline section in filters panel to rename or delete tags across all transactions
+  - Rename: batch-updates all transaction notes replacing `#oldtag` with `#newtag`
+  - Delete: strips `#tag` from all matching transaction notes
+- **Tag autocomplete**: Suggests existing tags when typing `#` in notes input
+- Helper text below notes input clarifies tag format rules
+- Tag index (`TagIndex` class) provides fast lookups, rebuilt from transaction cache
 
 ### Subscriptions
 - Mark transactions as subscriptions (monthly/annual)

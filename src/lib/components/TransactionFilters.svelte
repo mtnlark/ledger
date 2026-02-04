@@ -265,7 +265,7 @@
 									<input
 										type="text"
 										bind:value={editValue}
-										onblur={() => handleRename(tag)}
+										onblur={() => { if (!isProcessing) handleRename(tag); }}
 										onkeydown={(e) => handleEditKeydown(e, tag)}
 										disabled={isProcessing}
 										class="flex-1 px-2 py-1 text-sm bg-surface border border-primary-300 rounded focus:ring-2 focus:ring-primary-100 focus:outline-none"
