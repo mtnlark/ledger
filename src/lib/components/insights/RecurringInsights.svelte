@@ -4,7 +4,6 @@
 	import type { Category, Transaction, CancelledSubscription } from '$lib/db';
 	import { createCategoryHelpers } from '$lib/utils/category-helpers';
 	import { formatCurrencyWhole, formatCurrency } from '$lib/utils/format-helpers';
-	import InsightGroup from './InsightGroup.svelte';
 	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
 	import type { DetectedRecurring } from '$lib/stores/recurring';
 	import {
@@ -281,8 +280,13 @@
 
 </script>
 
-<InsightGroup title="Recurring Expenses" description="Subscriptions and recurring bills">
-	{#snippet preview()}
+<div class="bg-surface rounded-xl shadow-md shadow-[var(--color-shadow)] overflow-hidden">
+	<div class="px-6 py-4">
+		<h2 class="font-display text-xl font-medium text-charcoal">Recurring Expenses</h2>
+		<p class="text-sm text-charcoal-muted mt-0.5">Subscriptions and recurring bills</p>
+	</div>
+	<div class="px-6 pb-6 space-y-6">
+		<!-- Summary counts row -->
 		{#if !hasData}
 			<p class="text-charcoal-muted text-sm">No recurring expenses yet</p>
 		{:else}
@@ -302,9 +306,7 @@
 				</div>
 			</div>
 		{/if}
-	{/snippet}
 
-	{#snippet children()}
 		{#if !hasData}
 			<div class="text-center py-6">
 				<RefreshCw size={32} class="mx-auto text-charcoal-muted/50 mb-3" />
@@ -321,7 +323,7 @@
 			</div>
 		{:else}
 			<!-- Summary Cards -->
-			<div class="grid grid-cols-2 gap-4 mb-6">
+			<div class="grid grid-cols-2 gap-4">
 				<div class="bg-primary-50 rounded-lg p-4">
 					<p class="text-sm text-charcoal-muted mb-1">Total Monthly</p>
 					<p class="text-2xl font-mono font-medium text-charcoal">
@@ -346,196 +348,193 @@
 				</div>
 			</div>
 
-			<div class="space-y-6">
-				<!-- Active Subscriptions Section -->
-				{#if activeSubscriptions.length > 0}
-					<div>
-						<h4 class="text-sm font-medium text-charcoal-muted mb-3 flex items-center gap-2">
-							<RefreshCw size={14} />
-							Subscriptions
-							<span class="text-xs font-normal">({activeSubscriptions.length})</span>
-						</h4>
+			<!-- Active Subscriptions Section -->
+			{#if activeSubscriptions.length > 0}
+				<div>
+					<h4 class="text-sm font-medium text-charcoal-muted mb-3 flex items-center gap-2">
+						<RefreshCw size={14} />
+						Subscriptions
+						<span class="text-xs font-normal">({activeSubscriptions.length})</span>
+					</h4>
 
-						<div class="space-y-2">
-							<!-- Monthly Subscriptions -->
-							{#each monthlySubscriptions as sub}
-								{@const userAmount = sub.isShared ? sub.amount - sub.partnerShare : sub.amount}
-								<div class="flex items-center gap-3 py-2 px-3 bg-cream rounded-lg">
-									<span class="text-lg">{getCategoryIcon(sub.categoryId)}</span>
-									<div class="flex-1 min-w-0">
+					<div class="space-y-2">
+						<!-- Monthly Subscriptions -->
+						{#each monthlySubscriptions as sub}
+							{@const userAmount = sub.isShared ? sub.amount - sub.partnerShare : sub.amount}
+							<div class="flex items-center gap-3 py-2 px-3 bg-cream rounded-lg">
+								<span class="text-lg">{getCategoryIcon(sub.categoryId)}</span>
+								<div class="flex-1 min-w-0">
+									<p class="text-sm font-medium text-charcoal truncate">{sub.merchant}</p>
+									<p class="text-xs text-charcoal-muted">{getCategoryName(sub.categoryId)}</p>
+								</div>
+								<div class="text-right">
+									<p class="font-mono text-sm font-medium text-charcoal">
+										{formatCurrency(userAmount)}/mo
+									</p>
+									{#if sub.isShared}
+										<p class="text-xs text-success-600">Shared</p>
+									{/if}
+								</div>
+							</div>
+						{/each}
+
+						<!-- Annual Subscriptions -->
+						{#each annualSubscriptions as sub}
+							{@const userAmount = sub.isShared ? sub.amount - sub.partnerShare : sub.amount}
+							{@const monthlyEquiv = userAmount / 12}
+							<div class="flex items-center gap-3 py-2 px-3 bg-cream rounded-lg">
+								<span class="text-lg">{getCategoryIcon(sub.categoryId)}</span>
+								<div class="flex-1 min-w-0">
+									<div class="flex items-center gap-1.5">
 										<p class="text-sm font-medium text-charcoal truncate">{sub.merchant}</p>
-										<p class="text-xs text-charcoal-muted">{getCategoryName(sub.categoryId)}</p>
+										<Calendar size={12} class="text-charcoal-muted flex-shrink-0" />
 									</div>
-									<div class="text-right">
-										<p class="font-mono text-sm font-medium text-charcoal">
-											{formatCurrency(userAmount)}/mo
-										</p>
-										{#if sub.isShared}
-											<p class="text-xs text-success-600">Shared</p>
-										{/if}
-									</div>
+									<p class="text-xs text-charcoal-muted">{getCategoryName(sub.categoryId)}</p>
 								</div>
-							{/each}
-
-							<!-- Annual Subscriptions -->
-							{#each annualSubscriptions as sub}
-								{@const userAmount = sub.isShared ? sub.amount - sub.partnerShare : sub.amount}
-								{@const monthlyEquiv = userAmount / 12}
-								<div class="flex items-center gap-3 py-2 px-3 bg-cream rounded-lg">
-									<span class="text-lg">{getCategoryIcon(sub.categoryId)}</span>
-									<div class="flex-1 min-w-0">
-										<div class="flex items-center gap-1.5">
-											<p class="text-sm font-medium text-charcoal truncate">{sub.merchant}</p>
-											<Calendar size={12} class="text-charcoal-muted flex-shrink-0" />
-										</div>
-										<p class="text-xs text-charcoal-muted">{getCategoryName(sub.categoryId)}</p>
-									</div>
-									<div class="text-right">
-										<p class="font-mono text-sm font-medium text-charcoal">
-											{formatCurrency(userAmount)}/yr
-										</p>
-										<p class="text-xs text-charcoal-muted">
-											~{formatCurrency(monthlyEquiv)}/mo
-										</p>
-									</div>
+								<div class="text-right">
+									<p class="font-mono text-sm font-medium text-charcoal">
+										{formatCurrency(userAmount)}/yr
+									</p>
+									<p class="text-xs text-charcoal-muted">
+										~{formatCurrency(monthlyEquiv)}/mo
+									</p>
 								</div>
-							{/each}
-						</div>
+							</div>
+						{/each}
 					</div>
-				{/if}
+				</div>
+			{/if}
 
-				<!-- Upcoming Annual Renewals -->
-				{#if upcomingRenewals.length > 0}
-					<div>
-						<h4 class="text-sm font-medium text-charcoal-muted mb-3 flex items-center gap-2">
-							<Calendar size={14} />
-							Coming Up
-							<span class="text-xs font-normal">({upcomingRenewals.length})</span>
-						</h4>
+			<!-- Upcoming Annual Renewals -->
+			{#if upcomingRenewals.length > 0}
+				<div>
+					<h4 class="text-sm font-medium text-charcoal-muted mb-3 flex items-center gap-2">
+						<Calendar size={14} />
+						Coming Up
+						<span class="text-xs font-normal">({upcomingRenewals.length})</span>
+					</h4>
 
-						<div class="space-y-2">
-							{#each upcomingRenewals as renewal}
-								<div class="flex items-center gap-3 py-2 px-3 bg-primary-500/5 rounded-lg border border-primary-500/20">
-									<span class="text-lg">{getCategoryIcon(renewal.categoryId)}</span>
-									<div class="flex-1 min-w-0">
-										<p class="text-sm font-medium text-charcoal truncate">{renewal.merchant}</p>
-										<p class="text-xs text-charcoal-muted">
-											Renews ~{renewal.expectedRenewal.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
-										</p>
-									</div>
-									<div class="text-right flex-shrink-0">
-										<p class="font-mono text-sm font-medium text-charcoal">
-											{formatCurrency(renewal.amount)}/yr
-										</p>
-									</div>
+					<div class="space-y-2">
+						{#each upcomingRenewals as renewal}
+							<div class="flex items-center gap-3 py-2 px-3 bg-primary-500/5 rounded-lg border border-primary-500/20">
+								<span class="text-lg">{getCategoryIcon(renewal.categoryId)}</span>
+								<div class="flex-1 min-w-0">
+									<p class="text-sm font-medium text-charcoal truncate">{renewal.merchant}</p>
+									<p class="text-xs text-charcoal-muted">
+										Renews ~{renewal.expectedRenewal.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
+									</p>
 								</div>
-							{/each}
-						</div>
-					</div>
-				{/if}
-
-				<!-- Possibly Inactive Subscriptions -->
-				{#if possiblyInactiveSubscriptions.length > 0}
-					<div>
-						<h4 class="text-sm font-medium text-warning-600 mb-3 flex items-center gap-2">
-							<AlertCircle size={14} />
-							Possibly Inactive
-							<span class="text-xs font-normal">({possiblyInactiveSubscriptions.length})</span>
-						</h4>
-
-						<div class="space-y-2">
-							{#each possiblyInactiveSubscriptions as sub}
-								{@const userAmount = sub.isShared ? sub.amount - sub.partnerShare : sub.amount}
-								<div class="flex items-center gap-3 py-2 px-3 bg-warning-50 rounded-lg border border-warning-200">
-									<span class="text-lg">{getCategoryIcon(sub.categoryId)}</span>
-									<div class="flex-1 min-w-0">
-										<p class="text-sm font-medium text-charcoal truncate">{sub.merchant}</p>
-										<p class="text-xs text-warning-600">
-											No charge since {formatRelativeDate(new Date(sub.date))}
-										</p>
-									</div>
-									<div class="text-right flex-shrink-0">
-										<p class="font-mono text-sm font-medium text-charcoal">
-											{formatCurrency(userAmount)}{sub.subscriptionFrequency === 'annual' ? '/yr' : '/mo'}
-										</p>
-									</div>
-									<div class="flex gap-1 flex-shrink-0">
-										<button
-											onclick={() => handleConfirmActive(sub.merchant)}
-											class="px-2 py-1 text-xs font-medium text-charcoal-soft bg-surface border border-theme rounded hover:bg-surface-hover transition-colors"
-										>
-											Still Active
-										</button>
-										<button
-											onclick={() => handleCancelSubscription(sub.merchant)}
-											class="px-2 py-1 text-xs font-medium text-danger-600 bg-surface border border-danger-200 rounded hover:bg-danger-50 transition-colors"
-										>
-											Cancelled
-										</button>
-									</div>
+								<div class="text-right flex-shrink-0">
+									<p class="font-mono text-sm font-medium text-charcoal">
+										{formatCurrency(renewal.amount)}/yr
+									</p>
 								</div>
-							{/each}
-						</div>
+							</div>
+						{/each}
 					</div>
-				{/if}
+				</div>
+			{/if}
 
-				<!-- Detected Recurring Bills Section -->
-				{#if activeRecurring.length > 0}
-					<div>
-						<h4 class="text-sm font-medium text-charcoal-muted mb-3 flex items-center gap-2">
-							<Zap size={14} />
-							Detected Bills
-							<span class="text-xs font-normal">({activeRecurring.length})</span>
-						</h4>
+			<!-- Possibly Inactive Subscriptions -->
+			{#if possiblyInactiveSubscriptions.length > 0}
+				<div>
+					<h4 class="text-sm font-medium text-warning-600 mb-3 flex items-center gap-2">
+						<AlertCircle size={14} />
+						Possibly Inactive
+						<span class="text-xs font-normal">({possiblyInactiveSubscriptions.length})</span>
+					</h4>
 
-						<div class="space-y-2">
-							{#each activeRecurring as item (item.merchant)}
-								{@const freqLabel = item.frequency === 'monthly' ? '/mo' : item.frequency === 'semi-annual' ? '/6mo' : '/yr'}
-								{@const freqDesc = item.frequency === 'monthly' ? 'monthly' : item.frequency === 'semi-annual' ? 'every 6 months' : 'annually'}
-								<div class="flex items-center gap-3 py-2 px-3 bg-cream/50 rounded-lg group">
-									<span class="text-lg">{getCategoryIcon(item.categoryId)}</span>
-									<div class="flex-1 min-w-0">
-										<p class="text-sm font-medium text-charcoal truncate">{item.merchant}</p>
-										<p class="text-xs text-charcoal-muted">
-											{getCategoryName(item.categoryId)}
-											<span class="mx-1">·</span>
-											{freqDesc}
-											{#if item.amountType === 'variable'}
-												<span class="mx-1">·</span>
-												<span class="text-warning-600">varies</span>
-											{/if}
-										</p>
-									</div>
-									<div class="text-right flex-shrink-0">
-										<p class="font-mono text-sm font-medium text-charcoal">
-											~{formatCurrency(item.averageUserAmount)}{freqLabel}
-										</p>
-										{#if item.isShared}
-											<p class="text-xs text-success-600">Shared</p>
-										{:else}
-											<p class="text-xs text-charcoal-muted">
-												{item.occurrenceCount}x
-											</p>
-										{/if}
-									</div>
+					<div class="space-y-2">
+						{#each possiblyInactiveSubscriptions as sub}
+							{@const userAmount = sub.isShared ? sub.amount - sub.partnerShare : sub.amount}
+							<div class="flex items-center gap-3 py-2 px-3 bg-warning-50 rounded-lg border border-warning-200">
+								<span class="text-lg">{getCategoryIcon(sub.categoryId)}</span>
+								<div class="flex-1 min-w-0">
+									<p class="text-sm font-medium text-charcoal truncate">{sub.merchant}</p>
+									<p class="text-xs text-warning-600">
+										No charge since {formatRelativeDate(new Date(sub.date))}
+									</p>
+								</div>
+								<div class="text-right flex-shrink-0">
+									<p class="font-mono text-sm font-medium text-charcoal">
+										{formatCurrency(userAmount)}{sub.subscriptionFrequency === 'annual' ? '/yr' : '/mo'}
+									</p>
+								</div>
+								<div class="flex gap-1 flex-shrink-0">
 									<button
-										onclick={() => handleDismiss(item.merchant)}
-										class="p-1.5 text-charcoal-muted/0 group-hover:text-charcoal-muted hover:!text-danger-500 hover:bg-danger-50 rounded-lg transition-colors flex-shrink-0"
-										aria-label="Dismiss recurring expense"
-										title="Remove from recurring"
+										onclick={() => handleConfirmActive(sub.merchant)}
+										class="px-2 py-1 text-xs font-medium text-charcoal-soft bg-surface border border-theme rounded hover:bg-surface-hover transition-colors"
 									>
-										<X size={14} />
+										Still Active
+									</button>
+									<button
+										onclick={() => handleCancelSubscription(sub.merchant)}
+										class="px-2 py-1 text-xs font-medium text-danger-600 bg-surface border border-danger-200 rounded hover:bg-danger-50 transition-colors"
+									>
+										Cancelled
 									</button>
 								</div>
-							{/each}
-						</div>
+							</div>
+						{/each}
 					</div>
-				{/if}
+				</div>
+			{/if}
 
-			</div>
+			<!-- Detected Recurring Bills Section -->
+			{#if activeRecurring.length > 0}
+				<div>
+					<h4 class="text-sm font-medium text-charcoal-muted mb-3 flex items-center gap-2">
+						<Zap size={14} />
+						Detected Bills
+						<span class="text-xs font-normal">({activeRecurring.length})</span>
+					</h4>
+
+					<div class="space-y-2">
+						{#each activeRecurring as item (item.merchant)}
+							{@const freqLabel = item.frequency === 'monthly' ? '/mo' : item.frequency === 'semi-annual' ? '/6mo' : '/yr'}
+							{@const freqDesc = item.frequency === 'monthly' ? 'monthly' : item.frequency === 'semi-annual' ? 'every 6 months' : 'annually'}
+							<div class="flex items-center gap-3 py-2 px-3 bg-cream/50 rounded-lg group">
+								<span class="text-lg">{getCategoryIcon(item.categoryId)}</span>
+								<div class="flex-1 min-w-0">
+									<p class="text-sm font-medium text-charcoal truncate">{item.merchant}</p>
+									<p class="text-xs text-charcoal-muted">
+										{getCategoryName(item.categoryId)}
+										<span class="mx-1">·</span>
+										{freqDesc}
+										{#if item.amountType === 'variable'}
+											<span class="mx-1">·</span>
+											<span class="text-warning-600">varies</span>
+										{/if}
+									</p>
+								</div>
+								<div class="text-right flex-shrink-0">
+									<p class="font-mono text-sm font-medium text-charcoal">
+										~{formatCurrency(item.averageUserAmount)}{freqLabel}
+									</p>
+									{#if item.isShared}
+										<p class="text-xs text-success-600">Shared</p>
+									{:else}
+										<p class="text-xs text-charcoal-muted">
+											{item.occurrenceCount}x
+										</p>
+									{/if}
+								</div>
+								<button
+									onclick={() => handleDismiss(item.merchant)}
+									class="p-1.5 text-charcoal-muted/0 group-hover:text-charcoal-muted hover:!text-danger-500 hover:bg-danger-50 rounded-lg transition-colors flex-shrink-0"
+									aria-label="Dismiss recurring expense"
+									title="Remove from recurring"
+								>
+									<X size={14} />
+								</button>
+							</div>
+						{/each}
+					</div>
+				</div>
+			{/if}
 		{/if}
-	{/snippet}
-</InsightGroup>
+	</div>
+</div>
 
 <!-- Confirm Dialog for dismissing recurring bills -->
 <ConfirmDialog

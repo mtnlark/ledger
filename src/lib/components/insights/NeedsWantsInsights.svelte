@@ -3,7 +3,6 @@
 	import { goto } from '$app/navigation';
 	import { formatCurrencyWhole } from '$lib/utils/format-helpers';
 	import { getInsightsEngine } from '$lib/insights';
-	import InsightGroup from './InsightGroup.svelte';
 	import NeedsWantsTrendChart from './NeedsWantsTrendChart.svelte';
 
 	interface Props {
@@ -49,8 +48,13 @@
 	});
 </script>
 
-<InsightGroup title="Needs vs Wants" description="Essential vs discretionary spending">
-	{#snippet preview()}
+<div class="bg-surface rounded-xl shadow-md shadow-[var(--color-shadow)] overflow-hidden">
+	<div class="px-6 py-4">
+		<h2 class="font-display text-xl font-medium text-charcoal">Needs vs Wants</h2>
+		<p class="text-sm text-charcoal-muted mt-0.5">Essential vs discretionary spending</p>
+	</div>
+	<div class="px-6 pb-6 space-y-6">
+		<!-- Needs/Wants percentage row -->
 		{#if currentMonthStats.total === 0}
 			<p class="text-charcoal-muted text-sm">No spending data this month</p>
 		{:else}
@@ -70,9 +74,7 @@
 				</div>
 			</div>
 		{/if}
-	{/snippet}
 
-	{#snippet children()}
 		{#if currentMonthStats.total === 0}
 			<div class="text-center py-6">
 				<p class="text-charcoal-soft font-medium">No spending data</p>
@@ -88,7 +90,7 @@
 			</div>
 		{:else}
 			<!-- Visual Bar -->
-			<div class="mb-6">
+			<div>
 				<div class="h-8 rounded-full overflow-hidden flex">
 					<div
 						class="bg-primary-500 transition-all duration-500"
@@ -116,7 +118,7 @@
 			</div>
 
 			<!-- Stats Grid -->
-			<div class="grid grid-cols-2 gap-4 mb-6">
+			<div class="grid grid-cols-2 gap-4">
 				<div class="bg-primary-50 rounded-lg p-4">
 					<p class="text-sm text-charcoal-muted mb-1">This Month - Needs</p>
 					<p class="text-2xl font-mono font-medium text-charcoal">
@@ -178,7 +180,7 @@
 
 			<!-- All-time comparison -->
 			{#if allTransactions.length > transactions.length}
-				<div class="mt-6 pt-4 border-t border-dashed border-theme">
+				<div class="pt-4 border-t border-dashed border-theme">
 					<h4 class="text-sm font-medium text-charcoal-muted mb-2">All-Time Average</h4>
 					<div class="flex items-center gap-4 text-sm">
 						<span class="text-charcoal-soft">
@@ -194,11 +196,11 @@
 
 			<!-- Needs vs Wants Trend -->
 			{#if allTransactions.length > 0}
-				<div class="mt-6 pt-4 border-t border-dashed border-theme">
+				<div class="pt-4 border-t border-dashed border-theme">
 					<h4 class="text-sm font-medium text-charcoal-muted mb-3">Trend Over Time</h4>
 					<NeedsWantsTrendChart {allTransactions} {categories} />
 				</div>
 			{/if}
 		{/if}
-	{/snippet}
-</InsightGroup>
+	</div>
+</div>
