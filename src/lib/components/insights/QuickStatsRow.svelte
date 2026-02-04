@@ -80,7 +80,7 @@
 				{budgetStatus.onTrack}/{budgetStatus.total}
 			</p>
 			<p class="text-xs text-charcoal-muted mt-1">
-				{isCurrentMonth ? 'on track' : 'within budget'}
+				budget {budgetStatus.total === 1 ? 'category' : 'categories'} {isCurrentMonth ? 'on track' : 'within budget'}
 			</p>
 		{:else}
 			<p class="font-mono text-xl font-medium text-charcoal-muted">—</p>
