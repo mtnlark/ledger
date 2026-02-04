@@ -22,9 +22,10 @@
 		selectionMode?: boolean;
 		onSelectionModeChange?: (mode: boolean) => void;
 		onTagClick?: (tag: string) => void;
+		allTransactions?: Transaction[];
 	}
 
-	let { transactions, categories, settings, onEdit, onDelete, onBulkDelete, onBulkCategoryChange, onAddTransaction, selectionMode = false, onSelectionModeChange, onTagClick }: Props = $props();
+	let { transactions, categories, settings, onEdit, onDelete, onBulkDelete, onBulkCategoryChange, onAddTransaction, selectionMode = false, onSelectionModeChange, onTagClick, allTransactions }: Props = $props();
 
 	// Selection mode state - use prop if provided, otherwise internal state
 	let internalSelectionMode = $state(false);
@@ -231,7 +232,7 @@
 											<p class="text-xs text-charcoal-muted/70 italic truncate mr-1">{cleanNotes}</p>
 										{/if}
 										{#each tags as tag (tag)}
-											<TagPill {tag} onClick={onTagClick} />
+											<TagPill {tag} onClick={onTagClick} transactions={allTransactions ?? []} />
 										{/each}
 									</div>
 								{/if}

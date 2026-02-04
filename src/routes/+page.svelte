@@ -534,6 +534,7 @@
 					transactions={filteredTransactions}
 					{categories}
 					{settings}
+					{allTransactions}
 					onEdit={handleEdit}
 					onDelete={handleDelete}
 					onBulkDelete={handleBulkDelete}
