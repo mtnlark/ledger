@@ -7,7 +7,6 @@
 	import { calculateVelocityComparison } from '$lib/insights/calculations/velocity';
 	import { formatCurrency } from '$lib/utils/format-helpers';
 	import { roundCurrency } from '$lib/utils/currency';
-	import MonthlyTrendsChart from '../MonthlyTrendsChart.svelte';
 
 	interface Props {
 		currentMonth: string;
@@ -180,7 +179,7 @@
 							than last month
 						</p>
 						<p class="text-sm text-charcoal-muted mt-0.5">
-							${velocityComparison.currentDailyAvg.toFixed(0)}/day vs ${velocityComparison.prevDailyAvg.toFixed(0)}/day last month
+							${velocityComparison.currentDailyAvg.toFixed(0)}/day vs. ${velocityComparison.prevDailyAvg.toFixed(0)}/day last month
 						</p>
 					</div>
 				</div>
@@ -192,67 +191,74 @@
 			</div>
 		{/if}
 
-		<!-- Monthly Spending Trends -->
-		{#if monthlyTrends.size > 0}
-			<MonthlyTrendsChart monthlyData={monthlyTrends} />
-		{/if}
-
 		<!-- Top Merchants -->
 		{#if topMerchants.length > 0}
 			{@const maxMerchant = topMerchants[0]?.amount || 1}
 			<div>
 				<h3 class="text-sm font-medium text-charcoal-soft mb-3">Top Merchants</h3>
-				<div class="space-y-2">
+				<div class="rounded-lg border border-theme overflow-hidden divide-y divide-theme">
 					{#each topMerchants as { merchant, amount }, i}
-						<div class="flex items-center gap-3">
-							<span class="text-xs text-charcoal-muted w-5 text-right font-mono">{i + 1}</span>
-							<div class="flex-1 min-w-0">
-								<div class="flex items-center justify-between mb-1">
-									<span class="text-sm text-charcoal truncate">{merchant}</span>
-									<span class="font-mono text-sm text-charcoal-soft ml-2 shrink-0">{formatCurrency(amount)}</span>
-								</div>
-								<div class="h-1.5 bg-surface-alt rounded-full overflow-hidden">
-									<div
-										class="h-full bg-primary-400 rounded-full transition-all duration-500"
-										style="width: {(amount / maxMerchant) * 100}%"
-									></div>
-								</div>
-							</div>
+						{@const pct = (amount / maxMerchant) * 100}
+						<div class="relative flex items-center px-4 py-3 bg-surface">
+							<!-- Fill bar background -->
+							<div
+								class="absolute inset-y-0 left-0 bg-primary-500/[0.06] transition-all duration-500"
+								style="width: {pct}%"
+							></div>
+							<!-- Rank -->
+							<span
+								class="relative z-10 w-6 h-6 rounded-full flex items-center justify-center text-xs font-mono shrink-0
+									{i === 0 ? 'bg-primary-500 text-white font-medium' : 'bg-surface-alt text-charcoal-muted'}"
+							>
+								{i + 1}
+							</span>
+							<!-- Name -->
+							<span class="relative z-10 text-sm text-charcoal truncate ml-3 flex-1">{merchant}</span>
+							<!-- Ledger dot leader -->
+							<span class="ledger-line relative z-10"></span>
+							<!-- Amount -->
+							<span class="relative z-10 font-mono text-sm font-medium text-charcoal shrink-0">{formatCurrency(amount)}</span>
 						</div>
 					{/each}
 				</div>
 			</div>
 		{/if}
 
-		<!-- Shared vs Personal -->
+		<!-- Personal vs. Shared -->
 		{#if sharedBreakdown.hasShared}
 			{@const personalPercent = totalSpent > 0 ? Math.round((sharedBreakdown.personal / totalSpent) * 100) : 0}
 			{@const sharedPercent = 100 - personalPercent}
 			<div>
-				<h3 class="text-sm font-medium text-charcoal-soft mb-3">Personal vs Shared</h3>
-				<div class="h-3 rounded-full overflow-hidden flex mb-3">
-					<div
-						class="bg-charcoal/70 transition-all duration-500"
-						style="width: {personalPercent}%"
-					></div>
-					<div
-						class="bg-primary-400 transition-all duration-500"
-						style="width: {sharedPercent}%"
-					></div>
-				</div>
-				<div class="grid grid-cols-2 gap-4">
-					<div class="flex items-center gap-2">
-						<div class="w-3 h-3 rounded bg-charcoal/70 shrink-0"></div>
-						<div>
-							<p class="font-mono text-sm font-medium text-charcoal">{formatCurrency(sharedBreakdown.personal)}</p>
-							<p class="text-xs text-charcoal-muted">Personal</p>
-						</div>
+				<h3 class="text-sm font-medium text-charcoal-soft mb-3">Personal vs. Shared</h3>
+				<div class="rounded-lg border border-theme overflow-hidden bg-surface">
+					<!-- Proportional bar -->
+					<div class="h-2 flex">
+						<div
+							class="bg-charcoal/60 transition-all duration-500"
+							style="width: {personalPercent}%"
+						></div>
+						<div
+							class="bg-primary-400 transition-all duration-500"
+							style="width: {sharedPercent}%"
+						></div>
 					</div>
-					<div class="flex items-center gap-2">
-						<div class="w-3 h-3 rounded bg-primary-400 shrink-0"></div>
-						<div>
-							<p class="font-mono text-sm font-medium text-charcoal">{formatCurrency(sharedBreakdown.shared)}</p>
-							<p class="text-xs text-charcoal-muted">Your portion of shared</p>
+					<!-- Stats -->
+					<div class="grid grid-cols-2 divide-x divide-theme">
+						<div class="px-4 py-3">
+							<div class="flex items-center gap-2 mb-1">
+								<div class="w-2.5 h-2.5 rounded-sm bg-charcoal/60 shrink-0"></div>
+								<span class="text-xs text-charcoal-muted uppercase tracking-wide">Personal</span>
+							</div>
+							<p class="font-mono text-lg font-medium text-charcoal">{formatCurrency(sharedBreakdown.personal)}</p>
+							<p class="text-xs text-charcoal-muted mt-0.5">{personalPercent}% of spending</p>
+						</div>
+						<div class="px-4 py-3">
+							<div class="flex items-center gap-2 mb-1">
+								<div class="w-2.5 h-2.5 rounded-sm bg-primary-400 shrink-0"></div>
+								<span class="text-xs text-charcoal-muted uppercase tracking-wide">Shared</span>
+							</div>
+							<p class="font-mono text-lg font-medium text-charcoal">{formatCurrency(sharedBreakdown.shared)}</p>
+							<p class="text-xs text-charcoal-muted mt-0.5">{sharedPercent}% · your portion</p>
 						</div>
 					</div>
 				</div>
