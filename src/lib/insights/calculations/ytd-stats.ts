@@ -82,6 +82,24 @@ export function computeYTDStats(allTransactions: Transaction[], year?: number): 
 		}
 	}
 
+	// Smallest spending month (only if multiple months exist)
+	let smallestMonth: { label: string; amount: number } | null = null;
+	if (monthlySpending.size > 1) {
+		let min = { month: '', amount: Infinity };
+		for (const [month, amount] of monthlySpending) {
+			if (amount < min.amount) {
+				min = { month, amount };
+			}
+		}
+		if (min.month) {
+			const [, monthNum] = min.month.split('-').map(Number);
+			const monthName = new Date(currentYear, monthNum - 1).toLocaleString('default', {
+				month: 'long'
+			});
+			smallestMonth = { label: monthName, amount: min.amount };
+		}
+	}
+
 	// Most frequent merchant (no minimum threshold for YTD)
 	const freq = new Map<string, number>();
 	for (const t of ytdTransactions) {
@@ -106,6 +124,7 @@ export function computeYTDStats(allTransactions: Transaction[], year?: number): 
 		daysInYearSoFar,
 		dailyAvg,
 		biggestMonth,
+		smallestMonth,
 		topMerchant,
 		dailySpending
 	};

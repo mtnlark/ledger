@@ -25,6 +25,7 @@
 	let dailySpending = $derived(ytdStats.dailySpending);
 	let dailyAvg = $derived(ytdStats.dailyAvg);
 	let biggestMonth = $derived(ytdStats.biggestMonth);
+	let smallestMonth = $derived(ytdStats.smallestMonth);
 	let topMerchant = $derived(ytdStats.topMerchant);
 
 	// Recent 30 days for mini heatmap (UI-only, not worth memoizing in engine)
@@ -110,6 +111,22 @@
 					</div>
 				{/if}
 			</div>
+
+			<!-- Best/Worst Months -->
+			{#if biggestMonth && smallestMonth}
+				<div class="grid grid-cols-2 gap-4">
+					<div class="bg-success-500/10 rounded-lg p-4 border border-success-500/20">
+						<p class="text-xs text-success-700 font-medium mb-1">Lowest</p>
+						<p class="font-mono text-lg font-medium text-charcoal">{formatCurrencyWhole(smallestMonth.amount)}</p>
+						<p class="text-sm text-charcoal-muted">{smallestMonth.label}</p>
+					</div>
+					<div class="bg-warning-500/10 rounded-lg p-4 border border-warning-500/20">
+						<p class="text-xs text-warning-700 font-medium mb-1">Highest</p>
+						<p class="font-mono text-lg font-medium text-charcoal">{formatCurrencyWhole(biggestMonth.amount)}</p>
+						<p class="text-sm text-charcoal-muted">{biggestMonth.label}</p>
+					</div>
+				</div>
+			{/if}
 
 			<!-- Goals Completed This Year -->
 			{#if goalsCompletedThisYear > 0}

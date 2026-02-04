@@ -121,6 +121,45 @@ describe('computeYTDStats', () => {
 		expect(result.dailySpending.get('2025-03-16')).toBe(25);
 	});
 
+	it('returns smallestMonth with correct data', () => {
+		const txs = [
+			makeTx({ date: new Date(2025, 0, 15, 12), amount: 500 }),
+			makeTx({ date: new Date(2025, 0, 20, 12), amount: 300 }),
+			makeTx({ date: new Date(2025, 1, 10, 12), amount: 200 })
+		];
+
+		const result = computeYTDStats(txs, 2025);
+
+		// January = $800, February = $200
+		expect(result.smallestMonth).not.toBeNull();
+		expect(result.smallestMonth!.label).toBe('February');
+		expect(result.smallestMonth!.amount).toBe(200);
+	});
+
+	it('returns null smallestMonth when no transactions', () => {
+		const result = computeYTDStats([], 2025);
+		expect(result.smallestMonth).toBeNull();
+	});
+
+	it('returns different biggest and smallest months', () => {
+		const txs = [
+			makeTx({ date: new Date(2025, 0, 15, 12), amount: 1000 }),
+			makeTx({ date: new Date(2025, 1, 10, 12), amount: 200 })
+		];
+
+		const result = computeYTDStats(txs, 2025);
+		expect(result.biggestMonth!.label).toBe('January');
+		expect(result.smallestMonth!.label).toBe('February');
+	});
+
+	it('returns null smallestMonth with only one month of transactions', () => {
+		const txs = [makeTx({ date: new Date(2025, 0, 15, 12), amount: 100 })];
+
+		const result = computeYTDStats(txs, 2025);
+		// With only one month, smallest should be null
+		expect(result.smallestMonth).toBeNull();
+	});
+
 	it('excludes future-dated transactions from spend days count', () => {
 		// System time is March 20, 2025
 		// Transaction on March 15 (past) and March 25 (future)

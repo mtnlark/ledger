@@ -82,6 +82,7 @@ export interface YTDStatsResult {
 	daysInYearSoFar: number;
 	dailyAvg: number;
 	biggestMonth: { label: string; amount: number } | null;
+	smallestMonth: { label: string; amount: number } | null;
 	topMerchant: { merchant: string; count: number } | null;
 	dailySpending: Map<string, number>;
 }
