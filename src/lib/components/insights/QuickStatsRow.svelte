@@ -4,6 +4,7 @@
 	import type { CategoryBudget } from '$lib/db';
 	import { sumCurrency, calculatePercent, roundCurrency } from '$lib/utils/currency';
 	import { formatCurrencyWhole } from '$lib/utils/format-helpers';
+	import { getBudgetStatus } from '$lib/utils/budget-status';
 
 	interface Props {
 		transactions: Transaction[];
@@ -26,14 +27,15 @@
 	);
 
 	// Budget Status: count how many budgeted categories are within budget
+	// Uses getBudgetStatus() to match the Budget page's tolerance logic
 	let budgetStatus = $derived.by(() => {
 		if (categoryBudgets.length === 0) return null;
 
-		// Sum spending per category (user's portion)
+		// Sum spending per category (user's portion) — raw float, matching getAllCategorySpending
 		const spending = new Map<number, number>();
 		for (const t of transactions) {
 			const userAmount = t.isShared ? t.amount - t.partnerShare : t.amount;
-			spending.set(t.categoryId, roundCurrency((spending.get(t.categoryId) || 0) + userAmount));
+			spending.set(t.categoryId, (spending.get(t.categoryId) || 0) + userAmount);
 		}
 
 		let onTrack = 0;
@@ -43,7 +45,8 @@
 			if (cb.budgetAmount <= 0) continue;
 			total++;
 			const spent = spending.get(cb.categoryId) || 0;
-			if (spent <= cb.budgetAmount) {
+			const status = getBudgetStatus(spent, cb.budgetAmount);
+			if (status.status !== 'over') {
 				onTrack++;
 			}
 		}
