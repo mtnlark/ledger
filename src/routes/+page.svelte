@@ -493,6 +493,7 @@
 				totalCount={transactions.length}
 				allTimeCount={allTransactions.length}
 				onSearchInputRef={setSearchInputRef}
+				{allTransactions}
 			/>
 
 			<!-- Transaction List -->

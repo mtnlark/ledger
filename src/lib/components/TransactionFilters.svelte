@@ -1,8 +1,11 @@
 <script lang="ts">
 	import { Search, Filter, X, ChevronDown, ChevronUp, Globe } from 'lucide-svelte';
 	import { slide } from 'svelte/transition';
-	import type { Category } from '$lib/db';
+	import type { Category, Transaction } from '$lib/db';
 	import { tagIndex } from '$lib/stores/tags.svelte';
+	import { renameTag, deleteTag } from '$lib/stores/transactions';
+	import { calculateTagTotal } from '$lib/utils/tags';
+	import { formatCurrency } from '$lib/utils/format-helpers';
 
 	export interface FilterState {
 		searchQuery: string;
@@ -21,9 +24,10 @@
 		totalCount?: number;
 		allTimeCount?: number;
 		onSearchInputRef?: (el: HTMLInputElement | null) => void;
+		allTransactions?: Transaction[];
 	}
 
-	let { categories, filters, onFilterChange, resultCount, totalCount, allTimeCount, onSearchInputRef }: Props = $props();
+	let { categories, filters, onFilterChange, resultCount, totalCount, allTimeCount, onSearchInputRef, allTransactions = [] }: Props = $props();
 
 	let searchInput = $state<HTMLInputElement | null>(null);
 
@@ -34,6 +38,11 @@
 
 	// Local UI state
 	let showAdvanced = $state(false);
+	let showManageTags = $state(false);
+	let editingTag = $state<string | null>(null);
+	let editValue = $state('');
+	let confirmingDelete = $state<string | null>(null);
+	let isProcessing = $state(false);
 
 	// Available tags for filtering
 	let availableTags = $derived(tagIndex.getAllTags());
@@ -95,6 +104,48 @@
 
 	function clearSearch() {
 		onFilterChange({ ...filters, searchQuery: '' });
+	}
+
+	async function handleRename(oldTag: string): Promise<void> {
+		const newTag = editValue.trim().toLowerCase();
+		if (!newTag || newTag === oldTag || !/^[a-zA-Z0-9][a-zA-Z0-9-]*$/.test(newTag)) {
+			editingTag = null;
+			return;
+		}
+		isProcessing = true;
+		try {
+			await renameTag(oldTag, newTag);
+		} finally {
+			editingTag = null;
+			isProcessing = false;
+		}
+	}
+
+	async function handleDelete(tag: string): Promise<void> {
+		isProcessing = true;
+		try {
+			await deleteTag(tag);
+			if (filters.tags.includes(tag)) {
+				onFilterChange({ ...filters, tags: filters.tags.filter(t => t !== tag) });
+			}
+		} finally {
+			confirmingDelete = null;
+			isProcessing = false;
+		}
+	}
+
+	function startEdit(tag: string): void {
+		editingTag = tag;
+		editValue = tag;
+	}
+
+	function handleEditKeydown(e: KeyboardEvent, tag: string): void {
+		if (e.key === 'Enter') {
+			e.preventDefault();
+			handleRename(tag);
+		} else if (e.key === 'Escape') {
+			editingTag = null;
+		}
 	}
 </script>
 
@@ -179,28 +230,110 @@
 
 			<!-- Tag Filter -->
 			<div>
-				<label for="tag-filter" class="block text-xs font-medium text-charcoal-muted mb-1">Tags</label>
-				<select
-					id="tag-filter"
-					value=""
-					onchange={(e) => {
-						const tag = e.currentTarget.value;
-						if (tag && !filters.tags.includes(tag)) {
-							onFilterChange({ ...filters, tags: [...filters.tags, tag] });
-						}
-						e.currentTarget.value = '';
-					}}
-					class="w-full px-3 py-2 bg-cream rounded-lg border border-transparent focus:border-primary-300 focus:ring-2 focus:ring-primary-100 focus:bg-surface transition-all text-charcoal"
-				>
-					<option value="">Add tag filter...</option>
-					{#each availableTags as tag (tag)}
-						{#if !filters.tags.includes(tag)}
-							<option value={tag}>
-								{tag} ({tagIndex.getTransactionCountForTag(tag)})
-							</option>
-						{/if}
-					{/each}
-				</select>
+				<div class="flex items-center justify-between mb-1">
+					<label for="tag-filter" class="block text-xs font-medium text-charcoal-muted">Tags</label>
+					{#if availableTags.length > 0 && !showManageTags}
+						<button
+							type="button"
+							onclick={() => showManageTags = true}
+							class="text-xs text-primary-600 hover:text-primary-700 font-medium transition-colors"
+						>
+							Manage tags
+						</button>
+					{/if}
+				</div>
+
+				{#if showManageTags}
+					<!-- Manage Tags Section -->
+					<div class="space-y-1">
+						<div class="flex items-center justify-between mb-2">
+							<span class="text-xs font-medium text-charcoal-muted">Manage Tags</span>
+							<button
+								type="button"
+								onclick={() => { showManageTags = false; editingTag = null; confirmingDelete = null; }}
+								class="text-xs text-primary-600 hover:text-primary-700 font-medium transition-colors"
+							>
+								Done
+							</button>
+						</div>
+						{#each availableTags as tag (tag)}
+							<div class="flex items-center gap-2 py-1.5 px-2 rounded-lg hover:bg-cream/50 group">
+								{#if editingTag === tag}
+									<input
+										type="text"
+										bind:value={editValue}
+										onblur={() => handleRename(tag)}
+										onkeydown={(e) => handleEditKeydown(e, tag)}
+										disabled={isProcessing}
+										class="flex-1 px-2 py-1 text-sm bg-surface border border-primary-300 rounded focus:ring-2 focus:ring-primary-100 focus:outline-none"
+									/>
+								{:else if confirmingDelete === tag}
+									<span class="flex-1 text-sm text-charcoal">
+										Remove from {tagIndex.getTransactionCountForTag(tag)} transactions?
+									</span>
+									<button
+										type="button"
+										onclick={() => handleDelete(tag)}
+										disabled={isProcessing}
+										class="text-xs text-danger-600 hover:text-danger-700 font-medium"
+									>
+										Confirm
+									</button>
+									<button
+										type="button"
+										onclick={() => confirmingDelete = null}
+										class="text-xs text-charcoal-muted hover:text-charcoal font-medium"
+									>
+										Cancel
+									</button>
+								{:else}
+									<button
+										type="button"
+										onclick={() => startEdit(tag)}
+										class="flex-1 text-left text-sm text-charcoal hover:text-primary-600 transition-colors"
+										title="Click to rename"
+									>
+										{tag}
+									</button>
+									<span class="text-xs text-charcoal-muted font-mono">
+										{tagIndex.getTransactionCountForTag(tag)} txns · {formatCurrency(calculateTagTotal(allTransactions, tag))}
+									</span>
+									<button
+										type="button"
+										onclick={() => confirmingDelete = tag}
+										class="opacity-0 group-hover:opacity-100 text-charcoal-muted hover:text-danger-500 transition-all"
+										title="Delete tag"
+									>
+										<X size={14} />
+									</button>
+								{/if}
+							</div>
+						{/each}
+					</div>
+				{:else}
+					<!-- Normal Tag Selection -->
+					<select
+						id="tag-filter"
+						value=""
+						onchange={(e) => {
+							const tag = e.currentTarget.value;
+							if (tag && !filters.tags.includes(tag)) {
+								onFilterChange({ ...filters, tags: [...filters.tags, tag] });
+							}
+							e.currentTarget.value = '';
+						}}
+						class="w-full px-3 py-2 bg-cream rounded-lg border border-transparent focus:border-primary-300 focus:ring-2 focus:ring-primary-100 focus:bg-surface transition-all text-charcoal"
+					>
+						<option value="">Add tag filter...</option>
+						{#each availableTags as tag (tag)}
+							{#if !filters.tags.includes(tag)}
+								<option value={tag}>
+									{tag} ({tagIndex.getTransactionCountForTag(tag)})
+								</option>
+							{/if}
+						{/each}
+					</select>
+				{/if}
 
 				{#if filters.tags.length > 0}
 					<div class="flex flex-wrap gap-1 mt-2">
