@@ -31,7 +31,12 @@ describe('Storage Types', () => {
 					cancelledSubscriptions: [],
 					confirmedActiveSubscriptions: [],
 					iCloudBackupEnabled: false,
-					completedGoals: []
+					completedGoals: [],
+					notificationsEnabled: false,
+					dailyReminderEnabled: true,
+					dailyReminderTime: '20:00',
+					weeklyReviewEnabled: true,
+					monthlyBudgetSetupEnabled: true
 				}
 			};
 
@@ -58,7 +63,12 @@ describe('Storage Types', () => {
 					cancelledSubscriptions: [],
 					confirmedActiveSubscriptions: [],
 					iCloudBackupEnabled: false,
-					completedGoals: []
+					completedGoals: [],
+					notificationsEnabled: false,
+					dailyReminderEnabled: true,
+					dailyReminderTime: '20:00',
+					weeklyReviewEnabled: true,
+					monthlyBudgetSetupEnabled: true
 				}
 			};
 
@@ -88,7 +98,12 @@ describe('Storage Types', () => {
 						cancelledSubscriptions: [],
 						confirmedActiveSubscriptions: [],
 						iCloudBackupEnabled: false,
-						completedGoals: []
+						completedGoals: [],
+						notificationsEnabled: false,
+						dailyReminderEnabled: true,
+						dailyReminderTime: '20:00',
+						weeklyReviewEnabled: true,
+						monthlyBudgetSetupEnabled: true
 					}
 				}
 			};
@@ -140,7 +155,12 @@ describe('Storage Types', () => {
 						cancelledSubscriptions: [],
 						confirmedActiveSubscriptions: [],
 						iCloudBackupEnabled: false,
-						completedGoals: []
+						completedGoals: [],
+						notificationsEnabled: false,
+						dailyReminderEnabled: true,
+						dailyReminderTime: '20:00',
+						weeklyReviewEnabled: true,
+						monthlyBudgetSetupEnabled: true
 					}
 				}
 			};
@@ -174,7 +194,12 @@ describe('Storage Types', () => {
 						cancelledSubscriptions: [],
 						confirmedActiveSubscriptions: [],
 						iCloudBackupEnabled: false,
-						completedGoals: []
+						completedGoals: [],
+						notificationsEnabled: false,
+						dailyReminderEnabled: true,
+						dailyReminderTime: '20:00',
+						weeklyReviewEnabled: true,
+						monthlyBudgetSetupEnabled: true
 					}
 				},
 				backupName: 'data-2026-01-14T10-30-00-000Z.json'

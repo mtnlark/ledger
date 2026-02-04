@@ -143,6 +143,11 @@ export interface Settings {
 	iCloudBackupEnabled: boolean; // Whether to copy backups to iCloud Drive
 	lastAutoSuggestedMonth?: string; // "YYYY-MM" format - tracks when recurring suggestions were last shown
 	completedGoals: CompletedGoal[]; // Archived savings goals that have been completed
+	notificationsEnabled: boolean; // Master toggle for all notifications (opt-in)
+	dailyReminderEnabled: boolean; // Whether to send daily expense reminder
+	dailyReminderTime: string; // "HH:MM" 24h format for daily reminder
+	weeklyReviewEnabled: boolean; // Whether to send weekly review prompt (Monday 9am)
+	monthlyBudgetSetupEnabled: boolean; // Whether to send monthly budget setup prompt (1st of month)
 }
 
 // Default categories from your spreadsheets
@@ -193,7 +198,12 @@ export const DEFAULT_SETTINGS: Settings = {
 	cancelledSubscriptions: [],
 	confirmedActiveSubscriptions: [],
 	iCloudBackupEnabled: false,
-	completedGoals: []
+	completedGoals: [],
+	notificationsEnabled: false,
+	dailyReminderEnabled: true,
+	dailyReminderTime: '20:00',
+	weeklyReviewEnabled: true,
+	monthlyBudgetSetupEnabled: true
 };
 
 // Default savings accounts

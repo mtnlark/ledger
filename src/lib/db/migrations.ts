@@ -201,6 +201,23 @@ async function migrateSettingsCompletedGoals(): Promise<void> {
 }
 
 /**
+ * Migration: Add notification settings fields to settings
+ */
+async function migrateSettingsNotifications(): Promise<void> {
+	const settings = await db.settings.get(1);
+	if (settings && (settings as { notificationsEnabled?: boolean }).notificationsEnabled === undefined) {
+		await db.settings.update(1, {
+			notificationsEnabled: false,
+			dailyReminderEnabled: true,
+			dailyReminderTime: '20:00',
+			weeklyReviewEnabled: true,
+			monthlyBudgetSetupEnabled: true
+		});
+		if (import.meta.env.DEV) console.log('Migration: Added notification settings fields');
+	}
+}
+
+/**
  * Run all database migrations
  * Each migration is idempotent and checks if it needs to run
  */
@@ -213,4 +230,5 @@ export async function runMigrations(): Promise<void> {
 	await migrateTransactionDates();
 	await migrateSeedSavingsAccounts();
 	await migrateSettingsCompletedGoals();
+	await migrateSettingsNotifications();
 }

@@ -1,10 +1,11 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { afterNavigate } from '$app/navigation';
-	import { Upload, Download, Database, FileSpreadsheet, Sun, Moon, Monitor, Cloud, CloudOff, Command } from 'lucide-svelte';
+	import { Upload, Download, Database, FileSpreadsheet, Sun, Moon, Monitor, Cloud, CloudOff, Command, Bell, BellOff } from 'lucide-svelte';
 	import { type Settings, type Category, type Transaction, DEFAULT_SETTINGS } from '$lib/db';
 	import { initializeStorage } from '$lib/storage';
-	import { getSettings, updateSettings, updateTheme, updateICloudBackup } from '$lib/stores/settings';
+	import { getSettings, updateSettings, updateTheme, updateICloudBackup, updateNotifications } from '$lib/stores/settings';
+	import { requestNotificationPermission, isNotificationPermissionGranted } from '$lib/notifications';
 	import { isICloudAvailable, getICloudBackupDir } from '$lib/storage/tauri-adapter';
 	import { getTransactionsByMonth, getAvailableMonths } from '$lib/stores/transactions';
 	import { getAllCategories } from '$lib/stores/categories';
@@ -122,6 +123,55 @@
 		} catch (error) {
 			console.error('Failed to update iCloud setting:', error);
 			toast.error('Failed to update iCloud setting');
+		}
+	}
+
+	// Toggle notification master switch
+	async function handleNotificationToggle() {
+		const enabling = !settings.notificationsEnabled;
+
+		if (enabling) {
+			// Request OS permission on first enable
+			const permission = await requestNotificationPermission();
+			if (permission !== 'granted') {
+				toast.error('Notification permission denied. Enable in System Settings > Notifications > Ledger.');
+				return;
+			}
+		}
+
+		try {
+			await updateNotifications(enabling);
+			settings = await getSettings();
+			toast.success(enabling ? 'Notifications enabled' : 'Notifications disabled');
+		} catch (error) {
+			console.error('Failed to update notification setting:', error);
+			toast.error('Failed to update notification setting');
+		}
+	}
+
+	// Update individual notification sub-settings
+	async function handleNotificationSubToggle(
+		field: 'dailyReminderEnabled' | 'weeklyReviewEnabled' | 'monthlyBudgetSetupEnabled',
+	) {
+		try {
+			await updateSettings({ [field]: !settings[field] });
+			settings = await getSettings();
+		} catch (error) {
+			console.error('Failed to update notification setting:', error);
+			toast.error('Failed to update notification setting');
+		}
+	}
+
+	// Update daily reminder time
+	async function handleDailyTimeChange(event: Event) {
+		const input = event.target as HTMLInputElement;
+		if (!input.value) return;
+		try {
+			await updateSettings({ dailyReminderTime: input.value });
+			settings = await getSettings();
+		} catch (error) {
+			console.error('Failed to update reminder time:', error);
+			toast.error('Failed to update reminder time');
 		}
 	}
 
@@ -386,6 +436,109 @@
 							</button>
 						{/each}
 					</div>
+				</div>
+			</div>
+
+			<!-- Notifications -->
+			<div class="bg-surface rounded-xl shadow-md shadow-[var(--color-shadow)] overflow-hidden">
+				<div class="px-6 py-4 border-b border-dashed border-theme-dashed">
+					<h2 class="font-display text-xl font-medium text-charcoal flex items-center gap-2">
+						<Bell size={20} class="text-primary-500" />
+						Notifications
+					</h2>
+					<p class="text-sm text-charcoal-muted mt-1">Get reminders to log expenses and review your budget</p>
+				</div>
+
+				<div class="p-6 space-y-5">
+					<!-- Master Toggle -->
+					<div class="flex items-center justify-between p-4 bg-surface-alt rounded-lg border border-theme">
+						<div class="flex items-center gap-3">
+							{#if settings.notificationsEnabled}
+								<Bell size={20} class="text-primary-500" />
+							{:else}
+								<BellOff size={20} class="text-charcoal-muted" />
+							{/if}
+							<div>
+								<p class="text-sm font-medium text-charcoal">Enable notifications</p>
+								<p class="text-xs text-charcoal-muted">
+									Receive reminders to log expenses and review spending
+								</p>
+							</div>
+						</div>
+						<button
+							type="button"
+							role="switch"
+							aria-checked={settings.notificationsEnabled}
+							aria-label="Toggle notifications"
+							onclick={handleNotificationToggle}
+							class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:ring-offset-2
+								{settings.notificationsEnabled ? 'bg-primary-500' : 'bg-[#C5C0B8]'}"
+						>
+							<span
+								class="inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform
+									{settings.notificationsEnabled ? 'translate-x-6' : 'translate-x-1'}"
+							></span>
+						</button>
+					</div>
+
+					<!-- Sub-options (visible when master toggle is on) -->
+					{#if settings.notificationsEnabled}
+						<div class="space-y-4 pl-2">
+							<!-- Daily Reminder -->
+							<div class="flex items-center justify-between">
+								<div class="flex items-start gap-3">
+									<input
+										type="checkbox"
+										id="daily-reminder"
+										checked={settings.dailyReminderEnabled}
+										onchange={() => handleNotificationSubToggle('dailyReminderEnabled')}
+										class="mt-0.5 text-primary-600 focus:ring-primary-500/20 rounded"
+									/>
+									<label for="daily-reminder" class="cursor-pointer">
+										<p class="text-sm font-medium text-charcoal">Daily expense reminder</p>
+										<p class="text-xs text-charcoal-muted">Reminds you to log expenses if none were added today</p>
+									</label>
+								</div>
+								<input
+									type="time"
+									value={settings.dailyReminderTime}
+									onchange={handleDailyTimeChange}
+									disabled={!settings.dailyReminderEnabled}
+									class="px-2 py-1 bg-surface-alt border border-theme rounded-lg text-sm font-mono text-charcoal-soft focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+								/>
+							</div>
+
+							<!-- Weekly Review -->
+							<div class="flex items-start gap-3">
+								<input
+									type="checkbox"
+									id="weekly-review"
+									checked={settings.weeklyReviewEnabled}
+									onchange={() => handleNotificationSubToggle('weeklyReviewEnabled')}
+									class="mt-0.5 text-primary-600 focus:ring-primary-500/20 rounded"
+								/>
+								<label for="weekly-review" class="cursor-pointer">
+									<p class="text-sm font-medium text-charcoal">Weekly review</p>
+									<p class="text-xs text-charcoal-muted">Every Monday morning</p>
+								</label>
+							</div>
+
+							<!-- Monthly Budget Setup -->
+							<div class="flex items-start gap-3">
+								<input
+									type="checkbox"
+									id="monthly-budget"
+									checked={settings.monthlyBudgetSetupEnabled}
+									onchange={() => handleNotificationSubToggle('monthlyBudgetSetupEnabled')}
+									class="mt-0.5 text-primary-600 focus:ring-primary-500/20 rounded"
+								/>
+								<label for="monthly-budget" class="cursor-pointer">
+									<p class="text-sm font-medium text-charcoal">Monthly budget setup</p>
+									<p class="text-xs text-charcoal-muted">1st of each month</p>
+								</label>
+							</div>
+						</div>
+					{/if}
 				</div>
 			</div>
 

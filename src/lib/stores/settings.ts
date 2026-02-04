@@ -85,6 +85,12 @@ export async function getDismissedRecurring(): Promise<string[]> {
 	return settings.dismissedRecurring ?? [];
 }
 
+// Update notification master toggle
+export async function updateNotifications(enabled: boolean): Promise<void> {
+	await db.settings.update(1, { notificationsEnabled: enabled });
+	await persistData();
+}
+
 // Update iCloud backup setting
 export async function updateICloudBackup(enabled: boolean): Promise<void> {
 	await db.settings.update(1, { iCloudBackupEnabled: enabled });

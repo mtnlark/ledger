@@ -97,6 +97,21 @@ export const config = {
 		dismissDurationHours: 24
 	},
 
+	/**
+	 * Notification scheduling
+	 */
+	notifications: {
+		/** Scheduler tick interval in milliseconds */
+		checkIntervalMs: 60_000,
+		/** Default daily reminder time (24h) */
+		defaultDailyTime: '20:00',
+		/** Default weekly/monthly notification time (24h) */
+		defaultWeeklyTime: '09:00',
+		defaultMonthlyTime: '09:00',
+		/** Day of week for weekly review (0=Sun, 1=Mon, ..., 6=Sat) */
+		weeklyReviewDay: 1
+	},
+
 	insights: {
 		/** Anomaly detection settings */
 		anomaly: {

@@ -112,6 +112,11 @@ ledger/
 │   │   │   ├── selectedMonth.ts    # UI state for month selection
 │   │   │   ├── theme.ts            # Light/dark/system theme
 │   │   │   └── toast.ts            # Toast notification system
+│   │   ├── notifications/        # Native macOS notification system
+│   │   │   ├── index.ts          # Public API (init, cleanup)
+│   │   │   ├── tauri-notifications.ts  # Tauri plugin wrapper
+│   │   │   ├── scheduler.ts      # setInterval-based scheduler
+│   │   │   └── app-open-checks.ts # One-shot app-open fallback
 │   │   ├── insights/             # Memoized insight calculations
 │   │   │   ├── index.ts          # Public API (getInsightsEngine)
 │   │   │   ├── types.ts          # Type definitions
@@ -359,6 +364,11 @@ interface Settings {
   iCloudBackupEnabled: boolean;           // Copy backups to iCloud Drive
   lastAutoSuggestedMonth?: string;        // "YYYY-MM" - tracks recurring suggestion dismissal
   completedGoals: CompletedGoal[];        // Archived savings goals that have been completed
+  notificationsEnabled: boolean;          // Master toggle (opt-in, default false)
+  dailyReminderEnabled: boolean;          // Daily expense reminder (default true)
+  dailyReminderTime: string;             // "HH:MM" 24h format (default "20:00")
+  weeklyReviewEnabled: boolean;           // Monday 9am review prompt (default true)
+  monthlyBudgetSetupEnabled: boolean;     // 1st-of-month budget prompt (default true)
 }
 ```
 
@@ -469,6 +479,15 @@ Sidebar state persists to localStorage (`ledger-sidebar-expanded`).
 - Helper text below notes input clarifies tag format rules
 - Tag index (`TagIndex` class) provides fast lookups, rebuilt from transaction cache
 
+### Notifications
+- Native macOS notifications via Tauri plugin (opt-in)
+- **Daily expense reminder**: Fires at configured time if no transactions logged today (schedule-only)
+- **Weekly review prompt**: Monday mornings (schedule + app-open fallback)
+- **Monthly budget setup prompt**: 1st of month (schedule + app-open fallback, catches up on 2nd+)
+- Scheduler uses `setInterval` (60s tick) with localStorage for last-fired tracking
+- App stays alive in dock when window is closed (Cmd+W hides, Cmd+Q quits)
+- Permission requested on first enable; silently disables if OS permission revoked
+
 ### Subscriptions
 - Mark transactions as subscriptions (monthly/annual)
 - Track cancelled subscriptions
@@ -484,6 +503,9 @@ UI state persisted across sessions:
 - `ledger-addform-expanded` - Transaction form state
 - `ledger-insight-{title}` - Each insight group state
 - `ledger-dashboard-insight-dismissed` - Dashboard insight widget dismiss timestamp
+- `ledger-notif-daily-last-fired` - Daily notification last-fired date ("YYYY-MM-DD")
+- `ledger-notif-weekly-last-fired` - Weekly notification last-fired date ("YYYY-MM-DD")
+- `ledger-notif-monthly-last-fired` - Monthly notification last-fired month ("YYYY-MM")
 
 ---
 

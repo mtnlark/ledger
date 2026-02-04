@@ -3,8 +3,10 @@
 	import favicon from '$lib/assets/favicon.svg';
 	import SideNav from '$lib/components/SideNav.svelte';
 	import ToastContainer from '$lib/components/ToastContainer.svelte';
-	import { settings } from '$lib/stores/settings';
+	import { settings, updateSettings } from '$lib/stores/settings';
 	import { applyTheme, initThemeListener } from '$lib/stores/theme';
+	import { initNotifications, cleanupNotifications, isNotificationPermissionGranted } from '$lib/notifications';
+	import { db } from '$lib/db';
 	import { onDestroy } from 'svelte';
 
 	let { children } = $props();
@@ -21,8 +23,42 @@
 		}
 	});
 
+	// Notification scheduler — restarts whenever notification settings change
+	$effect(() => {
+		const s = $settings;
+		if (!s?.notificationsEnabled) {
+			cleanupNotifications();
+			return;
+		}
+
+		// Start notifications asynchronously
+		(async () => {
+			// Check if today has any transactions (for daily reminder skip logic)
+			const now = new Date();
+			const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+			const todayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+			const todayCount = await db.transactions
+				.where('date')
+				.between(todayStart, todayEnd, true, true)
+				.count();
+
+			const started = await initNotifications(s, todayCount > 0);
+
+			// If OS permission was revoked, silently disable notifications
+			if (!started && s.notificationsEnabled) {
+				const stillGranted = await isNotificationPermissionGranted();
+				if (!stillGranted) {
+					await updateSettings({ notificationsEnabled: false });
+				}
+			}
+		})();
+
+		return () => cleanupNotifications();
+	});
+
 	onDestroy(() => {
 		cleanupListener?.();
+		cleanupNotifications();
 	});
 </script>
 

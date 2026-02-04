@@ -122,6 +122,11 @@ export function createMockSettings(overrides: Partial<Settings> = {}): Settings 
 		confirmedActiveSubscriptions: [],
 		iCloudBackupEnabled: false,
 		completedGoals: [],
+		notificationsEnabled: false,
+		dailyReminderEnabled: true,
+		dailyReminderTime: '20:00',
+		weeklyReviewEnabled: true,
+		monthlyBudgetSetupEnabled: true,
 		...overrides
 	};
 }
