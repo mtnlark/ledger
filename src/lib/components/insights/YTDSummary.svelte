@@ -2,6 +2,7 @@
 	import { format } from 'date-fns';
 	import type { Transaction, Settings } from '$lib/db';
 	import { formatCurrencyWhole } from '$lib/utils/format-helpers';
+	import { extractTags } from '$lib/utils/tags';
 	import { getInsightsEngine } from '$lib/insights';
 	import InsightGroup from './InsightGroup.svelte';
 	import CalendarHeatmap from './CalendarHeatmap.svelte';
@@ -49,6 +50,31 @@
 		if (!settings?.completedGoals) return 0;
 		const yearPrefix = String(currentYear);
 		return settings.completedGoals.filter((g) => g.completedDate.startsWith(yearPrefix)).length;
+	});
+
+	// Tag spending summary for the year
+	let tagSummary = $derived.by(() => {
+		const tagTotals = new Map<string, { total: number; count: number }>();
+		const yearTransactions = transactions.filter(
+			(t) => new Date(t.date).getFullYear() === currentYear
+		);
+
+		for (const t of yearTransactions) {
+			const tags = extractTags(t.notes);
+			if (tags.length === 0) continue;
+			const userAmount = t.isShared ? t.amount - t.partnerShare : t.amount;
+
+			for (const tag of tags) {
+				const existing = tagTotals.get(tag) || { total: 0, count: 0 };
+				existing.total += userAmount;
+				existing.count += 1;
+				tagTotals.set(tag, existing);
+			}
+		}
+
+		return Array.from(tagTotals.entries())
+			.map(([tag, { total, count }]) => ({ tag, total, count }))
+			.sort((a, b) => b.total - a.total);
 	});
 </script>
 
@@ -146,6 +172,24 @@
 					<span class="font-mono text-sm text-charcoal">
 						{needsWantsStats.needsPercent.toFixed(0)}% needs / {needsWantsStats.wantsPercent.toFixed(0)}% wants
 					</span>
+				</div>
+			{/if}
+
+			<!-- Tag Spending Summary -->
+			{#if tagSummary.length > 0}
+				<div>
+					<h3 class="text-sm font-medium text-charcoal-soft mb-3">Tags This Year</h3>
+					<div class="space-y-2">
+						{#each tagSummary as { tag, total, count }}
+							<div class="flex items-center justify-between py-1.5">
+								<span class="text-sm text-primary-600 font-medium">#{tag}</span>
+								<div class="text-right">
+									<span class="font-mono text-sm text-charcoal">{formatCurrencyWhole(total)}</span>
+									<span class="text-xs text-charcoal-muted ml-2">{count} txn{count !== 1 ? 's' : ''}</span>
+								</div>
+							</div>
+						{/each}
+					</div>
 				</div>
 			{/if}
 		</div>
