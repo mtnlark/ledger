@@ -302,6 +302,7 @@
 							onInput={(v) => notes = v}
 							placeholder="Add notes... use #tags for filtering"
 						/>
+						<p class="text-xs text-charcoal-muted mt-1">Use #tags to group transactions (letters, numbers, hyphens)</p>
 					</div>
 
 					<EssentialToggle bind:isEssential {selectedCategory} />
