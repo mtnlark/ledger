@@ -54,3 +54,27 @@ export async function sendNotification(title: string, body: string): Promise<voi
 		console.error('Failed to send notification:', error);
 	}
 }
+
+/**
+ * Register a listener that shows and focuses the app window when a notification is clicked.
+ * Call once during initialization. Returns an unlisten function.
+ */
+export async function registerNotificationClickHandler(): Promise<(() => void) | null> {
+	if (!isTauri()) return null;
+
+	try {
+		const { onAction } = await import('@tauri-apps/plugin-notification');
+		const { getCurrentWindow } = await import('@tauri-apps/api/window');
+
+		const unlisten = await onAction(() => {
+			const appWindow = getCurrentWindow();
+			appWindow.show();
+			appWindow.setFocus();
+		});
+
+		return () => unlisten();
+	} catch (error) {
+		console.error('Failed to register notification click handler:', error);
+		return null;
+	}
+}

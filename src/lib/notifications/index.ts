@@ -8,9 +8,12 @@
 import type { Settings } from '$lib/db/constants';
 import { startScheduler, stopScheduler } from './scheduler';
 import { checkAppOpenNotifications } from './app-open-checks';
-import { isNotificationPermissionGranted } from './tauri-notifications';
+import { isNotificationPermissionGranted, registerNotificationClickHandler } from './tauri-notifications';
 
 export { requestNotificationPermission, isNotificationPermissionGranted } from './tauri-notifications';
+
+// Track the click handler unlisten function so we only register once
+let unlistenClickHandler: (() => void) | null = null;
 
 /**
  * Initialize the notification system.
@@ -35,6 +38,11 @@ export async function initNotifications(
 	startScheduler(settings, hasTodayTransactions);
 	checkAppOpenNotifications(settings);
 
+	// Register click handler once (brings app to front when notification is clicked)
+	if (!unlistenClickHandler) {
+		unlistenClickHandler = await registerNotificationClickHandler();
+	}
+
 	return true;
 }
 
@@ -43,4 +51,8 @@ export async function initNotifications(
  */
 export function cleanupNotifications(): void {
 	stopScheduler();
+	if (unlistenClickHandler) {
+		unlistenClickHandler();
+		unlistenClickHandler = null;
+	}
 }
