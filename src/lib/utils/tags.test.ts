@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { extractTags, removeTags, matchesTag } from './tags.js';
+import { extractTags, removeTags, matchesTag, calculateTagTotal, replaceTag, stripTag } from './tags.js';
 import type { Transaction } from '$lib/db/constants.js';
 
 describe('extractTags', () => {
@@ -192,5 +192,125 @@ describe('matchesTag', () => {
   it('works with search term that includes # prefix', () => {
     const tx = createTransaction('Trip to #italy');
     expect(matchesTag(tx, '#italy')).toBe(true);
+  });
+});
+
+describe('calculateTagTotal', () => {
+  const createTx = (amount: number, notes?: string, isShared = false, partnerShare = 0): Transaction => ({
+    id: 1,
+    date: new Date(),
+    merchant: 'Test',
+    amount,
+    categoryId: 1,
+    isShared,
+    splitType: 'percentage',
+    splitValue: 50,
+    partnerShare,
+    isSettled: false,
+    isEssential: false,
+    isSubscription: false,
+    notes,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  });
+
+  it('returns 0 for empty transactions', () => {
+    expect(calculateTagTotal([], 'italy')).toBe(0);
+  });
+
+  it('sums full amounts for non-shared transactions', () => {
+    const txs = [
+      createTx(50, '#italy dinner'),
+      createTx(30, '#italy lunch'),
+    ];
+    expect(calculateTagTotal(txs, 'italy')).toBe(80);
+  });
+
+  it('sums user share for shared transactions', () => {
+    const txs = [
+      createTx(100, '#italy hotel', true, 50),
+    ];
+    expect(calculateTagTotal(txs, 'italy')).toBe(50);
+  });
+
+  it('only includes transactions matching the tag', () => {
+    const txs = [
+      createTx(50, '#italy dinner'),
+      createTx(30, '#france lunch'),
+    ];
+    expect(calculateTagTotal(txs, 'italy')).toBe(50);
+  });
+
+  it('handles mix of shared and non-shared', () => {
+    const txs = [
+      createTx(100, '#trip shared hotel', true, 40),
+      createTx(25, '#trip solo coffee'),
+    ];
+    expect(calculateTagTotal(txs, 'trip')).toBe(85);
+  });
+
+  it('is case insensitive', () => {
+    const txs = [createTx(50, '#Italy dinner')];
+    expect(calculateTagTotal(txs, 'italy')).toBe(50);
+  });
+});
+
+describe('replaceTag', () => {
+  it('replaces a tag in notes', () => {
+    expect(replaceTag('Dinner #old-tag notes', 'old-tag', 'new-tag')).toBe('Dinner #new-tag notes');
+  });
+
+  it('replaces tag case-insensitively', () => {
+    expect(replaceTag('#OldTag lunch', 'oldtag', 'newtag')).toBe('#newtag lunch');
+  });
+
+  it('replaces only the exact tag', () => {
+    expect(replaceTag('#italy #italy-trip', 'italy', 'france')).toBe('#france #italy-trip');
+  });
+
+  it('handles tag at end of string', () => {
+    expect(replaceTag('Dinner #food', 'food', 'restaurant')).toBe('Dinner #restaurant');
+  });
+
+  it('handles tag at start of string', () => {
+    expect(replaceTag('#food dinner', 'food', 'restaurant')).toBe('#restaurant dinner');
+  });
+
+  it('handles notes with only the tag', () => {
+    expect(replaceTag('#food', 'food', 'restaurant')).toBe('#restaurant');
+  });
+
+  it('returns original if tag not found', () => {
+    expect(replaceTag('Dinner #food', 'travel', 'trip')).toBe('Dinner #food');
+  });
+});
+
+describe('stripTag', () => {
+  it('removes a tag from notes', () => {
+    expect(stripTag('Dinner #italy notes', 'italy')).toBe('Dinner notes');
+  });
+
+  it('removes tag case-insensitively', () => {
+    expect(stripTag('#ITALY lunch', 'italy')).toBe('lunch');
+  });
+
+  it('removes only the exact tag', () => {
+    expect(stripTag('#italy #italy-trip', 'italy')).toBe('#italy-trip');
+  });
+
+  it('cleans up extra whitespace', () => {
+    expect(stripTag('Before  #tag  after', 'tag')).toBe('Before after');
+  });
+
+  it('returns empty string when tag is the only content', () => {
+    expect(stripTag('#italy', 'italy')).toBe('');
+  });
+
+  it('returns trimmed result when other tags remain', () => {
+    expect(stripTag('#italy #france', 'italy')).toBe('#france');
+  });
+
+  it('returns original if tag not found', () => {
+    expect(stripTag('Dinner #food', 'travel')).toBe('Dinner #food');
   });
 });
