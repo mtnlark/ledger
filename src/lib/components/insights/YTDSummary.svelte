@@ -52,6 +52,34 @@
 		return settings.completedGoals.filter((g) => g.completedDate.startsWith(yearPrefix)).length;
 	});
 
+	// Shared expense annual summary
+	let sharedSummary = $derived.by(() => {
+		const yearTransactions = transactions.filter(
+			(t) => new Date(t.date).getFullYear() === currentYear && t.isShared
+		);
+
+		if (yearTransactions.length === 0) return null;
+
+		let totalShared = 0;
+		let totalSettled = 0;
+		let totalPartnerShare = 0;
+
+		for (const t of yearTransactions) {
+			totalShared += t.amount;
+			totalPartnerShare += t.partnerShare;
+			if (t.isSettled) {
+				totalSettled += t.partnerShare;
+			}
+		}
+
+		return {
+			totalShared,
+			totalPartnerShare,
+			totalSettled,
+			count: yearTransactions.length
+		};
+	});
+
 	// Tag spending summary for the year
 	let tagSummary = $derived.by(() => {
 		const tagTotals = new Map<string, { total: number; count: number }>();
@@ -190,6 +218,30 @@
 							</div>
 						{/each}
 					</div>
+				</div>
+			{/if}
+
+			<!-- Shared Expense Annual Summary -->
+			{#if sharedSummary}
+				<div class="bg-cream-dark rounded-lg p-4 border border-dashed border-theme">
+					<h3 class="text-sm font-medium text-charcoal-soft mb-3">Shared Expenses This Year</h3>
+					<div class="grid grid-cols-3 gap-4">
+						<div class="text-center">
+							<p class="font-mono text-lg font-medium text-charcoal">{formatCurrencyWhole(sharedSummary.totalShared)}</p>
+							<p class="text-xs text-charcoal-muted">Total shared</p>
+						</div>
+						<div class="text-center">
+							<p class="font-mono text-lg font-medium text-charcoal">{formatCurrencyWhole(sharedSummary.totalPartnerShare)}</p>
+							<p class="text-xs text-charcoal-muted">Partner's share</p>
+						</div>
+						<div class="text-center">
+							<p class="font-mono text-lg font-medium text-charcoal">{formatCurrencyWhole(sharedSummary.totalSettled)}</p>
+							<p class="text-xs text-charcoal-muted">Settled</p>
+						</div>
+					</div>
+					<p class="text-xs text-charcoal-muted mt-3 text-center">
+						{sharedSummary.count} shared transaction{sharedSummary.count !== 1 ? 's' : ''}
+					</p>
 				</div>
 			{/if}
 		</div>
