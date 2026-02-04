@@ -31,8 +31,12 @@
 	import CategoryDeepDives from '$lib/components/insights/CategoryDeepDives.svelte';
 	import YTDSummary from '$lib/components/insights/YTDSummary.svelte';
 	import RecurringInsights from '$lib/components/insights/RecurringInsights.svelte';
+	import InsightTabs from '$lib/components/insights/InsightTabs.svelte';
+	import NeedsWantsInsights from '$lib/components/insights/NeedsWantsInsights.svelte';
 	import { detectRecurringExpenses, type DetectedRecurring } from '$lib/stores/recurring';
 	import { getCancelledSubscriptions, getConfirmedActiveSubscriptions, getSettings } from '$lib/stores/settings';
+	import { getCategoryBudgetsForMonth } from '$lib/stores/categoryBudget';
+	import type { CategoryBudget } from '$lib/db';
 
 	// State
 	let isLoading = $state(true);
@@ -52,6 +56,14 @@
 	let selectedMonthContributions = $state<SavingsContribution[]>([]);
 	let allContributions = $state<SavingsContribution[]>([]);
 	let appSettings = $state<Settings | null>(null);
+	let activeTab = $state('overview');
+	let categoryBudgets = $state<CategoryBudget[]>([]);
+
+	// Tab change handler
+	function handleTabChange(tab: string) {
+		activeTab = tab;
+		localStorage.setItem('ledger-insights-tab', tab);
+	}
 
 	// Load data
 	async function loadData() {
@@ -75,6 +87,7 @@
 			selectedMonthTransactions = await getTransactionsByMonth(selectedMonth);
 			budget = await getBudgetForMonth(selectedMonth);
 			selectedMonthContributions = await getAllContributionsForMonth(selectedMonth);
+			categoryBudgets = await getCategoryBudgetsForMonth(selectedMonth);
 			// Get trends for all available months
 			monthlyTrends = await getMonthlySpendingTrends(availableMonths);
 		} catch (error) {
@@ -88,15 +101,17 @@
 	// Handle month change - update transactions and budget for selected month
 	// Fetch data first, then update all state atomically to prevent UI mismatch
 	async function handleMonthChange(month: string) {
-		const [txns, monthBudget, monthContributions] = await Promise.all([
+		const [txns, monthBudget, monthContributions, monthCategoryBudgets] = await Promise.all([
 			getTransactionsByMonth(month),
 			getBudgetForMonth(month),
-			getAllContributionsForMonth(month)
+			getAllContributionsForMonth(month),
+			getCategoryBudgetsForMonth(month)
 		]);
 		selectedMonth = month;
 		selectedMonthTransactions = txns;
 		budget = monthBudget;
 		selectedMonthContributions = monthContributions;
+		categoryBudgets = monthCategoryBudgets;
 	}
 
 	// Reload subscription-related data when subscriptions change
@@ -111,6 +126,9 @@
 	});
 
 	onMount(() => {
+		const savedTab = localStorage.getItem('ledger-insights-tab');
+		if (savedTab) activeTab = savedTab;
+
 		// Reload data when page becomes visible (e.g., switching browser tabs)
 		function handleVisibilityChange() {
 			if (document.visibilityState === 'visible' && !isLoading) {
@@ -162,55 +180,66 @@
 				/>
 			</div>
 
-			<!-- Smart Takeaways (always visible at top) -->
-			<SmartTakeaways
-				currentMonthTransactions={selectedMonthTransactions}
-				{allTransactions}
-				{categories}
-				{availableMonths}
-				{budget}
-				{selectedMonth}
-				contributions={selectedMonthContributions}
-				{allContributions}
-				{allBudgets}
-				settings={appSettings}
-			/>
+			<!-- Tab Navigation -->
+			<InsightTabs {activeTab} onTabChange={handleTabChange} />
 
-			<!-- Spending This Month -->
-			<SpendingThisMonth
-				currentMonth={selectedMonth}
-				transactions={selectedMonthTransactions}
-				{budget}
-				{allBudgets}
-				{monthlyTrends}
-			/>
+			<!-- Tab Content -->
+			<div id="insights-tabpanel" role="tabpanel" class="space-y-6">
+				{#if activeTab === 'overview'}
+					<SmartTakeaways
+						currentMonthTransactions={selectedMonthTransactions}
+						{allTransactions}
+						{categories}
+						{availableMonths}
+						{budget}
+						{selectedMonth}
+						contributions={selectedMonthContributions}
+						{allContributions}
+						{allBudgets}
+						settings={appSettings}
+					/>
+					<!-- QuickStatsRow will be added in Task 3 -->
 
-			<!-- Savings This Month -->
-			<SavingsInsights
-				currentMonth={selectedMonth}
-				contributions={selectedMonthContributions}
-				accounts={savingsAccounts}
-				{budget}
-				{allContributions}
-				{allBudgets}
-			/>
+				{:else if activeTab === 'spending'}
+					<SpendingThisMonth
+						currentMonth={selectedMonth}
+						transactions={selectedMonthTransactions}
+						{budget}
+						{allBudgets}
+						{monthlyTrends}
+					/>
+					<CategoryDeepDives currentMonth={selectedMonth} transactions={selectedMonthTransactions} {allTransactions} {categories} {availableMonths} />
 
-			<!-- Category Deep Dives -->
-			<CategoryDeepDives currentMonth={selectedMonth} transactions={selectedMonthTransactions} {allTransactions} {categories} {availableMonths} />
+				{:else if activeTab === 'savings'}
+					<SavingsInsights
+						currentMonth={selectedMonth}
+						contributions={selectedMonthContributions}
+						accounts={savingsAccounts}
+						{budget}
+						{allContributions}
+						{allBudgets}
+					/>
 
-			<!-- Recurring Expenses (subscriptions + auto-detected bills) -->
-			<RecurringInsights
-				{recurring}
-				{categories}
-				{allTransactions}
-				{cancelledSubscriptions}
-				{confirmedActiveSubscriptions}
-				onDismiss={async () => { recurring = await detectRecurringExpenses(); }}
-				onSubscriptionChange={handleSubscriptionChange}
-			/>
+				{:else if activeTab === 'recurring'}
+					<RecurringInsights
+						{recurring}
+						{categories}
+						{allTransactions}
+						{cancelledSubscriptions}
+						{confirmedActiveSubscriptions}
+						onDismiss={async () => { recurring = await detectRecurringExpenses(); }}
+						onSubscriptionChange={handleSubscriptionChange}
+					/>
 
-			<!-- Year in Review -->
-			<YTDSummary transactions={allTransactions} settings={appSettings} />
+				{:else if activeTab === 'year-in-review'}
+					<YTDSummary transactions={allTransactions} settings={appSettings} />
+					<NeedsWantsInsights
+						transactions={selectedMonthTransactions}
+						{categories}
+						{allTransactions}
+					/>
+				{/if}
+			</div>
 		{/if}
 	</main>
 </div>
