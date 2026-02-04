@@ -5,6 +5,7 @@
 	import { TrendingUp, TrendingDown, Minus } from 'lucide-svelte';
 	import { getInsightsEngine } from '$lib/insights';
 	import { calculateVelocityComparison } from '$lib/insights/calculations/velocity';
+	import { formatCurrency } from '$lib/utils/format-helpers';
 	import InsightGroup from './InsightGroup.svelte';
 	import MonthlyTrendsChart from '../MonthlyTrendsChart.svelte';
 
@@ -69,6 +70,34 @@
 			10, // 10% minimum threshold
 			historicalTotals
 		);
+	});
+
+	// Top 5 merchants by spending (user's portion)
+	let topMerchants = $derived.by(() => {
+		const merchantTotals = new Map<string, number>();
+		for (const t of transactions) {
+			if (!t.merchant) continue;
+			const userAmount = t.isShared ? t.amount - t.partnerShare : t.amount;
+			merchantTotals.set(t.merchant, (merchantTotals.get(t.merchant) || 0) + userAmount);
+		}
+		return Array.from(merchantTotals.entries())
+			.sort((a, b) => b[1] - a[1])
+			.slice(0, 5)
+			.map(([merchant, amount]) => ({ merchant, amount }));
+	});
+
+	// Shared vs personal breakdown
+	let sharedBreakdown = $derived.by(() => {
+		let personal = 0;
+		let sharedUserPortion = 0;
+		for (const t of transactions) {
+			if (t.isShared) {
+				sharedUserPortion += t.amount - t.partnerShare;
+			} else {
+				personal += t.amount;
+			}
+		}
+		return { personal, shared: sharedUserPortion, hasShared: sharedUserPortion > 0 };
 	});
 </script>
 
@@ -167,6 +196,39 @@
 			<!-- Monthly Spending Trends -->
 			{#if monthlyTrends.size > 0}
 				<MonthlyTrendsChart monthlyData={monthlyTrends} />
+			{/if}
+
+			<!-- Top Merchants -->
+			{#if topMerchants.length > 0}
+				<div>
+					<h3 class="text-sm font-medium text-charcoal-soft mb-3">Top Merchants</h3>
+					<div class="space-y-2">
+						{#each topMerchants as { merchant, amount }, i}
+							<div class="flex items-center gap-3">
+								<span class="text-xs text-charcoal-muted w-5 text-right font-mono">{i + 1}</span>
+								<span class="text-sm text-charcoal truncate flex-1">{merchant}</span>
+								<span class="font-mono text-sm text-charcoal-soft">{formatCurrency(amount)}</span>
+							</div>
+						{/each}
+					</div>
+				</div>
+			{/if}
+
+			<!-- Shared vs Personal -->
+			{#if sharedBreakdown.hasShared}
+				<div class="bg-cream-dark rounded-lg p-4 border border-dashed border-theme">
+					<h3 class="text-sm font-medium text-charcoal-soft mb-3">Spending Breakdown</h3>
+					<div class="grid grid-cols-2 gap-4">
+						<div class="text-center">
+							<p class="font-mono text-lg font-medium text-charcoal">{formatCurrency(sharedBreakdown.personal)}</p>
+							<p class="text-xs text-charcoal-muted">Personal</p>
+						</div>
+						<div class="text-center">
+							<p class="font-mono text-lg font-medium text-charcoal">{formatCurrency(sharedBreakdown.shared)}</p>
+							<p class="text-xs text-charcoal-muted">Your share of shared</p>
+						</div>
+					</div>
+				</div>
 			{/if}
 		</div>
 	{/snippet}
