@@ -7,6 +7,7 @@
 	import { calculateVelocityComparison } from '$lib/insights/calculations/velocity';
 	import { formatCurrency } from '$lib/utils/format-helpers';
 	import { roundCurrency } from '$lib/utils/currency';
+	import { filterUpToDate } from '$lib/utils/date-helpers';
 
 	interface Props {
 		currentMonth: string;
@@ -35,11 +36,15 @@
 	// Calculate totals
 	let totalSpent = $derived(engine.getTotalSpent(transactions, currentMonth));
 
+	// Transactions up to today (excludes future-dated recurring entries) for pace calculations
+	let pastTransactions = $derived(isCurrentMonth ? filterUpToDate(transactions) : transactions);
+	let pastTotalSpent = $derived(engine.getTotalSpent(pastTransactions, `${currentMonth}-past`));
+
 	// Quick stats
 	let sharedCount = $derived(transactions.filter((t) => t.isShared).length);
 	let avgTransaction = $derived(transactions.length > 0 ? totalSpent / transactions.length : 0);
 
-	// Spending velocity comparison
+	// Spending velocity comparison (uses only past transactions to avoid future-dated inflation)
 	let velocityComparison = $derived.by(() => {
 		// Get previous month key
 		const currentDate = parseMonthKey(currentMonth);
@@ -62,7 +67,7 @@
 		const historicalTotals = Array.from(monthlyTrends.values());
 
 		return calculateVelocityComparison(
-			totalSpent,
+			pastTotalSpent,
 			prevTotal,
 			currentDays,
 			prevDays,
