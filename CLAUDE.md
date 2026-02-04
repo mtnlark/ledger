@@ -194,7 +194,10 @@ ledger/
 │   │   │       ├── CategoryTrendsChart.svelte
 │   │   │       ├── SavingsInsights.svelte      # Savings breakdown and trends
 │   │   │       ├── SavingsRateTrendChart.svelte # Savings rate over time
-│   │   │       └── CalendarHeatmap.svelte
+│   │   │       ├── CalendarHeatmap.svelte
+│   │   │       ├── InsightTabs.svelte         # Pill tab bar for insights navigation
+│   │   │       ├── QuickStatsRow.svelte       # Overview tab quick stats (total, budget, savings rate)
+│   │   │       └── NeedsWantsTrendChart.svelte # Needs/wants % trend line chart
 │   │   ├── utils/
 │   │   │   ├── currency.ts            # Currency/percentage utilities (rounding, comparison)
 │   │   │   ├── budget-status.ts       # Budget status calculation (under/approaching/at/over)
@@ -435,24 +438,20 @@ Sidebar state persists to localStorage (`ledger-sidebar-expanded`).
 - Integration with Dashboard (available = income - savings contributions)
 
 ### Insights
-- **Highlights** (current month): Forward-looking takeaways (pace projection, anomalies, category shifts)
-  - Pace projection and velocity exclude future-dated transactions (e.g. auto-added recurring)
-    via `filterUpToDate()` — only spending up to today counts toward daily rate
-- **Month in Review** (past months): Hero stat + expandable grouped insights
-  - Hero stat: Most important insight (rank, savings milestone, vs-average)
-  - Grouped sections: Spending, Savings, Highlights
-  - Uses 12-month rolling window for historical comparisons
+- **Tab-based architecture** with 5 tabs: Overview, Spending, Savings, Recurring, Year in Review
+  - Selected tab persisted to localStorage (`ledger-insights-tab`)
+  - Month picker remains global, applies to all tabs
+- **Overview tab**: Smart Takeaways (forward-looking current month / retrospective past month), Quick Stats Row (total spent, budget status, savings rate)
+  - Highlights: pace projection, anomalies, category shifts
+  - Pace projection and velocity exclude future-dated transactions via `filterUpToDate()`
+  - Month in Review (past months): hero stat + grouped insights with 12-month rolling window
   - Positive-only savings insights (never flags low rates due to paycheck timing)
-- Category breakdown chart (pie/donut)
-- Monthly spending trends
-- Needs vs wants analysis
-- Year-to-date summary and statistics
-- Recurring expense detection with subscription tracking
-- Category deep dives and comparisons
+- **Spending tab**: Total + velocity, top 5 merchants, shared vs personal breakdown, category breakdown chart, category deep dives with trend charts, month-over-month comparison
   - Variability classification (Steady/Moderate/Variable) uses only completed months
     — current calendar month excluded to prevent partial-month distortion of weighted stats
-- Savings insights with rate trends
-- Calendar heatmap of daily spending
+- **Savings tab**: Contribution breakdown by account/source, goal progress, savings rate trend chart
+- **Recurring tab**: Active subscriptions, upcoming annual renewals, possibly inactive alerts, detected recurring bills
+- **Year in Review tab**: Calendar heatmap, best/worst spending months, needs vs wants with trend chart, tag spending summary, shared expense annual summary, YTD stats
 
 ### Shared Expenses
 - Outstanding balance with partner
@@ -503,6 +502,7 @@ UI state persisted across sessions:
 - `ledger-addform-expanded` - Transaction form state
 - `ledger-insight-{title}` - Each insight group state
 - `ledger-dashboard-insight-dismissed` - Dashboard insight widget dismiss timestamp
+- `ledger-insights-tab` - Selected insights tab
 - `ledger-notif-daily-last-fired` - Daily notification last-fired date ("YYYY-MM-DD")
 - `ledger-notif-weekly-last-fired` - Weekly notification last-fired date ("YYYY-MM-DD")
 - `ledger-notif-monthly-last-fired` - Monthly notification last-fired month ("YYYY-MM")
