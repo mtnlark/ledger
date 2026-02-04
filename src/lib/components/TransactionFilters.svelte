@@ -25,9 +25,10 @@
 		allTimeCount?: number;
 		onSearchInputRef?: (el: HTMLInputElement | null) => void;
 		allTransactions?: Transaction[];
+		onTagsChanged?: () => void;
 	}
 
-	let { categories, filters, onFilterChange, resultCount, totalCount, allTimeCount, onSearchInputRef, allTransactions = [] }: Props = $props();
+	let { categories, filters, onFilterChange, resultCount, totalCount, allTimeCount, onSearchInputRef, allTransactions = [], onTagsChanged }: Props = $props();
 
 	let searchInput = $state<HTMLInputElement | null>(null);
 
@@ -115,6 +116,7 @@
 		isProcessing = true;
 		try {
 			await renameTag(oldTag, newTag);
+			onTagsChanged?.();
 		} finally {
 			editingTag = null;
 			isProcessing = false;
@@ -125,6 +127,7 @@
 		isProcessing = true;
 		try {
 			await deleteTag(tag);
+			onTagsChanged?.();
 			if (filters.tags.includes(tag)) {
 				onFilterChange({ ...filters, tags: filters.tags.filter(t => t !== tag) });
 			}

@@ -494,6 +494,10 @@
 				allTimeCount={allTransactions.length}
 				onSearchInputRef={setSearchInputRef}
 				{allTransactions}
+				onTagsChanged={async () => {
+					transactions = await getTransactionsByMonth(currentMonth);
+					allTransactions = await getAllTransactions();
+				}}
 			/>
 
 			<!-- Transaction List -->
