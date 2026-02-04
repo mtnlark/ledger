@@ -4,6 +4,7 @@
 	import { formatCurrencyWhole } from '$lib/utils/format-helpers';
 	import { getInsightsEngine } from '$lib/insights';
 	import InsightGroup from './InsightGroup.svelte';
+	import NeedsWantsTrendChart from './NeedsWantsTrendChart.svelte';
 
 	interface Props {
 		transactions: Transaction[];
@@ -188,6 +189,14 @@
 							<span class="font-mono font-medium">{allTimeStats.wantsPercent.toFixed(0)}%</span> wants
 						</span>
 					</div>
+				</div>
+			{/if}
+
+			<!-- Needs vs Wants Trend -->
+			{#if allTransactions.length > 0}
+				<div class="mt-6 pt-4 border-t border-dashed border-theme">
+					<h4 class="text-sm font-medium text-charcoal-muted mb-3">Trend Over Time</h4>
+					<NeedsWantsTrendChart {allTransactions} {categories} />
 				</div>
 			{/if}
 		{/if}
