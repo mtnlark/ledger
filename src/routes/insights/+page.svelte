@@ -33,6 +33,7 @@
 	import RecurringInsights from '$lib/components/insights/RecurringInsights.svelte';
 	import InsightTabs from '$lib/components/insights/InsightTabs.svelte';
 	import NeedsWantsInsights from '$lib/components/insights/NeedsWantsInsights.svelte';
+	import QuickStatsRow from '$lib/components/insights/QuickStatsRow.svelte';
 	import { detectRecurringExpenses, type DetectedRecurring } from '$lib/stores/recurring';
 	import { getCancelledSubscriptions, getConfirmedActiveSubscriptions, getSettings } from '$lib/stores/settings';
 	import { getCategoryBudgetsForMonth } from '$lib/stores/categoryBudget';
@@ -198,7 +199,13 @@
 						{allBudgets}
 						settings={appSettings}
 					/>
-					<!-- QuickStatsRow will be added in Task 3 -->
+					<QuickStatsRow
+						transactions={selectedMonthTransactions}
+						{selectedMonth}
+						{categoryBudgets}
+						{budget}
+						contributions={selectedMonthContributions}
+					/>
 
 				{:else if activeTab === 'spending'}
 					<SpendingThisMonth
