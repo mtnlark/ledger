@@ -34,6 +34,8 @@
 	import InsightTabs from '$lib/components/insights/InsightTabs.svelte';
 	import NeedsWantsInsights from '$lib/components/insights/NeedsWantsInsights.svelte';
 	import QuickStatsRow from '$lib/components/insights/QuickStatsRow.svelte';
+	import CategoryBreakdownChart from '$lib/components/CategoryBreakdownChart.svelte';
+	import MonthlyTrendsChart from '$lib/components/MonthlyTrendsChart.svelte';
 	import { detectRecurringExpenses, type DetectedRecurring } from '$lib/stores/recurring';
 	import { getCancelledSubscriptions, getConfirmedActiveSubscriptions, getSettings } from '$lib/stores/settings';
 	import { getCategoryBudgetsForMonth } from '$lib/stores/categoryBudget';
@@ -208,6 +210,32 @@
 						contributions={selectedMonthContributions}
 					/>
 
+					<!-- Category Breakdown -->
+					{#if selectedMonthTransactions.length > 0}
+						<div class="bg-surface rounded-xl shadow-md shadow-[var(--color-shadow)] overflow-hidden">
+							<div class="px-6 py-4">
+								<h2 class="font-display text-xl font-medium text-charcoal">Where It Goes</h2>
+								<p class="text-sm text-charcoal-muted mt-0.5">Spending by category</p>
+							</div>
+							<div class="px-6 pb-6">
+								<CategoryBreakdownChart transactions={selectedMonthTransactions} {categories} />
+							</div>
+						</div>
+					{/if}
+
+					<!-- Monthly Trends -->
+					{#if monthlyTrends.size > 1}
+						<div class="bg-surface rounded-xl shadow-md shadow-[var(--color-shadow)] overflow-hidden">
+							<div class="px-6 py-4">
+								<h2 class="font-display text-xl font-medium text-charcoal">Monthly Trends</h2>
+								<p class="text-sm text-charcoal-muted mt-0.5">Spending over time</p>
+							</div>
+							<div class="px-6 pb-6">
+								<MonthlyTrendsChart monthlyData={monthlyTrends} />
+							</div>
+						</div>
+					{/if}
+
 				{:else if activeTab === 'spending'}
 					<SpendingThisMonth
 						currentMonth={selectedMonth}
@@ -240,7 +268,7 @@
 					/>
 
 				{:else if activeTab === 'year-in-review'}
-					<YTDSummary transactions={allTransactions} settings={appSettings} />
+					<YTDSummary transactions={allTransactions} {categories} settings={appSettings} />
 					<NeedsWantsInsights
 						transactions={selectedMonthTransactions}
 						{categories}

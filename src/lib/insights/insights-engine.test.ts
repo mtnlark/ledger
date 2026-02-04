@@ -124,7 +124,7 @@ describe('InsightsEngine', () => {
 				makeTx({ amount: 25, isEssential: false })
 			];
 
-			const result = engine.getNeedsVsWants(txs, '2025-01');
+			const result = engine.getNeedsVsWants(txs, [], '2025-01');
 			expect(result?.needsPercent).toBe(75);
 		});
 
@@ -135,7 +135,7 @@ describe('InsightsEngine', () => {
 				makeTx({ amount: 40, isEssential: false })
 			];
 
-			const result = engine.getNeedsVsWantsFull(txs, '2025-01');
+			const result = engine.getNeedsVsWantsFull(txs, [], '2025-01');
 			expect(result.needsPercent).toBe(60);
 			expect(result.wantsPercent).toBe(40);
 		});

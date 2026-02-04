@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { format } from 'date-fns';
-	import type { Transaction, Settings } from '$lib/db';
+	import type { Transaction, Category, Settings } from '$lib/db';
 	import { formatCurrencyWhole } from '$lib/utils/format-helpers';
 	import { roundCurrency } from '$lib/utils/currency';
 	import { extractTags } from '$lib/utils/tags';
@@ -9,10 +9,11 @@
 
 	interface Props {
 		transactions: Transaction[];
+		categories: Category[];
 		settings?: Settings | null;
 	}
 
-	let { transactions, settings = null }: Props = $props();
+	let { transactions, categories, settings = null }: Props = $props();
 
 	const engine = getInsightsEngine();
 	let currentYear = new Date().getFullYear();
@@ -43,7 +44,7 @@
 	});
 
 	// All-time needs vs wants
-	let needsWantsStats = $derived(engine.getNeedsVsWantsFull(transactions, 'ytd-all-time'));
+	let needsWantsStats = $derived(engine.getNeedsVsWantsFull(transactions, categories, 'ytd-all-time'));
 
 	// Goals completed this year
 	let goalsCompletedThisYear = $derived.by(() => {

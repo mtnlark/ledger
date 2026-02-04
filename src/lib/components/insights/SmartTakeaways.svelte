@@ -131,7 +131,7 @@
 	// Fallback: Needs vs wants ratio (current month only)
 	let needsVsWants = $derived.by(() => {
 		if (!isCurrentMonth) return null;
-		return engine.getNeedsVsWants(currentMonthTransactions, selectedMonth);
+		return engine.getNeedsVsWants(currentMonthTransactions, categories, selectedMonth);
 	});
 
 	// Compute historical monthly totals for velocity adaptive threshold

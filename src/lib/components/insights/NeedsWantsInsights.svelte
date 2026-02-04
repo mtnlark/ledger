@@ -15,11 +15,16 @@
 
 	const engine = getInsightsEngine();
 
+	// Build category essential lookup for needs/wants classification
+	let categoryEssentialMap = $derived(
+		new Map(categories.filter((c) => c.id != null).map((c) => [c.id!, c.isEssential]))
+	);
+
 	// Calculate needs vs wants for current month
-	let currentMonthStats = $derived(engine.getNeedsVsWantsFull(transactions, 'current-month'));
+	let currentMonthStats = $derived(engine.getNeedsVsWantsFull(transactions, categories, 'current-month'));
 
 	// Calculate all-time stats
-	let allTimeStats = $derived(engine.getNeedsVsWantsFull(allTransactions, 'all-time'));
+	let allTimeStats = $derived(engine.getNeedsVsWantsFull(allTransactions, categories, 'all-time'));
 
 	// Get top essential and discretionary categories for current month
 	let topCategories = $derived.by(() => {
@@ -28,7 +33,8 @@
 
 		for (const tx of transactions) {
 			const userAmount = tx.isShared ? tx.amount - tx.partnerShare : tx.amount;
-			const targetMap = tx.isEssential ? essentialTotals : discretionaryTotals;
+			const isNeeds = tx.isEssential || (categoryEssentialMap.get(tx.categoryId) ?? false);
+			const targetMap = isNeeds ? essentialTotals : discretionaryTotals;
 			targetMap.set(tx.categoryId, (targetMap.get(tx.categoryId) ?? 0) + userAmount);
 		}
 

@@ -33,7 +33,7 @@
 		const spending = new Map<number, number>();
 		for (const t of transactions) {
 			const userAmount = t.isShared ? t.amount - t.partnerShare : t.amount;
-			spending.set(t.categoryId, (spending.get(t.categoryId) || 0) + userAmount);
+			spending.set(t.categoryId, roundCurrency((spending.get(t.categoryId) || 0) + userAmount));
 		}
 
 		let onTrack = 0;

@@ -69,6 +69,46 @@ describe('calculateNeedsVsWants', () => {
 			needsPercent: 50
 		});
 	});
+
+	it('uses category fallback when transaction isEssential is false', () => {
+		const categoryMap = new Map([[1, true], [2, false]]);
+		const txs = [
+			makeTx({ amount: 100, isEssential: false, categoryId: 1 }), // category says essential
+			makeTx({ amount: 50, isEssential: false, categoryId: 2 })   // category says not essential
+		];
+		const result = calculateNeedsVsWants(txs, categoryMap);
+		expect(result).toEqual({
+			needsTotal: 100,
+			wantsTotal: 50,
+			needsPercent: 67
+		});
+	});
+
+	it('transaction isEssential overrides category default', () => {
+		const categoryMap = new Map([[1, false]]); // category says NOT essential
+		const txs = [
+			makeTx({ amount: 100, isEssential: true, categoryId: 1 }) // but transaction says essential
+		];
+		const result = calculateNeedsVsWants(txs, categoryMap);
+		expect(result).toEqual({
+			needsTotal: 100,
+			wantsTotal: 0,
+			needsPercent: 100
+		});
+	});
+
+	it('works without categoryEssentialMap (backward compatible)', () => {
+		const txs = [
+			makeTx({ amount: 100, isEssential: true }),
+			makeTx({ amount: 50, isEssential: false })
+		];
+		const result = calculateNeedsVsWants(txs);
+		expect(result).toEqual({
+			needsTotal: 100,
+			wantsTotal: 50,
+			needsPercent: 67
+		});
+	});
 });
 
 describe('calculateNeedsVsWantsFull', () => {
@@ -113,5 +153,18 @@ describe('calculateNeedsVsWantsFull', () => {
 		const basicResult = calculateNeedsVsWants(txs);
 		const fullResult = calculateNeedsVsWantsFull(txs);
 		expect(fullResult.needsPercent).toBe(basicResult!.needsPercent);
+	});
+
+	it('uses category fallback for Full result', () => {
+		const categoryMap = new Map([[1, true], [2, false]]);
+		const txs = [
+			makeTx({ amount: 80, isEssential: false, categoryId: 1 }), // category says essential
+			makeTx({ amount: 20, isEssential: false, categoryId: 2 })  // category says not essential
+		];
+		const result = calculateNeedsVsWantsFull(txs, categoryMap);
+		expect(result.needs).toBe(80);
+		expect(result.wants).toBe(20);
+		expect(result.needsPercent).toBe(80);
+		expect(result.wantsPercent).toBe(20);
 	});
 });

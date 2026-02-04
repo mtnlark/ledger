@@ -160,6 +160,34 @@ describe('computeYTDStats', () => {
 		expect(result.smallestMonth).toBeNull();
 	});
 
+	it('excludes current month from biggest/smallest calculations', () => {
+		// System time is March 20, so March is current month
+		const txs = [
+			makeTx({ date: new Date(2025, 0, 10, 12), amount: 50 }),  // Jan $50
+			makeTx({ date: new Date(2025, 1, 10, 12), amount: 100 }), // Feb $100
+			makeTx({ date: new Date(2025, 2, 5, 12), amount: 10 })    // Mar $10 (current month, excluded)
+		];
+
+		const result = computeYTDStats(txs, 2025);
+		// March should be excluded; smallest from completed months = Jan $50
+		expect(result.smallestMonth!.label).toBe('January');
+		expect(result.smallestMonth!.amount).toBe(50);
+		// Biggest from completed months = Feb $100
+		expect(result.biggestMonth!.label).toBe('February');
+		expect(result.biggestMonth!.amount).toBe(100);
+	});
+
+	it('returns null biggest/smallest when only current month has data', () => {
+		// Only March data (current month) — no completed months
+		const txs = [
+			makeTx({ date: new Date(2025, 2, 5, 12), amount: 200 })
+		];
+
+		const result = computeYTDStats(txs, 2025);
+		expect(result.biggestMonth).toBeNull();
+		expect(result.smallestMonth).toBeNull();
+	});
+
 	it('excludes future-dated transactions from spend days count', () => {
 		// System time is March 20, 2025
 		// Transaction on March 15 (past) and March 25 (future)

@@ -115,7 +115,7 @@
 		<div class="flex items-center justify-between">
 			<div>
 				<p class="font-mono text-2xl font-medium text-charcoal">
-					${totalSpent.toLocaleString()}
+					{formatCurrency(totalSpent)}
 				</p>
 				<p class="text-sm text-charcoal-muted">
 					{transactions.length} transaction{transactions.length !== 1 ? 's' : ''}
@@ -142,23 +142,20 @@
 
 		<!-- Quick Stats -->
 		{#if transactions.length > 0}
-			<div class="bg-cream-dark rounded-lg p-4 border border-dashed border-theme">
-				<h3 class="text-sm font-medium text-charcoal-soft mb-3">Quick Stats</h3>
-				<div class="grid grid-cols-3 gap-4">
-					<div class="text-center">
-						<p class="font-mono text-xl font-medium text-charcoal">{transactions.length}</p>
-						<p class="text-xs text-charcoal-muted">Transactions</p>
-					</div>
-					<div class="text-center">
-						<p class="font-mono text-xl font-medium text-charcoal">
-							${avgTransaction.toFixed(0)}
-						</p>
-						<p class="text-xs text-charcoal-muted">Avg Transaction</p>
-					</div>
-					<div class="text-center">
-						<p class="font-mono text-xl font-medium text-charcoal">{sharedCount}</p>
-						<p class="text-xs text-charcoal-muted">Shared</p>
-					</div>
+			<div class="grid grid-cols-3 gap-3">
+				<div class="bg-surface-alt rounded-lg p-3 text-center">
+					<p class="font-mono text-lg font-medium text-charcoal">{transactions.length}</p>
+					<p class="text-xs text-charcoal-muted">Transactions</p>
+				</div>
+				<div class="bg-surface-alt rounded-lg p-3 text-center">
+					<p class="font-mono text-lg font-medium text-charcoal">
+						{formatCurrency(roundCurrency(avgTransaction))}
+					</p>
+					<p class="text-xs text-charcoal-muted">Avg Transaction</p>
+				</div>
+				<div class="bg-surface-alt rounded-lg p-3 text-center">
+					<p class="font-mono text-lg font-medium text-charcoal">{sharedCount}</p>
+					<p class="text-xs text-charcoal-muted">Shared</p>
 				</div>
 			</div>
 		{/if}
@@ -202,14 +199,25 @@
 
 		<!-- Top Merchants -->
 		{#if topMerchants.length > 0}
+			{@const maxMerchant = topMerchants[0]?.amount || 1}
 			<div>
 				<h3 class="text-sm font-medium text-charcoal-soft mb-3">Top Merchants</h3>
 				<div class="space-y-2">
 					{#each topMerchants as { merchant, amount }, i}
 						<div class="flex items-center gap-3">
 							<span class="text-xs text-charcoal-muted w-5 text-right font-mono">{i + 1}</span>
-							<span class="text-sm text-charcoal truncate flex-1">{merchant}</span>
-							<span class="font-mono text-sm text-charcoal-soft">{formatCurrency(amount)}</span>
+							<div class="flex-1 min-w-0">
+								<div class="flex items-center justify-between mb-1">
+									<span class="text-sm text-charcoal truncate">{merchant}</span>
+									<span class="font-mono text-sm text-charcoal-soft ml-2 shrink-0">{formatCurrency(amount)}</span>
+								</div>
+								<div class="h-1.5 bg-surface-alt rounded-full overflow-hidden">
+									<div
+										class="h-full bg-primary-400 rounded-full transition-all duration-500"
+										style="width: {(amount / maxMerchant) * 100}%"
+									></div>
+								</div>
+							</div>
 						</div>
 					{/each}
 				</div>
@@ -218,16 +226,34 @@
 
 		<!-- Shared vs Personal -->
 		{#if sharedBreakdown.hasShared}
-			<div class="bg-cream-dark rounded-lg p-4 border border-dashed border-theme">
-				<h3 class="text-sm font-medium text-charcoal-soft mb-3">Spending Breakdown</h3>
+			{@const personalPercent = totalSpent > 0 ? Math.round((sharedBreakdown.personal / totalSpent) * 100) : 0}
+			{@const sharedPercent = 100 - personalPercent}
+			<div>
+				<h3 class="text-sm font-medium text-charcoal-soft mb-3">Personal vs Shared</h3>
+				<div class="h-3 rounded-full overflow-hidden flex mb-3">
+					<div
+						class="bg-charcoal/70 transition-all duration-500"
+						style="width: {personalPercent}%"
+					></div>
+					<div
+						class="bg-primary-400 transition-all duration-500"
+						style="width: {sharedPercent}%"
+					></div>
+				</div>
 				<div class="grid grid-cols-2 gap-4">
-					<div class="text-center">
-						<p class="font-mono text-lg font-medium text-charcoal">{formatCurrency(sharedBreakdown.personal)}</p>
-						<p class="text-xs text-charcoal-muted">Personal</p>
+					<div class="flex items-center gap-2">
+						<div class="w-3 h-3 rounded bg-charcoal/70 shrink-0"></div>
+						<div>
+							<p class="font-mono text-sm font-medium text-charcoal">{formatCurrency(sharedBreakdown.personal)}</p>
+							<p class="text-xs text-charcoal-muted">Personal</p>
+						</div>
 					</div>
-					<div class="text-center">
-						<p class="font-mono text-lg font-medium text-charcoal">{formatCurrency(sharedBreakdown.shared)}</p>
-						<p class="text-xs text-charcoal-muted">Your share of shared</p>
+					<div class="flex items-center gap-2">
+						<div class="w-3 h-3 rounded bg-primary-400 shrink-0"></div>
+						<div>
+							<p class="font-mono text-sm font-medium text-charcoal">{formatCurrency(sharedBreakdown.shared)}</p>
+							<p class="text-xs text-charcoal-muted">Your portion of shared</p>
+						</div>
 					</div>
 				</div>
 			</div>

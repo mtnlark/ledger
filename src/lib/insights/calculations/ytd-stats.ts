@@ -65,10 +65,19 @@ export function computeYTDStats(allTransactions: Transaction[], year?: number): 
 		monthlySpending.set(monthKey, (monthlySpending.get(monthKey) || 0) + amount);
 	}
 
+	// Exclude current calendar month from biggest/smallest (partial month would skew results)
+	const currentMonthKey = getMonthKey(now);
+	const completedMonths = new Map<string, number>();
+	for (const [month, amount] of monthlySpending) {
+		if (month !== currentMonthKey) {
+			completedMonths.set(month, amount);
+		}
+	}
+
 	let biggestMonth: { label: string; amount: number } | null = null;
-	if (monthlySpending.size > 0) {
+	if (completedMonths.size > 0) {
 		let max = { month: '', amount: 0 };
-		for (const [month, amount] of monthlySpending) {
+		for (const [month, amount] of completedMonths) {
 			if (amount > max.amount) {
 				max = { month, amount };
 			}
@@ -82,11 +91,11 @@ export function computeYTDStats(allTransactions: Transaction[], year?: number): 
 		}
 	}
 
-	// Smallest spending month (only if multiple months exist)
+	// Smallest spending month (only if 2+ completed months exist)
 	let smallestMonth: { label: string; amount: number } | null = null;
-	if (monthlySpending.size > 1) {
+	if (completedMonths.size > 1) {
 		let min = { month: '', amount: Infinity };
-		for (const [month, amount] of monthlySpending) {
+		for (const [month, amount] of completedMonths) {
 			if (amount < min.amount) {
 				min = { month, amount };
 			}

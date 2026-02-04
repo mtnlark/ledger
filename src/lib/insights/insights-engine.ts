@@ -132,14 +132,21 @@ export class InsightsEngine {
 		return this._getTotalSpent(this.version, key, transactions);
 	}
 
+	/** Build a category essential map for needs/wants classification. */
+	private buildCategoryEssentialMap(categories: Category[]): Map<number, boolean> {
+		return new Map(
+			categories.filter((c) => c.id != null).map((c) => [c.id!, c.isEssential])
+		);
+	}
+
 	/** Calculate needs vs wants breakdown (compact result). */
-	getNeedsVsWants(transactions: Transaction[], key: string): NeedsVsWantsResult | null {
-		return this._calculateNeedsVsWants(this.version, key, transactions);
+	getNeedsVsWants(transactions: Transaction[], categories: Category[], key: string): NeedsVsWantsResult | null {
+		return this._calculateNeedsVsWants(this.version, key, transactions, this.buildCategoryEssentialMap(categories));
 	}
 
 	/** Calculate full needs vs wants breakdown with both percentages. */
-	getNeedsVsWantsFull(transactions: Transaction[], key: string): NeedsWantsFullResult {
-		return this._calculateNeedsVsWantsFull(this.version, key, transactions);
+	getNeedsVsWantsFull(transactions: Transaction[], categories: Category[], key: string): NeedsWantsFullResult {
+		return this._calculateNeedsVsWantsFull(this.version, key, transactions, this.buildCategoryEssentialMap(categories));
 	}
 
 	/** Find the most frequently visited merchant. */
