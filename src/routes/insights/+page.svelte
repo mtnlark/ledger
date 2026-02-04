@@ -127,8 +127,9 @@
 	});
 
 	onMount(() => {
+		const validTabs = ['overview', 'spending', 'savings', 'recurring', 'year-in-review'];
 		const savedTab = localStorage.getItem('ledger-insights-tab');
-		if (savedTab) activeTab = savedTab;
+		if (savedTab && validTabs.includes(savedTab)) activeTab = savedTab;
 
 		// Reload data when page becomes visible (e.g., switching browser tabs)
 		function handleVisibilityChange() {

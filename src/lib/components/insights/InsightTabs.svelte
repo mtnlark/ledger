@@ -15,7 +15,7 @@
 	];
 </script>
 
-<nav aria-label="Insights tabs" class="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
+<nav aria-label="Insights tabs" role="tablist" class="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
 	{#each tabs as tab}
 		<button
 			type="button"

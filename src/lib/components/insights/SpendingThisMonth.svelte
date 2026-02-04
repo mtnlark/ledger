@@ -6,6 +6,7 @@
 	import { getInsightsEngine } from '$lib/insights';
 	import { calculateVelocityComparison } from '$lib/insights/calculations/velocity';
 	import { formatCurrency } from '$lib/utils/format-helpers';
+	import { roundCurrency } from '$lib/utils/currency';
 	import MonthlyTrendsChart from '../MonthlyTrendsChart.svelte';
 
 	interface Props {
@@ -82,7 +83,7 @@
 		return Array.from(merchantTotals.entries())
 			.sort((a, b) => b[1] - a[1])
 			.slice(0, 5)
-			.map(([merchant, amount]) => ({ merchant, amount }));
+			.map(([merchant, amount]) => ({ merchant, amount: roundCurrency(amount) }));
 	});
 
 	// Shared vs personal breakdown
@@ -96,7 +97,11 @@
 				personal += t.amount;
 			}
 		}
-		return { personal, shared: sharedUserPortion, hasShared: sharedUserPortion > 0 };
+		return {
+			personal: roundCurrency(personal),
+			shared: roundCurrency(sharedUserPortion),
+			hasShared: sharedUserPortion > 0
+		};
 	});
 </script>
 

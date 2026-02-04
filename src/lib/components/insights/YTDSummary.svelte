@@ -2,6 +2,7 @@
 	import { format } from 'date-fns';
 	import type { Transaction, Settings } from '$lib/db';
 	import { formatCurrencyWhole } from '$lib/utils/format-helpers';
+	import { roundCurrency } from '$lib/utils/currency';
 	import { extractTags } from '$lib/utils/tags';
 	import { getInsightsEngine } from '$lib/insights';
 	import CalendarHeatmap from './CalendarHeatmap.svelte';
@@ -72,9 +73,9 @@
 		}
 
 		return {
-			totalShared,
-			totalPartnerShare,
-			totalSettled,
+			totalShared: roundCurrency(totalShared),
+			totalPartnerShare: roundCurrency(totalPartnerShare),
+			totalSettled: roundCurrency(totalSettled),
 			count: yearTransactions.length
 		};
 	});
@@ -100,7 +101,7 @@
 		}
 
 		return Array.from(tagTotals.entries())
-			.map(([tag, { total, count }]) => ({ tag, total, count }))
+			.map(([tag, { total, count }]) => ({ tag, total: roundCurrency(total), count }))
 			.sort((a, b) => b.total - a.total);
 	});
 </script>

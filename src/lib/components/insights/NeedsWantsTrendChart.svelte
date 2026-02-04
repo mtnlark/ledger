@@ -2,7 +2,7 @@
 	import { format } from 'date-fns';
 	import { type ChartConfiguration } from 'chart.js/auto';
 	import ChartWrapper from '../ChartWrapper.svelte';
-	import { parseMonthKey, getMonthKey, type Transaction, type Category } from '$lib/db';
+	import { parseMonthKey, getMonthKey, type Transaction } from '$lib/db';
 	import { sumCurrency } from '$lib/utils/currency';
 	import { getChartTheme, onThemeChange, type ChartTheme } from '$lib/utils/chart-theme';
 
