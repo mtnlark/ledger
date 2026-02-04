@@ -8,6 +8,7 @@ import { getMonthDateRange } from '$lib/utils/date-helpers';
 import { getTransactionCache } from './transactionCache';
 import { sumCurrency } from '$lib/utils/currency';
 import { tagIndex } from './tags.svelte';
+import { replaceTag, stripTag } from '$lib/utils/tags';
 import {
 	validateAmount,
 	validateMerchant,
@@ -555,4 +556,96 @@ export async function getDailySpending(
 	}
 
 	return result;
+}
+
+// Rename a tag across all transactions
+// Returns the number of transactions updated
+export async function renameTag(oldTag: string, newTag: string): Promise<number> {
+	// Normalize both tags (strip # prefix, lowercase)
+	const normalizedOld = oldTag.replace(/^#/, '').toLowerCase();
+	const normalizedNew = newTag.replace(/^#/, '').toLowerCase();
+
+	// If same after normalization, nothing to do
+	if (normalizedOld === normalizedNew) return 0;
+
+	// Validate new tag format
+	if (!/^[a-zA-Z0-9][a-zA-Z0-9-]*$/.test(normalizedNew)) {
+		throw new Error('Invalid tag name. Tags must start with a letter or number and contain only letters, numbers, and hyphens.');
+	}
+
+	// Query all transactions from db
+	const allTransactions = await db.transactions.toArray();
+
+	// Filter to those whose notes contain the old tag
+	const tagPattern = new RegExp(`#${normalizedOld}(?![a-zA-Z0-9-])`, 'i');
+	const matching = allTransactions.filter((t) => t.notes && tagPattern.test(t.notes));
+
+	if (matching.length === 0) return 0;
+
+	const now = new Date();
+
+	// Update in a Dexie transaction
+	await db.transaction('rw', db.transactions, async () => {
+		for (const tx of matching) {
+			const newNotes = replaceTag(tx.notes!, normalizedOld, normalizedNew);
+			await db.transactions.update(tx.id!, { notes: newNotes, updatedAt: now });
+		}
+	});
+
+	// Update cache if loaded
+	const cache = getTransactionCache();
+	if (cache.isLoaded) {
+		for (const tx of matching) {
+			const newNotes = replaceTag(tx.notes!, normalizedOld, normalizedNew);
+			cache.update(tx.id!, { notes: newNotes, updatedAt: now });
+		}
+		tagIndex.rebuild(cache.getAll());
+	}
+
+	invalidateTransactionCaches();
+	await persistData();
+	return matching.length;
+}
+
+// Delete a tag from all transactions
+// Returns the number of transactions updated
+export async function deleteTag(tag: string): Promise<number> {
+	// Normalize tag (strip # prefix, lowercase)
+	const normalizedTag = tag.replace(/^#/, '').toLowerCase();
+
+	// Query all transactions from db
+	const allTransactions = await db.transactions.toArray();
+
+	// Filter to those whose notes contain the tag
+	const tagPattern = new RegExp(`#${normalizedTag}(?![a-zA-Z0-9-])`, 'i');
+	const matching = allTransactions.filter((t) => t.notes && tagPattern.test(t.notes));
+
+	if (matching.length === 0) return 0;
+
+	const now = new Date();
+
+	// Update in a Dexie transaction
+	await db.transaction('rw', db.transactions, async () => {
+		for (const tx of matching) {
+			const newNotes = stripTag(tx.notes!, normalizedTag);
+			await db.transactions.update(tx.id!, {
+				notes: newNotes || undefined,
+				updatedAt: now
+			});
+		}
+	});
+
+	// Update cache if loaded
+	const cache = getTransactionCache();
+	if (cache.isLoaded) {
+		for (const tx of matching) {
+			const newNotes = stripTag(tx.notes!, normalizedTag);
+			cache.update(tx.id!, { notes: newNotes || undefined, updatedAt: now });
+		}
+		tagIndex.rebuild(cache.getAll());
+	}
+
+	invalidateTransactionCaches();
+	await persistData();
+	return matching.length;
 }
