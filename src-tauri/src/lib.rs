@@ -26,12 +26,17 @@ pub fn run() {
     .expect("error while building tauri application");
 
   app.run(|app_handle, event| {
-    if let tauri::RunEvent::Reopen { .. } = event {
-      // Re-show and focus the window when the dock icon is clicked
-      if let Some(window) = app_handle.get_webview_window("main") {
-        window.show().unwrap_or_default();
-        window.set_focus().unwrap_or_default();
+    match event {
+      tauri::RunEvent::Reopen { .. } | tauri::RunEvent::Resumed => {
+        // Re-show and focus the window when:
+        // - Dock icon is clicked (Reopen)
+        // - App is activated, e.g. via notification click (Resumed)
+        if let Some(window) = app_handle.get_webview_window("main") {
+          window.show().unwrap_or_default();
+          window.set_focus().unwrap_or_default();
+        }
       }
+      _ => {}
     }
   });
 }

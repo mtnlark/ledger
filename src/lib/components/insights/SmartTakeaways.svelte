@@ -103,7 +103,7 @@
 		const today = new Date();
 		const currentDay = today.getDate();
 		const daysInMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
-		const totalSpent = engine.getTotalSpent(pastTransactions, selectedMonth);
+		const totalSpent = engine.getTotalSpent(pastTransactions, `${selectedMonth}-past`);
 		return engine.getPaceProjection(totalSpent, budget, currentDay, daysInMonth, selectedMonth);
 	});
 
@@ -159,7 +159,7 @@
 
 		const today = new Date();
 		const currentDay = today.getDate();
-		const currentTotal = engine.getTotalSpent(pastTransactions, selectedMonth);
+		const currentTotal = engine.getTotalSpent(pastTransactions, `${selectedMonth}-past`);
 
 		const prevMonthDate = parseMonthKey(previousMonthKey);
 		const daysInPrevMonth = new Date(prevMonthDate.getFullYear(), prevMonthDate.getMonth() + 1, 0).getDate();

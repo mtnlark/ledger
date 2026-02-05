@@ -33,18 +33,18 @@
 	// Month display
 	let monthDisplay = $derived(format(parseMonthKey(currentMonth), 'MMMM yyyy'));
 
-	// Calculate totals
-	let totalSpent = $derived(engine.getTotalSpent(transactions, currentMonth));
+	// Transactions up to today (excludes future-dated recurring entries) for current month
+	// For past months, use all transactions
+	let displayTransactions = $derived(isCurrentMonth ? filterUpToDate(transactions) : transactions);
 
-	// Transactions up to today (excludes future-dated recurring entries) for pace calculations
-	let pastTransactions = $derived(isCurrentMonth ? filterUpToDate(transactions) : transactions);
-	let pastTotalSpent = $derived(engine.getTotalSpent(pastTransactions, `${currentMonth}-past`));
+	// Calculate totals using filtered transactions for consistency
+	let totalSpent = $derived(engine.getTotalSpent(displayTransactions, isCurrentMonth ? `${currentMonth}-past` : currentMonth));
 
 	// Quick stats
-	let sharedCount = $derived(transactions.filter((t) => t.isShared).length);
-	let avgTransaction = $derived(transactions.length > 0 ? totalSpent / transactions.length : 0);
+	let sharedCount = $derived(displayTransactions.filter((t) => t.isShared).length);
+	let avgTransaction = $derived(displayTransactions.length > 0 ? totalSpent / displayTransactions.length : 0);
 
-	// Spending velocity comparison (uses only past transactions to avoid future-dated inflation)
+	// Spending velocity comparison (uses displayTransactions which already filters future-dated for current month)
 	let velocityComparison = $derived.by(() => {
 		// Get previous month key
 		const currentDate = parseMonthKey(currentMonth);
@@ -67,7 +67,7 @@
 		const historicalTotals = Array.from(monthlyTrends.values());
 
 		return calculateVelocityComparison(
-			pastTotalSpent,
+			totalSpent,
 			prevTotal,
 			currentDays,
 			prevDays,
@@ -79,7 +79,7 @@
 	// Top 5 merchants by spending (user's portion)
 	let topMerchants = $derived.by(() => {
 		const merchantTotals = new Map<string, number>();
-		for (const t of transactions) {
+		for (const t of displayTransactions) {
 			if (!t.merchant) continue;
 			const userAmount = t.isShared ? t.amount - t.partnerShare : t.amount;
 			merchantTotals.set(t.merchant, (merchantTotals.get(t.merchant) || 0) + userAmount);
@@ -94,7 +94,7 @@
 	let sharedBreakdown = $derived.by(() => {
 		let personal = 0;
 		let sharedUserPortion = 0;
-		for (const t of transactions) {
+		for (const t of displayTransactions) {
 			if (t.isShared) {
 				sharedUserPortion += t.amount - t.partnerShare;
 			} else {
@@ -122,7 +122,7 @@
 					{formatCurrency(totalSpent)}
 				</p>
 				<p class="text-sm text-charcoal-muted">
-					{transactions.length} transaction{transactions.length !== 1 ? 's' : ''}
+					{displayTransactions.length} transaction{transactions.length !== 1 ? 's' : ''}
 				</p>
 			</div>
 			{#if velocityComparison}
@@ -148,7 +148,7 @@
 		{#if transactions.length > 0}
 			<div class="grid grid-cols-3 gap-3">
 				<div class="bg-surface-alt rounded-lg p-3 text-center">
-					<p class="font-mono text-lg font-medium text-charcoal">{transactions.length}</p>
+					<p class="font-mono text-lg font-medium text-charcoal">{displayTransactions.length}</p>
 					<p class="text-xs text-charcoal-muted">Transactions</p>
 				</div>
 				<div class="bg-surface-alt rounded-lg p-3 text-center">
