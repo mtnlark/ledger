@@ -111,7 +111,8 @@ ledger/
 │   │   │   ├── tags.svelte.ts       # Reactive TagIndex wrapper ($state version)
 │   │   │   ├── selectedMonth.ts    # UI state for month selection
 │   │   │   ├── theme.ts            # Light/dark/system theme
-│   │   │   └── toast.ts            # Toast notification system
+│   │   │   ├── toast.ts            # Toast notification system
+│   │   │   └── undo.ts             # Undo store for recoverable deletions
 │   │   ├── notifications/        # Native macOS notification system
 │   │   │   ├── index.ts          # Public API (init, cleanup)
 │   │   │   ├── tauri-notifications.ts  # Tauri plugin wrapper
@@ -273,6 +274,8 @@ interface Transaction {
   parentTransactionId?: number;   // Links split children to parent
   isSplitParent?: boolean;        // True if split into children
   notes?: string;
+  isDeleted?: boolean;            // Soft delete flag (for undo support)
+  deletedAt?: Date;               // When transaction was soft-deleted
   createdAt: Date;
   updatedAt: Date;
 }
@@ -491,6 +494,15 @@ Sidebar state persists to localStorage (`ledger-sidebar-expanded`).
 - Mark transactions as subscriptions (monthly/annual)
 - Track cancelled subscriptions
 - Confirm active subscriptions to override staleness detection
+
+### Undo System
+- Recoverable deletions with 5-second undo window
+- **Soft delete pattern**: Deleted transactions marked with `isDeleted: true` rather than hard delete
+- Toast notification with "Undo" action button and countdown progress bar
+- Singleton behavior: new deletes replace previous undo toast
+- **Startup cleanup**: Soft-deleted transactions permanently purged on app launch
+- Survives app crashes during undo window (transactions can be recovered until next app launch)
+- Integrated with both single and bulk delete operations
 
 ---
 

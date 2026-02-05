@@ -6,12 +6,26 @@
 	import { settings, updateSettings } from '$lib/stores/settings';
 	import { applyTheme, initThemeListener } from '$lib/stores/theme';
 	import { initNotifications, cleanupNotifications, isNotificationPermissionGranted } from '$lib/notifications';
+	import { purgeDeletedTransactions } from '$lib/stores/transactions';
 	import { db } from '$lib/db';
 	import { onDestroy } from 'svelte';
 
 	let { children } = $props();
 
 	let cleanupListener: (() => void) | null = null;
+	let hasPurgedDeleted = false;
+
+	// One-time startup cleanup: permanently remove soft-deleted transactions from previous sessions
+	$effect(() => {
+		if (hasPurgedDeleted) return;
+		hasPurgedDeleted = true;
+
+		purgeDeletedTransactions().then((count) => {
+			if (count > 0 && import.meta.env.DEV) {
+				console.log(`Purged ${count} soft-deleted transactions from previous session`);
+			}
+		});
+	});
 
 	// Apply theme reactively when settings change
 	$effect(() => {

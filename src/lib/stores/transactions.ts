@@ -27,34 +27,34 @@ function invalidateTransactionCaches(): void {
 }
 
 // Reactive transactions for current month
-// Filters out split parent transactions (they've been replaced by children)
+// Filters out split parent transactions and soft-deleted transactions
 export function createTransactionsStore(month: string) {
 	const { start, end } = getMonthDateRange(month);
 	return liveQuery(() =>
 		db.transactions
 			.where('date')
 			.between(start, end, true, true)
-			.filter((t) => !t.isSplitParent)
+			.filter((t) => !t.isSplitParent && !t.isDeleted)
 			.reverse()
 			.sortBy('date')
 	);
 }
 
 // Get all transactions for a month using indexed date range query
-// Filters out split parent transactions (they've been replaced by children)
+// Filters out split parent transactions and soft-deleted transactions
 export async function getTransactionsByMonth(month: string): Promise<Transaction[]> {
 	const { start, end } = getMonthDateRange(month);
 	const transactions = await db.transactions
 		.where('date')
 		.between(start, end, true, true)
-		.filter((t) => !t.isSplitParent)
+		.filter((t) => !t.isSplitParent && !t.isDeleted)
 		.reverse()
 		.sortBy('date');
 	return transactions;
 }
 
 // Get transactions within a date range using indexed query
-// Filters out split parent transactions (they've been replaced by children)
+// Filters out split parent transactions and soft-deleted transactions
 export async function getTransactionsByDateRange(
 	fromDate?: Date,
 	toDate?: Date
@@ -70,7 +70,7 @@ export async function getTransactionsByDateRange(
 	return db.transactions
 		.where('date')
 		.between(start, end, true, true)
-		.filter((t) => !t.isSplitParent)
+		.filter((t) => !t.isSplitParent && !t.isDeleted)
 		.reverse()
 		.sortBy('date');
 }
@@ -227,6 +227,123 @@ export async function bulkDeleteTransactions(ids: number[]): Promise<void> {
 	await persistData();
 }
 
+// Soft delete a transaction (marks as deleted but keeps in DB for undo)
+// Returns the transaction data for undo capture, or null if not found
+export async function softDeleteTransaction(id: number): Promise<Transaction | null> {
+	const transaction = await db.transactions.get(id);
+	if (!transaction) return null;
+
+	const now = new Date();
+	await db.transactions.update(id, {
+		isDeleted: true,
+		deletedAt: now,
+		updatedAt: now
+	});
+
+	// Update the cache incrementally
+	const cache = getTransactionCache();
+	if (cache.isLoaded) {
+		cache.update(id, { isDeleted: true, deletedAt: now, updatedAt: now });
+		tagIndex.rebuild(cache.getAll());
+	}
+
+	invalidateTransactionCaches();
+	await persistData();
+	return transaction;
+}
+
+// Soft delete multiple transactions
+// Returns the deleted transactions for undo capture
+export async function softDeleteTransactions(ids: number[]): Promise<Transaction[]> {
+	if (ids.length === 0) return [];
+
+	// Get transactions before deleting
+	const transactions = await db.transactions.where('id').anyOf(ids).toArray();
+	if (transactions.length === 0) return [];
+
+	const now = new Date();
+	await db.transactions.where('id').anyOf(ids).modify({
+		isDeleted: true,
+		deletedAt: now,
+		updatedAt: now
+	});
+
+	// Update the cache incrementally
+	const cache = getTransactionCache();
+	if (cache.isLoaded) {
+		cache.bulkUpdate(ids, { isDeleted: true, deletedAt: now, updatedAt: now });
+		tagIndex.rebuild(cache.getAll());
+	}
+
+	invalidateTransactionCaches();
+	await persistData();
+	return transactions;
+}
+
+// Restore a soft-deleted transaction
+export async function restoreTransaction(id: number): Promise<void> {
+	const now = new Date();
+	await db.transactions.update(id, {
+		isDeleted: false,
+		deletedAt: undefined,
+		updatedAt: now
+	});
+
+	// Update the cache incrementally
+	const cache = getTransactionCache();
+	if (cache.isLoaded) {
+		cache.update(id, { isDeleted: false, deletedAt: undefined, updatedAt: now });
+		tagIndex.rebuild(cache.getAll());
+	}
+
+	invalidateTransactionCaches();
+	await persistData();
+}
+
+// Restore multiple soft-deleted transactions
+export async function restoreTransactions(ids: number[]): Promise<void> {
+	if (ids.length === 0) return;
+
+	const now = new Date();
+	await db.transactions.where('id').anyOf(ids).modify({
+		isDeleted: false,
+		deletedAt: undefined,
+		updatedAt: now
+	});
+
+	// Update the cache incrementally
+	const cache = getTransactionCache();
+	if (cache.isLoaded) {
+		cache.bulkUpdate(ids, { isDeleted: false, deletedAt: undefined, updatedAt: now });
+		tagIndex.rebuild(cache.getAll());
+	}
+
+	invalidateTransactionCaches();
+	await persistData();
+}
+
+// Permanently delete all soft-deleted transactions
+// Called on app startup to clean up items that weren't undone
+// Returns the count of purged transactions
+export async function purgeDeletedTransactions(): Promise<number> {
+	const deleted = await db.transactions.filter((t) => t.isDeleted === true).toArray();
+	if (deleted.length === 0) return 0;
+
+	const ids = deleted.map((t) => t.id!);
+	await db.transactions.where('id').anyOf(ids).delete();
+
+	// Update the cache incrementally
+	const cache = getTransactionCache();
+	if (cache.isLoaded) {
+		cache.bulkRemove(ids);
+		tagIndex.rebuild(cache.getAll());
+	}
+
+	invalidateTransactionCaches();
+	await persistData();
+	return deleted.length;
+}
+
 // Bulk update category for transactions
 export async function bulkUpdateCategory(ids: number[], categoryId: number): Promise<void> {
 	if (ids.length === 0) return;
@@ -364,10 +481,10 @@ export async function markAsSettled(ids: number[]): Promise<void> {
 
 // Get unsettled transactions (sorted by date, most recent first)
 // Note: IndexedDB doesn't support boolean index keys, so we use filter
-// Filters out split parent transactions (they've been replaced by children)
+// Filters out split parent transactions and soft-deleted transactions
 export async function getUnsettledTransactions(): Promise<Transaction[]> {
 	return db.transactions
-		.filter((t) => t.isShared && !t.isSettled && !t.isSplitParent)
+		.filter((t) => t.isShared && !t.isSettled && !t.isSplitParent && !t.isDeleted)
 		.reverse()
 		.sortBy('date');
 }
@@ -407,11 +524,11 @@ export async function getMonthlySpendingTrends(months: string[]): Promise<Map<st
 	const { end } = getMonthDateRange(lastMonth);
 
 	// Only load transactions within the requested date range
-	// Exclude split parent transactions (they've been replaced by children)
+	// Exclude split parent transactions and soft-deleted transactions
 	const transactions = await db.transactions
 		.where('date')
 		.between(start, end, true, true)
-		.filter((t) => !t.isSplitParent)
+		.filter((t) => !t.isSplitParent && !t.isDeleted)
 		.toArray();
 
 	// Sum spending for each month
@@ -499,13 +616,13 @@ export async function getCategoryTrends(
 	const { end } = getMonthDateRange(lastMonth);
 
 	// Use categoryId index and filter by date range
-	// Exclude split parent transactions (they've been replaced by children)
+	// Exclude split parent transactions and soft-deleted transactions
 	const transactions = await db.transactions
 		.where('categoryId')
 		.equals(categoryId)
 		.filter((t) => {
 			const date = new Date(t.date);
-			return date >= start && date <= end && !t.isSplitParent;
+			return date >= start && date <= end && !t.isSplitParent && !t.isDeleted;
 		})
 		.toArray();
 

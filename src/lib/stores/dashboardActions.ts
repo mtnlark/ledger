@@ -8,11 +8,14 @@ import {
 	splitTransaction as storeSplitTransaction,
 	getTransactionsByMonth,
 	getAllTransactions,
-	getAvailableMonths
+	getAvailableMonths,
+	softDeleteTransaction,
+	softDeleteTransactions
 } from '$lib/stores/transactions';
 import { cancelSubscription as storeCancelSubscription } from '$lib/stores/settings';
 import { toast } from '$lib/stores/toast';
 import { handleError } from '$lib/utils/error-handler';
+import { undoStore } from '$lib/stores/undo';
 
 /**
  * Data shape for adding a single transaction.
@@ -211,14 +214,18 @@ export function setupDashboardActions(ctx: DashboardContext) {
 		},
 
 		/**
-		 * Delete a single transaction.
+		 * Delete a single transaction with undo support.
+		 * Uses soft delete so transaction can be restored within undo window.
 		 * Note: the confirm dialog is managed by the page, not here.
 		 */
 		async deleteTransaction(id: number): Promise<void> {
 			try {
-				await storeDeleteTransaction(id);
+				const deleted = await softDeleteTransaction(id);
 				await reloadAfterMutation();
-				toast.success('Transaction deleted');
+				if (deleted) {
+					undoStore.capture([deleted]);
+				}
+				// Undo toast handles messaging - no toast.success() here
 			} catch (error) {
 				handleError(error, {
 					context: 'deleteTransaction',
@@ -228,18 +235,18 @@ export function setupDashboardActions(ctx: DashboardContext) {
 		},
 
 		/**
-		 * Delete multiple transactions at once.
+		 * Delete multiple transactions at once with undo support.
+		 * Uses soft delete so transactions can be restored within undo window.
 		 * Note: the confirm dialog is managed by the page, not here.
 		 */
 		async bulkDelete(ids: number[]): Promise<void> {
 			try {
-				await bulkDeleteTransactions(ids);
+				const deleted = await softDeleteTransactions(ids);
 				await reloadAfterMutation();
-				toast.success(
-					ids.length === 1
-						? 'Transaction deleted'
-						: `${ids.length} transactions deleted`
-				);
+				if (deleted.length > 0) {
+					undoStore.capture(deleted);
+				}
+				// Undo toast handles messaging - no toast.success() here
 			} catch (error) {
 				handleError(error, {
 					context: 'bulkDelete',

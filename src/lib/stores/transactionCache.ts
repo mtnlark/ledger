@@ -159,29 +159,29 @@ export class TransactionCache {
 	}
 
 	/**
-	 * Get all transactions (excluding split parents)
+	 * Get all transactions (excluding split parents and soft-deleted)
 	 */
 	getAll(): CachedTransaction[] {
 		if (!this._isLoaded) return [];
-		return Array.from(this.cache.values()).filter((t) => !t.isSplitParent);
+		return Array.from(this.cache.values()).filter((t) => !t.isSplitParent && !t.isDeleted);
 	}
 
 	/**
-	 * Get transactions for a specific month (excluding split parents)
+	 * Get transactions for a specific month (excluding split parents and soft-deleted)
 	 * @param month Month in "YYYY-MM" format
 	 */
 	getForMonth(month: string): CachedTransaction[] {
 		if (!this._isLoaded) return [];
 
 		return Array.from(this.cache.values()).filter((t) => {
-			if (t.isSplitParent) return false;
+			if (t.isSplitParent || t.isDeleted) return false;
 			const txMonth = getMonthKey(new Date(t.date));
 			return txMonth === month;
 		});
 	}
 
 	/**
-	 * Get transactions within a date range (excluding split parents)
+	 * Get transactions within a date range (excluding split parents and soft-deleted)
 	 * Both dates are inclusive
 	 */
 	getForDateRange(fromDate: Date, toDate: Date): CachedTransaction[] {
@@ -192,7 +192,7 @@ export class TransactionCache {
 		const end = new Date(toDate.getFullYear(), toDate.getMonth(), toDate.getDate(), 23, 59, 59, 999);
 
 		return Array.from(this.cache.values()).filter((t) => {
-			if (t.isSplitParent) return false;
+			if (t.isSplitParent || t.isDeleted) return false;
 			const txDate = new Date(t.date);
 			return txDate >= start && txDate <= end;
 		});

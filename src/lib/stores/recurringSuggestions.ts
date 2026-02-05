@@ -55,8 +55,8 @@ function isAlreadyAdded(suggestion: RecurringSuggestion, monthTxns: Transaction[
 	const normalized = suggestion.id;
 
 	return monthTxns.some((tx) => {
-		// Skip split parent transactions (they've been replaced by children)
-		if (tx.isSplitParent) return false;
+		// Skip split parent and soft-deleted transactions
+		if (tx.isSplitParent || tx.isDeleted) return false;
 		return normalizeMerchant(tx.merchant) === normalized;
 	});
 }

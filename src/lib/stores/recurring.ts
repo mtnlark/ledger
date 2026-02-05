@@ -188,8 +188,8 @@ export async function detectRecurringExpenses(): Promise<DetectedRecurring[]> {
 		return [];
 	}
 
-	// Filter out split parent transactions (they've been replaced by children)
-	const activeTransactions = allTransactions.filter((tx) => !tx.isSplitParent);
+	// Filter out split parent and soft-deleted transactions
+	const activeTransactions = allTransactions.filter((tx) => !tx.isSplitParent && !tx.isDeleted);
 
 	// Get dismissed merchants to filter out
 	const dismissedMerchants = await getDismissedRecurring();

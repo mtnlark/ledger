@@ -17,6 +17,8 @@ export interface Transaction {
 	subscriptionFrequency?: 'monthly' | 'annual'; // Billing frequency for subscriptions
 	parentTransactionId?: number; // Links split children to their parent transaction
 	isSplitParent?: boolean; // True if this transaction has been split into children
+	isDeleted?: boolean; // True if soft-deleted (awaiting permanent removal or undo)
+	deletedAt?: Date; // When the transaction was soft-deleted
 	createdAt: Date;
 	updatedAt: Date;
 }

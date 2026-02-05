@@ -1,17 +1,39 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // Mock all store dependencies before importing the module under test
-vi.mock('$lib/stores/transactions', () => ({
-	addTransaction: vi.fn().mockResolvedValue(1),
-	updateTransaction: vi.fn().mockResolvedValue(undefined),
-	deleteTransaction: vi.fn().mockResolvedValue(undefined),
-	bulkDeleteTransactions: vi.fn().mockResolvedValue(undefined),
-	bulkUpdateCategory: vi.fn().mockResolvedValue(undefined),
-	splitTransaction: vi.fn().mockResolvedValue([2, 3]),
-	getTransactionsByMonth: vi.fn().mockResolvedValue([]),
-	getAllTransactions: vi.fn().mockResolvedValue([]),
-	getAvailableMonths: vi.fn().mockResolvedValue(['2026-01'])
-}));
+vi.mock('$lib/stores/transactions', () => {
+	// Mock transaction for soft delete return value - defined inside factory to avoid hoisting issues
+	const mockDeletedTransaction = {
+		id: 1,
+		date: new Date('2026-01-15'),
+		merchant: 'Test Store',
+		amount: 42.5,
+		categoryId: 1,
+		isShared: false,
+		isSettled: false,
+		splitType: 'percentage' as const,
+		splitValue: 0.5,
+		partnerShare: 0,
+		isEssential: false,
+		isSubscription: false,
+		createdAt: new Date(),
+		updatedAt: new Date()
+	};
+
+	return {
+		addTransaction: vi.fn().mockResolvedValue(1),
+		updateTransaction: vi.fn().mockResolvedValue(undefined),
+		deleteTransaction: vi.fn().mockResolvedValue(undefined),
+		bulkDeleteTransactions: vi.fn().mockResolvedValue(undefined),
+		bulkUpdateCategory: vi.fn().mockResolvedValue(undefined),
+		splitTransaction: vi.fn().mockResolvedValue([2, 3]),
+		getTransactionsByMonth: vi.fn().mockResolvedValue([]),
+		getAllTransactions: vi.fn().mockResolvedValue([]),
+		getAvailableMonths: vi.fn().mockResolvedValue(['2026-01']),
+		softDeleteTransaction: vi.fn().mockResolvedValue(mockDeletedTransaction),
+		softDeleteTransactions: vi.fn().mockResolvedValue([mockDeletedTransaction])
+	};
+});
 
 vi.mock('$lib/stores/settings', () => ({
 	cancelSubscription: vi.fn().mockResolvedValue(undefined)
@@ -19,6 +41,10 @@ vi.mock('$lib/stores/settings', () => ({
 
 vi.mock('$lib/stores/toast', () => ({
 	toast: { success: vi.fn(), error: vi.fn(), warning: vi.fn() }
+}));
+
+vi.mock('$lib/stores/undo', () => ({
+	undoStore: { capture: vi.fn() }
 }));
 
 vi.mock('$lib/utils/error-handler', () => ({
@@ -35,10 +61,13 @@ import {
 	splitTransaction,
 	getTransactionsByMonth,
 	getAllTransactions,
-	getAvailableMonths
+	getAvailableMonths,
+	softDeleteTransaction,
+	softDeleteTransactions
 } from '$lib/stores/transactions';
 import { cancelSubscription } from '$lib/stores/settings';
 import { toast } from '$lib/stores/toast';
+import { undoStore } from '$lib/stores/undo';
 import { handleError } from '$lib/utils/error-handler';
 
 describe('dashboardActions', () => {
@@ -310,10 +339,10 @@ describe('dashboardActions', () => {
 	// ─── deleteTransaction ─────────────────────────────────────────────
 
 	describe('deleteTransaction', () => {
-		it('calls store deleteTransaction with the id', async () => {
+		it('calls softDeleteTransaction with the id', async () => {
 			await actions.deleteTransaction(99);
 
-			expect(deleteTransaction).toHaveBeenCalledWith(99);
+			expect(softDeleteTransaction).toHaveBeenCalledWith(99);
 		});
 
 		it('reloads transactions and available months', async () => {
@@ -324,15 +353,15 @@ describe('dashboardActions', () => {
 			expect(reloadFn).toHaveBeenCalled();
 		});
 
-		it('toasts success', async () => {
+		it('captures deleted transaction for undo', async () => {
 			await actions.deleteTransaction(99);
 
-			expect(toast.success).toHaveBeenCalledWith('Transaction deleted');
+			expect(undoStore.capture).toHaveBeenCalled();
 		});
 
 		it('calls handleError on failure', async () => {
 			const error = new Error('delete fail');
-			vi.mocked(deleteTransaction).mockRejectedValueOnce(error);
+			vi.mocked(softDeleteTransaction).mockRejectedValueOnce(error);
 
 			await actions.deleteTransaction(99);
 
@@ -346,10 +375,10 @@ describe('dashboardActions', () => {
 	// ─── bulkDelete ────────────────────────────────────────────────────
 
 	describe('bulkDelete', () => {
-		it('calls bulkDeleteTransactions with all ids', async () => {
+		it('calls softDeleteTransactions with all ids', async () => {
 			await actions.bulkDelete([1, 2, 3]);
 
-			expect(bulkDeleteTransactions).toHaveBeenCalledWith([1, 2, 3]);
+			expect(softDeleteTransactions).toHaveBeenCalledWith([1, 2, 3]);
 		});
 
 		it('reloads data including allTransactions when available', async () => {
@@ -364,21 +393,15 @@ describe('dashboardActions', () => {
 			expect(getAllTransactions).toHaveBeenCalled();
 		});
 
-		it('toasts with singular message for 1 item', async () => {
-			await actions.bulkDelete([1]);
-
-			expect(toast.success).toHaveBeenCalledWith('Transaction deleted');
-		});
-
-		it('toasts with plural message for multiple items', async () => {
+		it('captures deleted transactions for undo', async () => {
 			await actions.bulkDelete([1, 2, 3]);
 
-			expect(toast.success).toHaveBeenCalledWith('3 transactions deleted');
+			expect(undoStore.capture).toHaveBeenCalled();
 		});
 
 		it('calls handleError on failure', async () => {
 			const error = new Error('bulk delete fail');
-			vi.mocked(bulkDeleteTransactions).mockRejectedValueOnce(error);
+			vi.mocked(softDeleteTransactions).mockRejectedValueOnce(error);
 
 			await actions.bulkDelete([1, 2]);
 

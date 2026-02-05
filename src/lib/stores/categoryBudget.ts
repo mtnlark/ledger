@@ -95,7 +95,7 @@ async function getCategorySpendingForMonth(categoryId: number, month: string): P
 	const transactions = await db.transactions
 		.where('date')
 		.between(start, end, true, true)
-		.filter((t) => t.categoryId === categoryId && !t.isSplitParent)
+		.filter((t) => t.categoryId === categoryId && !t.isSplitParent && !t.isDeleted)
 		.toArray();
 
 	// Sum user's portion
@@ -157,7 +157,7 @@ export async function calculateSuggestedBudget(
 	const transactions = await db.transactions
 		.where('date')
 		.between(start, end, true, true)
-		.filter((t) => t.categoryId === categoryId && !t.isSplitParent)
+		.filter((t) => t.categoryId === categoryId && !t.isSplitParent && !t.isDeleted)
 		.toArray();
 
 	// Group by month and calculate spending
@@ -228,7 +228,7 @@ export async function generateAllSuggestions(month: string): Promise<Map<number,
 	const transactions = await db.transactions
 		.where('date')
 		.between(start, end, true, true)
-		.filter((t) => !t.isSplitParent)
+		.filter((t) => !t.isSplitParent && !t.isDeleted)
 		.toArray();
 
 	// Build spending map: Map<categoryId, Map<monthKey, spending>>
@@ -332,7 +332,7 @@ export async function getAllCategorySpending(month: string): Promise<Map<number,
 	const transactions = await db.transactions
 		.where('date')
 		.between(start, end, true, true)
-		.filter((t) => !t.isSplitParent)
+		.filter((t) => !t.isSplitParent && !t.isDeleted)
 		.toArray();
 
 	const spending = new Map<number, number>();
