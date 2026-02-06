@@ -293,6 +293,10 @@
     border-color: var(--color-border) !important;
   }
 
+  .divide-theme-dashed > :not([hidden]) ~ :not([hidden]) {
+    border-color: var(--color-border-dashed) !important;
+  }
+
   /* Softer category icon borders in dark mode - desaturate slightly */
   .dark .category-icon-box {
     filter: saturate(0.75) brightness(0.9);
@@ -303,6 +307,7 @@
   .dark .divide-y > :not([hidden]) ~ :not([hidden]) {
     border-color: rgba(250, 248, 245, 0.06) !important;
   }
+
 
   /* Card entrance animation */
   .animate-enter {

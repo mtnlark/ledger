@@ -201,28 +201,31 @@
 			{@const maxMerchant = topMerchants[0]?.amount || 1}
 			<div>
 				<h3 class="text-sm font-medium text-charcoal-soft mb-3">Top Merchants</h3>
-				<div class="rounded-lg border border-theme overflow-hidden divide-y divide-theme">
+				<div class="rounded-lg overflow-hidden">
 					{#each topMerchants as { merchant, amount }, i}
 						{@const pct = (amount / maxMerchant) * 100}
 						<div class="relative flex items-center px-4 py-3 bg-surface">
 							<!-- Fill bar background -->
 							<div
-								class="absolute inset-y-0 left-0 bg-primary-500/[0.06] transition-all duration-500"
+								class="absolute inset-y-0 left-0 bg-gradient-to-r from-primary-500/15 via-primary-500/7 to-transparent transition-all duration-500"
 								style="width: {pct}%"
 							></div>
 							<!-- Rank -->
 							<span
 								class="relative z-10 w-6 h-6 rounded-full flex items-center justify-center text-xs font-mono shrink-0
-									{i === 0 ? 'bg-primary-500 text-white font-medium' : 'bg-surface-alt text-charcoal-muted'}"
+									{i === 0 ? 'bg-primary-500 text-white font-medium' : i <= 2 ? 'border-2 border-primary-300 text-primary-700 bg-surface' : 'bg-surface-alt text-charcoal-muted'}"
 							>
 								{i + 1}
 							</span>
 							<!-- Name -->
-							<span class="relative z-10 text-sm text-charcoal truncate ml-3 flex-1">{merchant}</span>
+							<span class="relative z-10 text-sm text-charcoal truncate ml-3 min-w-0">{merchant}</span>
 							<!-- Ledger dot leader -->
 							<span class="ledger-line relative z-10"></span>
-							<!-- Amount -->
+							<!-- Amount + percentage -->
 							<span class="relative z-10 font-mono text-sm font-medium text-charcoal shrink-0">{formatCurrency(amount)}</span>
+							{#if topMerchants.length > 1}
+								<span class="relative z-10 text-xs text-charcoal-muted ml-1.5 shrink-0">{Math.round((amount / totalSpent) * 100)}%</span>
+							{/if}
 						</div>
 					{/each}
 				</div>
@@ -237,9 +240,9 @@
 				<h3 class="text-sm font-medium text-charcoal-soft mb-3">Personal vs. Shared</h3>
 				<div class="rounded-lg border border-theme overflow-hidden bg-surface">
 					<!-- Proportional bar -->
-					<div class="h-2 flex">
+					<div class="h-3 flex rounded-full overflow-hidden mx-4 mt-4">
 						<div
-							class="bg-charcoal/60 transition-all duration-500"
+							class="bg-neutral-500 transition-all duration-500"
 							style="width: {personalPercent}%"
 						></div>
 						<div
@@ -248,13 +251,13 @@
 						></div>
 					</div>
 					<!-- Stats -->
-					<div class="grid grid-cols-2 divide-x divide-theme">
+					<div class="grid grid-cols-2">
 						<div class="px-4 py-3">
 							<div class="flex items-center gap-2 mb-1">
-								<div class="w-2.5 h-2.5 rounded-sm bg-charcoal/60 shrink-0"></div>
+								<div class="w-2.5 h-2.5 rounded-sm bg-neutral-500 shrink-0"></div>
 								<span class="text-xs text-charcoal-muted uppercase tracking-wide">Personal</span>
 							</div>
-							<p class="font-mono text-lg font-medium text-charcoal">{formatCurrency(sharedBreakdown.personal)}</p>
+							<p class="font-mono {sharedBreakdown.personal >= sharedBreakdown.shared ? 'text-lg' : 'text-base'} font-medium text-charcoal">{formatCurrency(sharedBreakdown.personal)}</p>
 							<p class="text-xs text-charcoal-muted mt-0.5">{personalPercent}% of spending</p>
 						</div>
 						<div class="px-4 py-3">
@@ -262,7 +265,7 @@
 								<div class="w-2.5 h-2.5 rounded-sm bg-primary-400 shrink-0"></div>
 								<span class="text-xs text-charcoal-muted uppercase tracking-wide">Shared</span>
 							</div>
-							<p class="font-mono text-lg font-medium text-charcoal">{formatCurrency(sharedBreakdown.shared)}</p>
+							<p class="font-mono {sharedBreakdown.shared >= sharedBreakdown.personal ? 'text-lg' : 'text-base'} font-medium text-charcoal">{formatCurrency(sharedBreakdown.shared)}</p>
 							<p class="text-xs text-charcoal-muted mt-0.5">{sharedPercent}% · your portion</p>
 						</div>
 					</div>
