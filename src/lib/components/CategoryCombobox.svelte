@@ -132,7 +132,7 @@
 		aria-haspopup="listbox"
 		aria-autocomplete="list"
 		aria-controls="category-listbox"
-		class="w-full px-3 py-2 border border-[var(--color-border)] rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+		class="w-full px-3 py-2 border border-theme rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
 	/>
 
 	<!-- Dropdown arrow -->

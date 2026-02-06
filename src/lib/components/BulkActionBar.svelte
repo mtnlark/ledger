@@ -62,11 +62,14 @@
 	class="fixed bottom-0 left-0 right-0 z-40 bg-surface/95 backdrop-blur-sm border-t border-theme shadow-lg shadow-[var(--color-shadow)] animate-slide-up"
 >
 	<div class="max-w-4xl mx-auto px-4 py-3">
-		<div class="flex items-center justify-between gap-4">
+		<div class="flex items-center justify-between gap-4" role="toolbar" aria-label="Bulk actions">
 			<!-- Selected count -->
 			<div class="flex items-center gap-2">
 				<span class="text-sm font-medium text-charcoal">
 					{selectedCount} selected
+				</span>
+				<span class="sr-only" aria-live="polite" aria-atomic="true">
+					{selectedCount} transactions selected
 				</span>
 			</div>
 

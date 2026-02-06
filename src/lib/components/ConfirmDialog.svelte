@@ -99,7 +99,7 @@
 				<button
 					type="button"
 					onclick={onCancel}
-					class="flex-1 px-4 py-2.5 border border-[rgba(45,42,38,0.15)] text-charcoal-soft rounded-lg font-medium hover:bg-cream transition-colors"
+					class="flex-1 px-4 py-2.5 border border-theme text-charcoal-soft rounded-lg font-medium hover:bg-surface-hover transition-colors"
 				>
 					{cancelText}
 				</button>

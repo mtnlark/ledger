@@ -401,7 +401,7 @@
 						<button
 							onclick={handleSave}
 							disabled={isSaving}
-							class="px-5 py-2.5 bg-primary-500 text-white font-medium rounded-lg hover:bg-primary-600 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-primary-500/25 focus:ring-2 focus:ring-primary-500/20 focus:ring-offset-2 transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-none"
+							class="px-5 py-2.5 bg-primary-500 text-white font-medium rounded-lg hover:bg-primary-600 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-primary-500/25 active:scale-[0.97] focus:ring-2 focus:ring-primary-500/20 focus:ring-offset-2 transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-none"
 						>
 							{isSaving ? 'Saving...' : 'Save Settings'}
 						</button>
@@ -425,7 +425,7 @@
 								class="flex-1 flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all duration-150
 									{settings.theme === option.value
 										? 'border-primary-500 bg-primary-50'
-										: 'border-[var(--color-border)] hover:border-primary-300 hover:bg-surface-hover'}"
+										: 'border-theme hover:border-primary-300 hover:bg-surface-hover'}"
 							>
 								<option.icon size={24}
 									class={settings.theme === option.value ? 'text-primary-600' : 'text-charcoal-soft'} />
@@ -472,7 +472,7 @@
 							aria-label="Toggle notifications"
 							onclick={handleNotificationToggle}
 							class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:ring-offset-2
-								{settings.notificationsEnabled ? 'bg-primary-500' : 'bg-[#C5C0B8]'}"
+								{settings.notificationsEnabled ? 'bg-primary-500' : 'toggle-off'}"
 						>
 							<span
 								class="inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform
@@ -653,7 +653,7 @@
 							<button
 								onclick={handleCSVExport}
 								disabled={isExporting}
-								class="inline-flex items-center gap-2 px-4 py-2 bg-primary-500 text-white font-medium rounded-lg hover:bg-primary-600 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-primary-500/25 transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-none"
+								class="inline-flex items-center gap-2 px-4 py-2 bg-primary-500 text-white font-medium rounded-lg hover:bg-primary-600 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-primary-500/25 active:scale-[0.97] transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-none"
 							>
 								<Download size={16} />
 								Export to CSV
@@ -662,7 +662,7 @@
 							<button
 								onclick={handleJSONExport}
 								disabled={isExporting}
-								class="inline-flex items-center gap-2 px-4 py-2 bg-[#5C5751] text-white font-medium rounded-lg hover:bg-[#4A453F] hover:-translate-y-0.5 hover:shadow-lg transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-none"
+								class="inline-flex items-center gap-2 px-4 py-2 bg-charcoal-soft text-white font-medium rounded-lg hover:bg-charcoal hover:-translate-y-0.5 hover:shadow-lg active:scale-[0.97] transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-none"
 							>
 								<Database size={16} />
 								Full Backup (JSON)
@@ -709,7 +709,7 @@
 								disabled={!iCloudAvailable}
 								onclick={handleICloudToggle}
 								class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed
-									{settings.iCloudBackupEnabled ? 'bg-primary-500' : 'bg-[#C5C0B8]'}"
+									{settings.iCloudBackupEnabled ? 'bg-primary-500' : 'toggle-off'}"
 							>
 								<span
 									class="inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform

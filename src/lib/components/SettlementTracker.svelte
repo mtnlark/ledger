@@ -141,7 +141,7 @@
 							transaction.id!
 						)
 							? 'bg-success-500 border-success-500'
-							: 'border-[var(--color-border)]'}"
+							: 'border-theme'}"
 					>
 						{#if selectedIds.has(transaction.id!)}
 							<Check size={12} class="text-white" strokeWidth={3} />

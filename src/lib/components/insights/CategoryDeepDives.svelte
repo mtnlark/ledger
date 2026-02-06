@@ -212,7 +212,7 @@
 					id="category-select"
 					bind:value={selectedCategoryId}
 					onchange={() => hasUserSelected = true}
-					class="w-full px-3 py-2 bg-surface border border-[var(--color-border)] rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-charcoal"
+					class="w-full px-3 py-2 bg-surface border border-theme rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-charcoal"
 				>
 					{#each sortedCategories as cat}
 						{@const spent = categorySpending.get(cat.id!) || 0}

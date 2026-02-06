@@ -310,7 +310,7 @@
 							<input
 								type="checkbox"
 								bind:checked={isShared}
-								class="w-4 h-4 text-success-500 border-[var(--color-border)] rounded focus:ring-success-500/20"
+								class="w-4 h-4 text-success-500 border-theme rounded focus:ring-success-500/20"
 							/>
 							<span class="text-sm text-charcoal-soft">Shared with {settings.partnerName}</span>
 						</label>
@@ -319,7 +319,7 @@
 								<input
 									type="checkbox"
 									bind:checked={isSettled}
-									class="w-4 h-4 text-success-500 border-[var(--color-border)] rounded focus:ring-success-500/20"
+									class="w-4 h-4 text-success-500 border-theme rounded focus:ring-success-500/20"
 								/>
 								<span class="text-sm text-charcoal-soft">Already settled</span>
 							</label>
@@ -339,7 +339,7 @@
 					<button
 						type="submit"
 						disabled={!isValid || isSubmitting}
-						class="flex-1 bg-primary-500 text-white py-2.5 px-4 rounded-lg font-medium hover:bg-primary-600 focus:ring-2 focus:ring-primary-500/20 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-150 flex items-center justify-center gap-2"
+						class="flex-1 bg-primary-500 text-white py-2.5 px-4 rounded-lg font-medium hover:bg-primary-600 active:scale-[0.97] focus:ring-2 focus:ring-primary-500/20 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-150 flex items-center justify-center gap-2"
 					>
 						{#if isSubmitting}
 							<div class="animate-spin rounded-full h-4 w-4 border-2 border-white/30 border-t-white"></div>

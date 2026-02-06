@@ -62,7 +62,7 @@
 	</div>
 
 	<!-- Navigation items -->
-	<nav class="flex-1 py-4">
+	<nav class="flex-1 py-4" aria-label="Main navigation">
 		{#each navItems as item}
 			{@const active = isActive(item.href, $page.url.pathname)}
 			<a

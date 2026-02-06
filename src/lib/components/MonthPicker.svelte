@@ -20,6 +20,16 @@
 	}
 
 	let isOpen = $state(false);
+	let isNavigating = $state(false);
+	let pendingMonth = $state<string | null>(null);
+
+	// Reset navigating state when currentMonth prop changes
+	$effect(() => {
+		if (pendingMonth && currentMonth === pendingMonth) {
+			isNavigating = false;
+			pendingMonth = null;
+		}
+	});
 
 	// Format month for display
 	function formatMonth(monthKey: string): string {
@@ -40,18 +50,26 @@
 	function goPrev() {
 		if (canGoPrev) {
 			const idx = availableMonths.indexOf(currentMonth);
-			onMonthChange(availableMonths[idx - 1]);
+			const month = availableMonths[idx - 1];
+			isNavigating = true;
+			pendingMonth = month;
+			onMonthChange(month);
 		}
 	}
 
 	function goNext() {
 		if (canGoNext) {
 			const idx = availableMonths.indexOf(currentMonth);
-			onMonthChange(availableMonths[idx + 1]);
+			const month = availableMonths[idx + 1];
+			isNavigating = true;
+			pendingMonth = month;
+			onMonthChange(month);
 		}
 	}
 
 	function selectMonth(month: string) {
+		isNavigating = true;
+		pendingMonth = month;
 		onMonthChange(month);
 		isOpen = false;
 	}
@@ -66,6 +84,7 @@
 	<button
 		onclick={goPrev}
 		disabled={!canGoPrev}
+		aria-disabled={!canGoPrev}
 		class="p-2 hover:bg-surface-hover rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed text-charcoal-soft"
 		aria-label="Previous month"
 	>
@@ -80,7 +99,7 @@
 			aria-expanded={isOpen}
 			aria-haspopup="listbox"
 		>
-			<span>{formatMonth(currentMonth)}</span>
+			<span class={isNavigating ? 'opacity-50 transition-opacity' : 'transition-opacity'}>{formatMonth(currentMonth)}</span>
 			<ChevronDown size={16} class="text-charcoal-muted transition-transform {isOpen ? 'rotate-180' : ''}" />
 		</button>
 
@@ -115,6 +134,7 @@
 	<button
 		onclick={goNext}
 		disabled={!canGoNext}
+		aria-disabled={!canGoNext}
 		class="p-2 hover:bg-surface-hover rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed text-charcoal-soft"
 		aria-label="Next month"
 	>

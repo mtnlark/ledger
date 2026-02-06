@@ -162,6 +162,7 @@
 					type="text"
 					bind:this={searchInput}
 					placeholder={filters.searchAllTime ? "Search all transactions..." : "Search transactions..."}
+					aria-label="Search transactions"
 					value={filters.searchQuery}
 					oninput={(e) => handleSearchInput(e.currentTarget.value)}
 					class="w-full pl-10 pr-10 py-2.5 bg-cream rounded-lg border border-transparent focus:border-primary-300 focus:ring-2 focus:ring-primary-100 focus:bg-surface transition-all text-charcoal placeholder:text-charcoal-muted/60"
@@ -169,6 +170,7 @@
 				{#if filters.searchQuery}
 					<button
 						onclick={clearSearch}
+						aria-label="Clear search"
 						class="absolute right-3 top-1/2 -translate-y-1/2 text-charcoal-muted hover:text-charcoal transition-colors"
 					>
 						<X size={18} />
@@ -260,7 +262,7 @@
 							</button>
 						</div>
 						{#each availableTags as tag (tag)}
-							<div class="flex items-center gap-2 py-1.5 px-2 rounded-lg hover:bg-cream/50 group">
+							<div class="flex items-center gap-2 py-1.5 px-2 rounded-lg hover:bg-surface-hover/50 group">
 								{#if editingTag === tag}
 									<input
 										type="text"
@@ -306,6 +308,7 @@
 										onclick={() => confirmingDelete = tag}
 										class="opacity-0 group-hover:opacity-100 text-charcoal-muted hover:text-danger-500 transition-all"
 										title="Delete tag"
+										aria-label="Delete tag {tag}"
 									>
 										<X size={14} />
 									</button>
@@ -346,6 +349,7 @@
 								<button
 									type="button"
 									onclick={() => onFilterChange({ ...filters, tags: filters.tags.filter(t => t !== tag) })}
+									aria-label="Remove {tag} filter"
 									class="hover:text-primary-900"
 								>
 									<X size={12} />
@@ -384,7 +388,7 @@
 
 	<!-- Results count & Clear button -->
 	{#if hasActiveFilters}
-		<div class="px-4 py-2.5 bg-cream/50 border-t border-dashed border-theme-dashed flex items-center justify-between">
+		<div class="px-4 py-2.5 bg-surface-alt/50 border-t border-dashed border-theme-dashed flex items-center justify-between">
 			<span class="text-sm text-charcoal-muted">
 				{#if resultCount !== undefined}
 					{#if filters.searchAllTime && allTimeCount !== undefined}

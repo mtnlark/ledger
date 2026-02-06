@@ -18,6 +18,6 @@
 </script>
 
 <div
-	class="animate-pulse bg-gray-200 {roundedClasses[rounded]} {className}"
+	class="animate-pulse bg-surface-alt {roundedClasses[rounded]} {className}"
 	style="{width ? `width: ${width};` : ''} {height ? `height: ${height};` : ''}"
 ></div>

@@ -109,8 +109,8 @@
   --color-border: rgba(250, 248, 245, 0.1);
   --color-border-dashed: rgba(250, 248, 245, 0.15);
   --color-text: #EDE8E1;  /* Warmer cream instead of pure white */
-  --color-text-soft: #BDB7AD;
-  --color-text-muted: #8A847C;
+  --color-text-soft: #C5C0B8;
+  --color-text-muted: #A39D95;
   --color-shadow: rgba(0, 0, 0, 0.4);
   --color-ledger-line: rgba(250, 248, 245, 0.15);
 
@@ -205,6 +205,11 @@
 }
 
 @layer utilities {
+  /* Button press feedback */
+  .btn-press {
+    @apply active:scale-[0.97] transition-transform;
+  }
+
   .font-display {
     font-family: var(--font-display);
   }
@@ -224,6 +229,14 @@
 
   .text-charcoal-muted {
     color: var(--color-text-muted);
+  }
+
+  .bg-charcoal {
+    background-color: var(--color-text);
+  }
+
+  .bg-charcoal-soft {
+    background-color: var(--color-text-soft);
   }
 
   .bg-cream {

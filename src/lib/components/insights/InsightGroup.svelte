@@ -36,7 +36,7 @@
 <div class="bg-surface rounded-xl shadow-md shadow-[var(--color-shadow)] overflow-hidden card-interactive">
 	<!-- Header (always visible, clickable) -->
 	<button
-		class="w-full px-6 py-4 flex items-center justify-between hover:bg-cream/50 transition-colors"
+		class="w-full px-6 py-4 flex items-center justify-between hover:bg-surface-hover/50 transition-colors"
 		onclick={toggleExpanded}
 	>
 		<div class="text-left">

@@ -55,7 +55,7 @@
 		<input
 			type="checkbox"
 			bind:checked={isShared}
-			class="w-5 h-5 text-success-500 border-[var(--color-border)] rounded focus:ring-success-500/20"
+			class="w-5 h-5 text-success-500 border-theme rounded focus:ring-success-500/20"
 		/>
 		<span class="text-sm font-medium text-charcoal-soft">
 			Shared with {partnerName}
@@ -72,7 +72,7 @@
 					onclick={() => (splitType = 'percentage')}
 					class="px-3 py-1.5 text-sm font-medium rounded-lg transition-all duration-150 {splitType === 'percentage'
 						? 'bg-success-500 text-white shadow-sm'
-						: 'bg-surface text-charcoal-soft border border-[var(--color-border)] hover:bg-surface-hover'}"
+						: 'bg-surface text-charcoal-soft border border-theme hover:bg-surface-hover'}"
 				>
 					% Percentage
 				</button>
@@ -81,7 +81,7 @@
 					onclick={() => (splitType = 'fixed')}
 					class="px-3 py-1.5 text-sm font-medium rounded-lg transition-all duration-150 {splitType === 'fixed'
 						? 'bg-success-500 text-white shadow-sm'
-						: 'bg-surface text-charcoal-soft border border-[var(--color-border)] hover:bg-surface-hover'}"
+						: 'bg-surface text-charcoal-soft border border-theme hover:bg-surface-hover'}"
 				>
 					$ Fixed Amount
 				</button>
@@ -100,6 +100,7 @@
 						max="1"
 						step="0.05"
 						bind:value={splitValue}
+						aria-label="{partnerName}'s share percentage"
 						class="w-full accent-success-500"
 					/>
 				</div>
@@ -123,7 +124,7 @@
 							max={amount}
 							class="w-full pl-7 pr-3 py-2 bg-surface border rounded-lg focus:ring-2 transition-colors font-mono {splitValueInvalid
 								? 'border-warning-500 focus:ring-warning-500/20 focus:border-warning-500'
-								: 'border-[var(--color-border)] focus:ring-success-500/20 focus:border-success-500'}"
+								: 'border-theme focus:ring-success-500/20 focus:border-success-500'}"
 						/>
 					</div>
 					{#if splitValueInvalid}
@@ -152,7 +153,7 @@
 					<input
 						type="checkbox"
 						bind:checked={isSettled}
-						class="w-4 h-4 text-success-500 border-[var(--color-border)] rounded focus:ring-success-500/20"
+						class="w-4 h-4 text-success-500 border-theme rounded focus:ring-success-500/20"
 					/>
 					<span class="text-sm text-charcoal-soft">Already settled</span>
 				</label>

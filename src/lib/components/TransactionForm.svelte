@@ -101,6 +101,7 @@
 	let isSubscription = $state(false);
 	let subscriptionFrequency = $state<'monthly' | 'annual'>('monthly');
 	let futureDateConfirmed = $state(false);
+	let isSubmitting = $state(false);
 
 	// Validation state
 	let touched = $state(new Set<string>());
@@ -244,10 +245,10 @@
 		splitLines = splitLines.map((line, i) => (i === index ? { ...line, [field]: value } : line));
 	}
 
-	function handleSubmit(e: Event) {
+	async function handleSubmit(e: Event) {
 		e.preventDefault();
 
-		if (!validateAllFields()) {
+		if (!validateAllFields() || isSubmitting) {
 			return;
 		}
 
@@ -256,62 +257,67 @@
 			return;
 		}
 
-		// Handle split mode submission
-		if (isSplitMode) {
-			if (!isSplitValid || !onSplitSubmit) {
-				return;
+		isSubmitting = true;
+		try {
+			// Handle split mode submission
+			if (isSplitMode) {
+				if (!isSplitValid || !onSplitSubmit) {
+					return;
+				}
+
+				await onSplitSubmit({
+					date: parseLocalDate(dateStr),
+					merchant: merchant.trim(),
+					isShared,
+					isSettled: isShared ? isSettled : false,
+					splitType,
+					splitValue: validatedSplitValue,
+					isEssential,
+					isSubscription,
+					subscriptionFrequency: isSubscription ? subscriptionFrequency : undefined,
+					splits: splitLines
+				});
+			} else {
+				if (!categoryId) {
+					return;
+				}
+
+				await onSubmit({
+					date: parseLocalDate(dateStr),
+					merchant: merchant.trim(),
+					amount,
+					categoryId,
+					isShared,
+					isSettled: isShared ? isSettled : false,
+					splitType,
+					splitValue: validatedSplitValue,
+					notes: notes.trim() || undefined,
+					isEssential,
+					isSubscription,
+					subscriptionFrequency: isSubscription ? subscriptionFrequency : undefined
+				});
 			}
 
-			onSplitSubmit({
-				date: parseLocalDate(dateStr),
-				merchant: merchant.trim(),
-				isShared,
-				isSettled: isShared ? isSettled : false,
-				splitType,
-				splitValue: validatedSplitValue,
-				isEssential,
-				isSubscription,
-				subscriptionFrequency: isSubscription ? subscriptionFrequency : undefined,
-				splits: splitLines
-			});
-		} else {
-			if (!categoryId) {
-				return;
-			}
-
-			onSubmit({
-				date: parseLocalDate(dateStr),
-				merchant: merchant.trim(),
-				amount,
-				categoryId,
-				isShared,
-				isSettled: isShared ? isSettled : false,
-				splitType,
-				splitValue: validatedSplitValue,
-				notes: notes.trim() || undefined,
-				isEssential,
-				isSubscription,
-				subscriptionFrequency: isSubscription ? subscriptionFrequency : undefined
-			});
+			// Reset form
+			merchant = '';
+			amountStr = '';
+			categoryId = 0;
+			isShared = false;
+			isSettled = false;
+			splitType = settings.defaultSplitType;
+			splitValue = settings.defaultSplitValue;
+			notes = '';
+			isEssential = false;
+			isSubscription = false;
+			subscriptionFrequency = 'monthly';
+			isSplitMode = false;
+			splitLines = [];
+			futureDateConfirmed = false;
+			touched = new Set();
+			errors = {};
+		} finally {
+			isSubmitting = false;
 		}
-
-		// Reset form
-		merchant = '';
-		amountStr = '';
-		categoryId = 0;
-		isShared = false;
-		isSettled = false;
-		splitType = settings.defaultSplitType;
-		splitValue = settings.defaultSplitValue;
-		notes = '';
-		isEssential = false;
-		isSubscription = false;
-		subscriptionFrequency = 'monthly';
-		isSplitMode = false;
-		splitLines = [];
-		futureDateConfirmed = false;
-		touched = new Set();
-		errors = {};
 	}
 
 	// Handle merchant selection from autocomplete
@@ -470,7 +476,7 @@
 						<select
 							value={line.categoryId}
 							onchange={(e) => updateSplitLine(index, 'categoryId', parseInt(e.currentTarget.value))}
-							class="flex-1 px-3 py-2 bg-surface border border-[var(--color-border)] rounded-lg focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-colors text-sm"
+							class="flex-1 px-3 py-2 bg-surface border border-theme rounded-lg focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-colors text-sm"
 						>
 							<option value={0}>Select category...</option>
 							{#each activeCategories as cat (cat.id)}
@@ -485,7 +491,7 @@
 								oninput={(e) => updateSplitLine(index, 'amount', parseFloat(e.currentTarget.value) || 0)}
 								step="0.01"
 								min="0"
-								class="w-full pl-5 pr-2 py-2 bg-surface border border-[var(--color-border)] rounded-lg focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-colors font-mono text-sm"
+								class="w-full pl-5 pr-2 py-2 bg-surface border border-theme rounded-lg focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-colors font-mono text-sm"
 							/>
 						</div>
 						<button
@@ -574,9 +580,12 @@
 			<div class="flex gap-3 pt-3">
 				<button
 					type="submit"
-					disabled={!merchant.trim() || amount <= 0 || (isSplitMode ? !isSplitValid : !categoryId) || (isFutureDate && !futureDateConfirmed)}
-					class="flex-1 bg-primary-500 text-white py-2.5 px-4 rounded-lg font-medium hover:bg-primary-600 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-primary-500/25 focus:ring-2 focus:ring-primary-500/20 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-none transition-all duration-150"
+					disabled={isSubmitting || !merchant.trim() || amount <= 0 || (isSplitMode ? !isSplitValid : !categoryId) || (isFutureDate && !futureDateConfirmed)}
+					class="flex-1 bg-primary-500 text-white py-2.5 px-4 rounded-lg font-medium hover:bg-primary-600 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-primary-500/25 active:scale-[0.97] focus:ring-2 focus:ring-primary-500/20 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-none transition-all duration-150 flex items-center justify-center gap-2"
 				>
+					{#if isSubmitting}
+						<div class="animate-spin rounded-full h-4 w-4 border-2 border-white/30 border-t-white"></div>
+					{/if}
 					{isSplitMode ? `Add ${splitLines.length} Transactions` : 'Add Transaction'}
 				</button>
 				{#if onCancel}

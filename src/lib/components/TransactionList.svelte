@@ -180,7 +180,7 @@
 										transaction.id!
 									)
 										? 'bg-primary-500 border-primary-500 checkbox-spring'
-										: 'border-[var(--color-border)] bg-surface'}"
+										: 'border-theme bg-surface'}"
 								>
 									{#if selectedIds.has(transaction.id!)}
 										<Check size={12} class="text-white" strokeWidth={3} />
