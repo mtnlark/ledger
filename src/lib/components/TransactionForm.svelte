@@ -39,7 +39,7 @@
 		notes?: string;
 		isEssential: boolean;
 		isSubscription: boolean;
-		subscriptionFrequency?: 'monthly' | 'annual';
+		subscriptionFrequency?: 'monthly' | 'semi-annual' | 'annual';
 	}
 
 	export interface SplitTransactionFormData {
@@ -51,7 +51,7 @@
 		splitValue: number;
 		isEssential: boolean;
 		isSubscription: boolean;
-		subscriptionFrequency?: 'monthly' | 'annual';
+		subscriptionFrequency?: 'monthly' | 'semi-annual' | 'annual';
 		splits: { categoryId: number; amount: number }[];
 	}
 
@@ -99,7 +99,7 @@
 	let notes = $state('');
 	let isEssential = $state(false);
 	let isSubscription = $state(false);
-	let subscriptionFrequency = $state<'monthly' | 'annual'>('monthly');
+	let subscriptionFrequency = $state<'monthly' | 'semi-annual' | 'annual'>('monthly');
 	let futureDateConfirmed = $state(false);
 	let isSubmitting = $state(false);
 

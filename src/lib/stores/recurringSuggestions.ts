@@ -6,15 +6,21 @@
  * 2. User-tagged subscriptions (transactions marked isSubscription: true)
  *
  * Subscriptions take priority over detected recurring for the same merchant.
+ *
+ * Groups by merchant+amount composite key so multiple subscriptions from
+ * the same merchant (e.g., Apple iCloud $2.99 + Apple Music $2.16) are
+ * tracked independently.
  */
 
 import { db, type Transaction, parseMonthKey } from '$lib/db';
 import { detectRecurringExpenses, type RecurringFrequency } from './recurring';
 import { getSettings, getCancelledSubscriptions } from './settings';
-import { normalizeMerchant } from '$lib/utils/string-helpers';
+import { normalizeMerchant, subscriptionKey, findSupersededSubscriptionKeys } from '$lib/utils/string-helpers';
+import { roundCurrency, currencyEquals } from '$lib/utils/currency';
+import { config } from '$lib/config';
 
 export interface RecurringSuggestion {
-	/** Unique ID - normalized merchant name */
+	/** Unique ID - composite key (merchant|amount) for subscriptions, normalized merchant for detected */
 	id: string;
 	/** Display name (original casing) */
 	merchant: string;
@@ -47,17 +53,28 @@ export function shouldShowRecurringBanner(
 
 /**
  * Check if a suggestion has already been added this month.
- * Matches by normalized merchant name only - if ANY transaction for that
- * merchant exists this month, consider it added (regardless of amount).
- * This handles cases where prices change or amounts vary.
+ * For subscriptions (with composite key), matches by merchant + amount within tolerance.
+ * For detected recurring (merchant-only key), matches by merchant name only.
  */
 function isAlreadyAdded(suggestion: RecurringSuggestion, monthTxns: Transaction[]): boolean {
-	const normalized = suggestion.id;
+	const normalizedMerchant = normalizeMerchant(suggestion.merchant);
+	const tolerance = config.recurringSuggestions.amountTolerance;
 
 	return monthTxns.some((tx) => {
 		// Skip split parent and soft-deleted transactions
 		if (tx.isSplitParent || tx.isDeleted) return false;
-		return normalizeMerchant(tx.merchant) === normalized;
+		if (normalizeMerchant(tx.merchant) !== normalizedMerchant) return false;
+
+		// For subscription suggestions, also match by amount (within tolerance)
+		if (suggestion.isSubscription) {
+			const expected = suggestion.expectedAmount;
+			if (expected === 0) return true; // Edge case: free subscriptions
+			const diff = Math.abs(tx.amount - expected) / expected;
+			return diff <= tolerance;
+		}
+
+		// For detected recurring (non-subscription), merchant match is sufficient
+		return true;
 	});
 }
 
@@ -65,7 +82,7 @@ function isAlreadyAdded(suggestion: RecurringSuggestion, monthTxns: Transaction[
  * Check if a recurring item is expected this month based on its frequency.
  * For semi-annual and annual items, checks if this is the expected month.
  */
-function isExpectedThisMonth(
+export function isExpectedThisMonth(
 	frequency: RecurringFrequency,
 	dayOfMonth: number,
 	lastOccurrence: Date | null,
@@ -78,19 +95,21 @@ function isExpectedThisMonth(
 	if (!lastOccurrence) return false;
 
 	const targetDate = parseMonthKey(targetMonth);
-	const targetMonthNum = targetDate.getMonth();
-	const lastMonthNum = lastOccurrence.getMonth();
+
+	// Calculate total months difference accounting for year
+	const totalMonthsDiff =
+		(targetDate.getFullYear() - lastOccurrence.getFullYear()) * 12 +
+		(targetDate.getMonth() - lastOccurrence.getMonth());
+
+	// Must be in a future month relative to last occurrence
+	if (totalMonthsDiff <= 0) return false;
 
 	if (frequency === 'semi-annual') {
-		// Expected every 6 months from last occurrence
-		// Check if target month is ~6 months from last occurrence
-		const monthsDiff = (targetMonthNum - lastMonthNum + 12) % 12;
-		return monthsDiff === 6 || monthsDiff === 0;
+		return totalMonthsDiff % 6 === 0;
 	}
 
 	if (frequency === 'annual') {
-		// Expected same month as last occurrence
-		return targetMonthNum === lastMonthNum;
+		return totalMonthsDiff % 12 === 0;
 	}
 
 	return false;
@@ -98,17 +117,18 @@ function isExpectedThisMonth(
 
 /**
  * Get user-tagged subscriptions from transactions.
- * Groups by merchant and extracts the most recent occurrence's details.
+ * Groups by merchant+amount composite key so multiple subscriptions from
+ * the same merchant with different amounts are tracked independently.
  */
-async function getUserSubscriptions(): Promise<Map<string, RecurringSuggestion>> {
+export async function getUserSubscriptions(): Promise<Map<string, RecurringSuggestion>> {
 	// Filter in-memory since isSubscription isn't indexed
 	const allTransactions = await db.transactions.toArray();
-	const allTxns = allTransactions.filter((tx) => tx.isSubscription);
+	const allTxns = allTransactions.filter((tx) => tx.isSubscription && !tx.isDeleted && !tx.isSplitParent);
 
-	// Group by normalized merchant
+	// Group by composite key (merchant|amount)
 	const grouped = new Map<string, Transaction[]>();
 	for (const tx of allTxns) {
-		const key = normalizeMerchant(tx.merchant);
+		const key = subscriptionKey(tx.merchant, tx.amount);
 		const existing = grouped.get(key) || [];
 		grouped.set(key, [...existing, tx]);
 	}
@@ -129,11 +149,8 @@ async function getUserSubscriptions(): Promise<Map<string, RecurringSuggestion>>
 		const days = txns.map((t) => new Date(t.date).getDate());
 		const dayOfMonth = mode(days);
 
-		// Map subscription frequency to RecurringFrequency
-		let frequency: RecurringFrequency = 'monthly';
-		if (mostRecent.subscriptionFrequency === 'annual') {
-			frequency = 'annual';
-		}
+		// Map subscription frequency to RecurringFrequency (types now align)
+		const frequency: RecurringFrequency = mostRecent.subscriptionFrequency ?? 'monthly';
 
 		// Determine if typically shared
 		const sharedCount = txns.filter((t) => t.isShared).length;
@@ -166,6 +183,20 @@ async function getUserSubscriptions(): Promise<Map<string, RecurringSuggestion>>
 		});
 	}
 
+	// Filter out superseded entries (price changes, plan upgrades)
+	const entries = Array.from(subscriptions.entries()).map(([key, s]) => ({
+		key,
+		merchant: s.merchant,
+		amount: s.expectedAmount,
+		latestDate: new Date(
+			Math.max(...(grouped.get(key) || []).map((tx) => new Date(tx.date).getTime()))
+		)
+	}));
+	const superseded = findSupersededSubscriptionKeys(entries, allTxns);
+	for (const key of superseded) {
+		subscriptions.delete(key);
+	}
+
 	return subscriptions;
 }
 
@@ -191,18 +222,50 @@ function mode<T>(arr: T[]): T {
 
 /**
  * Get last occurrence date for a merchant from all transactions.
+ *
+ * @param normalizedMerchant - Normalized merchant name
+ * @param amount - Optional amount to filter by (within tolerance). When provided,
+ *                 only considers transactions with matching amount.
  */
-async function getLastOccurrence(normalizedMerchant: string): Promise<Date | null> {
+async function getLastOccurrence(normalizedMerchant: string, amount?: number): Promise<Date | null> {
 	const allTxns = await db.transactions.toArray();
-	const matching = allTxns.filter(
-		(tx) => normalizeMerchant(tx.merchant) === normalizedMerchant
-	);
+	const tolerance = config.recurringSuggestions.amountTolerance;
+
+	const matching = allTxns.filter((tx) => {
+		if (normalizeMerchant(tx.merchant) !== normalizedMerchant) return false;
+		// When amount specified, filter by amount within tolerance
+		if (amount != null && amount > 0) {
+			const diff = Math.abs(tx.amount - amount) / amount;
+			if (diff > tolerance) return false;
+		}
+		return true;
+	});
 
 	if (matching.length === 0) return null;
 
 	// Sort by date descending
 	matching.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 	return new Date(matching[0].date);
+}
+
+/**
+ * Check if a subscription is cancelled.
+ * Checks both targeted (merchant+amount) and legacy (merchant-only) cancellation records.
+ */
+function isCancelledSubscription(
+	normalizedMerchant: string,
+	cancelledSubs: { merchant: string; cancelledDate: string; amount?: number }[],
+	amount?: number
+): boolean {
+	return cancelledSubs.some((c) => {
+		if (c.merchant !== normalizedMerchant) return false;
+		// Legacy record (no amount) cancels ALL subscriptions from this merchant
+		if (c.amount == null) return true;
+		// Targeted record: match if amounts are equal (within tolerance)
+		if (amount != null) return currencyEquals(c.amount, amount);
+		// Targeted record but no amount to check against: match
+		return true;
+	});
 }
 
 /**
@@ -213,7 +276,6 @@ async function getLastOccurrence(normalizedMerchant: string): Promise<Date | nul
 export async function getRecurringSuggestions(month: string): Promise<RecurringSuggestion[]> {
 	const settings = await getSettings();
 	const cancelledSubs = await getCancelledSubscriptions();
-	const cancelledMerchants = new Set(cancelledSubs.map((c) => c.merchant));
 
 	// Get transactions for this month (to check if already added)
 	const monthStart = parseMonthKey(month);
@@ -236,8 +298,8 @@ export async function getRecurringSuggestions(month: string): Promise<RecurringS
 	for (const detected of detectedRecurring) {
 		const key = normalizeMerchant(detected.merchant);
 
-		// Skip if cancelled
-		if (cancelledMerchants.has(key)) continue;
+		// Skip if cancelled (merchant-wide check for detected recurring)
+		if (isCancelledSubscription(key, cancelledSubs)) continue;
 
 		// Get last occurrence for frequency check
 		const lastOccurrence = await getLastOccurrence(key);
@@ -283,11 +345,13 @@ export async function getRecurringSuggestions(month: string): Promise<RecurringS
 
 	// Then, add/override with user subscriptions
 	for (const [key, subscription] of userSubscriptions) {
-		// Skip if cancelled
-		if (cancelledMerchants.has(key)) continue;
+		const merchant = normalizeMerchant(subscription.merchant);
 
-		// Get last occurrence for frequency check
-		const lastOccurrence = await getLastOccurrence(key);
+		// Skip if cancelled (check targeted + legacy)
+		if (isCancelledSubscription(merchant, cancelledSubs, subscription.expectedAmount)) continue;
+
+		// Get last occurrence for frequency check (filtered by amount)
+		const lastOccurrence = await getLastOccurrence(merchant, subscription.expectedAmount);
 
 		// Skip if not expected this month
 		if (
@@ -301,7 +365,13 @@ export async function getRecurringSuggestions(month: string): Promise<RecurringS
 			continue;
 		}
 
-		// User subscription overrides detected
+		// User subscription overrides detected for same merchant
+		// Remove any detected entry for this merchant before adding
+		const detectedKey = merchant;
+		if (suggestionsMap.has(detectedKey)) {
+			suggestionsMap.delete(detectedKey);
+		}
+
 		suggestionsMap.set(key, subscription);
 	}
 

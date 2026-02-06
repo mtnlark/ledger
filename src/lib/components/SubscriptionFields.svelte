@@ -3,9 +3,10 @@
 
 	interface Props {
 		isSubscription: boolean;
-		subscriptionFrequency: 'monthly' | 'annual';
+		subscriptionFrequency: 'monthly' | 'semi-annual' | 'annual';
 		merchant?: string;
-		onCancelSubscription?: (merchant: string) => void;
+		amount?: number;
+		onCancelSubscription?: (merchant: string, amount?: number) => void;
 		onClose?: () => void;
 		showTransition?: boolean;
 	}
@@ -14,6 +15,7 @@
 		isSubscription = $bindable(),
 		subscriptionFrequency = $bindable(),
 		merchant = '',
+		amount,
 		onCancelSubscription,
 		onClose,
 		showTransition = false
@@ -24,7 +26,7 @@
 
 	function handleCancel() {
 		if (merchant && onCancelSubscription) {
-			onCancelSubscription(merchant);
+			onCancelSubscription(merchant, amount);
 			onClose?.();
 		}
 	}
@@ -65,6 +67,15 @@
 					: 'bg-surface-alt text-charcoal-soft border border-theme hover:bg-surface-hover'}"
 			>
 				Monthly
+			</button>
+			<button
+				type="button"
+				onclick={() => (subscriptionFrequency = 'semi-annual')}
+				class="px-3 py-1.5 text-sm font-medium rounded-lg transition-all duration-150 {subscriptionFrequency === 'semi-annual'
+					? 'bg-primary-500 text-white shadow-sm'
+					: 'bg-surface-alt text-charcoal-soft border border-theme hover:bg-surface-hover'}"
+			>
+				Semi-Annual
 			</button>
 			<button
 				type="button"

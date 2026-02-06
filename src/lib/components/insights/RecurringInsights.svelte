@@ -11,7 +11,8 @@
 		cancelSubscription,
 		confirmSubscriptionActive
 	} from '$lib/stores/settings';
-	import { normalizeMerchant } from '$lib/utils/string-helpers';
+	import { normalizeMerchant, subscriptionKey, findSupersededSubscriptionKeys } from '$lib/utils/string-helpers';
+	import { currencyEquals } from '$lib/utils/currency';
 	import { config } from '$lib/config';
 
 	interface Props {
@@ -68,46 +69,72 @@
 	}
 
 	// Check if a subscription is stale based on last transaction date
-	function isStale(lastDate: Date, frequency: 'monthly' | 'annual' | undefined): boolean {
+	function isStale(lastDate: Date, frequency: 'monthly' | 'semi-annual' | 'annual' | undefined): boolean {
 		const now = new Date();
 		const daysSince = Math.floor((now.getTime() - lastDate.getTime()) / (1000 * 60 * 60 * 24));
 
 		if (frequency === 'annual') {
 			const monthsSince = daysSince / 30;
 			return monthsSince > config.subscription.annualStaleMonths;
+		} else if (frequency === 'semi-annual') {
+			const monthsSince = daysSince / 30;
+			return monthsSince > config.subscription.semiAnnualStaleMonths;
 		} else {
 			return daysSince > config.subscription.monthlyStaleDays;
 		}
 	}
 
-	// Get unique subscriptions from transactions (most recent for each merchant)
+	// Get unique subscriptions from transactions (most recent for each merchant+amount)
 	let allSubscriptions = $derived.by(() => {
-		const subTransactions = allTransactions.filter((t: Transaction) => t.isSubscription);
+		const subTransactions = allTransactions.filter(
+			(t: Transaction) => t.isSubscription && !t.isDeleted
+		);
 
-		// Group by merchant to get unique subscriptions (keep most recent)
-		const byMerchant = new Map<string, Transaction>();
+		// Group by composite key (merchant|amount) so multiple subscriptions
+		// from the same merchant with different amounts appear separately
+		const bySubscription = new Map<string, Transaction>();
 		for (const tx of subTransactions) {
-			const existing = byMerchant.get(tx.merchant);
+			const key = subscriptionKey(tx.merchant, tx.amount);
+			const existing = bySubscription.get(key);
 			if (!existing || new Date(tx.date) > new Date(existing.date)) {
-				byMerchant.set(tx.merchant, tx);
+				bySubscription.set(key, tx);
 			}
 		}
 
-		return Array.from(byMerchant.values());
+		// Filter out superseded entries (price changes, plan upgrades)
+		// Keeps concurrent subscriptions (e.g., Apple iCloud + Apple Music)
+		const entries = Array.from(bySubscription.entries()).map(([key, tx]) => ({
+			key,
+			merchant: tx.merchant,
+			amount: tx.amount,
+			latestDate: new Date(tx.date)
+		}));
+		const superseded = findSupersededSubscriptionKeys(entries, subTransactions);
+		for (const key of superseded) {
+			bySubscription.delete(key);
+		}
+
+		return Array.from(bySubscription.values());
 	});
 
-	// Create a map of cancelled merchants to their cancellation dates
-	let cancelledMerchantMap = $derived(
-		new Map(cancelledSubscriptions.map((c: CancelledSubscription) => [c.merchant, new Date(c.cancelledDate)]))
-	);
-
-	// Check if a merchant is cancelled (with resubscription detection via charge date)
+	// Check if a subscription is cancelled (with resubscription detection via charge date)
+	// Supports both legacy (merchant-wide) and targeted (merchant+amount) cancellations.
 	// Only a charge date AFTER the cancellation is treated as a resubscription —
 	// createdAt is not used since users may record old charges after cancelling
-	function isCancelled(merchant: string, lastChargeDate?: Date): boolean {
+	function isCancelled(merchant: string, lastChargeDate?: Date, amount?: number): boolean {
 		const normalized = normalizeMerchant(merchant);
-		const cancelledDate = cancelledMerchantMap.get(normalized);
-		if (!cancelledDate) return false;
+		// Find matching cancellation record (targeted or legacy)
+		const matchingRecord = cancelledSubscriptions.find((c: CancelledSubscription) => {
+			if (c.merchant !== normalized) return false;
+			// Legacy record (no amount) matches all subscriptions from this merchant
+			if (c.amount == null) return true;
+			// Targeted record: match if amounts are equal (within tolerance)
+			if (amount != null) return currencyEquals(c.amount, amount);
+			// Targeted record but no amount to check against: match
+			return true;
+		});
+		if (!matchingRecord) return false;
+		const cancelledDate = new Date(matchingRecord.cancelledDate);
 		if (lastChargeDate && !isNaN(lastChargeDate.getTime()) && lastChargeDate > cancelledDate) {
 			return false;
 		}
@@ -125,14 +152,15 @@
 			.filter((sub) => {
 				const normalized = normalizeMerchant(sub.merchant);
 				const subDate = new Date(sub.date);
-				if (isCancelled(sub.merchant, subDate)) return false;
+				if (isCancelled(sub.merchant, subDate, sub.amount)) return false;
 				const stale = isStale(subDate, sub.subscriptionFrequency);
 				return confirmedActiveSet.has(normalized) || !stale;
 			})
 			.sort((a, b) => {
-				if (a.subscriptionFrequency !== b.subscriptionFrequency) {
-					return a.subscriptionFrequency === 'monthly' ? -1 : 1;
-				}
+				const freqOrder = { monthly: 0, 'semi-annual': 1, annual: 2 } as const;
+				const aOrder = freqOrder[a.subscriptionFrequency ?? 'monthly'] ?? 0;
+				const bOrder = freqOrder[b.subscriptionFrequency ?? 'monthly'] ?? 0;
+				if (aOrder !== bOrder) return aOrder - bOrder;
 				return b.amount - a.amount;
 			});
 	});
@@ -142,16 +170,19 @@
 			.filter((sub) => {
 				const normalized = normalizeMerchant(sub.merchant);
 				const subDate = new Date(sub.date);
-				if (isCancelled(sub.merchant, subDate)) return false;
+				if (isCancelled(sub.merchant, subDate, sub.amount)) return false;
 				if (confirmedActiveSet.has(normalized)) return false;
 				return isStale(subDate, sub.subscriptionFrequency);
 			})
 			.sort((a, b) => b.amount - a.amount);
 	});
 
-	// Separate monthly and annual for active subscriptions
+	// Separate monthly, semi-annual, and annual for active subscriptions
 	let monthlySubscriptions = $derived(
-		activeSubscriptions.filter((s) => s.subscriptionFrequency !== 'annual')
+		activeSubscriptions.filter((s) => !s.subscriptionFrequency || s.subscriptionFrequency === 'monthly')
+	);
+	let semiAnnualSubscriptions = $derived(
+		activeSubscriptions.filter((s) => s.subscriptionFrequency === 'semi-annual')
 	);
 	let annualSubscriptions = $derived(
 		activeSubscriptions.filter((s) => s.subscriptionFrequency === 'annual')
@@ -185,12 +216,21 @@
 
 	// Calculate subscription totals (user's portion only, all non-cancelled subscriptions)
 	let allNonCancelledSubs = $derived(
-		allSubscriptions.filter((sub) => !isCancelled(sub.merchant, new Date(sub.date)))
+		allSubscriptions.filter((sub) => !isCancelled(sub.merchant, new Date(sub.date), sub.amount))
 	);
 
 	let monthlySubCost = $derived(
 		allNonCancelledSubs
-			.filter((s) => s.subscriptionFrequency !== 'annual')
+			.filter((s) => !s.subscriptionFrequency || s.subscriptionFrequency === 'monthly')
+			.reduce((sum, t) => {
+				const userAmount = t.isShared ? t.amount - t.partnerShare : t.amount;
+				return sum + userAmount;
+			}, 0)
+	);
+
+	let semiAnnualSubCost = $derived(
+		allNonCancelledSubs
+			.filter((s) => s.subscriptionFrequency === 'semi-annual')
 			.reduce((sum, t) => {
 				const userAmount = t.isShared ? t.amount - t.partnerShare : t.amount;
 				return sum + userAmount;
@@ -207,11 +247,21 @@
 	);
 
 	// Monthly equivalent of all non-cancelled subscriptions
-	let totalSubMonthly = $derived(monthlySubCost + annualSubCost / 12);
+	let totalSubMonthly = $derived(monthlySubCost + semiAnnualSubCost / 6 + annualSubCost / 12);
 
-	// Filter detected recurring to exclude cancelled merchants
+	// Merchants already shown in the Subscriptions section (avoid dual-listing)
+	let subscriptionMerchants = $derived(
+		new Set(allSubscriptions.map((s) => normalizeMerchant(s.merchant)))
+	);
+
+	// Filter detected recurring to exclude cancelled and already-listed subscription merchants
 	let activeRecurring = $derived(
-		recurring.filter((r: DetectedRecurring) => !cancelledMerchantMap.has(normalizeMerchant(r.merchant)))
+		recurring.filter((r: DetectedRecurring) => {
+			const normalized = normalizeMerchant(r.merchant);
+			// Merchant-wide cancellation check (no amount) for detected recurring
+			if (isCancelled(r.merchant)) return false;
+			return !subscriptionMerchants.has(normalized);
+		})
 	);
 
 	// Calculate detected recurring totals (user's portion only, converted to monthly)
@@ -240,8 +290,8 @@
 		showDismissConfirmDialog(merchant);
 	}
 
-	async function handleCancelSubscription(merchant: string) {
-		await cancelSubscription(merchant);
+	async function handleCancelSubscription(merchant: string, amount?: number) {
+		await cancelSubscription(merchant, amount);
 		onSubscriptionChange?.();
 	}
 
@@ -378,6 +428,27 @@
 							</div>
 						{/each}
 
+						<!-- Semi-Annual Subscriptions -->
+						{#each semiAnnualSubscriptions as sub}
+							{@const userAmount = sub.isShared ? sub.amount - sub.partnerShare : sub.amount}
+							{@const monthlyEquiv = userAmount / 6}
+							<div class="flex items-center gap-3 py-2 px-3 bg-cream rounded-lg">
+								<span class="text-lg">{getCategoryIcon(sub.categoryId)}</span>
+								<div class="flex-1 min-w-0">
+									<p class="text-sm font-medium text-charcoal truncate">{sub.merchant}</p>
+									<p class="text-xs text-charcoal-muted">{getCategoryName(sub.categoryId)}</p>
+								</div>
+								<div class="text-right">
+									<p class="font-mono text-sm font-medium text-charcoal">
+										{formatCurrency(userAmount)}/6mo
+									</p>
+									<p class="text-xs text-charcoal-muted">
+										~{formatCurrency(monthlyEquiv)}/mo
+									</p>
+								</div>
+							</div>
+						{/each}
+
 						<!-- Annual Subscriptions -->
 						{#each annualSubscriptions as sub}
 							{@const userAmount = sub.isShared ? sub.amount - sub.partnerShare : sub.amount}
@@ -457,7 +528,7 @@
 								</div>
 								<div class="text-right flex-shrink-0">
 									<p class="font-mono text-sm font-medium text-charcoal">
-										{formatCurrency(userAmount)}{sub.subscriptionFrequency === 'annual' ? '/yr' : '/mo'}
+										{formatCurrency(userAmount)}{sub.subscriptionFrequency === 'annual' ? '/yr' : sub.subscriptionFrequency === 'semi-annual' ? '/6mo' : '/mo'}
 									</p>
 								</div>
 								<div class="flex gap-1 flex-shrink-0">
@@ -468,7 +539,7 @@
 										Still Active
 									</button>
 									<button
-										onclick={() => handleCancelSubscription(sub.merchant)}
+										onclick={() => handleCancelSubscription(sub.merchant, sub.amount)}
 										class="px-2 py-1 text-xs font-medium text-danger-600 bg-surface border border-danger-200 rounded hover:bg-danger-50 transition-colors"
 									>
 										Cancelled

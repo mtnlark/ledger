@@ -19,7 +19,7 @@
 		settings: Settings;
 		onSave: (id: number, data: TransactionUpdateData) => void;
 		onSplit?: (transaction: Transaction) => void;
-		onCancelSubscription?: (merchant: string) => void;
+		onCancelSubscription?: (merchant: string, amount?: number) => void;
 		onClose: () => void;
 	}
 
@@ -34,7 +34,7 @@
 		notes?: string;
 		isEssential: boolean;
 		isSubscription: boolean;
-		subscriptionFrequency?: 'monthly' | 'annual';
+		subscriptionFrequency?: 'monthly' | 'semi-annual' | 'annual';
 	}
 
 	let { isOpen, transaction, categories, settings, onSave, onSplit, onCancelSubscription, onClose }: Props = $props();
@@ -67,7 +67,7 @@
 	let notes = $state('');
 	let isEssential = $state(false);
 	let isSubscription = $state(false);
-	let subscriptionFrequency = $state<'monthly' | 'annual'>('monthly');
+	let subscriptionFrequency = $state<'monthly' | 'semi-annual' | 'annual'>('monthly');
 
 	// Get selected category for essential default display
 	let selectedCategory = $derived(categories.find((c) => c.id === categoryId));
@@ -318,6 +318,7 @@
 						bind:isSubscription
 						bind:subscriptionFrequency
 						{merchant}
+						{amount}
 						{onCancelSubscription}
 						onClose={handleClose}
 					/>
