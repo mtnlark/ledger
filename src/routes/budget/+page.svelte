@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { afterNavigate } from '$app/navigation';
+	import { fade } from 'svelte/transition';
 	import { getMonthKey, navigateMonth, type Category, type CategoryBudget, type MonthlyBudget } from '$lib/db';
 	import { initializeStorage } from '$lib/storage';
 	import { getAllCategories } from '$lib/stores/categories';
@@ -248,7 +249,7 @@
 	<title>Budget | Ledger</title>
 </svelte:head>
 
-<div class="min-h-screen bg-cream-subtle">
+<div class="min-h-screen">
 	<HeaderNav title="Budget">
 		<MonthPicker
 			{currentMonth}
@@ -417,7 +418,7 @@
 
 				<!-- Budget Alerts (only shown when there are alerts) -->
 				{#if visibleBudgetAlerts.length > 0}
-					<div class="bg-surface rounded-xl shadow-md shadow-theme p-5 border-l-4 border-warning-500">
+					<div class="bg-surface rounded-xl shadow-md shadow-theme p-5 border-l-4 border-warning-500" transition:fade={{ duration: 200 }}>
 						<div class="flex items-center gap-2 mb-3">
 							<AlertTriangle size={18} class="text-warning-600" />
 							<h3 class="font-medium text-charcoal">Budget Alerts</h3>

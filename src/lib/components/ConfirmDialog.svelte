@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { X, AlertTriangle } from 'lucide-svelte';
+	import { fade, scale } from 'svelte/transition';
 	import { focusTrap } from '$lib/utils/focus-trap';
 
 	interface Props {
@@ -50,12 +51,14 @@
 		role="button"
 		tabindex="-1"
 		aria-label="Close dialog"
+		transition:fade={{ duration: 150 }}
 	></div>
 
 	<!-- Dialog -->
 	<div class="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
 		<div
-			class="bg-surface rounded-xl shadow-xl shadow-[var(--color-shadow)] w-full max-w-sm animate-enter pointer-events-auto"
+			class="bg-surface rounded-xl shadow-xl shadow-[var(--color-shadow)] w-full max-w-sm pointer-events-auto"
+			transition:scale={{ duration: 200, start: 0.95 }}
 			role="dialog"
 			aria-modal="true"
 			aria-labelledby="confirm-dialog-title"
@@ -75,7 +78,7 @@
 				<button
 					type="button"
 					onclick={onCancel}
-					class="p-2 text-charcoal-muted hover:text-charcoal hover:bg-cream rounded-lg transition-colors"
+					class="p-2 text-charcoal-muted hover:text-charcoal hover:bg-surface-hover rounded-lg transition-colors"
 					aria-label="Close"
 				>
 					<X size={18} />
@@ -91,17 +94,17 @@
 			<div class="flex gap-3 px-6 py-4 border-t border-dashed border-theme-dashed bg-surface-alt rounded-b-xl">
 				<button
 					type="button"
-					onclick={onConfirm}
-					class="flex-1 text-white py-2.5 px-4 rounded-lg font-medium focus:ring-2 focus:ring-offset-2 transition-all duration-150 {buttonClass}"
-				>
-					{confirmText}
-				</button>
-				<button
-					type="button"
 					onclick={onCancel}
 					class="flex-1 px-4 py-2.5 border border-theme text-charcoal-soft rounded-lg font-medium hover:bg-surface-hover transition-colors"
 				>
 					{cancelText}
+				</button>
+				<button
+					type="button"
+					onclick={onConfirm}
+					class="flex-1 text-white py-2.5 px-4 rounded-lg font-medium focus:ring-2 focus:ring-offset-2 transition-all duration-150 {buttonClass}"
+				>
+					{confirmText}
 				</button>
 			</div>
 		</div>

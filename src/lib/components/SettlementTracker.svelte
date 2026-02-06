@@ -6,6 +6,7 @@
 	import { createCategoryHelpers } from '$lib/utils/category-helpers';
 	import { formatCurrency } from '$lib/utils/format-helpers';
 	import EmptyState from './EmptyState.svelte';
+	import ConfirmDialog from './ConfirmDialog.svelte';
 
 	interface Props {
 		transactions: Transaction[];
@@ -25,6 +26,7 @@
 
 	// Track selected transactions for batch settlement
 	let selectedIds = $state<Set<number>>(new Set());
+	let showSettleConfirm = $state(false);
 
 	// Create category helpers bound to current categories
 	let categoryHelpers = $derived(createCategoryHelpers(categories));
@@ -59,9 +61,14 @@
 
 	function handleMarkSettled() {
 		if (selectedIds.size > 0) {
-			onMarkSettled(Array.from(selectedIds));
-			selectedIds = new Set();
+			showSettleConfirm = true;
 		}
+	}
+
+	function confirmSettle() {
+		onMarkSettled(Array.from(selectedIds));
+		selectedIds = new Set();
+		showSettleConfirm = false;
 	}
 
 	// Computed values
@@ -82,7 +89,7 @@
 	<!-- Header with outstanding balance -->
 	<div class="px-6 py-5 border-b border-dashed border-theme-dashed bg-gradient-to-r from-success-50 to-success-100/50">
 		<div class="flex items-center justify-between mb-1">
-			<h2 class="text-sm font-medium text-charcoal-soft">Outstanding Balance with {settings.partnerName}</h2>
+			<h2 class="text-sm font-medium text-charcoal-soft">Outstanding Balance with {settings.partnerName || 'Partner'}</h2>
 		</div>
 		<p class="font-mono text-3xl font-medium text-charcoal">
 			{formatCurrency(outstandingBalance)}
@@ -122,6 +129,7 @@
 					<button
 						onclick={handleMarkSettled}
 						class="px-4 py-2 bg-success-500 text-white text-sm font-medium rounded-lg hover:bg-success-600 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-success-500/25 transition-all duration-150"
+						aria-label="Mark {selectedIds.size} transaction{selectedIds.size === 1 ? '' : 's'} as settled"
 					>
 						Mark as Settled
 					</button>
@@ -134,6 +142,8 @@
 					onclick={() => toggleSelection(transaction.id!)}
 					class="w-full px-6 py-4 flex items-center gap-4 hover:bg-cream/50 transition-colors text-left border-l-4"
 					style="border-left-color: {getCategoryColor(transaction.categoryId)};"
+					aria-pressed={selectedIds.has(transaction.id!)}
+					aria-label="{selectedIds.has(transaction.id!) ? 'Deselect' : 'Select'} {transaction.merchant} — {formatCurrency(transaction.partnerShare)}"
 				>
 					<!-- Checkbox -->
 					<div
@@ -169,3 +179,12 @@
 		{/if}
 	</div>
 </div>
+
+<ConfirmDialog
+	isOpen={showSettleConfirm}
+	title="Mark as Settled?"
+	message="Mark {selectedIds.size} transaction{selectedIds.size === 1 ? '' : 's'} ({formatCurrency(selectedBalance)}) as settled with {settings.partnerName || 'Partner'}?"
+	confirmText="Mark Settled"
+	onConfirm={confirmSettle}
+	onCancel={() => (showSettleConfirm = false)}
+/>

@@ -1,6 +1,9 @@
 <script lang="ts">
 	import { format } from 'date-fns';
-	import { ArrowRight, Target, TrendingUp, AlertTriangle, PartyPopper } from 'lucide-svelte';
+	import type { ComponentType } from 'svelte';
+	import { goto } from '$app/navigation';
+	import { ArrowRight, Target, TrendingUp, AlertTriangle, PartyPopper, PiggyBank } from 'lucide-svelte';
+	import EmptyState from '../EmptyState.svelte';
 	import type { SavingsAccount, SavingsContribution, MonthlyBudget } from '$lib/db';
 	import { parseMonthKey, getMonthKey } from '$lib/db';
 	import { formatCurrency, formatCurrencyWhole } from '$lib/utils/format-helpers';
@@ -156,17 +159,13 @@
 		</div>
 
 		{#if contributions.length === 0}
-			<!-- Empty state -->
-			<div class="text-center py-6">
-				<p class="text-charcoal-muted mb-3">No savings contributions this month</p>
-				<a
-					href="/savings"
-					class="inline-flex items-center gap-1 text-sm text-primary-600 hover:text-primary-700 font-medium"
-				>
-					Add a contribution
-					<ArrowRight size={14} />
-				</a>
-			</div>
+			<EmptyState
+				icon={PiggyBank as ComponentType}
+				title="No contributions yet"
+				description="Add savings contributions to track your progress"
+				actionLabel="Go to Savings"
+				onAction={() => goto('/savings')}
+			/>
 		{:else}
 			<!-- By Account Breakdown -->
 			<div class="bg-cream-dark rounded-lg p-4 border border-dashed border-theme">

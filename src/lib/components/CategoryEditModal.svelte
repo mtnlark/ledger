@@ -232,7 +232,7 @@
 						id="category-name"
 						bind:value={name}
 						placeholder="e.g., Groceries"
-						class="w-full px-3 py-2.5 bg-cream border border-[rgba(45,42,38,0.15)] rounded-lg focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-colors placeholder:text-charcoal-muted"
+						class="w-full px-3 py-2.5 bg-surface-alt border border-theme rounded-lg focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-colors placeholder:text-charcoal-muted"
 					/>
 				</div>
 
@@ -245,7 +245,7 @@
 						type="button"
 						id="icon-button"
 						onclick={() => (showEmojiPicker = !showEmojiPicker)}
-						class="w-full px-3 py-3 bg-cream border border-[rgba(45,42,38,0.15)] rounded-lg hover:border-primary-400 focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-colors text-2xl"
+						class="w-full px-3 py-3 bg-surface-alt border border-theme rounded-lg hover:border-primary-400 focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-colors text-2xl"
 					>
 						{icon || '✨'}
 					</button>
@@ -278,14 +278,14 @@
 						<input
 							type="color"
 							bind:value={color}
-							class="w-10 h-10 rounded-lg cursor-pointer border border-[rgba(45,42,38,0.15)]"
+							class="w-10 h-10 rounded-lg cursor-pointer border border-theme"
 						/>
 						<input
 							type="text"
 							bind:value={color}
 							placeholder="#000000"
 							maxlength="7"
-							class="w-24 px-2 py-1.5 bg-cream border border-[rgba(45,42,38,0.15)] rounded-lg text-sm font-mono focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-colors"
+							class="w-24 px-2 py-1.5 bg-surface-alt border border-theme rounded-lg text-sm font-mono focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-colors"
 						/>
 						<span class="text-xs text-charcoal-muted">Custom color</span>
 					</div>
@@ -303,7 +303,7 @@
 						<button
 							type="button"
 							onclick={() => (isEssential = !isEssential)}
-							class="relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:ring-offset-2 {isEssential ? 'bg-primary-500' : 'bg-gray-200'}"
+							class="relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:ring-offset-2 {isEssential ? 'bg-primary-500' : 'toggle-off'}"
 							role="switch"
 							aria-checked={isEssential}
 							aria-label="Toggle essential spending"
@@ -342,7 +342,7 @@
 									<button
 										type="button"
 										onclick={() => (showDeleteConfirm = false)}
-										class="px-3 py-1.5 text-sm bg-surface border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+										class="px-3 py-1.5 text-sm bg-surface border border-theme rounded-lg hover:bg-surface-hover transition-colors"
 									>
 										Cancel
 									</button>
@@ -366,7 +366,7 @@
 				<button
 					type="button"
 					onclick={onClose}
-					class="flex-1 py-2.5 px-4 border border-[rgba(45,42,38,0.15)] text-charcoal-soft rounded-lg font-medium hover:bg-surface-hover transition-colors"
+					class="flex-1 py-2.5 px-4 border border-theme text-charcoal-soft rounded-lg font-medium hover:bg-surface-hover transition-colors"
 				>
 					Cancel
 				</button>

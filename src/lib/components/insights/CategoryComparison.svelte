@@ -1,7 +1,10 @@
 <script lang="ts">
 	import { format } from 'date-fns';
+	import type { ComponentType } from 'svelte';
 	import { type ChartConfiguration } from 'chart.js/auto';
+	import { BarChart3 } from 'lucide-svelte';
 	import ChartWrapper from '../ChartWrapper.svelte';
+	import EmptyState from '../EmptyState.svelte';
 	import { parseMonthKey } from '$lib/db';
 	import type { Transaction, Category } from '$lib/db';
 
@@ -132,9 +135,11 @@
 </script>
 
 {#if comparisonData.length === 0}
-	<div class="text-center py-8 text-charcoal-muted">
-		<p>No transaction data available for comparison</p>
-	</div>
+	<EmptyState
+		icon={BarChart3 as ComponentType}
+		title="No comparison data"
+		description="Add transactions in two consecutive months to see category comparisons"
+	/>
 {:else}
 	<div class="h-[300px]">
 		<ChartWrapper config={chartConfig} class="h-full" />

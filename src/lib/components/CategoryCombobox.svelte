@@ -6,9 +6,10 @@
 		categories: Category[];
 		value: number;
 		onSelect: (categoryId: number) => void;
+		idPrefix?: string;
 	}
 
-	let { categories, value, onSelect }: Props = $props();
+	let { categories, value, onSelect, idPrefix = 'category' }: Props = $props();
 
 	// Internal state
 	let searchText = $state('');
@@ -119,7 +120,7 @@
 	<input
 		bind:this={inputRef}
 		type="text"
-		id="category"
+		id="{idPrefix}-combobox"
 		value={isOpen ? searchText : (value ? displayText : '')}
 		oninput={handleInput}
 		onfocus={handleFocus}
@@ -131,8 +132,8 @@
 		aria-expanded={isOpen}
 		aria-haspopup="listbox"
 		aria-autocomplete="list"
-		aria-controls="category-listbox"
-		class="w-full px-3 py-2 border border-theme rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+		aria-controls="{idPrefix}-listbox"
+		class="w-full px-3 py-2 border border-theme rounded-lg focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500"
 	/>
 
 	<!-- Dropdown arrow -->
@@ -151,7 +152,7 @@
 	<!-- Dropdown list -->
 	{#if isOpen}
 		<ul
-			id="category-listbox"
+			id="{idPrefix}-listbox"
 			role="listbox"
 			class="absolute z-50 w-full mt-1 bg-surface border border-theme rounded-lg shadow-lg max-h-60 overflow-auto"
 		>

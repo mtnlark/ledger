@@ -169,7 +169,7 @@
 	<title>Savings | Ledger</title>
 </svelte:head>
 
-<div class="min-h-screen bg-cream-subtle">
+<div class="min-h-screen">
 	<HeaderNav title="Savings">
 		<MonthPicker {currentMonth} {availableMonths} onMonthChange={handleMonthChange} />
 	</HeaderNav>

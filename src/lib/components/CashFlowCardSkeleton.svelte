@@ -4,7 +4,7 @@
 
 <div class="bg-surface rounded-xl shadow-sm border border-theme overflow-hidden">
 	<!-- Header -->
-	<div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+	<div class="px-6 py-4 border-b border-theme flex items-center justify-between">
 		<Skeleton class="h-6" width="120px" rounded="sm" />
 		<Skeleton class="h-4" width="80px" rounded="sm" />
 	</div>

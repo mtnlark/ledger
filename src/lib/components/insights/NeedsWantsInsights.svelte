@@ -103,7 +103,7 @@
 						style="width: {currentMonthStats.needsPercent}%"
 					></div>
 					<div
-						class="bg-gray-300 transition-all duration-500"
+						class="bg-charcoal-muted/40 transition-all duration-500"
 						style="width: {currentMonthStats.wantsPercent}%"
 					></div>
 				</div>
@@ -115,7 +115,7 @@
 						</span>
 					</div>
 					<div class="flex items-center gap-2">
-						<div class="w-3 h-3 rounded bg-gray-300"></div>
+						<div class="w-3 h-3 rounded bg-charcoal-muted/40"></div>
 						<span class="text-charcoal-soft">
 							Wants: {formatCurrencyWhole(currentMonthStats.wants)}
 						</span>

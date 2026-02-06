@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { X } from 'lucide-svelte';
+	import { fade, scale } from 'svelte/transition';
 	import { focusTrap } from '$lib/utils/focus-trap';
 	import type { Snippet } from 'svelte';
 
@@ -60,12 +61,14 @@
 		class="fixed inset-0 bg-black/40 flex items-center justify-center p-4 backdrop-blur-sm"
 		style="z-index: {zIndex};"
 		onclick={handleBackdropClick}
+		transition:fade={{ duration: 150 }}
 	>
 		<!-- Modal -->
 		<div
 			class="bg-surface rounded-xl shadow-xl shadow-[var(--color-shadow)] w-full {maxWidthClasses[
 				maxWidth
-			]} max-h-[90vh] overflow-y-auto animate-enter"
+			]} max-h-[90vh] overflow-y-auto"
+			transition:scale={{ duration: 200, start: 0.95 }}
 			role="dialog"
 			aria-modal="true"
 			aria-labelledby={generatedTitleId}

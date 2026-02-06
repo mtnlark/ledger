@@ -20,12 +20,14 @@
 	// Form state - initialize from existing budget or defaults
 	let incomeStr = $state('');
 	let notes = $state('');
+	let isSubmitting = $state(false);
 
 	// Reset form when modal opens or budget changes
 	$effect(() => {
 		if (isOpen) {
 			incomeStr = budget?.income?.toString() ?? '';
 			notes = budget?.notes ?? '';
+			isSubmitting = false;
 		}
 	});
 
@@ -35,14 +37,20 @@
 		incomeStr = cleanNumberInput(input.value);
 	}
 
-	function handleSubmit(e: Event) {
+	async function handleSubmit(e: Event) {
 		e.preventDefault();
-		const income = parseFloat(cleanNumberInput(incomeStr)) || 0;
+		if (isSubmitting) return;
 
-		onSave({
-			income,
-			notes: notes.trim() || undefined
-		});
+		isSubmitting = true;
+		try {
+			const income = parseFloat(cleanNumberInput(incomeStr)) || 0;
+			await onSave({
+				income,
+				notes: notes.trim() || undefined
+			});
+		} finally {
+			isSubmitting = false;
+		}
 	}
 </script>
 
@@ -122,8 +130,12 @@
 		<div class="flex gap-3 pt-3">
 			<button
 				type="submit"
-				class="flex-1 bg-primary-500 text-white py-2.5 px-4 rounded-lg font-medium hover:bg-primary-600 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-primary-500/25 focus:ring-2 focus:ring-primary-500/20 focus:ring-offset-2 transition-all duration-150"
+				disabled={isSubmitting}
+				class="flex-1 bg-primary-500 text-white py-2.5 px-4 rounded-lg font-medium hover:bg-primary-600 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-primary-500/25 focus:ring-2 focus:ring-primary-500/20 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-none transition-all duration-150 flex items-center justify-center gap-2"
 			>
+				{#if isSubmitting}
+					<div class="animate-spin rounded-full h-4 w-4 border-2 border-white/30 border-t-white"></div>
+				{/if}
 				Save Budget
 			</button>
 			<button

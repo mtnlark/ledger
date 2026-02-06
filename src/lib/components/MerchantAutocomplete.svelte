@@ -126,16 +126,22 @@
 		onblur={handleBlur}
 		bind:this={inputElement}
 		autocomplete="off"
-		class="w-full px-3 py-2.5 bg-cream border border-[rgba(45,42,38,0.15)] rounded-lg focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-colors placeholder:text-charcoal-muted {className}"
+		role="combobox"
+		aria-expanded={showSuggestions && suggestions.length > 0}
+		aria-controls="{inputId}-listbox"
+		aria-activedescendant={selectedIndex >= 0 ? `${inputId}-option-${selectedIndex}` : undefined}
+		class="w-full px-3 py-2.5 bg-surface-alt border border-theme rounded-lg focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-colors placeholder:text-charcoal-muted {className}"
 	/>
 
 	{#if showSuggestions && suggestions.length > 0}
 		<ul
+			id="{inputId}-listbox"
 			class="absolute z-50 w-full mt-1 bg-surface border border-theme rounded-lg shadow-lg overflow-hidden"
 			role="listbox"
 		>
 			{#each suggestions as suggestion, i (suggestion.merchant)}
 				<li
+					id="{inputId}-option-{i}"
 					role="option"
 					aria-selected={i === selectedIndex}
 					class="px-3 py-2.5 cursor-pointer transition-colors {i === selectedIndex

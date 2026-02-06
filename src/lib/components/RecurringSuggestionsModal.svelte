@@ -365,7 +365,7 @@
 									type="date"
 									value={data?.date ?? ''}
 									onchange={(e) => updateConfirmationDate(suggestion.id, e.currentTarget.value)}
-									class="w-full px-3 py-2 text-sm border border-cream-dark rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+									class="w-full px-3 py-2 text-sm border border-theme rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500"
 								/>
 							</div>
 							<div>
@@ -379,7 +379,7 @@
 										inputmode="decimal"
 										value={data?.amount ?? ''}
 										onchange={(e) => updateConfirmationAmount(suggestion.id, e.currentTarget.value)}
-										class="w-full pl-7 pr-3 py-2 text-sm font-mono border border-cream-dark rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+										class="w-full pl-7 pr-3 py-2 text-sm font-mono border border-theme rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500"
 									/>
 								</div>
 							</div>

@@ -14,7 +14,7 @@
 		<Skeleton class="h-4 mb-2 ml-1" width="100px" rounded="sm" />
 		<div class="space-y-2">
 			{#each Array(count) as _, i}
-				<div class="bg-surface rounded-lg shadow-sm border border-gray-100 p-4 flex items-center gap-4">
+				<div class="bg-surface rounded-lg shadow-sm border border-theme p-4 flex items-center gap-4">
 					<!-- Icon skeleton -->
 					<Skeleton class="w-10 h-10" rounded="lg" />
 

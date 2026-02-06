@@ -95,7 +95,7 @@
 				</h2>
 				<button
 					onclick={closeHelp}
-					class="p-1.5 rounded-lg text-charcoal-muted hover:text-charcoal hover:bg-cream transition-colors"
+					class="p-1.5 rounded-lg text-charcoal-muted hover:text-charcoal hover:bg-surface-hover transition-colors"
 				>
 					<X size={20} />
 				</button>

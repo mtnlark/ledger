@@ -89,7 +89,7 @@
 					<Skeleton class="h-8 mb-1" width="120px" rounded="sm" />
 					<Skeleton class="h-4" width="80px" rounded="sm" />
 				</div>
-				<div class="divide-y divide-gray-100">
+				<div class="divide-y divide-theme">
 					{#each Array(3) as _}
 						<div class="px-6 py-4 flex items-center gap-4">
 							<Skeleton class="w-5 h-5" rounded="sm" />

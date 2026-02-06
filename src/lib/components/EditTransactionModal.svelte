@@ -42,6 +42,7 @@
 	// Confirmation state for subscription cancellation
 	let showCancelConfirm = $state(false);
 	let futureDateConfirmed = $state(false);
+	let isSubmitting = $state(false);
 
 	// Can only split transactions that aren't already split children
 	let canSplit = $derived(transaction && !transaction.parentTransactionId && onSplit);
@@ -124,6 +125,7 @@
 			subscriptionFrequency = transaction.subscriptionFrequency ?? 'monthly';
 			showCancelConfirm = false;
 			futureDateConfirmed = false;
+			isSubmitting = false;
 			touched = new Set();
 			errors = {};
 		}
@@ -172,10 +174,10 @@
 		}
 	});
 
-	function handleSubmit(e: Event) {
+	async function handleSubmit(e: Event) {
 		e.preventDefault();
 
-		if (!transaction?.id || !validateAllFields()) {
+		if (!transaction?.id || !validateAllFields() || isSubmitting) {
 			return;
 		}
 
@@ -184,19 +186,24 @@
 			return;
 		}
 
-		onSave(transaction.id, {
-			date: parseLocalDate(dateStr),
-			merchant: merchant.trim(),
-			amount,
-			categoryId,
-			isShared,
-			splitType,
-			splitValue: validatedSplitValue, // Use validated value
-			notes: notes.trim() || undefined,
-			isEssential,
-			isSubscription,
-			subscriptionFrequency: isSubscription ? subscriptionFrequency : undefined
-		});
+		isSubmitting = true;
+		try {
+			await onSave(transaction.id, {
+				date: parseLocalDate(dateStr),
+				merchant: merchant.trim(),
+				amount,
+				categoryId,
+				isShared,
+				splitType,
+				splitValue: validatedSplitValue, // Use validated value
+				notes: notes.trim() || undefined,
+				isEssential,
+				isSubscription,
+				subscriptionFrequency: isSubscription ? subscriptionFrequency : undefined
+			});
+		} finally {
+			isSubmitting = false;
+		}
 	}
 
 	function handleClose() {
@@ -337,9 +344,12 @@
 				<div class="flex gap-3 px-6 py-4 border-t border-dashed border-theme-dashed bg-surface-alt rounded-b-xl">
 					<button
 						type="submit"
-						disabled={!merchant.trim() || amount <= 0 || !categoryId || (isFutureDate && !futureDateConfirmed)}
-						class="flex-1 bg-primary-500 text-white py-2.5 px-4 rounded-lg font-medium hover:bg-primary-600 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-primary-500/25 focus:ring-2 focus:ring-primary-500/20 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-none transition-all duration-150"
+						disabled={isSubmitting || !merchant.trim() || amount <= 0 || !categoryId || (isFutureDate && !futureDateConfirmed)}
+						class="flex-1 bg-primary-500 text-white py-2.5 px-4 rounded-lg font-medium hover:bg-primary-600 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-primary-500/25 focus:ring-2 focus:ring-primary-500/20 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-none transition-all duration-150 flex items-center justify-center gap-2"
 					>
+						{#if isSubmitting}
+							<div class="animate-spin rounded-full h-4 w-4 border-2 border-white/30 border-t-white"></div>
+						{/if}
 						Save Changes
 					</button>
 					<button

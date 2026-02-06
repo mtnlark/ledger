@@ -11,6 +11,7 @@
 	import { getAllCategories } from '$lib/stores/categories';
 	import HeaderNav from '$lib/components/HeaderNav.svelte';
 	import CategoryManager from '$lib/components/CategoryManager.svelte';
+	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
 	import { readExcelFile, parseExpensesSheet, importTransactions, type ImportResult } from '$lib/utils/import';
 	import { exportTransactionsToCSV, exportAllDataToJSON, importFromJSON, downloadFile } from '$lib/utils/export';
 	import { toast } from '$lib/stores/toast';
@@ -27,6 +28,10 @@
 	let isExporting = $state(false);
 	let fileInput = $state<HTMLInputElement | null>(null);
 	let jsonFileInput = $state<HTMLInputElement | null>(null);
+
+	// JSON import confirmation
+	let showJsonImportConfirm = $state(false);
+	let pendingJsonFile = $state<File | null>(null);
 
 	// iCloud state
 	let iCloudAvailable = $state(false);
@@ -201,10 +206,21 @@
 		}
 	}
 
-	// Import from JSON backup
-	async function handleJSONImport(event: Event) {
+	// Import from JSON backup — show confirmation first
+	function handleJSONImportSelect(event: Event) {
 		const input = event.target as HTMLInputElement;
 		const file = input.files?.[0];
+		if (!file) return;
+
+		pendingJsonFile = file;
+		showJsonImportConfirm = true;
+		if (input) input.value = '';
+	}
+
+	async function handleJSONImportConfirm() {
+		showJsonImportConfirm = false;
+		const file = pendingJsonFile;
+		pendingJsonFile = null;
 		if (!file) return;
 
 		isImporting = true;
@@ -224,8 +240,12 @@
 			toast.error(`Import failed: ${error}`);
 		} finally {
 			isImporting = false;
-			if (input) input.value = '';
 		}
+	}
+
+	function handleJSONImportCancel() {
+		showJsonImportConfirm = false;
+		pendingJsonFile = null;
 	}
 
 	// Export to CSV
@@ -450,6 +470,10 @@
 				</div>
 
 				<div class="p-6 space-y-5">
+					<p class="text-sm text-charcoal-soft">
+						Ledger can send native macOS notifications for daily reminders, weekly reviews, and monthly budget setup.
+					</p>
+
 					<!-- Master Toggle -->
 					<div class="flex items-center justify-between p-4 bg-surface-alt rounded-lg border border-theme">
 						<div class="flex items-center gap-3">
@@ -619,7 +643,7 @@
 								<input
 									type="file"
 									accept=".json"
-									onchange={handleJSONImport}
+									onchange={handleJSONImportSelect}
 									bind:this={jsonFileInput}
 									class="hidden"
 									id="json-import"
@@ -749,3 +773,13 @@
 		{/if}
 	</main>
 </div>
+
+<ConfirmDialog
+	isOpen={showJsonImportConfirm}
+	title="Replace All Data?"
+	message="This will replace all your data with the contents of the backup file. This cannot be undone."
+	confirmText="Replace Data"
+	variant="danger"
+	onConfirm={handleJSONImportConfirm}
+	onCancel={handleJSONImportCancel}
+/>

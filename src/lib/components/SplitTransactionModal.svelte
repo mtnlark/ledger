@@ -21,6 +21,8 @@
 
 	let { isOpen, transaction, categories, onSplit, onClose }: Props = $props();
 
+	let isSubmitting = $state(false);
+
 	// Create category helpers
 	let categoryHelpers = $derived(createCategoryHelpers(categories));
 	let getCategoryName = $derived(categoryHelpers.getName);
@@ -37,6 +39,7 @@
 		if (isOpen && transaction) {
 			// Initialize with original transaction as first line
 			lines = [{ categoryId: transaction.categoryId, amount: transaction.amount }];
+			isSubmitting = false;
 		}
 	});
 
@@ -66,12 +69,17 @@
 		lines = lines.map((line, i) => (i === index ? { ...line, [field]: value } : line));
 	}
 
-	function handleSubmit(e: Event) {
+	async function handleSubmit(e: Event) {
 		e.preventDefault();
 
-		if (!isValid || !transaction?.id) return;
+		if (!isValid || !transaction?.id || isSubmitting) return;
 
-		onSplit(transaction.id, lines);
+		isSubmitting = true;
+		try {
+			await onSplit(transaction.id, lines);
+		} finally {
+			isSubmitting = false;
+		}
 	}
 </script>
 
@@ -105,7 +113,7 @@
 									value={line.categoryId}
 									onchange={(e) =>
 										updateLine(index, 'categoryId', parseInt(e.currentTarget.value))}
-									class="flex-1 px-3 py-2 bg-cream border border-[rgba(45,42,38,0.15)] rounded-lg focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-colors"
+									class="flex-1 px-3 py-2 bg-surface-alt border border-theme rounded-lg focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-colors"
 								>
 									<option value={0}>Select category...</option>
 									{#each activeCategories as cat (cat.id)}
@@ -126,7 +134,7 @@
 											updateLine(index, 'amount', parseFloat(e.currentTarget.value) || 0)}
 										step="0.01"
 										min="0"
-										class="w-full pl-6 pr-2 py-2 bg-cream border border-[rgba(45,42,38,0.15)] rounded-lg focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-colors font-mono text-sm"
+										class="w-full pl-6 pr-2 py-2 bg-surface-alt border border-theme rounded-lg focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-colors font-mono text-sm"
 									/>
 								</div>
 
@@ -195,15 +203,18 @@
 				>
 					<button
 						type="submit"
-						disabled={!isValid}
-						class="flex-1 bg-primary-500 text-white py-2.5 px-4 rounded-lg font-medium hover:bg-primary-600 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-primary-500/25 focus:ring-2 focus:ring-primary-500/20 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-none transition-all duration-150"
+						disabled={!isValid || isSubmitting}
+						class="flex-1 bg-primary-500 text-white py-2.5 px-4 rounded-lg font-medium hover:bg-primary-600 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-primary-500/25 focus:ring-2 focus:ring-primary-500/20 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-none transition-all duration-150 flex items-center justify-center gap-2"
 					>
+						{#if isSubmitting}
+							<div class="animate-spin rounded-full h-4 w-4 border-2 border-white/30 border-t-white"></div>
+						{/if}
 						Split into {lines.length} Transactions
 					</button>
 					<button
 						type="button"
 						onclick={onClose}
-						class="px-4 py-2.5 border border-[rgba(45,42,38,0.15)] text-charcoal-soft rounded-lg font-medium hover:bg-surface-hover transition-colors"
+						class="px-4 py-2.5 border border-theme text-charcoal-soft rounded-lg font-medium hover:bg-surface-hover transition-colors"
 					>
 						Cancel
 					</button>

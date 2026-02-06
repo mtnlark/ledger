@@ -111,7 +111,7 @@
 					bind:this={inputRef}
 					onkeydown={handleKeydown}
 					class="w-20 px-3 py-1.5 text-right font-mono text-sm border border-theme rounded-lg
-						focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent
+						focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500
 						bg-surface text-charcoal"
 					placeholder="0"
 				/>
