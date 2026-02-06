@@ -33,7 +33,7 @@ export interface AddTransactionData {
 	notes?: string;
 	isEssential: boolean;
 	isSubscription: boolean;
-	subscriptionFrequency?: 'monthly' | 'annual';
+	subscriptionFrequency?: 'monthly' | 'semi-annual' | 'annual';
 }
 
 /**
@@ -48,7 +48,7 @@ export interface SplitTransactionFormData {
 	splitValue: number;
 	isEssential: boolean;
 	isSubscription: boolean;
-	subscriptionFrequency?: 'monthly' | 'annual';
+	subscriptionFrequency?: 'monthly' | 'semi-annual' | 'annual';
 	splits: { categoryId: number; amount: number }[];
 }
 
@@ -66,7 +66,7 @@ export interface TransactionUpdateData {
 	notes?: string;
 	isEssential: boolean;
 	isSubscription: boolean;
-	subscriptionFrequency?: 'monthly' | 'annual';
+	subscriptionFrequency?: 'monthly' | 'semi-annual' | 'annual';
 }
 
 /**
@@ -311,10 +311,11 @@ export function setupDashboardActions(ctx: DashboardContext) {
 		/**
 		 * Cancel a subscription. This is a settings update, not a transaction mutation,
 		 * so it does NOT call reloadAfterMutation.
+		 * @param amount - Optional amount for targeted cancellation of a specific subscription
 		 */
-		async cancelSubscription(merchant: string): Promise<void> {
+		async cancelSubscription(merchant: string, amount?: number): Promise<void> {
 			try {
-				await storeCancelSubscription(merchant);
+				await storeCancelSubscription(merchant, amount);
 				toast.success(`${merchant} marked as cancelled`);
 			} catch (error) {
 				handleError(error, {

@@ -14,7 +14,7 @@ export interface Transaction {
 	notes?: string;
 	isEssential: boolean; // Needs vs wants - defaults from category but can be overridden
 	isSubscription: boolean; // Recurring subscription payment
-	subscriptionFrequency?: 'monthly' | 'annual'; // Billing frequency for subscriptions
+	subscriptionFrequency?: 'monthly' | 'semi-annual' | 'annual'; // Billing frequency for subscriptions
 	parentTransactionId?: number; // Links split children to their parent transaction
 	isSplitParent?: boolean; // True if this transaction has been split into children
 	isDeleted?: boolean; // True if soft-deleted (awaiting permanent removal or undo)
@@ -53,6 +53,7 @@ export interface CategoryBudget {
 export interface CancelledSubscription {
 	merchant: string; // Normalized merchant name
 	cancelledDate: string; // ISO date string
+	amount?: number; // When set, cancellation targets this specific subscription amount
 }
 
 export interface CompletedGoal {

@@ -186,7 +186,7 @@ describe('dashboardActions', () => {
 			splitValue: 0.5,
 			isEssential: true,
 			isSubscription: false,
-			subscriptionFrequency: undefined as 'monthly' | 'annual' | undefined,
+			subscriptionFrequency: undefined as 'monthly' | 'semi-annual' | 'annual' | undefined,
 			splits: [
 				{ categoryId: 1, amount: 30 },
 				{ categoryId: 2, amount: 20 }
@@ -559,7 +559,13 @@ describe('dashboardActions', () => {
 		it('calls settings cancelSubscription with merchant name', async () => {
 			await actions.cancelSubscription('Netflix');
 
-			expect(cancelSubscription).toHaveBeenCalledWith('Netflix');
+			expect(cancelSubscription).toHaveBeenCalledWith('Netflix', undefined);
+		});
+
+		it('calls settings cancelSubscription with merchant and amount', async () => {
+			await actions.cancelSubscription('Apple', 2.99);
+
+			expect(cancelSubscription).toHaveBeenCalledWith('Apple', 2.99);
 		});
 
 		it('toasts success with merchant name', async () => {

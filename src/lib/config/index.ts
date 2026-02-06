@@ -62,6 +62,8 @@ export const config = {
 	subscription: {
 		/** Days without charge before monthly subscription is considered stale */
 		monthlyStaleDays: 60,
+		/** Months without charge before semi-annual subscription is considered stale */
+		semiAnnualStaleMonths: 8,
 		/** Months without charge before annual subscription is considered stale */
 		annualStaleMonths: 13
 	},

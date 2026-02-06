@@ -325,23 +325,28 @@
 	// Handle adding selected recurring suggestions
 	async function handleAddSelectedSuggestions(items: Array<RecurringSuggestion & { date: Date }>) {
 		try {
-			for (const item of items) {
-				await addTransaction({
-					date: item.date,
-					merchant: item.merchant,
-					amount: item.expectedAmount,
-					categoryId: item.categoryId,
-					isShared: item.isShared,
-					isSettled: false,
-					splitType: item.splitType,
-					splitValue: item.splitValue,
-					isEssential: item.isEssential,
-					isSubscription: item.isSubscription,
-					subscriptionFrequency: item.frequency === 'annual' ? 'annual' : 'monthly'
-				});
-			}
+			const results = await Promise.allSettled(
+				items.map((item) =>
+					addTransaction({
+						date: item.date,
+						merchant: item.merchant,
+						amount: item.expectedAmount,
+						categoryId: item.categoryId,
+						isShared: item.isShared,
+						isSettled: false,
+						splitType: item.splitType,
+						splitValue: item.splitValue,
+						isEssential: item.isEssential,
+						isSubscription: item.isSubscription,
+						subscriptionFrequency: item.frequency
+					})
+				)
+			);
 
-			// Reload transactions
+			const succeeded = results.filter((r) => r.status === 'fulfilled').length;
+			const failed = results.filter((r) => r.status === 'rejected').length;
+
+			// Always reload — some may have succeeded
 			transactions = await getTransactionsByMonth(currentMonth);
 			availableMonths = await getAvailableMonths();
 			if (allTransactions.length > 0) {
@@ -360,9 +365,15 @@
 			showRecurringBanner = recurringSuggestions.length > 0;
 			showRecurringSuggestionsModal = false;
 
-			toast.success(items.length === 1
-				? 'Transaction added'
-				: `${items.length} transactions added`);
+			if (failed === 0) {
+				toast.success(succeeded === 1
+					? 'Transaction added'
+					: `${succeeded} transactions added`);
+			} else if (succeeded > 0) {
+				toast.warning(`${succeeded} added, ${failed} failed`);
+			} else {
+				toast.error('Failed to add transactions');
+			}
 		} catch (error) {
 			handleError(error, { context: 'handleAddSelectedSuggestions', userMessage: 'Failed to add transactions' });
 		}

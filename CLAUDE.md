@@ -270,7 +270,7 @@ interface Transaction {
   settledDate?: Date;
   isEssential: boolean;           // Needs vs wants
   isSubscription: boolean;        // Recurring subscription payment
-  subscriptionFrequency?: 'monthly' | 'annual';
+  subscriptionFrequency?: 'monthly' | 'semi-annual' | 'annual';
   parentTransactionId?: number;   // Links split children to parent
   isSplitParent?: boolean;        // True if split into children
   notes?: string;
@@ -347,6 +347,7 @@ interface CategoryBudget {
 interface CancelledSubscription {
   merchant: string;        // Normalized merchant name
   cancelledDate: string;   // ISO date string
+  amount?: number;         // When set, cancellation targets this specific subscription amount
 }
 
 interface CompletedGoal {
@@ -494,6 +495,8 @@ Sidebar state persists to localStorage (`ledger-sidebar-expanded`).
 - Mark transactions as subscriptions (monthly/annual)
 - Track cancelled subscriptions
 - Confirm active subscriptions to override staleness detection
+- **Multiple subscriptions per merchant**: Same merchant with different amounts (e.g., Apple iCloud $2.99 + Apple Music $2.16) tracked independently using composite key `merchant|amount` via `subscriptionKey()` from `string-helpers.ts`
+- Cancellations with `amount` target a specific subscription; without `amount` they cancel all subscriptions from that merchant (backward compatible)
 
 ### Undo System
 - Recoverable deletions with 5-second undo window
