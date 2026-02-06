@@ -17,6 +17,7 @@ import { detectRecurringExpenses, type RecurringFrequency } from './recurring';
 import { getSettings, getCancelledSubscriptions } from './settings';
 import { normalizeMerchant, subscriptionKey, findSupersededSubscriptionKeys } from '$lib/utils/string-helpers';
 import { roundCurrency, currencyEquals } from '$lib/utils/currency';
+import { mode } from '$lib/insights/calculations/stats';
 import { config } from '$lib/config';
 
 export interface RecurringSuggestion {
@@ -201,51 +202,61 @@ export async function getUserSubscriptions(): Promise<Map<string, RecurringSugge
 }
 
 /**
- * Find mode (most common value) in an array.
+ * Pre-built lookup maps for last occurrence dates, avoiding N+1 queries.
+ * - merchantLastDate: keyed by normalized merchant, latest date across all amounts
+ * - merchantAmountLastDate: keyed by `merchant|amount` (rounded), latest date for that specific amount
  */
-function mode<T>(arr: T[]): T {
-	const counts = new Map<T, number>();
-	for (const val of arr) {
-		counts.set(val, (counts.get(val) || 0) + 1);
-	}
-
-	let maxCount = 0;
-	let modeValue = arr[0];
-	for (const [val, count] of counts) {
-		if (count > maxCount) {
-			maxCount = count;
-			modeValue = val;
-		}
-	}
-	return modeValue;
+interface LastOccurrenceMaps {
+	merchantLastDate: Map<string, Date>;
+	merchantAmountLastDate: Map<string, Date>;
 }
 
 /**
- * Get last occurrence date for a merchant from all transactions.
- *
- * @param normalizedMerchant - Normalized merchant name
- * @param amount - Optional amount to filter by (within tolerance). When provided,
- *                 only considers transactions with matching amount.
+ * Build last-occurrence lookup maps from all transactions in a single pass.
  */
-async function getLastOccurrence(normalizedMerchant: string, amount?: number): Promise<Date | null> {
-	const allTxns = await db.transactions.toArray();
-	const tolerance = config.recurringSuggestions.amountTolerance;
+function buildLastOccurrenceMaps(allTxns: Transaction[]): LastOccurrenceMaps {
+	const merchantLastDate = new Map<string, Date>();
+	const merchantAmountLastDate = new Map<string, Date>();
 
-	const matching = allTxns.filter((tx) => {
-		if (normalizeMerchant(tx.merchant) !== normalizedMerchant) return false;
-		// When amount specified, filter by amount within tolerance
-		if (amount != null && amount > 0) {
-			const diff = Math.abs(tx.amount - amount) / amount;
-			if (diff > tolerance) return false;
+	for (const tx of allTxns) {
+		const merchant = normalizeMerchant(tx.merchant);
+		const txDate = new Date(tx.date);
+
+		// Merchant-level: latest date for this merchant (any amount)
+		const existing = merchantLastDate.get(merchant);
+		if (!existing || txDate.getTime() > existing.getTime()) {
+			merchantLastDate.set(merchant, txDate);
 		}
-		return true;
-	});
 
-	if (matching.length === 0) return null;
+		// Merchant+amount-level: latest date for this specific amount
+		const amountKey = `${merchant}|${roundCurrency(tx.amount)}`;
+		const existingAmount = merchantAmountLastDate.get(amountKey);
+		if (!existingAmount || txDate.getTime() > existingAmount.getTime()) {
+			merchantAmountLastDate.set(amountKey, txDate);
+		}
+	}
 
-	// Sort by date descending
-	matching.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-	return new Date(matching[0].date);
+	return { merchantLastDate, merchantAmountLastDate };
+}
+
+/**
+ * Look up last occurrence date for a merchant from pre-built maps.
+ *
+ * @param maps - Pre-built lookup maps
+ * @param normalizedMerchant - Normalized merchant name
+ * @param amount - Optional amount to filter by. When provided, looks up the
+ *                 merchant+amount composite key for exact (rounded) match.
+ */
+function getLastOccurrence(
+	maps: LastOccurrenceMaps,
+	normalizedMerchant: string,
+	amount?: number
+): Date | null {
+	if (amount != null && amount > 0) {
+		const amountKey = `${normalizedMerchant}|${roundCurrency(amount)}`;
+		return maps.merchantAmountLastDate.get(amountKey) ?? null;
+	}
+	return maps.merchantLastDate.get(normalizedMerchant) ?? null;
 }
 
 /**
@@ -291,6 +302,10 @@ export async function getRecurringSuggestions(month: string): Promise<RecurringS
 	// Get detected recurring expenses
 	const detectedRecurring = await detectRecurringExpenses();
 
+	// Build last-occurrence maps once (fixes N+1: was fetching all txns per item)
+	const allTxns = await db.transactions.toArray();
+	const occurrenceMaps = buildLastOccurrenceMaps(allTxns);
+
 	// Build merged suggestions map (subscriptions override detected)
 	const suggestionsMap = new Map<string, RecurringSuggestion>();
 
@@ -302,7 +317,7 @@ export async function getRecurringSuggestions(month: string): Promise<RecurringS
 		if (isCancelledSubscription(key, cancelledSubs)) continue;
 
 		// Get last occurrence for frequency check
-		const lastOccurrence = await getLastOccurrence(key);
+		const lastOccurrence = getLastOccurrence(occurrenceMaps, key);
 
 		// Skip if not expected this month
 		if (!isExpectedThisMonth(detected.frequency, detected.dayOfMonth, lastOccurrence, month)) {
@@ -351,7 +366,7 @@ export async function getRecurringSuggestions(month: string): Promise<RecurringS
 		if (isCancelledSubscription(merchant, cancelledSubs, subscription.expectedAmount)) continue;
 
 		// Get last occurrence for frequency check (filtered by amount)
-		const lastOccurrence = await getLastOccurrence(merchant, subscription.expectedAmount);
+		const lastOccurrence = getLastOccurrence(occurrenceMaps, merchant, subscription.expectedAmount);
 
 		// Skip if not expected this month
 		if (

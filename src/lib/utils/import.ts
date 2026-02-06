@@ -1,4 +1,3 @@
-import * as XLSX from 'xlsx';
 import { db } from '$lib/db';
 import { getAllCategories, getCategoryByName } from '$lib/stores/categories';
 import { excelDateToJS, parseDateString } from '$lib/utils/date-helpers';
@@ -23,9 +22,12 @@ export interface ImportResult {
 }
 
 /**
- * Parse the Expenses sheet from an Excel file
+ * Parse the Expenses sheet from an Excel file.
+ * Dynamically imports XLSX to avoid loading ~500KB at app startup.
  */
-export function parseExpensesSheet(workbook: XLSX.WorkBook): ImportedTransaction[] {
+export async function parseExpensesSheet(workbook: { Sheets: Record<string, unknown>; SheetNames: string[] }): Promise<ImportedTransaction[]> {
+	const XLSX = await import('xlsx');
+
 	const sheet = workbook.Sheets['Expenses'];
 	if (!sheet) {
 		throw new Error('No "Expenses" sheet found in workbook');
@@ -226,9 +228,12 @@ export async function importTransactions(
 }
 
 /**
- * Read and parse an Excel file from a File object
+ * Read and parse an Excel file from a File object.
+ * Dynamically imports XLSX to avoid loading ~500KB at app startup.
  */
-export async function readExcelFile(file: File): Promise<XLSX.WorkBook> {
+export async function readExcelFile(file: File): Promise<{ Sheets: Record<string, unknown>; SheetNames: string[] }> {
+	const XLSX = await import('xlsx');
+
 	return new Promise((resolve, reject) => {
 		const reader = new FileReader();
 		reader.onload = (e) => {

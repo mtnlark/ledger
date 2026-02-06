@@ -4,7 +4,7 @@
 
 This document organizes planned work by logical groupings and engineering dependencies. Items within each group should be implemented together; groups are ordered by what needs to land first.
 
-**Status**: Groups 1–7 are complete. Group 8 (Performance & Tech Debt) is partially complete — see details below.
+**Status**: Groups 1–8 are complete.
 
 ---
 
@@ -468,21 +468,17 @@ interface Settings {
 
 ---
 
-## Group 8: Performance & Tech Debt (Partially Complete)
+## Group 8: Performance & Tech Debt ✅ Complete
 
 **Why here**: Cleanup and optimization after features are stable.
 
 **Dependencies**: Groups 2-6 complete
 
-### 8.1 Fix N+1 Query in Recurring Suggestions
+### 8.1 Fix N+1 Query in Recurring Suggestions ✅ Complete
 
-**Status**: Open
+**Problem**: `getLastOccurrence()` in `recurringSuggestions.ts` made a full `db.transactions.toArray()` call per suggestion item, causing 15+ DB round-trips for users with many subscriptions.
 
-**Problem**: `getLastOccurrence()` in `recurringSuggestions.ts` makes a DB query per suggestion.
-
-**Solution**:
-- Batch the lookup: build `Map<key, lastDate>` in one pass
-- Replace per-suggestion DB queries with map lookups
+**Solution**: Build `LastOccurrenceMaps` (merchant-level and merchant+amount-level) in a single pass at the top of `getRecurringSuggestions()`. Converted `getLastOccurrence()` from async DB function to synchronous map lookup.
 
 **Files**: `src/lib/stores/recurringSuggestions.ts`
 
@@ -494,44 +490,32 @@ interface Settings {
 
 **Files**: `src/lib/stores/transactionCache.ts`
 
-### 8.3 Extract Shared Statistics Utility
+### 8.3 Extract Shared Statistics Utility ✅ Complete
 
-**Status**: Open
+**Problem**: `mode()` function was duplicated in `recurring.ts` and `recurringSuggestions.ts`.
 
-**Problem**: `mode()` function is duplicated in `recurring.ts` and `recurringSuggestions.ts`.
+**Solution**: Added `mode<T>()` to the existing `src/lib/insights/calculations/stats.ts` (alongside `computeStdDev`, `computeZScore`, etc.). Replaced both local definitions with imports. Added unit tests in `src/tests/utils/stats.test.ts`.
 
-**Solution**:
-- Create `src/lib/utils/stats.ts` with shared statistical functions
-- Move `mode()`, consider consolidating other stats helpers
-- Note: `src/lib/insights/calculations/stats.ts` already has `stdDev` and `zScore` — consider merging
+**Files**: `src/lib/insights/calculations/stats.ts`, `src/lib/stores/recurring.ts`, `src/lib/stores/recurringSuggestions.ts`
 
-**Files**: Create `src/lib/utils/stats.ts`, update `recurring.ts`, `recurringSuggestions.ts`
+### 8.4 Lazy-Load Insights Components & Bundle Optimization ✅ Complete
 
-### 8.4 Lazy-Load Insights Components
-
-**Status**: Open
-
-**Problem**: Insights page loads all chart/calculation components upfront.
+**Problem**: Insights page statically imported all ~15 components (including chart-heavy ones) upfront. XLSX (~500KB) loaded at startup despite being used only for import. No Vite chunk splitting configured.
 
 **Solution**:
-- Use Svelte's `{#await import(...)}` for heavy components
-- Load chart components only when their section is expanded
-- Reduces initial bundle and speeds up page load
+- **Insights page**: Converted tab content to lazy-loaded components using `{#await import(...)}`. Only the active tab's components load; others load on tab switch.
+- **XLSX dynamic import**: Converted top-level `import * as XLSX from 'xlsx'` in `import.ts` to dynamic `await import('xlsx')` inside `parseExpensesSheet()` and `readExcelFile()`.
+- **Vite chunk splitting**: Added `build.rollupOptions.output.manualChunks` to split `chart.js` (~244KB), `xlsx` (~429KB), and `dexie` into separate chunks.
 
-**Files**: `src/routes/insights/+page.svelte`
+**Files**: `src/routes/insights/+page.svelte`, `src/lib/utils/import.ts`, `src/routes/settings/+page.svelte`, `vite.config.ts`
 
-### 8.5 Import/Export Test Coverage
+### 8.5 Import/Export Test Coverage ✅ Complete
 
-**Status**: Open
+**Problem**: `import.ts` (246 lines) and `export.ts` (150 lines) handled user data with zero test coverage.
 
-**Problem**: `import.ts` and `export.ts` have zero tests despite handling user data.
+**Solution**: Comprehensive test suites covering Excel parsing (date formats, column detection, shared expenses), CSV export (escaping, headers, edge cases), JSON export/import (structure, round-trip), and error handling.
 
-**Solution**:
-- Test Excel parsing edge cases (different formats, missing columns)
-- Test CSV/JSON export structure
-- Test round-trip: export → import → data unchanged
-
-**Files**: Create `src/lib/utils/import.test.ts`, `src/lib/utils/export.test.ts`
+**Files**: `src/tests/utils/import.test.ts`, `src/tests/utils/export.test.ts`
 
 ---
 
@@ -568,6 +552,9 @@ Monthly report generation for tax prep or sharing. Consider whether enhanced CSV
 
 ### Year-over-Year Comparison
 Current insights compare to rolling averages but not same-month-last-year. Would require >12 months of data to be useful.
+
+### Large Component Extraction
+Several components exceed 500 lines: Settings page (785), RecurringInsights (619), TransactionForm (604), SmartTakeaways (586). These are working well but could benefit from extraction into smaller sub-components if they grow further or become harder to maintain.
 
 ---
 

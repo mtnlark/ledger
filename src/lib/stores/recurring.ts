@@ -5,7 +5,8 @@ import { config } from '$lib/config';
 import {
 	generateDecayWeights,
 	computeWeightedMean,
-	computeWeightedStdDev
+	computeWeightedStdDev,
+	mode
 } from '$lib/insights/calculations/stats';
 import { roundCurrency, roundCoefficient } from '$lib/utils/currency';
 import { getCachedRecurring, setCachedRecurring } from './recurringCache';
@@ -89,26 +90,6 @@ function getAdaptiveVarianceThresholds(
 		maxVariance: config.recurring.maxVariance * adjustment,
 		fixedThreshold: config.recurring.fixedVarianceThreshold * adjustment
 	};
-}
-
-/**
- * Find the most common value in an array (mode)
- */
-function mode<T>(arr: T[]): T {
-	const counts = new Map<T, number>();
-	for (const val of arr) {
-		counts.set(val, (counts.get(val) || 0) + 1);
-	}
-
-	let maxCount = 0;
-	let modeValue = arr[0];
-	for (const [val, count] of counts) {
-		if (count > maxCount) {
-			maxCount = count;
-			modeValue = val;
-		}
-	}
-	return modeValue;
 }
 
 export type RecurringFrequency = 'monthly' | 'semi-annual' | 'annual';

@@ -26,20 +26,28 @@
 	import Skeleton from '$lib/components/Skeleton.svelte';
 	import MonthPicker from '$lib/components/MonthPicker.svelte';
 	import SmartTakeaways from '$lib/components/insights/SmartTakeaways.svelte';
-	import SpendingThisMonth from '$lib/components/insights/SpendingThisMonth.svelte';
-	import SavingsInsights from '$lib/components/insights/SavingsInsights.svelte';
-	import CategoryDeepDives from '$lib/components/insights/CategoryDeepDives.svelte';
-	import YTDSummary from '$lib/components/insights/YTDSummary.svelte';
-	import RecurringInsights from '$lib/components/insights/RecurringInsights.svelte';
 	import InsightTabs from '$lib/components/insights/InsightTabs.svelte';
-	import NeedsWantsInsights from '$lib/components/insights/NeedsWantsInsights.svelte';
 	import QuickStatsRow from '$lib/components/insights/QuickStatsRow.svelte';
-	import CategoryBreakdownChart from '$lib/components/CategoryBreakdownChart.svelte';
-	import MonthlyTrendsChart from '$lib/components/MonthlyTrendsChart.svelte';
 	import { detectRecurringExpenses, type DetectedRecurring } from '$lib/stores/recurring';
 	import { getCancelledSubscriptions, getConfirmedActiveSubscriptions, getSettings } from '$lib/stores/settings';
 	import { getCategoryBudgetsForMonth } from '$lib/stores/categoryBudget';
 	import type { CategoryBudget } from '$lib/db';
+
+	// Lazy-loaded chart-heavy components (loaded on tab switch)
+	const lazyOverviewCharts = () => Promise.all([
+		import('$lib/components/CategoryBreakdownChart.svelte'),
+		import('$lib/components/MonthlyTrendsChart.svelte')
+	]);
+	const lazySpending = () => Promise.all([
+		import('$lib/components/insights/SpendingThisMonth.svelte'),
+		import('$lib/components/insights/CategoryDeepDives.svelte')
+	]);
+	const lazySavings = () => import('$lib/components/insights/SavingsInsights.svelte');
+	const lazyRecurring = () => import('$lib/components/insights/RecurringInsights.svelte');
+	const lazyYearInReview = () => Promise.all([
+		import('$lib/components/insights/YTDSummary.svelte'),
+		import('$lib/components/insights/NeedsWantsInsights.svelte')
+	]);
 
 	// State
 	let isLoading = $state(true);
@@ -210,70 +218,81 @@
 						contributions={selectedMonthContributions}
 					/>
 
-					<!-- Category Breakdown -->
-					{#if selectedMonthTransactions.length > 0}
-						<div class="bg-surface rounded-xl shadow-md shadow-[var(--color-shadow)] overflow-hidden">
-							<div class="px-6 py-4">
-								<h2 class="font-display text-xl font-medium text-charcoal">Where It Goes</h2>
-								<p class="text-sm text-charcoal-muted mt-0.5">Spending by category</p>
+					<!-- Lazy-loaded chart components for overview tab -->
+					{#await lazyOverviewCharts() then [CategoryBreakdownChartMod, MonthlyTrendsChartMod]}
+						<!-- Category Breakdown -->
+						{#if selectedMonthTransactions.length > 0}
+							<div class="bg-surface rounded-xl shadow-md shadow-[var(--color-shadow)] overflow-hidden">
+								<div class="px-6 py-4">
+									<h2 class="font-display text-xl font-medium text-charcoal">Where It Goes</h2>
+									<p class="text-sm text-charcoal-muted mt-0.5">Spending by category</p>
+								</div>
+								<div class="px-6 pb-6">
+									<CategoryBreakdownChartMod.default transactions={selectedMonthTransactions} {categories} />
+								</div>
 							</div>
-							<div class="px-6 pb-6">
-								<CategoryBreakdownChart transactions={selectedMonthTransactions} {categories} />
-							</div>
-						</div>
-					{/if}
+						{/if}
 
-					<!-- Monthly Trends -->
-					{#if monthlyTrends.size > 1}
-						<div class="bg-surface rounded-xl shadow-md shadow-[var(--color-shadow)] overflow-hidden">
-							<div class="px-6 py-4">
-								<h2 class="font-display text-xl font-medium text-charcoal">Monthly Trends</h2>
-								<p class="text-sm text-charcoal-muted mt-0.5">Spending over time</p>
+						<!-- Monthly Trends -->
+						{#if monthlyTrends.size > 1}
+							<div class="bg-surface rounded-xl shadow-md shadow-[var(--color-shadow)] overflow-hidden">
+								<div class="px-6 py-4">
+									<h2 class="font-display text-xl font-medium text-charcoal">Monthly Trends</h2>
+									<p class="text-sm text-charcoal-muted mt-0.5">Spending over time</p>
+								</div>
+								<div class="px-6 pb-6">
+									<MonthlyTrendsChartMod.default monthlyData={monthlyTrends} />
+								</div>
 							</div>
-							<div class="px-6 pb-6">
-								<MonthlyTrendsChart monthlyData={monthlyTrends} />
-							</div>
-						</div>
-					{/if}
+						{/if}
+					{/await}
 
 				{:else if activeTab === 'spending'}
-					<SpendingThisMonth
-						currentMonth={selectedMonth}
-						transactions={selectedMonthTransactions}
-						{budget}
-						{allBudgets}
-						{monthlyTrends}
-					/>
-					<CategoryDeepDives currentMonth={selectedMonth} transactions={selectedMonthTransactions} {allTransactions} {categories} {availableMonths} />
+					{#await lazySpending() then [SpendingThisMonthMod, CategoryDeepDivesMod]}
+						<SpendingThisMonthMod.default
+							currentMonth={selectedMonth}
+							transactions={selectedMonthTransactions}
+							{budget}
+							{allBudgets}
+							{monthlyTrends}
+						/>
+						<CategoryDeepDivesMod.default currentMonth={selectedMonth} transactions={selectedMonthTransactions} {allTransactions} {categories} {availableMonths} />
+					{/await}
 
 				{:else if activeTab === 'savings'}
-					<SavingsInsights
-						currentMonth={selectedMonth}
-						contributions={selectedMonthContributions}
-						accounts={savingsAccounts}
-						{budget}
-						{allContributions}
-						{allBudgets}
-					/>
+					{#await lazySavings() then SavingsInsightsMod}
+						<SavingsInsightsMod.default
+							currentMonth={selectedMonth}
+							contributions={selectedMonthContributions}
+							accounts={savingsAccounts}
+							{budget}
+							{allContributions}
+							{allBudgets}
+						/>
+					{/await}
 
 				{:else if activeTab === 'recurring'}
-					<RecurringInsights
-						{recurring}
-						{categories}
-						{allTransactions}
-						{cancelledSubscriptions}
-						{confirmedActiveSubscriptions}
-						onDismiss={async () => { recurring = await detectRecurringExpenses(); }}
-						onSubscriptionChange={handleSubscriptionChange}
-					/>
+					{#await lazyRecurring() then RecurringInsightsMod}
+						<RecurringInsightsMod.default
+							{recurring}
+							{categories}
+							{allTransactions}
+							{cancelledSubscriptions}
+							{confirmedActiveSubscriptions}
+							onDismiss={async () => { recurring = await detectRecurringExpenses(); }}
+							onSubscriptionChange={handleSubscriptionChange}
+						/>
+					{/await}
 
 				{:else if activeTab === 'year-in-review'}
-					<YTDSummary transactions={allTransactions} {categories} settings={appSettings} />
-					<NeedsWantsInsights
-						transactions={selectedMonthTransactions}
-						{categories}
-						{allTransactions}
-					/>
+					{#await lazyYearInReview() then [YTDSummaryMod, NeedsWantsInsightsMod]}
+						<YTDSummaryMod.default transactions={allTransactions} {categories} settings={appSettings} />
+						<NeedsWantsInsightsMod.default
+							transactions={selectedMonthTransactions}
+							{categories}
+							{allTransactions}
+						/>
+					{/await}
 				{/if}
 			</div>
 		{/if}

@@ -9,7 +9,7 @@ Use test-driven development (TDD) best practices when adding new code. Update CL
 
 ## Active Development
 
-See `PRODUCT_ROADMAP.md` for the full development plan. Groups 1–7 are complete:
+See `PRODUCT_ROADMAP.md` for the full development plan. Groups 1–8 are complete:
 
 1. ~~Data Integrity Hardening~~ — Backup recovery, atomic writes, checksums ✅
 2. ~~Savings Goals~~ — Goal tracking with projections ✅
@@ -18,9 +18,9 @@ See `PRODUCT_ROADMAP.md` for the full development plan. Groups 1–7 are complet
 5. ~~Insights Page Redesign~~ — Tab-based navigation (5 tabs) ✅
 6. ~~Undo System~~ — Recoverable deletions with soft delete ✅
 7. ~~Design Polish~~ — Accessibility, dark mode, loading states ✅
-8. **Performance & Tech Debt** — Partially complete (N+1 query fix, stats dedup, lazy-load, import/export tests remaining)
+8. ~~Performance & Tech Debt~~ — N+1 fix, stats dedup, lazy-load, chunk splitting, import/export tests ✅
 
-**Recent**: Multiple subscriptions per merchant (PR #2) — composite `merchant|amount` keys with supersession detection.
+**Recent**: Group 8 Performance & Tech Debt — N+1 query fix, `mode()` dedup, XLSX/Chart.js lazy-loading, Vite chunk splitting, import/export test coverage.
 
 ---
 
@@ -251,6 +251,9 @@ ledger/
 │       │   └── subscriptionSettings.test.ts
 │       └── utils/            # Utility tests
 │           ├── error-handler.test.ts
+│           ├── export.test.ts
+│           ├── import.test.ts
+│           ├── stats.test.ts
 │           └── string-helpers.test.ts
 ├── src-tauri/
 │   ├── src/

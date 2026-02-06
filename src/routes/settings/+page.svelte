@@ -190,7 +190,7 @@
 
 		try {
 			const workbook = await readExcelFile(file);
-			const parsed = parseExpensesSheet(workbook);
+			const parsed = await parseExpensesSheet(workbook);
 			const result = await importTransactions(parsed, { skipDuplicates: true });
 
 			if (result.success) {

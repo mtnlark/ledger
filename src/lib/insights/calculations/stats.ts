@@ -68,3 +68,25 @@ export function computeZScore(value: number, mean: number, stdDev: number): numb
 	if (stdDev === 0) return 0;
 	return (value - mean) / stdDev;
 }
+
+/**
+ * Find the most common value in an array (statistical mode).
+ * For ties, returns the first value that reached the highest count.
+ * Assumes arr is non-empty.
+ */
+export function mode<T>(arr: T[]): T {
+	const counts = new Map<T, number>();
+	for (const val of arr) {
+		counts.set(val, (counts.get(val) || 0) + 1);
+	}
+
+	let maxCount = 0;
+	let modeValue = arr[0];
+	for (const [val, count] of counts) {
+		if (count > maxCount) {
+			maxCount = count;
+			modeValue = val;
+		}
+	}
+	return modeValue;
+}
