@@ -9,18 +9,18 @@ Use test-driven development (TDD) best practices when adding new code. Update CL
 
 ## Active Development
 
-See `PRODUCT_ROADMAP.md` for the current development plan. Work is organized into 8 groups:
+See `PRODUCT_ROADMAP.md` for the full development plan. Groups 1–7 are complete:
 
-1. **Data Integrity Hardening** — Backup recovery, atomic writes, checksums
-2. **Savings Goals** — Extend savings accounts with goal tracking
-3. **Tags System** — Hashtag-based tagging via notes field
-4. **Notifications** — Daily reminders, weekly review, monthly budget setup
-5. **Insights Page Redesign** — Tab-based navigation for better UX
-6. **Undo System** — Recoverable deletions
-7. **Design Polish** — Accessibility, dark mode, loading states
-8. **Performance & Tech Debt** — Query optimization, test coverage
+1. ~~Data Integrity Hardening~~ — Backup recovery, atomic writes, checksums ✅
+2. ~~Savings Goals~~ — Goal tracking with projections ✅
+3. ~~Tags System~~ — Hashtag-based tagging via notes field ✅
+4. ~~Notifications~~ — Daily reminders, weekly review, monthly budget setup ✅
+5. ~~Insights Page Redesign~~ — Tab-based navigation (5 tabs) ✅
+6. ~~Undo System~~ — Recoverable deletions with soft delete ✅
+7. ~~Design Polish~~ — Accessibility, dark mode, loading states ✅
+8. **Performance & Tech Debt** — Partially complete (N+1 query fix, stats dedup, lazy-load, import/export tests remaining)
 
-Groups are ordered by engineering dependencies. Check the roadmap before starting new feature work.
+**Recent**: Multiple subscriptions per merchant (PR #2) — composite `merchant|amount` keys with supersession detection.
 
 ---
 
@@ -94,8 +94,11 @@ ledger/
 │   │   │   ├── index.ts      # Storage abstraction layer
 │   │   │   ├── types.ts      # StoredData interface
 │   │   │   └── tauri-adapter.ts  # File persistence
+│   │   ├── config/
+│   │   │   └── index.ts          # Centralized configuration constants
 │   │   ├── stores/           # Data operations
 │   │   │   ├── transactions.ts
+│   │   │   ├── transactionCache.ts    # In-memory transaction cache with versioning
 │   │   │   ├── categories.ts
 │   │   │   ├── settings.ts
 │   │   │   ├── budget.ts
@@ -106,6 +109,7 @@ ledger/
 │   │   │   ├── recurring.ts
 │   │   │   ├── recurringCache.ts       # Recurring detection cache management
 │   │   │   ├── recurringSuggestions.ts  # Monthly recurring transaction suggestions
+│   │   │   ├── subscriptionSettings.ts # Cancel/confirm/reactivate subscription state
 │   │   │   ├── dashboardActions.ts     # Dashboard transaction CRUD operations
 │   │   │   ├── tags.ts              # TagIndex class for tag lookups
 │   │   │   ├── tags.svelte.ts       # Reactive TagIndex wrapper ($state version)
@@ -181,6 +185,10 @@ ledger/
 │   │   │   ├── TagPill.svelte             # Tag pill display with hover popover
 │   │   │   ├── TagPopover.svelte          # Tag hover popover (total + count)
 │   │   │   ├── TagAutocomplete.svelte     # Tag autocomplete for notes input
+│   │   │   ├── KeyboardShortcuts.svelte  # Global keyboard shortcut handler
+│   │   │   ├── __tests__/             # Component test utilities
+│   │   │   │   ├── setup.ts
+│   │   │   │   └── test-utils.test.ts
 │   │   │   └── insights/              # Insight components
 │   │   │       ├── InsightGroup.svelte
 │   │   │       ├── InsightMetric.svelte
@@ -210,7 +218,7 @@ ledger/
 │   │   │   ├── category-helpers.ts
 │   │   │   ├── chart-theme.ts         # Chart.js theme configuration
 │   │   │   ├── date-helpers.ts        # Date parsing, filterUpToDate
-│   │   │   ├── string-helpers.ts
+│   │   │   ├── string-helpers.ts      # Merchant normalization, subscription keys, supersession
 │   │   │   ├── focus-trap.ts          # Modal focus trapping utility
 │   │   │   ├── modal-helpers.ts       # Modal event handlers (backdrop click, escape key)
 │   │   │   ├── form-validation.ts     # Shared form validation helpers
@@ -235,7 +243,15 @@ ledger/
 │   │   ├── shared/+page.svelte
 │   │   └── settings/+page.svelte
 │   └── tests/
-│       └── setup.ts          # Vitest test setup
+│       ├── setup.ts          # Vitest test setup
+│       ├── stores/           # Store integration tests
+│       │   ├── dashboardActions.test.ts
+│       │   ├── recurringCache.test.ts
+│       │   ├── recurringSuggestions.test.ts
+│       │   └── subscriptionSettings.test.ts
+│       └── utils/            # Utility tests
+│           ├── error-handler.test.ts
+│           └── string-helpers.test.ts
 ├── src-tauri/
 │   ├── src/
 │   │   ├── main.rs
@@ -492,11 +508,13 @@ Sidebar state persists to localStorage (`ledger-sidebar-expanded`).
 - Permission requested on first enable; silently disables if OS permission revoked
 
 ### Subscriptions
-- Mark transactions as subscriptions (monthly/annual)
+- Mark transactions as subscriptions (monthly/semi-annual/annual)
 - Track cancelled subscriptions
 - Confirm active subscriptions to override staleness detection
 - **Multiple subscriptions per merchant**: Same merchant with different amounts (e.g., Apple iCloud $2.99 + Apple Music $2.16) tracked independently using composite key `merchant|amount` via `subscriptionKey()` from `string-helpers.ts`
+- **Supersession detection**: `findSupersededSubscriptionKeys()` identifies price changes (old amount stops before new amount starts) vs concurrent subscriptions (charges overlap). Old prices are automatically filtered from the active subscription list.
 - Cancellations with `amount` target a specific subscription; without `amount` they cancel all subscriptions from that merchant (backward compatible)
+- Staleness thresholds configurable in `config.subscription` (60 days monthly, 8 months semi-annual, 13 months annual)
 
 ### Undo System
 - Recoverable deletions with 5-second undo window

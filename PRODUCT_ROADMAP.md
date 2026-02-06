@@ -4,9 +4,11 @@
 
 This document organizes planned work by logical groupings and engineering dependencies. Items within each group should be implemented together; groups are ordered by what needs to land first.
 
+**Status**: Groups 1–7 are complete. Group 8 (Performance & Tech Debt) is partially complete — see details below.
+
 ---
 
-## Group 1: Data Integrity Hardening
+## Group 1: Data Integrity Hardening ✅ Complete
 
 **Why first**: Everything else depends on reliable persistence. These changes protect against data loss and should land before adding new features that create more data.
 
@@ -73,7 +75,7 @@ This document organizes planned work by logical groupings and engineering depend
 
 ---
 
-## Group 2: Savings Goals
+## Group 2: Savings Goals ✅ Complete
 
 **Why here**: High-value feature that extends existing infrastructure. Schema change should happen early so subsequent work can build on it.
 
@@ -155,7 +157,7 @@ Cover projection edge cases:
 
 ---
 
-## Group 3: Tags System
+## Group 3: Tags System ✅ Complete
 
 **Why here**: Self-contained feature with no schema changes (uses existing `notes` field). Good candidate for parallel work.
 
@@ -213,7 +215,7 @@ function matchesTag(transaction: Transaction, tag: string): boolean
 
 ---
 
-## Group 4: Notifications
+## Group 4: Notifications ✅ Complete
 
 **Why here**: Requires Tauri plugin integration. Self-contained infrastructure that multiple features build on.
 
@@ -275,7 +277,7 @@ interface Settings {
 
 ---
 
-## Group 5: Insights Page Redesign
+## Group 5: Insights Page Redesign ✅ Complete
 
 **Why here**: After core features (goals, tags), restructure how we surface data. This is a more ambitious redesign that provides flexibility for future power-user features.
 
@@ -361,7 +363,7 @@ interface Settings {
 
 ---
 
-## Group 6: Undo System
+## Group 6: Undo System ✅ Complete
 
 **Why here**: Quality-of-life feature that's self-contained.
 
@@ -399,7 +401,7 @@ interface Settings {
 
 ---
 
-## Group 7: Design Polish
+## Group 7: Design Polish ✅ Complete
 
 **Why here**: After features are complete, polish the experience.
 
@@ -466,7 +468,7 @@ interface Settings {
 
 ---
 
-## Group 8: Performance & Tech Debt
+## Group 8: Performance & Tech Debt (Partially Complete)
 
 **Why here**: Cleanup and optimization after features are stable.
 
@@ -474,35 +476,40 @@ interface Settings {
 
 ### 8.1 Fix N+1 Query in Recurring Suggestions
 
-**Problem**: `getLastOccurrence()` in `recurringSuggestions.ts` scans all transactions once per suggestion.
+**Status**: Open
+
+**Problem**: `getLastOccurrence()` in `recurringSuggestions.ts` makes a DB query per suggestion.
 
 **Solution**:
-- Batch the lookup: build `Map<merchant, lastDate>` in one pass
+- Batch the lookup: build `Map<key, lastDate>` in one pass
 - Replace per-suggestion DB queries with map lookups
 
 **Files**: `src/lib/stores/recurringSuggestions.ts`
 
-### 8.2 TransactionCache Version Tracking Fix
+### 8.2 TransactionCache Version Tracking Fix ✅ Complete
 
 **Problem**: Insights can go stale if cache version doesn't increment properly when cache wasn't initially loaded.
 
-**Solution**:
-- Ensure version always increments on mutation, regardless of cache load state
-- Add test coverage for this edge case
+**Solution**: Version now always increments on every mutation (add, update, remove, bulkAdd, bulkRemove, reload).
 
 **Files**: `src/lib/stores/transactionCache.ts`
 
 ### 8.3 Extract Shared Statistics Utility
+
+**Status**: Open
 
 **Problem**: `mode()` function is duplicated in `recurring.ts` and `recurringSuggestions.ts`.
 
 **Solution**:
 - Create `src/lib/utils/stats.ts` with shared statistical functions
 - Move `mode()`, consider consolidating other stats helpers
+- Note: `src/lib/insights/calculations/stats.ts` already has `stdDev` and `zScore` — consider merging
 
 **Files**: Create `src/lib/utils/stats.ts`, update `recurring.ts`, `recurringSuggestions.ts`
 
 ### 8.4 Lazy-Load Insights Components
+
+**Status**: Open
 
 **Problem**: Insights page loads all chart/calculation components upfront.
 
@@ -515,6 +522,8 @@ interface Settings {
 
 ### 8.5 Import/Export Test Coverage
 
+**Status**: Open
+
 **Problem**: `import.ts` and `export.ts` have zero tests despite handling user data.
 
 **Solution**:
@@ -523,6 +532,18 @@ interface Settings {
 - Test round-trip: export → import → data unchanged
 
 **Files**: Create `src/lib/utils/import.test.ts`, `src/lib/utils/export.test.ts`
+
+---
+
+## Recently Completed (Post-Roadmap)
+
+### Multiple Subscriptions Per Merchant (PR #2)
+
+**Problem**: Users with multiple subscriptions from the same merchant (e.g., Apple iCloud $2.99 + Apple Music $2.16) only saw one because all grouping layers used normalized merchant name as the unique key.
+
+**Solution**: Changed grouping key from `normalizeMerchant(merchant)` to composite `subscriptionKey(merchant, amount)` — e.g., `"apple|2.99"`. Added supersession detection (`findSupersededSubscriptionKeys()`) to filter out old prices from price changes while preserving concurrent subscriptions.
+
+**Files changed**: `string-helpers.ts`, `constants.ts`, `subscriptionSettings.ts`, `recurringSuggestions.ts`, `RecurringInsights.svelte`, `SubscriptionFields.svelte`, `EditTransactionModal.svelte`, `dashboardActions.ts`
 
 ---
 
