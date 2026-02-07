@@ -91,7 +91,7 @@ ledger/
 │   │   │   ├── constants.ts  # Type definitions & default data
 │   │   │   └── migrations.ts # Database migration logic
 │   │   ├── storage/
-│   │   │   ├── index.ts      # Storage abstraction layer
+│   │   │   ├── index.ts      # Storage abstraction layer (UI-agnostic, uses registered callbacks)
 │   │   │   ├── types.ts      # StoredData interface
 │   │   │   └── tauri-adapter.ts  # File persistence
 │   │   ├── config/
@@ -111,7 +111,7 @@ ledger/
 │   │   │   ├── recurringSuggestions.ts  # Monthly recurring transaction suggestions
 │   │   │   ├── subscriptionSettings.ts # Cancel/confirm/reactivate subscription state
 │   │   │   ├── dashboardActions.ts     # Dashboard transaction CRUD operations
-│   │   │   ├── tags.ts              # TagIndex class for tag lookups
+│   │   │   ├── tags.ts              # TagIndex class for tag lookups (incremental + bulk)
 │   │   │   ├── tags.svelte.ts       # Reactive TagIndex wrapper ($state version)
 │   │   │   ├── selectedMonth.ts    # UI state for month selection
 │   │   │   ├── theme.ts            # Light/dark/system theme
@@ -248,8 +248,13 @@ ledger/
 │       │   ├── dashboardActions.test.ts
 │       │   ├── recurringCache.test.ts
 │       │   ├── recurringSuggestions.test.ts
-│       │   └── subscriptionSettings.test.ts
+│       │   ├── splitTransaction.test.ts   # Split transaction edge cases
+│       │   ├── subscriptionSettings.test.ts
+│       │   ├── tagIndex.test.ts           # TagIndex incremental add/remove/update
+│       │   └── tagOperations.test.ts      # Tag rename/delete batch operations
 │       └── utils/            # Utility tests
+│           ├── cash-flow.test.ts          # Cash flow + total spent calculations
+│           ├── dashboard-insight.test.ts  # Budget status edges + pace warning
 │           ├── error-handler.test.ts
 │           ├── export.test.ts
 │           ├── import.test.ts
