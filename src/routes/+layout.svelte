@@ -7,8 +7,16 @@
 	import { applyTheme, initThemeListener } from '$lib/stores/theme';
 	import { initNotifications, cleanupNotifications, isNotificationPermissionGranted } from '$lib/notifications';
 	import { purgeDeletedTransactions } from '$lib/stores/transactions';
+	import { registerStorageCallbacks } from '$lib/storage';
+	import { toast } from '$lib/stores/toast';
 	import { db } from '$lib/db';
 	import { onDestroy } from 'svelte';
+
+	// Wire storage layer UI feedback to toast (keeps storage UI-agnostic)
+	registerStorageCallbacks({
+		onWarning: (msg, duration) => toast.warning(msg, duration),
+		onError: (msg, duration) => toast.error(msg, duration)
+	});
 
 	let { children } = $props();
 

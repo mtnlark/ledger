@@ -26,6 +26,22 @@ let initialized = false;
 // Store the most recent init result for UI access
 let lastInitResult: StorageInitResult | null = null;
 
+// UI feedback callbacks (registered by layout, keeps storage layer UI-agnostic)
+let _onWarning: ((message: string, duration?: number) => void) | null = null;
+let _onError: ((message: string, duration?: number) => void) | null = null;
+
+/**
+ * Register UI feedback callbacks for storage events.
+ * Call once from the app layout to decouple storage from toast/UI imports.
+ */
+export function registerStorageCallbacks(callbacks: {
+	onWarning: (message: string, duration?: number) => void;
+	onError: (message: string, duration?: number) => void;
+}): void {
+	_onWarning = callbacks.onWarning;
+	_onError = callbacks.onError;
+}
+
 // Check if running in Tauri (has __TAURI__ global)
 function isTauri(): boolean {
 	return typeof window !== 'undefined' && '__TAURI__' in window;
@@ -75,7 +91,7 @@ export async function initializeStorage(): Promise<StorageInitResult> {
 		lastInitResult = result;
 
 		// Show user-facing notifications for recovery scenarios
-		await showInitializationFeedback(result);
+		showInitializationFeedback(result);
 
 		return result;
 	} catch (error) {
@@ -90,26 +106,24 @@ export async function initializeStorage(): Promise<StorageInitResult> {
 }
 
 /**
- * Show toast notifications for recovery scenarios
+ * Show UI feedback for recovery scenarios via registered callbacks.
+ * Falls back silently if no callbacks registered (e.g. in tests).
  */
-async function showInitializationFeedback(result: StorageInitResult): Promise<void> {
+function showInitializationFeedback(result: StorageInitResult): void {
 	// Only show feedback for recovery scenarios, not normal load
 	if (result.status === 'loaded' || result.status === 'initialized_fresh') {
 		return;
 	}
 
-	// Lazy-import toast to avoid circular dependency
-	const { toast } = await import('$lib/stores/toast');
-
 	if (result.status === 'recovered') {
-		toast.warning(
+		_onWarning?.(
 			`Data file was corrupted. Restored from backup (${result.backupName}).`,
-			10000 // Show for 10 seconds
+			10000
 		);
 	} else if (result.status === 'initialized_after_unrecoverable_corruption') {
-		toast.error(
+		_onError?.(
 			'Data file was corrupted and no valid backup was found. Starting fresh.',
-			15000 // Show for 15 seconds
+			15000
 		);
 	}
 }
@@ -148,9 +162,7 @@ export async function persistData(): Promise<void> {
 		await saveToFile();
 	} catch (error) {
 		console.error('Data persistence failed:', error);
-		// Lazy-import toast to avoid circular dependency
-		const { toast } = await import('$lib/stores/toast');
-		toast.error('Failed to save data to disk. Your changes may not persist.');
+		_onError?.('Failed to save data to disk. Your changes may not persist.');
 	}
 }
 
