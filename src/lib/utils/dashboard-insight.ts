@@ -16,6 +16,7 @@ import { getBudgetStatus } from '$lib/utils/budget-status';
 import { config } from '$lib/config';
 import { formatCurrency } from '$lib/utils/format-helpers';
 import { filterUpToDate } from '$lib/utils/date-helpers';
+import { calculateTotalSpent } from '$lib/utils/currency';
 import type { ComponentType } from 'svelte';
 import { AlertTriangle, TrendingUp, Gauge, CheckCircle, BarChart3 } from 'lucide-svelte';
 
@@ -224,10 +225,7 @@ function checkPaceWarning(
 	const pastTransactions = filterUpToDate(transactions);
 
 	// Calculate total spent (user's portion)
-	const totalSpent = pastTransactions.reduce((sum, t) => {
-		const userAmount = t.isShared ? t.amount - t.partnerShare : t.amount;
-		return sum + userAmount;
-	}, 0);
+	const totalSpent = calculateTotalSpent(pastTransactions);
 
 	// Avoid division by zero on edge cases
 	if (currentDay <= 0) return null;

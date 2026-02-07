@@ -10,7 +10,7 @@
 	import { getBudgetForMonth, saveBudget } from '$lib/stores/budget';
 	import { getContributionsAffectingAvailable } from '$lib/stores/savingsContributions';
 	import { getRecurringSuggestions, shouldShowRecurringBanner, type RecurringSuggestion } from '$lib/stores/recurringSuggestions';
-	import { sumCurrency } from '$lib/utils/currency';
+	import { sumCurrency, calculateTotalSpent } from '$lib/utils/currency';
 	import { matchesTag } from '$lib/utils/tags';
 	import { getSelectedMonth, setSelectedMonth } from '$lib/stores/selectedMonth';
 	import { toast } from '$lib/stores/toast';
@@ -183,15 +183,7 @@
 	let monthDisplay = $derived(format(parseMonthKey(currentMonth), 'MMMM yyyy'));
 	let daysInCurrentMonth = $derived(getDaysInMonth(parseMonthKey(currentMonth)));
 	let currentDayOfMonth = $derived(new Date().getDate());
-	let totalSpent = $derived(
-		transactions.reduce((sum, t) => {
-			// For shared transactions, only count your portion
-			if (t.isShared) {
-				return sum + (t.amount - t.partnerShare);
-			}
-			return sum + t.amount;
-		}, 0)
-	);
+	let totalSpent = $derived(calculateTotalSpent(transactions));
 
 	// Initial data load - runs once on mount
 	$effect(() => {

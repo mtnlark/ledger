@@ -84,6 +84,31 @@ export function isSplitBalanced(remaining: number): boolean {
 }
 
 // ============================================================================
+// Transaction Spending Utilities
+// ============================================================================
+
+/**
+ * Calculate total spent from transactions, accounting for shared expenses.
+ * For shared transactions, only the user's portion (amount - partnerShare) is counted.
+ *
+ * @param transactions - Array of transactions (must have amount, isShared, partnerShare)
+ * @returns Total user spending, rounded to 2 decimal places
+ *
+ * @example
+ * calculateTotalSpent([
+ *   { amount: 100, isShared: false, partnerShare: 0 },
+ *   { amount: 60, isShared: true, partnerShare: 30 }
+ * ]) // 130.00
+ */
+export function calculateTotalSpent(
+	transactions: { amount: number; isShared: boolean; partnerShare: number }[]
+): number {
+	return sumCurrency(
+		transactions.map((t) => (t.isShared ? t.amount - t.partnerShare : t.amount))
+	);
+}
+
+// ============================================================================
 // Coefficient/Ratio Utilities
 // ============================================================================
 
