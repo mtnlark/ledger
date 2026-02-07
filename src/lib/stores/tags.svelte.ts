@@ -18,6 +18,33 @@ class ReactiveTagIndex {
 	}
 
 	/**
+	 * Add a single transaction's tags to the index.
+	 */
+	addTransaction(transaction: { id?: number; notes?: string }): void {
+		this.index.addTransaction(transaction);
+		this._version++;
+	}
+
+	/**
+	 * Remove a single transaction's tags from the index.
+	 */
+	removeTransaction(transaction: { id?: number; notes?: string }): void {
+		this.index.removeTransaction(transaction);
+		this._version++;
+	}
+
+	/**
+	 * Update a transaction's tags (remove old, add new).
+	 */
+	updateTransaction(
+		oldTransaction: { id?: number; notes?: string },
+		newTransaction: { id?: number; notes?: string }
+	): void {
+		this.index.updateTransaction(oldTransaction, newTransaction);
+		this._version++;
+	}
+
+	/**
 	 * Return all unique tags sorted alphabetically.
 	 * Reads _version to establish reactive dependency.
 	 */

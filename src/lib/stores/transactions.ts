@@ -132,7 +132,7 @@ export async function addTransaction(
 	const cache = getTransactionCache();
 	if (cache.isLoaded) {
 		cache.add({ ...newTransaction, id } as Transaction & { id: number });
-		tagIndex.rebuild(cache.getAll());
+		tagIndex.addTransaction({ id, notes: newTransaction.notes });
 	}
 
 	// Auto-reactivate if adding a subscription for a cancelled merchant
@@ -181,7 +181,12 @@ export async function updateTransaction(
 	const cache = getTransactionCache();
 	if (cache.isLoaded) {
 		cache.update(id, updatedFields);
-		tagIndex.rebuild(cache.getAll());
+		if (updates.notes !== undefined) {
+			tagIndex.updateTransaction(
+				{ id, notes: existing.notes },
+				{ id, notes: updates.notes }
+			);
+		}
 	}
 
 	// Auto-reactivate if marking as subscription for a cancelled merchant
@@ -198,13 +203,15 @@ export async function updateTransaction(
 
 // Delete a transaction
 export async function deleteTransaction(id: number): Promise<void> {
+	// Get transaction for tag index removal before deleting
+	const oldTx = await db.transactions.get(id);
 	await db.transactions.delete(id);
 
 	// Update the cache incrementally
 	const cache = getTransactionCache();
 	if (cache.isLoaded) {
 		cache.remove(id);
-		tagIndex.rebuild(cache.getAll());
+		if (oldTx) tagIndex.removeTransaction({ id, notes: oldTx.notes });
 	}
 
 	invalidateTransactionCaches();
@@ -244,7 +251,6 @@ export async function softDeleteTransaction(id: number): Promise<Transaction | n
 	const cache = getTransactionCache();
 	if (cache.isLoaded) {
 		cache.update(id, { isDeleted: true, deletedAt: now, updatedAt: now });
-		tagIndex.rebuild(cache.getAll());
 	}
 
 	invalidateTransactionCaches();
@@ -272,7 +278,6 @@ export async function softDeleteTransactions(ids: number[]): Promise<Transaction
 	const cache = getTransactionCache();
 	if (cache.isLoaded) {
 		cache.bulkUpdate(ids, { isDeleted: true, deletedAt: now, updatedAt: now });
-		tagIndex.rebuild(cache.getAll());
 	}
 
 	invalidateTransactionCaches();
@@ -293,7 +298,6 @@ export async function restoreTransaction(id: number): Promise<void> {
 	const cache = getTransactionCache();
 	if (cache.isLoaded) {
 		cache.update(id, { isDeleted: false, deletedAt: undefined, updatedAt: now });
-		tagIndex.rebuild(cache.getAll());
 	}
 
 	invalidateTransactionCaches();
@@ -315,7 +319,6 @@ export async function restoreTransactions(ids: number[]): Promise<void> {
 	const cache = getTransactionCache();
 	if (cache.isLoaded) {
 		cache.bulkUpdate(ids, { isDeleted: false, deletedAt: undefined, updatedAt: now });
-		tagIndex.rebuild(cache.getAll());
 	}
 
 	invalidateTransactionCaches();
@@ -357,7 +360,6 @@ export async function bulkUpdateCategory(ids: number[], categoryId: number): Pro
 	const cache = getTransactionCache();
 	if (cache.isLoaded) {
 		cache.bulkUpdate(ids, { categoryId, updatedAt });
-		tagIndex.rebuild(cache.getAll());
 	}
 
 	invalidateTransactionCaches();
@@ -472,7 +474,6 @@ export async function markAsSettled(ids: number[]): Promise<void> {
 	const cache = getTransactionCache();
 	if (cache.isLoaded) {
 		cache.bulkUpdate(ids, { isSettled: true, settledDate: now, updatedAt: now });
-		tagIndex.rebuild(cache.getAll());
 	}
 
 	invalidateTransactionCaches();
