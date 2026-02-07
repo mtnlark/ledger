@@ -59,15 +59,15 @@ export async function sendNotification(title: string, body: string): Promise<voi
  * Register a listener for notification click events.
  *
  * NOTE: The Tauri notification plugin's `onAction` API is mobile-only.
- * On macOS, notification clicks are handled at the Rust level via RunEvent::Resumed,
- * which brings the window to front when the app is activated (see src-tauri/src/lib.rs).
+ * On macOS, notification clicks are handled at the Rust level via an
+ * NSApplicationDidBecomeActiveNotification observer that shows and focuses
+ * the window (see src-tauri/src/lib.rs).
  *
- * This function is kept as a no-op for API compatibility, but the actual click
- * handling happens in the Rust backend.
+ * This function registers the mobile-only onAction as a fallback.
  */
 export async function registerNotificationClickHandler(): Promise<(() => void) | null> {
 	// On desktop (macOS), notification clicks activate the app which triggers
-	// RunEvent::Resumed in the Rust backend, showing and focusing the window.
+	// the NSApplicationDidBecomeActiveNotification observer in the Rust backend.
 	// The onAction listener below only works on mobile platforms.
 	if (!isTauri()) return null;
 
