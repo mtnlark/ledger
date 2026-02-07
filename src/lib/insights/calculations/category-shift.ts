@@ -8,6 +8,7 @@ import type { CategoryShiftResult, CategoryDeepDiveShift } from '../types';
 import type { AnomalyResult } from '../types';
 import type { CategoryStats } from './category-averages';
 import { getSpendingByCategory, getUserAmount } from './spending';
+import { calculatePercent } from '$lib/utils/currency';
 
 interface ShiftConfig {
 	earlyMonthCutoff: number;
@@ -130,7 +131,7 @@ export function computeCategoryDeepDiveShift(
 
 		if (absDiff > maxChange.absDiff) {
 			// Round percentage for display consistency
-			const changePercent = previous > 0 ? Math.round(((current - previous) / previous) * 100) : 0;
+			const changePercent = previous > 0 ? calculatePercent(current - previous, previous, true) : 0;
 			maxChange = { categoryId: catId, absDiff, changePercent, current, previous };
 		}
 	}

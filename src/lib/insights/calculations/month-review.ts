@@ -13,6 +13,7 @@ import {
 	computeWeightedMean,
 	computeWeightedStdDev
 } from './stats';
+import { calculatePercent } from '$lib/utils/currency';
 
 export interface SavingsReviewResult {
 	/** Total saved this month */
@@ -134,7 +135,7 @@ export function computeVsAverage(
 
 	const stdDev = computeWeightedStdDev(values, weights);
 	const diff = selectedMonthTotal - mean;
-	const percentDiff = Math.round((Math.abs(diff) / mean) * 100);
+	const percentDiff = calculatePercent(Math.abs(diff), mean, true);
 	const isAbove = diff > 0;
 	const withinOneSigma = stdDev > 0 ? Math.abs(diff) <= stdDev : true;
 
@@ -286,7 +287,7 @@ export function computeNeedsPercent(transactions: Transaction[]): number | null 
 	}
 
 	if (total === 0) return null;
-	return Math.round((needsTotal / total) * 100);
+	return calculatePercent(needsTotal, total, true);
 }
 
 /**
@@ -381,7 +382,7 @@ export function computeSavingsReview(
 
 			// Only report if ABOVE average (never flag low rates)
 			if (savingsRate > averageRate) {
-				const percentDiff = Math.round(((savingsRate - averageRate) / averageRate) * 100);
+				const percentDiff = calculatePercent(savingsRate - averageRate, averageRate, true);
 				// Only show if meaningfully above (at least 10% higher)
 				if (percentDiff >= 10) {
 					vsAverage = { percentDiff, averageRate };

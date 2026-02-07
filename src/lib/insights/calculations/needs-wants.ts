@@ -5,6 +5,7 @@
 import type { Transaction } from '$lib/db';
 import type { NeedsVsWantsResult, NeedsWantsFullResult } from '../types';
 import { getUserAmount } from './spending';
+import { calculatePercent } from '$lib/utils/currency';
 
 /**
  * Check if a transaction is essential (needs), falling back to category default.
@@ -40,7 +41,7 @@ export function calculateNeedsVsWants(
 	const total = needsTotal + wantsTotal;
 	if (total === 0) return null;
 
-	const needsPercent = Math.round((needsTotal / total) * 100);
+	const needsPercent = calculatePercent(needsTotal, total, true);
 	return { needsTotal, wantsTotal, needsPercent };
 }
 
@@ -69,8 +70,8 @@ export function calculateNeedsVsWantsFull(
 
 	const total = needs + wants;
 	// Round percentages to match calculateNeedsVsWants() for display consistency
-	const needsPercent = total > 0 ? Math.round((needs / total) * 100) : 0;
-	const wantsPercent = total > 0 ? Math.round((wants / total) * 100) : 0;
+	const needsPercent = calculatePercent(needs, total, true);
+	const wantsPercent = calculatePercent(wants, total, true);
 
 	return { needs, wants, total, needsPercent, wantsPercent };
 }

@@ -1,5 +1,6 @@
 import { db, type MonthlyBudget } from '$lib/db';
 import { persistData } from '$lib/storage';
+import { calculatePercent, roundCoefficient } from '$lib/utils/currency';
 
 export interface CashFlowResult {
 	income: number;
@@ -72,7 +73,7 @@ export function calculateCashFlow(income: number, saved: number, spent: number):
 		// If no budget available, cap at 100%
 		percentSpent = 100;
 	} else {
-		percentSpent = Math.round(((spent / available) * 100) * 100) / 100;
+		percentSpent = roundCoefficient(calculatePercent(spent, available), 2);
 	}
 
 	return {
