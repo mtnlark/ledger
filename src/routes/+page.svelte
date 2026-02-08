@@ -32,6 +32,7 @@
 	import RecurringSuggestionsBanner from '$lib/components/RecurringSuggestionsBanner.svelte';
 	import RecurringSuggestionsModal from '$lib/components/RecurringSuggestionsModal.svelte';
 	import DashboardInsightWidget from '$lib/components/DashboardInsightWidget.svelte';
+	import WeekInReviewCard from '$lib/components/WeekInReviewCard.svelte';
 	import { Plus, Square } from 'lucide-svelte';
 	import { getDaysInMonth } from 'date-fns';
 
@@ -468,6 +469,9 @@
 				currentDay={currentDayOfMonth}
 				daysInMonth={daysInCurrentMonth}
 			/>
+
+			<!-- Week in Review -->
+			<WeekInReviewCard {allTransactions} {categories} />
 
 			<!-- Cash Flow Summary -->
 			<CashFlowCard

@@ -185,6 +185,7 @@ ledger/
 │   │   │   ├── TagPill.svelte             # Tag pill display with hover popover
 │   │   │   ├── TagPopover.svelte          # Tag hover popover (total + count)
 │   │   │   ├── TagAutocomplete.svelte     # Tag autocomplete for notes input
+│   │   │   ├── WeekInReviewCard.svelte    # Week in Review dashboard card
 │   │   │   ├── KeyboardShortcuts.svelte  # Global keyboard shortcut handler
 │   │   │   ├── __tests__/             # Component test utilities
 │   │   │   │   ├── setup.ts
@@ -230,6 +231,7 @@ ledger/
 │   │   │   ├── tags.ts                # Tag parsing, replace, strip, total calculation
 │   │   │   ├── errors.ts              # Error class definitions & type guards
 │   │   │   ├── error-handler.ts       # Centralized error handler (logging + toast)
+│   │   │   ├── week-in-review.ts      # Week in Review calculations + dismiss logic
 │   │   │   └── debug.ts               # Debugging utilities
 │   │   └── assets/
 │   │       └── favicon.svg
@@ -259,7 +261,8 @@ ledger/
 │           ├── export.test.ts
 │           ├── import.test.ts
 │           ├── stats.test.ts
-│           └── string-helpers.test.ts
+│           ├── string-helpers.test.ts
+│           └── week-in-review.test.ts     # Week in Review calculations + dismiss
 ├── src-tauri/
 │   ├── src/
 │   │   ├── main.rs
@@ -547,6 +550,7 @@ UI state persisted across sessions:
 - `ledger-notif-daily-last-fired` - Daily notification last-fired date ("YYYY-MM-DD")
 - `ledger-notif-weekly-last-fired` - Weekly notification last-fired date ("YYYY-MM-DD")
 - `ledger-notif-monthly-last-fired` - Monthly notification last-fired month ("YYYY-MM")
+- `ledger-week-review-dismissed` - Week in Review dismiss date (this Monday's "YYYY-MM-DD")
 
 ---
 
