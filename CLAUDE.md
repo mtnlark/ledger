@@ -403,6 +403,7 @@ interface Settings {
   dailyReminderTime: string;             // "HH:MM" 24h format (default "20:00")
   weeklyReviewEnabled: boolean;           // Monday 9am review prompt (default true)
   monthlyBudgetSetupEnabled: boolean;     // 1st-of-month budget prompt (default true)
+  migrationVersion?: number;              // Tracks applied migrations (skip all if current)
 }
 ```
 
