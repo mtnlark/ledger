@@ -4,7 +4,7 @@
 
 This document organizes planned work by logical groupings and engineering dependencies. Items within each group should be implemented together; groups are ordered by what needs to land first.
 
-**Status**: Groups 1–8 are complete.
+**Status**: Groups 1–9 are complete.
 
 ---
 
@@ -519,6 +519,70 @@ interface Settings {
 
 ---
 
+## Group 9: Startup Performance & Search Enhancements ✅ Complete
+
+**Why here**: Dashboard startup accumulated 4-7 redundant DB scans as features were added. Search only matched merchant names, leaving the tag system invisible. Existing pagination utility was unused.
+
+**Dependencies**: Groups 1-8 complete
+
+### 9.1 Eliminate Redundant Startup DB Scans ✅ Complete
+
+**Problem**: `loadData()` called `getAllTransactions()` which populated `TransactionCache`, then `getTransactionsByMonth()`, `detectRecurringExpenses()`, `getUserSubscriptions()`, and `getRecurringSuggestions()` each re-queried the DB independently.
+
+**Solution**: Added optional `providedTransactions` parameter to `detectRecurringExpenses()`, `getUserSubscriptions()`, and `getRecurringSuggestions()`. Dashboard and insights pages pass already-loaded transactions through. Added `getTransactionsByMonthFromCache()` to read from cache instead of re-querying Dexie.
+
+**Files**: `src/lib/stores/recurring.ts`, `src/lib/stores/recurringSuggestions.ts`, `src/lib/stores/transactions.ts`, `src/routes/+page.svelte`, `src/routes/insights/+page.svelte`
+
+### 9.2 Parallelize Startup Queries ✅ Complete
+
+**Problem**: `loadData()` awaited `getAllCategories()`, `getSettings()`, and `getAllTransactions()` sequentially despite being independent Dexie queries.
+
+**Solution**: Wrapped independent queries in `Promise.all()` (two batches: initial data load, then month-specific queries).
+
+**Files**: `src/routes/+page.svelte`
+
+### 9.3 Defer Recurring Suggestions After Paint ✅ Complete
+
+**Problem**: Recurring suggestions computation (20-50ms) ran inside `loadData()` before `isLoading = false`, keeping the skeleton up longer than needed.
+
+**Solution**: Moved recurring suggestions check after `isLoading = false` so dashboard renders immediately while the banner computes asynchronously.
+
+**Files**: `src/routes/+page.svelte`
+
+### 9.4 Extend Search to Notes & Add Amount Range Filter ✅ Complete
+
+**Problem**: Search only checked `merchant` field. Tags (`#vacation`, etc.) in `notes` were invisible to search. No amount-based filtering existed.
+
+**Solution**: Extended search to match `t.notes` in addition to `t.merchant`. Added `amountMin`/`amountMax` fields to `FilterState` with number inputs in the advanced filters panel.
+
+**Files**: `src/lib/components/TransactionFilters.svelte`, `src/routes/+page.svelte`
+
+### 9.5 Wire Up Transaction List Pagination ✅ Complete
+
+**Problem**: `pagination.ts` (129 lines) was fully implemented but unused. TransactionList rendered all filtered transactions in the DOM.
+
+**Solution**: Added progressive "Show more" loading using `DEFAULT_PAGE_SIZE` (50). Displays first 50 transactions, with a button to reveal 50 more at a time. Resets when transaction list changes (new month/filters).
+
+**Files**: `src/lib/components/TransactionList.svelte`
+
+### 9.6 Lazy-Load Emoji Picker ✅ Complete
+
+**Problem**: `import 'emoji-picker-element'` eagerly loaded this web component on every CategoryEditModal render despite being rarely used.
+
+**Solution**: Replaced static import with dynamic `import('emoji-picker-element')` inside the `setupEmojiPicker` Svelte action. The custom element registers on demand when the user opens the picker.
+
+**Files**: `src/lib/components/CategoryEditModal.svelte`
+
+### 9.7 Migration Version Stamp ✅ Complete
+
+**Problem**: Every startup ran 9 migration functions that each queried Dexie to check if work was needed.
+
+**Solution**: Added `migrationVersion` field to Settings. After all migrations complete, version is stamped (`CURRENT_MIGRATION_VERSION = 10`). Subsequent startups read one Settings row and skip all migration checks when version matches.
+
+**Files**: `src/lib/db/constants.ts`, `src/lib/db/migrations.ts`
+
+---
+
 ## Recently Completed (Post-Roadmap)
 
 ### Multiple Subscriptions Per Merchant (PR #2)
@@ -536,7 +600,7 @@ interface Settings {
 These are ideas that came up but aren't prioritized for immediate work:
 
 ### Virtual Scrolling for Transaction List
-Large transaction lists (500+) could benefit from virtualization, but this adds complexity and may be premature optimization. Revisit if users report lag.
+Progressive pagination (Group 9.5) handles most cases by showing 50 transactions at a time. Full virtualization would help with 500+ visible items but adds complexity. Revisit if users report lag after expanding the "Show more" list.
 
 ### Transaction Rules / Automation
 A rules engine ("always categorize Shell as Gas") would reduce manual work. Current auto-fill based on historical usage covers 80% of the use case. Full rules system is a larger project.

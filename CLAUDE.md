@@ -9,7 +9,7 @@ Use test-driven development (TDD) best practices when adding new code. Update CL
 
 ## Active Development
 
-See `PRODUCT_ROADMAP.md` for the full development plan. Groups 1–8 are complete:
+See `PRODUCT_ROADMAP.md` for the full development plan. Groups 1–9 are complete:
 
 1. ~~Data Integrity Hardening~~ — Backup recovery, atomic writes, checksums ✅
 2. ~~Savings Goals~~ — Goal tracking with projections ✅
@@ -19,8 +19,9 @@ See `PRODUCT_ROADMAP.md` for the full development plan. Groups 1–8 are complet
 6. ~~Undo System~~ — Recoverable deletions with soft delete ✅
 7. ~~Design Polish~~ — Accessibility, dark mode, loading states ✅
 8. ~~Performance & Tech Debt~~ — N+1 fix, stats dedup, lazy-load, chunk splitting, import/export tests ✅
+9. ~~Startup Perf & Search~~ — Redundant DB scan elimination, query parallelization, search/filter enhancements, pagination, lazy emoji picker, migration version stamp ✅
 
-**Recent**: Group 8 Performance & Tech Debt — N+1 query fix, `mode()` dedup, XLSX/Chart.js lazy-loading, Vite chunk splitting, import/export test coverage.
+**Recent**: Group 9 Startup Perf & Search — Dashboard startup reduced from 4-7 DB scans to 1, parallelized data queries, deferred recurring suggestions, search extended to notes field, amount range filters, progressive pagination, lazy emoji picker, migration version stamp.
 
 ---
 
@@ -428,7 +429,7 @@ Sidebar state persists to localStorage (`ledger-sidebar-expanded`).
 ### Dashboard
 - Cash flow summary (income, saved, available, spent, surplus)
 - Collapsible "Add Transaction" form with merchant autocomplete
-- Transaction list with search/filters
+- Transaction list with search/filters (searches merchant names and notes), amount range filter, progressive pagination (50 at a time)
 - Quick-add FAB for fast entry
 - Edit/split transaction modals
 - Bulk action toolbar for multi-select operations
