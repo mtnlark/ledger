@@ -218,10 +218,22 @@ async function migrateSettingsNotifications(): Promise<void> {
 }
 
 /**
+ * Current migration version. Increment this when adding a new migration.
+ * When the stored version matches, all migrations are skipped.
+ */
+const CURRENT_MIGRATION_VERSION = 10;
+
+/**
  * Run all database migrations
- * Each migration is idempotent and checks if it needs to run
+ * Skips entirely if the stored migration version is current.
+ * Each migration is idempotent and checks if it needs to run.
  */
 export async function runMigrations(): Promise<void> {
+	const settings = await db.settings.get(1);
+	if (settings?.migrationVersion === CURRENT_MIGRATION_VERSION) {
+		return; // All migrations already applied
+	}
+
 	await migrateCategoryColors();
 	await migrateCategoryEssential();
 	await migrateSettingsDismissedRecurring();
@@ -231,4 +243,7 @@ export async function runMigrations(): Promise<void> {
 	await migrateSeedSavingsAccounts();
 	await migrateSettingsCompletedGoals();
 	await migrateSettingsNotifications();
+
+	// Stamp the version so subsequent startups skip all checks
+	await db.settings.update(1, { migrationVersion: CURRENT_MIGRATION_VERSION });
 }

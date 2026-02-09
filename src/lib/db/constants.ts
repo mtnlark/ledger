@@ -151,6 +151,7 @@ export interface Settings {
 	dailyReminderTime: string; // "HH:MM" 24h format for daily reminder
 	weeklyReviewEnabled: boolean; // Whether to send weekly review prompt (Monday 9am)
 	monthlyBudgetSetupEnabled: boolean; // Whether to send monthly budget setup prompt (1st of month)
+	migrationVersion?: number; // Tracks which migrations have been applied (skip all if current)
 }
 
 // Default categories from your spreadsheets
