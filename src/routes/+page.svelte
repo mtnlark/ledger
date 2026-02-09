@@ -3,7 +3,7 @@
 	import { format, startOfDay, parseISO } from 'date-fns';
 	import { getMonthKey, parseMonthKey, type Transaction, type Category, type Settings, type MonthlyBudget, DEFAULT_SETTINGS } from '$lib/db';
 	import { initializeStorage } from '$lib/storage';
-	import { addTransaction, getTransactionsByMonth, getAllTransactions, getAvailableMonths } from '$lib/stores/transactions';
+	import { addTransaction, getTransactionsByMonth, getTransactionsByMonthFromCache, getAllTransactions, getAvailableMonths } from '$lib/stores/transactions';
 	import { setupDashboardActions } from '$lib/stores/dashboardActions';
 	import { getAllCategories } from '$lib/stores/categories';
 	import { getSettings, dismissRecurringSuggestionsForMonth } from '$lib/stores/settings';
@@ -124,7 +124,9 @@
 		dateFrom: '',
 		dateTo: '',
 		searchAllTime: false,
-		tags: []
+		tags: [],
+		amountMin: '',
+		amountMax: ''
 	});
 
 	// Check if we're using filters that require all transactions
@@ -141,10 +143,13 @@
 	let filteredTransactions = $derived.by(() => {
 		let result = baseTransactions;
 
-		// Filter by search query (merchant name)
+		// Filter by search query (merchant name and notes)
 		if (filters.searchQuery.trim()) {
 			const query = filters.searchQuery.toLowerCase().trim();
-			result = result.filter(t => t.merchant.toLowerCase().includes(query));
+			result = result.filter(t =>
+				t.merchant.toLowerCase().includes(query) ||
+				(t.notes?.toLowerCase().includes(query) ?? false)
+			);
 		}
 
 		// Filter by category
@@ -166,6 +171,16 @@
 		// Filter by tags (OR logic - show transactions with ANY selected tag)
 		if (filters.tags.length > 0) {
 			result = result.filter(tx => filters.tags.some(tag => matchesTag(tx, tag)));
+		}
+
+		// Filter by amount range
+		if (filters.amountMin) {
+			const min = parseFloat(filters.amountMin);
+			if (!isNaN(min)) result = result.filter(t => t.amount >= min);
+		}
+		if (filters.amountMax) {
+			const max = parseFloat(filters.amountMax);
+			if (!isNaN(max)) result = result.filter(t => t.amount <= max);
 		}
 
 		return result;
@@ -204,17 +219,17 @@
 			settings = await getSettings();
 			// Load all transactions first (populates cache and tag index)
 			allTransactions = await getAllTransactions();
-			// Then filter to current month for display
-			transactions = await getTransactionsByMonth(currentMonth);
+			// Use cache for current month (avoids redundant DB query)
+			transactions = getTransactionsByMonthFromCache(currentMonth) ?? await getTransactionsByMonth(currentMonth);
 			budget = await getBudgetForMonth(currentMonth);
 			availableMonths = await getAvailableMonths();
 			// Load savings contributions that affect available to spend
 			const contributions = await getContributionsAffectingAvailable(currentMonth);
 			savedFromContributions = sumCurrency(contributions.map(c => c.amount));
 
-			// Check for recurring suggestions
+			// Check for recurring suggestions — pass allTransactions to avoid redundant DB scans
 			if (shouldShowRecurringBanner(currentMonth, settings.lastAutoSuggestedMonth)) {
-				recurringSuggestions = await getRecurringSuggestions(currentMonth);
+				recurringSuggestions = await getRecurringSuggestions(currentMonth, allTransactions);
 				showRecurringBanner = recurringSuggestions.length > 0;
 			} else {
 				showRecurringBanner = false;
@@ -513,7 +528,7 @@
 					<h2 class="font-display text-xl font-medium text-charcoal">
 						{#if filters.searchAllTime}
 							All Transactions
-						{:else if filters.searchQuery || filters.categoryId !== null || filters.dateFrom || filters.dateTo}
+						{:else if filters.searchQuery || filters.categoryId !== null || filters.dateFrom || filters.dateTo || filters.amountMin || filters.amountMax}
 							Filtered Transactions
 						{:else}
 							Recent Transactions

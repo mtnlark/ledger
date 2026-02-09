@@ -86,7 +86,7 @@
 			availableMonths = await getAvailableMonths();
 			allTransactions = await getAllTransactions();
 			allBudgets = await getAllBudgets();
-			recurring = await detectRecurringExpenses();
+			recurring = await detectRecurringExpenses(allTransactions);
 			cancelledSubscriptions = await getCancelledSubscriptions();
 			confirmedActiveSubscriptions = await getConfirmedActiveSubscriptions();
 			// Load savings data

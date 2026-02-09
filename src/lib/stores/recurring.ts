@@ -155,14 +155,14 @@ function detectRecurringPattern(transactions: Transaction[]): PatternResult | nu
  * Excludes transactions already tagged as subscriptions (those are shown separately)
  * Results are cached until invalidated
  */
-export async function detectRecurringExpenses(): Promise<DetectedRecurring[]> {
+export async function detectRecurringExpenses(providedTransactions?: Transaction[]): Promise<DetectedRecurring[]> {
 	// Return cached results if available
 	const cached = getCachedRecurring();
 	if (cached !== null) {
 		return cached;
 	}
 
-	const allTransactions = await db.transactions.toArray();
+	const allTransactions = providedTransactions ?? await db.transactions.toArray();
 
 	if (allTransactions.length === 0) {
 		setCachedRecurring([]);

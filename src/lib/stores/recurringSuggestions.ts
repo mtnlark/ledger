@@ -121,9 +121,9 @@ export function isExpectedThisMonth(
  * Groups by merchant+amount composite key so multiple subscriptions from
  * the same merchant with different amounts are tracked independently.
  */
-export async function getUserSubscriptions(): Promise<Map<string, RecurringSuggestion>> {
+export async function getUserSubscriptions(providedTransactions?: Transaction[]): Promise<Map<string, RecurringSuggestion>> {
 	// Filter in-memory since isSubscription isn't indexed
-	const allTransactions = await db.transactions.toArray();
+	const allTransactions = providedTransactions ?? await db.transactions.toArray();
 	const allTxns = allTransactions.filter((tx) => tx.isSubscription && !tx.isDeleted && !tx.isSplitParent);
 
 	// Group by composite key (merchant|amount)
@@ -284,26 +284,28 @@ function isCancelledSubscription(
  * Merges detected recurring with user-tagged subscriptions.
  * Filters out already-added transactions and cancelled subscriptions.
  */
-export async function getRecurringSuggestions(month: string): Promise<RecurringSuggestion[]> {
+export async function getRecurringSuggestions(month: string, providedTransactions?: Transaction[]): Promise<RecurringSuggestion[]> {
 	const settings = await getSettings();
 	const cancelledSubs = await getCancelledSubscriptions();
 
-	// Get transactions for this month (to check if already added)
+	// Use provided transactions or fall back to DB query
+	const allTxns = providedTransactions ?? await db.transactions.toArray();
+
+	// Get transactions for this month from the full set (avoids separate DB query)
 	const monthStart = parseMonthKey(month);
 	const monthEnd = new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 0);
-	const monthTxns = await db.transactions
-		.where('date')
-		.between(monthStart, monthEnd, true, true)
-		.toArray();
+	const monthTxns = allTxns.filter((tx) => {
+		const d = new Date(tx.date);
+		return d >= monthStart && d <= monthEnd;
+	});
 
-	// Get user-tagged subscriptions (priority)
-	const userSubscriptions = await getUserSubscriptions();
+	// Get user-tagged subscriptions (priority) — pass full transactions to avoid re-querying
+	const userSubscriptions = await getUserSubscriptions(allTxns);
 
-	// Get detected recurring expenses
-	const detectedRecurring = await detectRecurringExpenses();
+	// Get detected recurring expenses — pass full transactions to avoid re-querying
+	const detectedRecurring = await detectRecurringExpenses(allTxns);
 
 	// Build last-occurrence maps once (fixes N+1: was fetching all txns per item)
-	const allTxns = await db.transactions.toArray();
 	const occurrenceMaps = buildLastOccurrenceMaps(allTxns);
 
 	// Build merged suggestions map (subscriptions override detected)

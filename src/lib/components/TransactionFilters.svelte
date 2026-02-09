@@ -14,6 +14,8 @@
 		dateTo: string;
 		searchAllTime: boolean;
 		tags: string[];
+		amountMin: string;
+		amountMax: string;
 	}
 
 	interface Props {
@@ -55,14 +57,18 @@
 		filters.dateFrom !== '' ||
 		filters.dateTo !== '' ||
 		filters.searchAllTime ||
-		filters.tags.length > 0
+		filters.tags.length > 0 ||
+		filters.amountMin !== '' ||
+		filters.amountMax !== ''
 	);
 
 	let hasAdvancedFilters = $derived(
 		filters.categoryId !== null ||
 		filters.dateFrom !== '' ||
 		filters.dateTo !== '' ||
-		filters.tags.length > 0
+		filters.tags.length > 0 ||
+		filters.amountMin !== '' ||
+		filters.amountMax !== ''
 	);
 
 	// Debounce search input
@@ -95,7 +101,9 @@
 			dateFrom: '',
 			dateTo: '',
 			searchAllTime: false,
-			tags: []
+			tags: [],
+			amountMin: '',
+			amountMax: ''
 		});
 	}
 
@@ -161,7 +169,7 @@
 				<input
 					type="text"
 					bind:this={searchInput}
-					placeholder={filters.searchAllTime ? "Search all transactions..." : "Search transactions..."}
+					placeholder={filters.searchAllTime ? "Search merchants & notes..." : "Search merchants & notes..."}
 					aria-label="Search transactions"
 					value={filters.searchQuery}
 					oninput={(e) => handleSearchInput(e.currentTarget.value)}
@@ -380,6 +388,36 @@
 						value={filters.dateTo}
 						onchange={(e) => handleDateToChange(e.currentTarget.value)}
 						class="w-full px-3 py-2 bg-cream rounded-lg border border-transparent focus:border-primary-300 focus:ring-2 focus:ring-primary-100 focus:bg-surface transition-all text-charcoal"
+					/>
+				</div>
+			</div>
+
+			<!-- Amount Range -->
+			<div class="grid grid-cols-2 gap-3">
+				<div>
+					<label for="amount-min" class="block text-xs font-medium text-charcoal-muted mb-1">Min Amount</label>
+					<input
+						id="amount-min"
+						type="number"
+						step="0.01"
+						min="0"
+						placeholder="0.00"
+						value={filters.amountMin}
+						oninput={(e) => onFilterChange({ ...filters, amountMin: e.currentTarget.value })}
+						class="w-full px-3 py-2 bg-cream rounded-lg border border-transparent focus:border-primary-300 focus:ring-2 focus:ring-primary-100 focus:bg-surface transition-all text-charcoal font-mono"
+					/>
+				</div>
+				<div>
+					<label for="amount-max" class="block text-xs font-medium text-charcoal-muted mb-1">Max Amount</label>
+					<input
+						id="amount-max"
+						type="number"
+						step="0.01"
+						min="0"
+						placeholder="0.00"
+						value={filters.amountMax}
+						oninput={(e) => onFilterChange({ ...filters, amountMax: e.currentTarget.value })}
+						class="w-full px-3 py-2 bg-cream rounded-lg border border-transparent focus:border-primary-300 focus:ring-2 focus:ring-primary-100 focus:bg-surface transition-all text-charcoal font-mono"
 					/>
 				</div>
 			</div>

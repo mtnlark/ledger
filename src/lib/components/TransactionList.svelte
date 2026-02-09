@@ -6,6 +6,7 @@
 	import { formatCurrency } from '$lib/utils/format-helpers';
 	import { createDateGroups, type DateGroup } from '$lib/utils/transaction-grouping';
 	import { extractTags, removeTags } from '$lib/utils/tags';
+	import { DEFAULT_PAGE_SIZE } from '$lib/utils/pagination';
 	import EmptyState from './EmptyState.svelte';
 	import BulkActionBar from './BulkActionBar.svelte';
 	import TagPill from './TagPill.svelte';
@@ -112,8 +113,26 @@
 	let getCategoryIcon = $derived(categoryHelpers.getIcon);
 	let getCategoryColor = $derived(categoryHelpers.getColor);
 
+	// Progressive loading — show DEFAULT_PAGE_SIZE initially, reveal more on demand
+	let displayCount = $state(DEFAULT_PAGE_SIZE);
+	let hasMore = $derived(transactions.length > displayCount);
+	let displayedTransactions = $derived(transactions.slice(0, displayCount));
+
+	// Reset display count when the transaction list changes (new month, filters, etc.)
+	let prevTransactionsRef = $state<Transaction[]>([]);
+	$effect(() => {
+		if (transactions !== prevTransactionsRef) {
+			prevTransactionsRef = transactions;
+			displayCount = DEFAULT_PAGE_SIZE;
+		}
+	});
+
+	function showMore() {
+		displayCount = Math.min(displayCount + DEFAULT_PAGE_SIZE, transactions.length);
+	}
+
 	// Group transactions by date using the utility function
-	let groupedTransactions = $derived(createDateGroups(transactions));
+	let groupedTransactions = $derived(createDateGroups(displayedTransactions));
 </script>
 
 <div class="space-y-5">
@@ -276,6 +295,22 @@
 				</div>
 			</div>
 		{/each}
+
+		<!-- Show more button -->
+		{#if hasMore}
+			<div class="flex flex-col items-center gap-1 pt-2">
+				<span class="text-xs text-charcoal-muted">
+					Showing {displayedTransactions.length} of {transactions.length} transactions
+				</span>
+				<button
+					type="button"
+					onclick={showMore}
+					class="px-4 py-2 text-sm font-medium text-primary-600 hover:text-primary-700 hover:bg-primary-50 rounded-lg transition-colors"
+				>
+					Show more
+				</button>
+			</div>
+		{/if}
 	{/if}
 </div>
 

@@ -574,6 +574,17 @@ export async function getAvailableMonths(): Promise<string[]> {
 	return months;
 }
 
+// Get transactions for a month from cache (avoids DB query when cache is already loaded)
+// Falls back to DB query if cache not loaded
+export function getTransactionsByMonthFromCache(month: string): Transaction[] | null {
+	const cache = getTransactionCache();
+	if (!cache.isLoaded) return null;
+	// Cache returns date-descending is not guaranteed, sort to match getTransactionsByMonth behavior
+	return cache.getForMonth(month).sort(
+		(a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+	);
+}
+
 // Get all transactions (for YTD calculations)
 // Uses cache when available, otherwise loads from DB and initializes cache
 // Uses async lock to prevent concurrent double-loading

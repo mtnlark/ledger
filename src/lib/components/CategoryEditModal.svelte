@@ -5,7 +5,6 @@
 	import { updateCategory, addCategory, deleteCategory, getCategoryUsageCount } from '$lib/stores/categories';
 	import { toast } from '$lib/stores/toast';
 	import { focusTrap } from '$lib/utils/focus-trap';
-	import 'emoji-picker-element';
 
 	interface Props {
 		category: Category | null; // null = adding new
@@ -62,7 +61,9 @@
 	}
 
 	function setupEmojiPicker(node: HTMLElement) {
-		node.addEventListener('emoji-click', handleEmojiSelect);
+		import('emoji-picker-element').then(() => {
+			node.addEventListener('emoji-click', handleEmojiSelect);
+		});
 		return {
 			destroy() {
 				node.removeEventListener('emoji-click', handleEmojiSelect);
