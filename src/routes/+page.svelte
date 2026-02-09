@@ -215,19 +215,37 @@
 			await initializeStorage();
 			// Restore selected month from localStorage
 			currentMonth = getSelectedMonth();
-			categories = await getAllCategories();
-			settings = await getSettings();
-			// Load all transactions first (populates cache and tag index)
-			allTransactions = await getAllTransactions();
+
+			// Parallelize independent queries
+			const [cats, s, allTxns] = await Promise.all([
+				getAllCategories(),
+				getSettings(),
+				getAllTransactions()
+			]);
+			categories = cats;
+			settings = s;
+			allTransactions = allTxns;
+
 			// Use cache for current month (avoids redundant DB query)
 			transactions = getTransactionsByMonthFromCache(currentMonth) ?? await getTransactionsByMonth(currentMonth);
-			budget = await getBudgetForMonth(currentMonth);
-			availableMonths = await getAvailableMonths();
-			// Load savings contributions that affect available to spend
-			const contributions = await getContributionsAffectingAvailable(currentMonth);
-			savedFromContributions = sumCurrency(contributions.map(c => c.amount));
 
-			// Check for recurring suggestions — pass allTransactions to avoid redundant DB scans
+			// Parallelize remaining independent queries
+			const [monthBudget, months, contributions] = await Promise.all([
+				getBudgetForMonth(currentMonth),
+				getAvailableMonths(),
+				getContributionsAffectingAvailable(currentMonth)
+			]);
+			budget = monthBudget;
+			availableMonths = months;
+			savedFromContributions = sumCurrency(contributions.map(c => c.amount));
+		} catch (error) {
+			handleError(error, { context: 'loadData', showToast: false });
+		} finally {
+			isLoading = false;
+		}
+
+		// Deferred: check recurring suggestions after first paint
+		try {
 			if (shouldShowRecurringBanner(currentMonth, settings.lastAutoSuggestedMonth)) {
 				recurringSuggestions = await getRecurringSuggestions(currentMonth, allTransactions);
 				showRecurringBanner = recurringSuggestions.length > 0;
@@ -235,9 +253,7 @@
 				showRecurringBanner = false;
 			}
 		} catch (error) {
-			handleError(error, { context: 'loadData', showToast: false });
-		} finally {
-			isLoading = false;
+			handleError(error, { context: 'loadRecurringSuggestions', showToast: false });
 		}
 	}
 
