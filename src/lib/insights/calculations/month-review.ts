@@ -8,6 +8,7 @@
 import type { Transaction, Category } from '$lib/db';
 import { getMonthKey } from '$lib/db';
 import { getUserAmount } from './spending';
+import { countMerchantVisits } from './top-merchant';
 import {
 	generateDecayWeights,
 	computeWeightedMean,
@@ -182,6 +183,7 @@ export function computeBiggestPurchase(
 
 /**
  * Find the most frequently visited merchant (≥ minVisits threshold).
+ * Split children sharing a parentTransactionId count as one visit.
  */
 export function computeMostVisitedMerchant(
 	transactions: Transaction[],
@@ -189,11 +191,7 @@ export function computeMostVisitedMerchant(
 ): MonthReviewResult['mostVisitedMerchant'] {
 	if (transactions.length === 0) return null;
 
-	const counts = new Map<string, number>();
-	for (const t of transactions) {
-		const name = t.merchant.trim().toLowerCase();
-		counts.set(name, (counts.get(name) || 0) + 1);
-	}
+	const counts = countMerchantVisits(transactions, (m) => m.trim().toLowerCase());
 
 	let topMerchant = '';
 	let topCount = 0;

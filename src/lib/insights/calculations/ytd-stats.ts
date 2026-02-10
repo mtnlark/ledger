@@ -7,6 +7,7 @@ import { getMonthKey } from '$lib/db';
 import type { Transaction } from '$lib/db';
 import type { YTDStatsResult } from '../types';
 import { getUserAmount } from './spending';
+import { countMerchantVisits } from './top-merchant';
 
 /**
  * Compute year-to-date statistics for all transactions in the current year.
@@ -110,10 +111,8 @@ export function computeYTDStats(allTransactions: Transaction[], year?: number): 
 	}
 
 	// Most frequent merchant (no minimum threshold for YTD)
-	const freq = new Map<string, number>();
-	for (const t of ytdTransactions) {
-		freq.set(t.merchant, (freq.get(t.merchant) || 0) + 1);
-	}
+	// Split children sharing a parentTransactionId count as one visit
+	const freq = countMerchantVisits(ytdTransactions);
 	let topMerchant: { merchant: string; count: number } | null = null;
 	let maxCount = 0;
 	for (const [merchant, count] of freq) {

@@ -5,7 +5,7 @@
  * Optimized to use bulk operations for better performance with large datasets.
  */
 
-import { db } from './index';
+import { db, calculatePartnerShare } from './index';
 import {
 	type Category,
 	type Transaction,
@@ -218,20 +218,152 @@ async function migrateSettingsNotifications(): Promise<void> {
 }
 
 /**
+ * Migration: Link form-split transactions that were created as independent records.
+ *
+ * The old addSplitTransactions() created N unlinked transactions via Promise.allSettled.
+ * This migration detects those groups by matching (merchant, date) with near-identical
+ * createdAt timestamps (<1 second apart), creates a hidden parent for each group,
+ * and links the children via parentTransactionId.
+ */
+async function migrateFormSplitLinkage(): Promise<void> {
+	const allTransactions = await db.transactions.toArray();
+	if (allTransactions.length === 0) return;
+
+	// Only process transactions that aren't already linked or marked as split parents
+	const candidates = allTransactions.filter(
+		(t) => !t.parentTransactionId && !t.isSplitParent && !t.isDeleted
+	);
+	if (candidates.length === 0) return;
+
+	// Group by (merchant, date YYYY-MM-DD)
+	const groups = new Map<string, Transaction[]>();
+	for (const t of candidates) {
+		const d = t.date instanceof Date ? t.date : new Date(t.date);
+		const dateKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+		const key = `${t.merchant}\0${dateKey}`;
+		let group = groups.get(key);
+		if (!group) {
+			group = [];
+			groups.set(key, group);
+		}
+		group.push(t);
+	}
+
+	// For each group with 2+ transactions, check createdAt proximity
+	const TIMESTAMP_WINDOW_MS = 1000; // 1 second
+	let migrated = 0;
+	const now = new Date();
+
+	for (const [, group] of groups) {
+		if (group.length < 2) continue;
+
+		// Sort by createdAt
+		group.sort(
+			(a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+		);
+
+		const firstTime = new Date(group[0].createdAt).getTime();
+		const lastTime = new Date(group[group.length - 1].createdAt).getTime();
+
+		if (lastTime - firstTime > TIMESTAMP_WINDOW_MS) continue;
+
+		// This is a form-split group — create parent and link children
+		const template = group[0];
+		const totalAmount = group.reduce((sum, t) => sum + t.amount, 0);
+		const partnerShare = template.isShared
+			? calculatePartnerShare(totalAmount, template.splitType, template.splitValue)
+			: 0;
+
+		// Create hidden parent transaction
+		const parentId = (await db.transactions.add({
+			date: template.date,
+			merchant: template.merchant,
+			amount: totalAmount,
+			categoryId: template.categoryId,
+			isShared: template.isShared,
+			splitType: template.splitType,
+			splitValue: template.splitValue,
+			partnerShare,
+			isSettled: template.isSettled,
+			settledDate: template.settledDate,
+			isEssential: template.isEssential,
+			isSubscription: false,
+			isSplitParent: true,
+			createdAt: template.createdAt,
+			updatedAt: now
+		})) as number;
+
+		// Link children to parent
+		for (const child of group) {
+			await db.transactions.update(child.id!, {
+				parentTransactionId: parentId,
+				updatedAt: now
+			});
+		}
+
+		migrated += group.length;
+	}
+
+	if (migrated > 0 && import.meta.env.DEV) {
+		console.log(
+			`Migration: Linked ${migrated} form-split transactions to new parent records`
+		);
+	}
+}
+
+/**
+ * Migration: Unmark orphaned split parents that have no children.
+ * These can occur when split creation partially failed or children were deleted.
+ */
+async function migrateOrphanedSplitParents(): Promise<void> {
+	const splitParents = await db.transactions
+		.filter((t) => t.isSplitParent === true)
+		.toArray();
+	if (splitParents.length === 0) return;
+
+	const orphanIds: number[] = [];
+	for (const parent of splitParents) {
+		const childCount = await db.transactions
+			.where('parentTransactionId')
+			.equals(parent.id!)
+			.count();
+		if (childCount === 0) {
+			orphanIds.push(parent.id!);
+		}
+	}
+
+	if (orphanIds.length > 0) {
+		const now = new Date();
+		for (const id of orphanIds) {
+			await db.transactions.update(id, {
+				isSplitParent: false,
+				updatedAt: now
+			});
+		}
+		if (import.meta.env.DEV) {
+			console.log(
+				`Migration: Unmarked ${orphanIds.length} orphaned split parent(s)`
+			);
+		}
+	}
+}
+
+/**
  * Current migration version. Increment this when adding a new migration.
  * When the stored version matches, all migrations are skipped.
  */
-const CURRENT_MIGRATION_VERSION = 10;
+const CURRENT_MIGRATION_VERSION = 11;
 
 /**
  * Run all database migrations
  * Skips entirely if the stored migration version is current.
  * Each migration is idempotent and checks if it needs to run.
+ * Returns true if any migrations were applied (caller should persist).
  */
-export async function runMigrations(): Promise<void> {
+export async function runMigrations(): Promise<boolean> {
 	const settings = await db.settings.get(1);
 	if (settings?.migrationVersion === CURRENT_MIGRATION_VERSION) {
-		return; // All migrations already applied
+		return false; // All migrations already applied
 	}
 
 	await migrateCategoryColors();
@@ -243,7 +375,10 @@ export async function runMigrations(): Promise<void> {
 	await migrateSeedSavingsAccounts();
 	await migrateSettingsCompletedGoals();
 	await migrateSettingsNotifications();
+	await migrateFormSplitLinkage();
+	await migrateOrphanedSplitParents();
 
 	// Stamp the version so subsequent startups skip all checks
 	await db.settings.update(1, { migrationVersion: CURRENT_MIGRATION_VERSION });
+	return true;
 }

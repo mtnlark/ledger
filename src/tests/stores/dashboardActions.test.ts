@@ -193,16 +193,17 @@ describe('dashboardActions', () => {
 			]
 		};
 
-		it('calls addTransaction for each split with correct data', async () => {
+		it('creates parent then splits into linked children', async () => {
 			await actions.addSplitTransactions(splitData);
 
-			expect(addTransaction).toHaveBeenCalledTimes(2);
+			// Creates one parent with the total amount
+			expect(addTransaction).toHaveBeenCalledTimes(1);
 			expect(addTransaction).toHaveBeenCalledWith(
 				expect.objectContaining({
 					date: splitData.date,
 					merchant: 'Split Store',
-					amount: 30,
-					categoryId: 1,
+					amount: 50, // total of splits
+					categoryId: 1, // first split's category
 					isShared: false,
 					isSettled: false,
 					splitType: 'percentage',
@@ -211,12 +212,10 @@ describe('dashboardActions', () => {
 					isSubscription: false
 				})
 			);
-			expect(addTransaction).toHaveBeenCalledWith(
-				expect.objectContaining({
-					amount: 20,
-					categoryId: 2
-				})
-			);
+
+			// Then calls splitTransaction with parent ID and split lines
+			expect(splitTransaction).toHaveBeenCalledTimes(1);
+			expect(splitTransaction).toHaveBeenCalledWith(1, splitData.splits);
 		});
 
 		it('reloads data and toasts with count', async () => {
@@ -225,40 +224,31 @@ describe('dashboardActions', () => {
 			expect(getTransactionsByMonth).toHaveBeenCalledWith('2026-01');
 			expect(getAvailableMonths).toHaveBeenCalled();
 			expect(reloadFn).toHaveBeenCalled();
-			expect(toast.success).toHaveBeenCalledWith('2 transactions added');
+			expect(toast.success).toHaveBeenCalledWith('Transaction split into 2 parts');
 		});
 
-		it('calls handleError when all splits fail', async () => {
-			const error = new Error('split fail');
-			// All splits must fail to trigger handleError (vs partial success warning)
-			// Use mockRejectedValueOnce for each split to avoid persisting across tests
-			vi.mocked(addTransaction)
-				.mockRejectedValueOnce(error)
-				.mockRejectedValueOnce(error);
+		it('calls handleError when parent creation fails', async () => {
+			const error = new Error('add fail');
+			vi.mocked(addTransaction).mockRejectedValueOnce(error);
 
 			await actions.addSplitTransactions(splitData);
 
 			expect(handleError).toHaveBeenCalledWith(error, {
 				context: 'addSplitTransactions',
-				userMessage: 'Failed to add transactions'
+				userMessage: 'Failed to add split transaction'
 			});
 		});
 
-		it('shows warning on partial success', async () => {
-			const error = new Error('partial fail');
-			// First succeeds, second fails
-			vi.mocked(addTransaction)
-				.mockResolvedValueOnce(1)
-				.mockRejectedValueOnce(error);
+		it('calls handleError when split fails', async () => {
+			const error = new Error('split fail');
+			vi.mocked(splitTransaction).mockRejectedValueOnce(error);
 
 			await actions.addSplitTransactions(splitData);
 
-			// Should NOT call handleError for partial success
-			expect(handleError).not.toHaveBeenCalled();
-			// Should show warning toast
-			expect(toast.warning).toHaveBeenCalledWith(
-				'1 of 2 transactions added. 1 failed.'
-			);
+			expect(handleError).toHaveBeenCalledWith(error, {
+				context: 'addSplitTransactions',
+				userMessage: 'Failed to add split transaction'
+			});
 		});
 	});
 

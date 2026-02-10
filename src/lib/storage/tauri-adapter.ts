@@ -439,11 +439,16 @@ export async function initializeTauriStorage(): Promise<InitializationResult> {
 }
 
 /**
- * Run migrations if needed (extracted for clarity)
+ * Run migrations if needed and persist results to JSON.
+ * Migrations that create/modify records (e.g. form-split linkage) must be
+ * persisted immediately, since Dexie is cleared on every startup.
  */
 async function runMigrationsIfNeeded(): Promise<void> {
 	const { runMigrations } = await import('$lib/db/migrations');
-	await runMigrations();
+	const migrated = await runMigrations();
+	if (migrated) {
+		await saveToFile();
+	}
 }
 
 /**

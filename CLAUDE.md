@@ -21,7 +21,7 @@ See `PRODUCT_ROADMAP.md` for the full development plan. Groups 1–9 are complet
 8. ~~Performance & Tech Debt~~ — N+1 fix, stats dedup, lazy-load, chunk splitting, import/export tests ✅
 9. ~~Startup Perf & Search~~ — Redundant DB scan elimination, query parallelization, search/filter enhancements, pagination, lazy emoji picker, migration version stamp ✅
 
-**Recent**: Group 9 Startup Perf & Search — Dashboard startup reduced from 4-7 DB scans to 1, parallelized data queries, deferred recurring suggestions, search extended to notes field, amount range filters, progressive pagination, lazy emoji picker, migration version stamp.
+**Recent**: Split transaction linkage fix — Form-split transactions now create proper parent+children with `parentTransactionId` (was creating unlinked independent records). Migration v11 retroactively links existing form-split groups and unmarks orphaned split parents. Merchant visit counting deduplicates split children in insights.
 
 ---
 
@@ -404,7 +404,7 @@ interface Settings {
   dailyReminderTime: string;             // "HH:MM" 24h format (default "20:00")
   weeklyReviewEnabled: boolean;           // Monday 9am review prompt (default true)
   monthlyBudgetSetupEnabled: boolean;     // 1st-of-month budget prompt (default true)
-  migrationVersion?: number;              // Tracks applied migrations (skip all if current)
+  migrationVersion?: number;              // Tracks applied migrations (skip all if current); currently v11
 }
 ```
 

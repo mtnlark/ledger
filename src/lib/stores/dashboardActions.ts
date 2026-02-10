@@ -137,17 +137,20 @@ export function setupDashboardActions(ctx: DashboardContext) {
 		},
 
 		/**
-		 * Add multiple split transactions from the form.
-		 * Creates each split as a separate transaction.
-		 * Uses Promise.allSettled to handle partial success gracefully.
+		 * Add a split transaction from the form.
+		 * Creates a parent (isSplitParent) then linked children via splitTransaction,
+		 * so each child carries parentTransactionId for proper visit counting.
 		 */
 		async addSplitTransactions(data: SplitTransactionFormData): Promise<void> {
-			const promises = data.splits.map((split) =>
-				storeAddTransaction({
+			try {
+				const totalAmount = data.splits.reduce((sum, s) => sum + s.amount, 0);
+
+				// Create the parent transaction with the total amount
+				const parentId = await storeAddTransaction({
 					date: data.date,
 					merchant: data.merchant,
-					amount: split.amount,
-					categoryId: split.categoryId,
+					amount: totalAmount,
+					categoryId: data.splits[0].categoryId,
 					isShared: data.isShared,
 					isSettled: data.isSettled,
 					splitType: data.splitType,
@@ -155,33 +158,17 @@ export function setupDashboardActions(ctx: DashboardContext) {
 					isEssential: data.isEssential,
 					isSubscription: data.isSubscription,
 					subscriptionFrequency: data.subscriptionFrequency
-				})
-			);
-
-			const results = await Promise.allSettled(promises);
-			const succeeded = results.filter((r) => r.status === 'fulfilled').length;
-			const failed = results.filter((r) => r.status === 'rejected').length;
-
-			// Always reload to reflect any successful additions
-			await reloadAfterMutation();
-
-			if (failed === 0) {
-				toast.success(`${succeeded} transactions added`);
-			} else if (succeeded === 0) {
-				// All failed - get first error for context
-				const firstError = results.find((r) => r.status === 'rejected') as PromiseRejectedResult;
-				handleError(firstError.reason, {
-					context: 'addSplitTransactions',
-					userMessage: 'Failed to add transactions'
 				});
-			} else {
-				// Partial success
-				toast.warning(`${succeeded} of ${data.splits.length} transactions added. ${failed} failed.`);
-				// Log the failures for debugging
-				results.forEach((r, i) => {
-					if (r.status === 'rejected') {
-						console.error(`Split transaction ${i + 1} failed:`, r.reason);
-					}
+
+				// Split into linked children (marks parent as isSplitParent)
+				await storeSplitTransaction(parentId, data.splits);
+
+				await reloadAfterMutation();
+				toast.success(`Transaction split into ${data.splits.length} parts`);
+			} catch (error) {
+				handleError(error, {
+					context: 'addSplitTransactions',
+					userMessage: 'Failed to add split transaction'
 				});
 			}
 		},

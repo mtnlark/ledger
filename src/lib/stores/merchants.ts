@@ -46,7 +46,9 @@ export async function buildMerchantIndex(): Promise<Map<string, MerchantEntry>> 
 		return cachedMerchantIndex;
 	}
 
-	const transactions = await db.transactions.toArray();
+	const transactions = await db.transactions
+		.filter((t) => !t.isSplitParent && !t.isDeleted)
+		.toArray();
 	const index = new Map<string, MerchantEntry>();
 
 	for (const tx of transactions) {
