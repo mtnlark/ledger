@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { format } from 'date-fns';
-	import { Plus, ChevronDown, ChevronUp, MoreVertical, Pencil, Trash2, Target, TrendingUp, AlertTriangle, Lightbulb, PartyPopper, CheckCircle2 } from 'lucide-svelte';
+	import { Plus, ChevronDown, ChevronUp, MoreVertical, Pencil, Trash2, Target, TrendingUp, AlertTriangle, Lightbulb, PartyPopper, CheckCircle2, ArrowUp, ArrowDown } from 'lucide-svelte';
 	import type { SavingsAccount, SavingsContribution } from '$lib/db';
 	import { formatCurrency, formatCurrencyWhole } from '$lib/utils/format-helpers';
 	import { sumCurrency, calculatePercent } from '$lib/utils/currency';
@@ -15,9 +15,13 @@
 		onEditContribution: (contribution: SavingsContribution) => void;
 		onEditAccount: () => void;
 		onAccountUpdated: () => void;
+		onMoveUp?: () => void;
+		onMoveDown?: () => void;
+		isFirst?: boolean;
+		isLast?: boolean;
 	}
 
-	let { account, contributions, onAddContribution, onEditContribution, onEditAccount, onAccountUpdated }: Props =
+	let { account, contributions, onAddContribution, onEditContribution, onEditAccount, onAccountUpdated, onMoveUp, onMoveDown, isFirst = false, isLast = false }: Props =
 		$props();
 
 	// Expand/collapse state for contributions list
@@ -208,6 +212,26 @@
 							<Pencil size={14} />
 							Edit Account
 						</button>
+						{#if onMoveUp}
+							<button
+								onclick={() => { closeMenu(); onMoveUp?.(); }}
+								disabled={isFirst}
+								class="w-full px-4 py-2 text-left text-sm text-charcoal hover:bg-surface-hover flex items-center gap-2 disabled:opacity-30 disabled:cursor-not-allowed"
+							>
+								<ArrowUp size={14} />
+								Move Up
+							</button>
+						{/if}
+						{#if onMoveDown}
+							<button
+								onclick={() => { closeMenu(); onMoveDown?.(); }}
+								disabled={isLast}
+								class="w-full px-4 py-2 text-left text-sm text-charcoal hover:bg-surface-hover flex items-center gap-2 disabled:opacity-30 disabled:cursor-not-allowed"
+							>
+								<ArrowDown size={14} />
+								Move Down
+							</button>
+						{/if}
 						<button
 							onclick={handleDeleteAccount}
 							class="w-full px-4 py-2 text-left text-sm text-danger-600 hover:bg-danger-50 flex items-center gap-2"

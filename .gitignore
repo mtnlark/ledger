@@ -29,3 +29,6 @@ vite.config.ts.timestamp-*
 *.xlsx
 data.json
 backups/
+
+# Personal financial insights
+insights/

@@ -3,7 +3,7 @@
 	import { format } from 'date-fns';
 	import { getMonthKey, type SavingsAccount, type SavingsContribution } from '$lib/db';
 	import { initializeStorage } from '$lib/storage';
-	import { getAllSavingsAccounts } from '$lib/stores/savingsAccounts';
+	import { getAllSavingsAccounts, moveSavingsAccountUp, moveSavingsAccountDown } from '$lib/stores/savingsAccounts';
 	import {
 		getAllContributionsForMonth,
 		getTotalSavedForMonth,
@@ -138,6 +138,24 @@
 		showAddAccount = false;
 		await loadMonthData(currentMonth);
 		toast.success('Account added');
+	}
+
+	async function handleMoveUp(id: number) {
+		try {
+			await moveSavingsAccountUp(id);
+			await loadMonthData(currentMonth);
+		} catch (error) {
+			toast.error('Failed to move account');
+		}
+	}
+
+	async function handleMoveDown(id: number) {
+		try {
+			await moveSavingsAccountDown(id);
+			await loadMonthData(currentMonth);
+		} catch (error) {
+			toast.error('Failed to move account');
+		}
 	}
 
 	function handleEditAccount(account: SavingsAccount) {
@@ -275,7 +293,7 @@
 					</div>
 				{:else}
 					<div class="space-y-3">
-						{#each accounts as account (account.id)}
+						{#each accounts as account, index (account.id)}
 							<SavingsAccountCard
 								{account}
 								contributions={contributionsByAccount.get(account.id!) || []}
@@ -283,7 +301,11 @@
 								onEditContribution={handleEditContribution}
 								onEditAccount={() => handleEditAccount(account)}
 								onAccountUpdated={() => loadMonthData(currentMonth)}
-							/>
+							onMoveUp={() => handleMoveUp(account.id!)}
+							onMoveDown={() => handleMoveDown(account.id!)}
+							isFirst={index === 0}
+							isLast={index === accounts.length - 1}
+						/>
 						{/each}
 					</div>
 				{/if}

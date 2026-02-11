@@ -58,6 +58,44 @@ export async function deleteSavingsAccount(id: number): Promise<void> {
 	await persistData();
 }
 
+// Move a savings account up one position
+export async function moveSavingsAccountUp(id: number): Promise<void> {
+	const accounts = await db.savingsAccounts.orderBy('sortOrder').toArray();
+	const index = accounts.findIndex((a) => a.id === id);
+
+	// Can't move up if already at top
+	if (index <= 0) return;
+
+	const current = accounts[index];
+	const above = accounts[index - 1];
+
+	// Swap sort orders
+	await db.transaction('rw', db.savingsAccounts, async () => {
+		await db.savingsAccounts.update(current.id!, { sortOrder: above.sortOrder });
+		await db.savingsAccounts.update(above.id!, { sortOrder: current.sortOrder });
+	});
+	await persistData();
+}
+
+// Move a savings account down one position
+export async function moveSavingsAccountDown(id: number): Promise<void> {
+	const accounts = await db.savingsAccounts.orderBy('sortOrder').toArray();
+	const index = accounts.findIndex((a) => a.id === id);
+
+	// Can't move down if already at bottom
+	if (index < 0 || index >= accounts.length - 1) return;
+
+	const current = accounts[index];
+	const below = accounts[index + 1];
+
+	// Swap sort orders
+	await db.transaction('rw', db.savingsAccounts, async () => {
+		await db.savingsAccounts.update(current.id!, { sortOrder: below.sortOrder });
+		await db.savingsAccounts.update(below.id!, { sortOrder: current.sortOrder });
+	});
+	await persistData();
+}
+
 // Reorder savings accounts based on an array of IDs
 export async function reorderSavingsAccounts(orderedIds: number[]): Promise<void> {
 	await db.transaction('rw', db.savingsAccounts, async () => {
