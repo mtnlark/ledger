@@ -82,19 +82,6 @@ describe('computeHistoricalRank', () => {
 
 	it('picks highest when rank ties (middle of pack)', () => {
 		// 300 is 3rd highest and 3rd lowest out of 5 — defaults to highest
-		// Use recent month so all 5 months are in the rolling window
-		const totals = new Map([
-			['2025-01', 100],
-			['2025-02', 200],
-			['2025-03', 300],
-			['2025-04', 400],
-			['2025-05', 500]
-		]);
-		// Selecting 2025-05 but checking rank of 300 (which would be 2025-03's value)
-		// We need to select the month with value 300
-		// With window from 2025-05: includes all 5 months
-		// But 2025-03 selected would only have 3 months in window
-		// Let's test a different scenario: select most recent, middle value
 		const totals2 = new Map([
 			['2025-01', 100],
 			['2025-02', 200],
@@ -121,6 +108,48 @@ describe('computeHistoricalRank', () => {
 		// 250 is 2nd lowest in the 8-month window ending at 2025-08
 		const result = computeHistoricalRank(250, totals, '2025-08');
 		expect(result).toEqual({ rank: 2, total: 8, direction: 'lowest' });
+	});
+
+	it('uses symmetric window — past months benefit from future data', () => {
+		// User has Oct, Nov, Dec data. Selecting Nov should see all 3 months,
+		// not just Oct+Nov (which was the old backward-only behavior).
+		const totals = new Map([
+			['2025-10', 3000],
+			['2025-11', 4742],
+			['2025-12', 5233]
+		]);
+		// Selecting Nov: window includes Oct, Nov, Dec (3 months total)
+		const result = computeHistoricalRank(4742, totals, '2025-11');
+		expect(result).not.toBeNull();
+		expect(result!.total).toBe(3); // all 3 months, not just 2
+		// Nov is 2nd highest (Dec=5233, Nov=4742, Oct=3000)
+		expect(result!.rank).toBe(2);
+		expect(result!.direction).toBe('highest');
+	});
+
+	it('symmetric window updates as more months are added', () => {
+		// Initially Oct+Nov — Nov is highest of 2
+		const initialTotals = new Map([
+			['2025-10', 3000],
+			['2025-11', 4742]
+		]);
+		const initialResult = computeHistoricalRank(4742, initialTotals, '2025-11');
+		expect(initialResult).toEqual({ rank: 1, total: 2, direction: 'highest' });
+
+		// After Dec+Jan are added, Nov is no longer highest
+		const updatedTotals = new Map([
+			['2025-10', 3000],
+			['2025-11', 4742],
+			['2025-12', 5233],
+			['2026-01', 4900]
+		]);
+		const updatedResult = computeHistoricalRank(4742, updatedTotals, '2025-11');
+		expect(updatedResult).not.toBeNull();
+		expect(updatedResult!.total).toBe(4);
+		// Nov (4742) is 2nd lowest (Oct=3000 < Nov < Jan=4900 < Dec=5233)
+		// lowestRank=2 < highestRank=3, so picks lowest direction
+		expect(updatedResult!.rank).toBe(2);
+		expect(updatedResult!.direction).toBe('lowest');
 	});
 });
 
@@ -189,6 +218,35 @@ describe('computeVsAverage', () => {
 		]);
 		const result = computeVsAverage(500, totals);
 		expect(result!.withinOneSigma).toBe(false);
+	});
+
+	it('returns weightedMean and sampleSize', () => {
+		const totals = new Map([
+			['2025-01', 200],
+			['2025-02', 300],
+			['2025-03', 400],
+			['2025-04', 500]
+		]);
+		const result = computeVsAverage(600, totals);
+		expect(result).not.toBeNull();
+		expect(result!.sampleSize).toBe(4);
+		// Weighted mean should be between min and max of the data
+		expect(result!.weightedMean).toBeGreaterThanOrEqual(200);
+		expect(result!.weightedMean).toBeLessThanOrEqual(500);
+	});
+
+	it('returns correct sampleSize with rolling window', () => {
+		const totals = new Map([
+			['2025-01', 100],
+			['2025-02', 200],
+			['2025-03', 300],
+			['2025-04', 400],
+			['2025-05', 500]
+		]);
+		const result = computeVsAverage(600, totals, '2025-03');
+		expect(result).not.toBeNull();
+		expect(result!.sampleSize).toBe(5);
+		expect(result!.weightedMean).toBeGreaterThan(0);
 	});
 });
 
@@ -274,7 +332,7 @@ describe('computeMostVisitedMerchant', () => {
 			makeTx({ merchant: 'Target' })
 		];
 		const result = computeMostVisitedMerchant(txs, 2);
-		expect(result).toEqual({ merchant: 'Trader Joes', count: 3 });
+		expect(result).toEqual({ merchant: 'Trader Joes', count: 3, totalSpent: 300 });
 	});
 
 	it('is case-insensitive but preserves original casing', () => {
@@ -292,6 +350,28 @@ describe('computeMostVisitedMerchant', () => {
 	it('uses default minVisits of 2', () => {
 		const txs = [makeTx({ merchant: 'Once' })];
 		expect(computeMostVisitedMerchant(txs)).toBeNull();
+	});
+
+	it('sums totalSpent with varied amounts', () => {
+		const txs = [
+			makeTx({ merchant: 'Coffee Shop', amount: 5 }),
+			makeTx({ merchant: 'Coffee Shop', amount: 8 }),
+			makeTx({ merchant: 'Coffee Shop', amount: 12 })
+		];
+		const result = computeMostVisitedMerchant(txs, 2);
+		expect(result).not.toBeNull();
+		expect(result!.totalSpent).toBe(25);
+	});
+
+	it('computes totalSpent using user portion for shared transactions', () => {
+		const txs = [
+			makeTx({ merchant: 'Restaurant', amount: 100, isShared: true, partnerShare: 40 }),
+			makeTx({ merchant: 'Restaurant', amount: 80, isShared: true, partnerShare: 30 })
+		];
+		const result = computeMostVisitedMerchant(txs, 2);
+		expect(result).not.toBeNull();
+		// User portions: (100-40) + (80-30) = 60 + 50 = 110
+		expect(result!.totalSpent).toBe(110);
 	});
 });
 

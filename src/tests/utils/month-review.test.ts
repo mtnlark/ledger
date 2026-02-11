@@ -36,7 +36,7 @@ describe('computeMostVisitedMerchant - split transaction dedup', () => {
 		];
 		const result = computeMostVisitedMerchant(txs);
 		// Target = 1 visit (deduped), Costco = 2 visits
-		expect(result).toEqual({ merchant: 'Costco', count: 2 });
+		expect(result).toEqual({ merchant: 'Costco', count: 2, totalSpent: 20 });
 	});
 
 	it('returns null when split dedup brings count below threshold', () => {
@@ -57,7 +57,7 @@ describe('computeMostVisitedMerchant - split transaction dedup', () => {
 			makeTx({ merchant: 'trader joe\'s' })
 		];
 		const result = computeMostVisitedMerchant(txs);
-		expect(result).toEqual({ merchant: 'Trader Joe\'s', count: 3 });
+		expect(result).toEqual({ merchant: 'Trader Joe\'s', count: 3, totalSpent: 30 });
 	});
 
 	it('handles mix of split and non-split correctly', () => {
@@ -72,6 +72,6 @@ describe('computeMostVisitedMerchant - split transaction dedup', () => {
 		];
 		const result = computeMostVisitedMerchant(txs);
 		// Target: 2 visits (1 regular + 1 split), Costco: 1
-		expect(result).toEqual({ merchant: 'Target', count: 2 });
+		expect(result).toEqual({ merchant: 'Target', count: 2, totalSpent: 30 });
 	});
 });

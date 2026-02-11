@@ -21,7 +21,7 @@ See `PRODUCT_ROADMAP.md` for the full development plan. Groups 1–9 are complet
 8. ~~Performance & Tech Debt~~ — N+1 fix, stats dedup, lazy-load, chunk splitting, import/export tests ✅
 9. ~~Startup Perf & Search~~ — Redundant DB scan elimination, query parallelization, search/filter enhancements, pagination, lazy emoji picker, migration version stamp ✅
 
-**Recent**: Split transaction linkage fix — Form-split transactions now create proper parent+children with `parentTransactionId` (was creating unlinked independent records). Migration v11 retroactively links existing form-split groups and unmarks orphaned split parents. Merchant visit counting deduplicates split children in insights.
+**Recent**: Month in Review contextual improvements — Anomalies and vs-average insights now show dollar amounts ($725 vs $500 avg). Goal completions surface as hero stat. Needs/wants split suppressed unless skewed (>75% or <25%). Budget context added to spending insights group. Merchant insights show spending totals. vs-average exposes weighted mean and sample size for transparency.
 
 ---
 
@@ -475,9 +475,13 @@ Sidebar state persists to localStorage (`ledger-sidebar-expanded`).
   - Selected tab persisted to localStorage (`ledger-insights-tab`)
   - Month picker remains global, applies to all tabs
 - **Overview tab**: Smart Takeaways (forward-looking current month / retrospective past month), Quick Stats Row (total spent, budget status, savings rate)
-  - Highlights: pace projection, anomalies, category shifts
+  - Highlights: pace projection, anomalies (with dollar amounts), category shifts
   - Pace projection and velocity exclude future-dated transactions via `filterUpToDate()`
   - Month in Review (past months): hero stat + grouped insights with 12-month rolling window
+  - Hero priority chain: rank superlative → goal completion → savings highest → vs-average → rank quartile → savings above avg → category standout → total
+  - Anomalies show dollar context ($current vs $avg avg), vs-average shows typical month amount + sample size
+  - Budget context in spending group: over/under count for budgeted categories
+  - Needs/wants only shown when skewed (>75% or <25%), with descriptive prefix
   - Positive-only savings insights (never flags low rates due to paycheck timing)
 - **Spending tab**: Total + velocity, top 5 merchants, shared vs personal breakdown, category breakdown chart, category deep dives with trend charts, month-over-month comparison
   - Variability classification (Steady/Moderate/Variable) uses only completed months

@@ -1,13 +1,16 @@
 <script lang="ts">
 	import { TrendingUp, TrendingDown, AlertTriangle, Gauge, Receipt, Store, BarChart3, PiggyBank, ChevronDown, ChevronUp, Trophy, Flame, PartyPopper } from 'lucide-svelte';
 	import { getMonthKey, navigateMonth, parseMonthKey } from '$lib/db';
-	import type { Transaction, Category, MonthlyBudget, SavingsContribution, CompletedGoal, Settings } from '$lib/db';
+	import type { Transaction, Category, MonthlyBudget, SavingsContribution, CompletedGoal, Settings, CategoryBudget } from '$lib/db';
 	import { config } from '$lib/config';
 	import { getInsightsEngine } from '$lib/insights';
 	import { computeStdDev } from '$lib/insights/calculations/stats';
 	import { computeSavingsReview } from '$lib/insights/calculations/month-review';
 	import { formatCurrency } from '$lib/utils/format-helpers';
 	import { filterUpToDate } from '$lib/utils/date-helpers';
+	import { getBudgetStatus } from '$lib/utils/budget-status';
+	import { sumCurrency, roundCurrency } from '$lib/utils/currency';
+	import { getUserAmount } from '$lib/insights/calculations/spending';
 
 	interface Props {
 		currentMonthTransactions: Transaction[];
@@ -22,6 +25,8 @@
 		allBudgets?: MonthlyBudget[];
 		// Settings for completed goals
 		settings?: Settings | null;
+		// Category budgets for budget context
+		categoryBudgets?: CategoryBudget[];
 	}
 
 	let {
@@ -34,7 +39,8 @@
 		contributions = [],
 		allContributions = [],
 		allBudgets = [],
-		settings = null
+		settings = null,
+		categoryBudgets = []
 	}: Props = $props();
 
 	const engine = getInsightsEngine();
@@ -208,10 +214,49 @@
 		);
 	});
 
+	// --- Budget context for month review ---
+
+	let budgetSummary = $derived.by(() => {
+		if (categoryBudgets.length === 0) return null;
+
+		// Compute spending by category for this month
+		const spendingByCategory = new Map<number, number>();
+		for (const t of currentMonthTransactions) {
+			const amount = getUserAmount(t);
+			spendingByCategory.set(t.categoryId, (spendingByCategory.get(t.categoryId) || 0) + amount);
+		}
+
+		let overCount = 0;
+		let totalBudgeted = 0;
+		let totalSpentInBudgeted = 0;
+
+		for (const cb of categoryBudgets) {
+			if (cb.budgetAmount <= 0) continue;
+			totalBudgeted += cb.budgetAmount;
+			const spent = spendingByCategory.get(cb.categoryId) || 0;
+			totalSpentInBudgeted += spent;
+			const status = getBudgetStatus(spent, cb.budgetAmount);
+			if (status.status === 'over') overCount++;
+		}
+
+		const budgetedCount = categoryBudgets.filter((cb) => cb.budgetAmount > 0).length;
+		if (budgetedCount === 0) return null;
+
+		const overallDiff = roundCurrency(totalSpentInBudgeted - totalBudgeted);
+
+		return { overCount, budgetedCount, overallDiff };
+	});
+
 	// --- Retrospective mode: Hero stat and grouped insights ---
 
 	// Compute total spent for the month
 	let totalSpent = $derived(engine.getTotalSpent(currentMonthTransactions, selectedMonth));
+
+	// Get goals completed this month
+	let goalsCompletedThisMonth = $derived.by(() => {
+		if (!settings?.completedGoals) return [] as CompletedGoal[];
+		return settings.completedGoals.filter((g) => g.completedDate.startsWith(selectedMonth));
+	});
 
 	// Hero stat for retrospective mode (the most important/interesting insight)
 	let heroStat = $derived.by(() => {
@@ -229,6 +274,27 @@
 			};
 		}
 
+		// Priority 1.5: Goal completions (emotionally significant)
+		if (goalsCompletedThisMonth.length > 0) {
+			if (goalsCompletedThisMonth.length === 1) {
+				const goal = goalsCompletedThisMonth[0];
+				return {
+					type: 'goalCompleted' as const,
+					icon: PartyPopper,
+					iconColor: 'text-success-500',
+					headline: `Reached your ${goal.accountName} goal!`,
+					subtext: `${formatCurrency(goal.targetAmount)} target achieved`
+				};
+			}
+			return {
+				type: 'goalCompleted' as const,
+				icon: PartyPopper,
+				iconColor: 'text-success-500',
+				headline: `Reached ${goalsCompletedThisMonth.length} savings goals!`,
+				subtext: goalsCompletedThisMonth.map((g) => g.accountName).join(', ')
+			};
+		}
+
 		// Priority 2: Highest savings month
 		if (savingsReview?.isHighestMonth && savingsReview.totalSaved > 0) {
 			return {
@@ -242,25 +308,55 @@
 
 		// Priority 3: Significant vs-average (spending)
 		if (monthReview?.vsAverage && monthReview.vsAverage.percentDiff >= 15) {
-			const { percentDiff, isAbove } = monthReview.vsAverage;
+			const { percentDiff, isAbove, weightedMean, sampleSize } = monthReview.vsAverage;
+			const sampleNote = sampleSize >= 2 ? ` · based on ${sampleSize} months` : '';
 			return {
 				type: 'vsAverage' as const,
 				icon: isAbove ? TrendingUp : TrendingDown,
 				iconColor: isAbove ? 'text-warning-500' : 'text-success-500',
 				headline: `${percentDiff}% ${isAbove ? 'above' : 'below'} your typical month`,
-				subtext: `${formatCurrency(totalSpent)} total spending`
+				subtext: `${formatCurrency(totalSpent)} total · typical ${formatCurrency(Math.round(weightedMean))}${sampleNote}`
 			};
 		}
 
-		// Priority 4: Historical rank (if noteworthy, e.g., top 3)
-		if (monthReview?.historicalRank && monthReview.historicalRank.rank <= 3) {
+		// Priority 4: Historical rank (top/bottom quartile, meaningful sample)
+		if (monthReview?.historicalRank && monthReview.historicalRank.total >= 4) {
 			const { rank, total, direction } = monthReview.historicalRank;
+			const quartile = Math.ceil(total / 4);
+			if (rank <= quartile) {
+				return {
+					type: 'rank' as const,
+					icon: BarChart3,
+					iconColor: direction === 'lowest' ? 'text-success-500' : 'text-warning-500',
+					headline: `Your ${getOrdinal(rank)} ${direction} spending month`,
+					subtext: `${formatCurrency(totalSpent)} total · out of ${total} months`
+				};
+			}
+		}
+
+		// Priority 5: Savings above average rate
+		if (savingsReview?.vsAverage) {
+			const ratePercent = savingsReview.savingsRate !== null ? Math.round(savingsReview.savingsRate * 100) : null;
 			return {
-				type: 'rank' as const,
-				icon: BarChart3,
-				iconColor: direction === 'lowest' ? 'text-success-500' : 'text-warning-500',
-				headline: `Your ${getOrdinal(rank)} ${direction} spending month`,
-				subtext: `${formatCurrency(totalSpent)} total · out of ${total} months`
+				type: 'savingsAboveAvg' as const,
+				icon: PiggyBank,
+				iconColor: 'text-success-500',
+				headline: ratePercent !== null
+					? `${ratePercent}% savings rate · ${savingsReview.vsAverage.percentDiff}% above average`
+					: `Saved ${savingsReview.vsAverage.percentDiff}% more than usual`,
+				subtext: `${formatCurrency(savingsReview.totalSaved)} saved this month`
+			};
+		}
+
+		// Priority 6: Category standout (notable category change)
+		if (monthReview?.categoryStandout && monthReview.categoryStandout.diff >= 50) {
+			const { name, icon, diff, isIncrease } = monthReview.categoryStandout;
+			return {
+				type: 'categoryStandout' as const,
+				icon: isIncrease ? TrendingUp : TrendingDown,
+				iconColor: isIncrease ? 'text-warning-500' : 'text-success-500',
+				headline: `${icon} ${name} ${isIncrease ? 'up' : 'down'} ${formatCurrency(diff)}`,
+				subtext: `Biggest category change from prior month`
 			};
 		}
 
@@ -285,20 +381,31 @@
 
 		// vs Average (if not already hero)
 		if (monthReview.vsAverage && heroStat?.type !== 'vsAverage') {
-			const { percentDiff, isAbove } = monthReview.vsAverage;
-			items.push({ text: `${percentDiff}% ${isAbove ? 'above' : 'below'} your typical month` });
+			const { percentDiff, isAbove, weightedMean, sampleSize } = monthReview.vsAverage;
+			const sampleNote = sampleSize >= 2 ? ` · based on ${sampleSize} months` : '';
+			items.push({ text: `${percentDiff}% ${isAbove ? 'above' : 'below'} your typical month (${formatCurrency(totalSpent)} vs ${formatCurrency(Math.round(weightedMean))} avg${sampleNote})` });
 		}
 
-		// Category standout
-		if (monthReview.categoryStandout) {
+		// Category standout (if not already hero)
+		if (monthReview.categoryStandout && heroStat?.type !== 'categoryStandout') {
 			const { name, diff, isIncrease } = monthReview.categoryStandout;
 			items.push({ text: `${name} ${isIncrease ? 'up' : 'down'} ${formatCurrency(diff)} from prior month` });
 		}
 
-		// Anomalies
+		// Anomalies (with dollar amounts)
 		for (const anomaly of anomalies) {
 			const percent = Math.round((anomaly.ratio - 1) * 100);
-			items.push({ text: `${anomaly.name} was ${percent}% higher than usual` });
+			items.push({ text: `${anomaly.name} was ${percent}% higher than usual (${formatCurrency(Math.round(anomaly.current))} vs ${formatCurrency(Math.round(anomaly.avg))} avg)` });
+		}
+
+		// Budget context
+		if (budgetSummary) {
+			const { overCount, budgetedCount, overallDiff } = budgetSummary;
+			if (overCount > 0) {
+				items.push({ text: `${overCount} of ${budgetedCount} budgeted categories over budget · ${formatCurrency(Math.abs(overallDiff))} over overall` });
+			} else {
+				items.push({ text: `All ${budgetedCount} budgeted categories within budget` });
+			}
 		}
 
 		return items;
@@ -309,7 +416,7 @@
 		const items: GroupedInsight[] = [];
 
 		// Skip if already hero
-		if (heroStat?.type === 'savingsHighest') return items;
+		if (heroStat?.type === 'savingsHighest' || heroStat?.type === 'savingsAboveAvg') return items;
 
 		if (savingsReview.isHighestMonth && savingsReview.totalSaved > 0) {
 			items.push({ text: `Highest savings month: ${formatCurrency(savingsReview.totalSaved)}` });
@@ -331,9 +438,11 @@
 		if (isCurrentMonth || !monthReview) return [] as GroupedInsight[];
 		const items: GroupedInsight[] = [];
 
-		// Goals completed this month
-		for (const goal of goalsCompletedThisMonth) {
-			items.push({ text: `🎉 Reached ${goal.accountName} goal!` });
+		// Goals completed this month (skip if already hero)
+		if (heroStat?.type !== 'goalCompleted') {
+			for (const goal of goalsCompletedThisMonth) {
+				items.push({ text: `🎉 Reached ${goal.accountName} goal!` });
+			}
 		}
 
 		// Biggest purchase
@@ -342,15 +451,19 @@
 			items.push({ text: `Biggest purchase: ${formatCurrency(amount)} at ${merchant}` });
 		}
 
-		// Most visited merchant
+		// Most visited merchant (with spending total)
 		if (monthReview.mostVisitedMerchant) {
-			const { merchant, count } = monthReview.mostVisitedMerchant;
-			items.push({ text: `Most visited merchant: ${merchant} (${count} times)` });
+			const { merchant, count, totalSpent: merchantTotal } = monthReview.mostVisitedMerchant;
+			items.push({ text: `Most visited: ${merchant} (${count} times, ${formatCurrency(merchantTotal)})` });
 		}
 
-		// Needs vs Wants
+		// Needs vs Wants (only show when skewed > 75% or < 25%)
 		if (monthReview.needsPercent !== null) {
-			items.push({ text: `${monthReview.needsPercent}% needs, ${100 - monthReview.needsPercent}% wants` });
+			if (monthReview.needsPercent > 75) {
+				items.push({ text: `Mostly essentials: ${monthReview.needsPercent}% needs, ${100 - monthReview.needsPercent}% wants` });
+			} else if (monthReview.needsPercent < 25) {
+				items.push({ text: `Mostly discretionary: ${monthReview.needsPercent}% needs, ${100 - monthReview.needsPercent}% wants` });
+			}
 		}
 
 		return items;
@@ -360,12 +473,6 @@
 	let hasGroupedInsights = $derived(
 		spendingInsights.length > 0 || savingsInsights.length > 0 || highlightInsights.length > 0
 	);
-
-	// Get goals completed this month
-	let goalsCompletedThisMonth = $derived.by(() => {
-		if (!settings?.completedGoals) return [] as CompletedGoal[];
-		return settings.completedGoals.filter((g) => g.completedDate.startsWith(selectedMonth));
-	});
 
 	// Build takeaways list (for current month / Highlights mode only)
 	interface Takeaway {
@@ -391,14 +498,14 @@
 			});
 		}
 
-		// Add anomalies (high priority)
+		// Add anomalies (high priority, with dollar amounts)
 		for (const anomaly of anomalies) {
 			const percent = Math.round((anomaly.ratio - 1) * 100);
 			items.push({
 				type: 'anomaly',
 				icon: AlertTriangle,
 				iconColor: 'text-warning-500',
-				text: `${anomaly.name} is ${percent}% higher than usual`
+				text: `${anomaly.name} is ${percent}% higher than usual (${formatCurrency(Math.round(anomaly.current))} vs ${formatCurrency(Math.round(anomaly.avg))} avg)`
 			});
 		}
 

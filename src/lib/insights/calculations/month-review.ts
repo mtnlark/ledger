@@ -29,9 +29,9 @@ export interface SavingsReviewResult {
 
 export interface MonthReviewResult {
 	historicalRank: { rank: number; total: number; direction: 'highest' | 'lowest' } | null;
-	vsAverage: { percentDiff: number; isAbove: boolean; withinOneSigma: boolean } | null;
+	vsAverage: { percentDiff: number; isAbove: boolean; withinOneSigma: boolean; weightedMean: number; sampleSize: number } | null;
 	biggestPurchase: { merchant: string; amount: number } | null;
-	mostVisitedMerchant: { merchant: string; count: number } | null;
+	mostVisitedMerchant: { merchant: string; count: number; totalSpent: number } | null;
 	categoryStandout: { name: string; icon: string; diff: number; isIncrease: boolean } | null;
 	needsPercent: number | null;
 	savings: SavingsReviewResult | null;
@@ -41,7 +41,18 @@ export interface MonthReviewResult {
 const ROLLING_WINDOW_MONTHS = 12;
 
 /**
+ * Calculate the distance in months between two month keys.
+ */
+function monthDistance(a: string, b: string): number {
+	const [yearA, monA] = a.split('-').map(Number);
+	const [yearB, monB] = b.split('-').map(Number);
+	return Math.abs((yearA * 12 + monA) - (yearB * 12 + monB));
+}
+
+/**
  * Filter monthly totals to only include months within a rolling window.
+ * Uses a symmetric window centered on the selected month, so insights
+ * for past months improve as new data becomes available.
  * @param allMonthlyTotals Map of month keys to totals
  * @param selectedMonth The reference month (YYYY-MM)
  * @param windowMonths Number of months to include (default 12)
@@ -52,20 +63,19 @@ function filterToRollingWindow(
 	selectedMonth: string,
 	windowMonths: number = ROLLING_WINDOW_MONTHS
 ): Map<string, number> {
-	// Get all months sorted descending (most recent first)
-	const sortedMonths = [...allMonthlyTotals.keys()].sort((a, b) => b.localeCompare(a));
+	const months = [...allMonthlyTotals.keys()];
+	if (!months.includes(selectedMonth)) return new Map();
 
-	// Find the position of selected month
-	const selectedIndex = sortedMonths.indexOf(selectedMonth);
-	if (selectedIndex === -1) return new Map();
+	// Sort by proximity to selected month (closest first), take nearest N
+	const byProximity = months
+		.map((month) => ({ month, distance: monthDistance(month, selectedMonth) }))
+		.sort((a, b) => a.distance - b.distance)
+		.slice(0, windowMonths);
 
-	// Include months from selected month back windowMonths months
 	const filtered = new Map<string, number>();
-	for (let i = selectedIndex; i < sortedMonths.length && filtered.size < windowMonths; i++) {
-		const month = sortedMonths[i];
+	for (const { month } of byProximity) {
 		filtered.set(month, allMonthlyTotals.get(month)!);
 	}
-
 	return filtered;
 }
 
@@ -124,8 +134,16 @@ export function computeVsAverage(
 
 	if (totalsToUse.size < 2) return null;
 
-	// Sort months chronologically (oldest first) for proper weighting
-	const sortedEntries = [...totalsToUse.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+	// Sort entries so closest months to selected get highest weight.
+	// generateDecayWeights gives weight 1.0 to the last element, so sort
+	// farthest-first / closest-last (proximity-based instead of chronological).
+	// This ensures months near the selected month influence the baseline most,
+	// regardless of whether they come before or after it.
+	const sortedEntries = selectedMonth
+		? [...totalsToUse.entries()].sort((a, b) =>
+				monthDistance(b[0], selectedMonth) - monthDistance(a[0], selectedMonth)
+			)
+		: [...totalsToUse.entries()].sort((a, b) => a[0].localeCompare(b[0]));
 	const values = sortedEntries.map(([, v]) => v);
 
 	// Generate decay weights (most recent month = 1.0)
@@ -140,7 +158,7 @@ export function computeVsAverage(
 	const isAbove = diff > 0;
 	const withinOneSigma = stdDev > 0 ? Math.abs(diff) <= stdDev : true;
 
-	return { percentDiff, isAbove, withinOneSigma };
+	return { percentDiff, isAbove, withinOneSigma, weightedMean: mean, sampleSize: totalsToUse.size };
 }
 
 /** Category names excluded from "biggest purchase" (predictable recurring expenses). */
@@ -209,7 +227,15 @@ export function computeMostVisitedMerchant(
 		(t) => t.merchant.trim().toLowerCase() === topMerchant
 	)?.merchant ?? topMerchant;
 
-	return { merchant: originalName, count: topCount };
+	// Sum user amounts for the top merchant's transactions
+	let totalSpent = 0;
+	for (const t of transactions) {
+		if (t.merchant.trim().toLowerCase() === topMerchant) {
+			totalSpent += getUserAmount(t);
+		}
+	}
+
+	return { merchant: originalName, count: topCount, totalSpent };
 }
 
 /**

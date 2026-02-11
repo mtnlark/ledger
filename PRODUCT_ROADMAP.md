@@ -593,6 +593,20 @@ interface Settings {
 
 **Files changed**: `string-helpers.ts`, `constants.ts`, `subscriptionSettings.ts`, `recurringSuggestions.ts`, `RecurringInsights.svelte`, `SubscriptionFields.svelte`, `EditTransactionModal.svelte`, `dashboardActions.ts`
 
+### Month in Review: Contextual Improvements
+
+**Problem**: Month in Review presented insights without dollar context — "15% above your typical month" gave no reference point. Goal completions were buried in expandable sections. Needs/wants split always shown even when unremarkable. No budget context.
+
+**Solution**: Six improvements across display and calculation layers:
+1. **Dollar amounts on anomalies/vs-average**: Shows `($725 vs $500 avg)` for both current and past month insights
+2. **Goal completions as hero**: Inserted at Priority 1.5 (between rank superlative and savings highest), with single/multiple goal handling and deduplication from highlights
+3. **Suppress needs % when unremarkable**: Only shown when >75% ("Mostly essentials") or <25% ("Mostly discretionary")
+4. **Expose weighted mean + sample size**: `computeVsAverage` now returns already-computed `weightedMean` and `sampleSize`; displayed as "typical $X,XXX · based on N months"
+5. **Budget context in month review**: Computes over/under for budgeted categories using existing `getBudgetStatus` utility; "2 of 5 budgeted categories over budget · $200 over overall"
+6. **Merchant spending totals**: `computeMostVisitedMerchant` returns `totalSpent`; displayed as "Most visited: Trader Joe's (8 times, $420)"
+
+**Files changed**: `month-review.ts`, `SmartTakeaways.svelte`, `insights/+page.svelte`, `month-review.test.ts` (×2)
+
 ---
 
 ## Future Considerations (Not in Current Sprint)
@@ -618,7 +632,7 @@ Monthly report generation for tax prep or sharing. Consider whether enhanced CSV
 Current insights compare to rolling averages but not same-month-last-year. Would require >12 months of data to be useful.
 
 ### Large Component Extraction
-Several components exceed 500 lines: Settings page (785), RecurringInsights (619), TransactionForm (604), SmartTakeaways (586). These are working well but could benefit from extraction into smaller sub-components if they grow further or become harder to maintain.
+Several components exceed 500 lines: Settings page (785), SmartTakeaways (693), RecurringInsights (619), TransactionForm (604). These are working well but could benefit from extraction into smaller sub-components if they grow further or become harder to maintain.
 
 ---
 

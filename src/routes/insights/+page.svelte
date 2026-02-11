@@ -209,6 +209,7 @@
 						{allContributions}
 						{allBudgets}
 						settings={appSettings}
+						{categoryBudgets}
 					/>
 					<QuickStatsRow
 						transactions={selectedMonthTransactions}
