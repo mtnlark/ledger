@@ -119,7 +119,10 @@
 	let displayedTransactions = $derived(transactions.slice(0, displayCount));
 
 	// Reset display count when the transaction list changes (new month, filters, etc.)
-	let prevTransactionsRef = $state<Transaction[]>([]);
+	// NOTE: prevTransactionsRef must be a plain variable, NOT $state.
+	// $state wraps values in reactive Proxies, so `transactions !== Proxy(transactions)`
+	// is always true, causing the $effect to loop infinitely and freeze the app.
+	let prevTransactionsRef: Transaction[] = [];
 	$effect(() => {
 		if (transactions !== prevTransactionsRef) {
 			prevTransactionsRef = transactions;

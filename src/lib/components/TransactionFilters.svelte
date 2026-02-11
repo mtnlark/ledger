@@ -47,6 +47,21 @@
 	let confirmingDelete = $state<string | null>(null);
 	let isProcessing = $state(false);
 
+	// Local search input state — updates immediately while debouncing parent callback.
+	// In Svelte 5, value={expr} resets the DOM input when the component re-renders for
+	// any reason. Using bind:value with local state prevents keystroke loss during debounce.
+	let localSearchQuery = $state(filters.searchQuery);
+	let lastSentQuery = filters.searchQuery;
+
+	// Sync from parent only on external changes (e.g., Clear All, tag click filter)
+	$effect(() => {
+		const parentQuery = filters.searchQuery;
+		if (parentQuery !== lastSentQuery) {
+			localSearchQuery = parentQuery;
+			lastSentQuery = parentQuery;
+		}
+	});
+
 	// Available tags for filtering
 	let availableTags = $derived(tagIndex.getAllTags());
 
@@ -71,12 +86,13 @@
 		filters.amountMax !== ''
 	);
 
-	// Debounce search input
+	// Debounce search input — local state updates immediately, parent after 200ms
 	let searchTimeout: ReturnType<typeof setTimeout>;
 
 	function handleSearchInput(value: string) {
 		clearTimeout(searchTimeout);
 		searchTimeout = setTimeout(() => {
+			lastSentQuery = value;
 			onFilterChange({ ...filters, searchQuery: value });
 		}, 200);
 	}
@@ -95,6 +111,9 @@
 	}
 
 	function clearFilters() {
+		clearTimeout(searchTimeout);
+		localSearchQuery = '';
+		lastSentQuery = '';
 		onFilterChange({
 			searchQuery: '',
 			categoryId: null,
@@ -112,6 +131,9 @@
 	}
 
 	function clearSearch() {
+		clearTimeout(searchTimeout);
+		localSearchQuery = '';
+		lastSentQuery = '';
 		onFilterChange({ ...filters, searchQuery: '' });
 	}
 
@@ -165,17 +187,17 @@
 	<div class="px-4 py-3">
 		<div class="flex gap-2">
 			<div class="relative flex-1">
-				<Search size={18} class="absolute left-3 top-1/2 -translate-y-1/2 text-charcoal-muted" />
+				<Search size={18} class="absolute left-3 top-1/2 -translate-y-1/2 text-charcoal-muted pointer-events-none" />
 				<input
 					type="text"
 					bind:this={searchInput}
-					placeholder={filters.searchAllTime ? "Search merchants & notes..." : "Search merchants & notes..."}
+					placeholder="Search merchants & notes..."
 					aria-label="Search transactions"
-					value={filters.searchQuery}
+					bind:value={localSearchQuery}
 					oninput={(e) => handleSearchInput(e.currentTarget.value)}
 					class="w-full pl-10 pr-10 py-2.5 bg-cream rounded-lg border border-transparent focus:border-primary-300 focus:ring-2 focus:ring-primary-100 focus:bg-surface transition-all text-charcoal placeholder:text-charcoal-muted/60"
 				/>
-				{#if filters.searchQuery}
+				{#if localSearchQuery}
 					<button
 						onclick={clearSearch}
 						aria-label="Clear search"
