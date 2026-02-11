@@ -1,30 +1,84 @@
 <script lang="ts">
-	import { Trash2, FolderInput, X, ChevronUp, Check } from 'lucide-svelte';
+	import { Trash2, FolderInput, X, ChevronUp, Tag, Plus, Minus } from 'lucide-svelte';
 	import type { Category } from '$lib/db';
 
 	interface Props {
 		selectedCount: number;
 		categories: Category[];
+		availableTags?: string[];
 		onDelete: () => void;
 		onCategoryChange: (categoryId: number) => void;
+		onTagAdd?: (tag: string) => void;
+		onTagRemove?: (tag: string) => void;
 		onCancel: () => void;
 	}
 
-	let { selectedCount, categories, onDelete, onCategoryChange, onCancel }: Props = $props();
+	let { selectedCount, categories, availableTags = [], onDelete, onCategoryChange, onTagAdd, onTagRemove, onCancel }: Props = $props();
 
 	// Category dropdown state
 	let showCategoryDropdown = $state(false);
 	let highlightedIndex = $state(0);
 
+	// Tag dropdown state
+	let showTagDropdown = $state(false);
+	let tagInput = $state('');
+	let tagHighlightedIndex = $state(-1);
+
 	// Get active categories
 	let activeCategories = $derived(categories.filter((c) => c.isActive));
+
+	// Filter tags based on input
+	let filteredTags = $derived(
+		tagInput.trim()
+			? availableTags.filter((t) => t.toLowerCase().includes(tagInput.trim().toLowerCase()))
+			: availableTags
+	);
+
+	// Validate tag input format
+	let normalizedTagInput = $derived(tagInput.trim().replace(/^#/, '').toLowerCase());
+	let isValidTag = $derived(/^[a-zA-Z0-9][a-zA-Z0-9-]*$/.test(normalizedTagInput));
+	let isNewTag = $derived(isValidTag && !availableTags.includes(normalizedTagInput));
 
 	function handleCategorySelect(categoryId: number) {
 		showCategoryDropdown = false;
 		onCategoryChange(categoryId);
 	}
 
+	function handleTagAdd(tag: string) {
+		showTagDropdown = false;
+		tagInput = '';
+		onTagAdd?.(tag);
+	}
+
+	function handleTagRemove(tag: string) {
+		showTagDropdown = false;
+		tagInput = '';
+		onTagRemove?.(tag);
+	}
+
+	function handleTagInputKeydown(e: KeyboardEvent) {
+		if (e.key === 'Enter') {
+			e.preventDefault();
+			if (tagHighlightedIndex >= 0 && filteredTags[tagHighlightedIndex]) {
+				handleTagAdd(filteredTags[tagHighlightedIndex]);
+			} else if (normalizedTagInput && isValidTag) {
+				handleTagAdd(normalizedTagInput);
+			}
+		} else if (e.key === 'ArrowDown') {
+			e.preventDefault();
+			tagHighlightedIndex = Math.min(tagHighlightedIndex + 1, filteredTags.length - 1);
+		} else if (e.key === 'ArrowUp') {
+			e.preventDefault();
+			tagHighlightedIndex = Math.max(tagHighlightedIndex - 1, -1);
+		} else if (e.key === 'Escape') {
+			e.preventDefault();
+			showTagDropdown = false;
+			tagInput = '';
+		}
+	}
+
 	function handleKeydown(e: KeyboardEvent) {
+		if (showTagDropdown) return; // Tag dropdown handles its own keys
 		if (!showCategoryDropdown) return;
 
 		switch (e.key) {
@@ -51,7 +105,15 @@
 
 	function toggleCategoryDropdown() {
 		showCategoryDropdown = !showCategoryDropdown;
+		showTagDropdown = false;
 		highlightedIndex = 0;
+	}
+
+	function toggleTagDropdown() {
+		showTagDropdown = !showTagDropdown;
+		showCategoryDropdown = false;
+		tagInput = '';
+		tagHighlightedIndex = -1;
 	}
 </script>
 
@@ -122,6 +184,101 @@
 						</ul>
 					{/if}
 				</div>
+
+				<!-- Tag dropdown -->
+				{#if onTagAdd || onTagRemove}
+					<div class="relative">
+						<button
+							type="button"
+							onclick={toggleTagDropdown}
+							class="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-charcoal-soft bg-surface-alt border border-theme rounded-lg hover:bg-surface-hover transition-colors"
+						>
+							<Tag size={16} />
+							<span>Tag</span>
+							<ChevronUp
+								size={14}
+								class="transition-transform {showTagDropdown ? 'rotate-180' : ''}"
+							/>
+						</button>
+
+						{#if showTagDropdown}
+							<!-- Backdrop to close dropdown -->
+							<button
+								type="button"
+								class="fixed inset-0 z-40"
+								onclick={() => { showTagDropdown = false; tagInput = ''; }}
+								aria-label="Close tag dropdown"
+							></button>
+
+							<div
+								class="absolute bottom-full left-0 mb-2 w-64 bg-surface border border-theme rounded-lg shadow-lg z-50 overflow-hidden"
+							>
+								<!-- Tag input -->
+								<div class="p-2 border-b border-theme">
+									<input
+										type="text"
+										bind:value={tagInput}
+										onkeydown={handleTagInputKeydown}
+										placeholder="Type a tag name..."
+										class="w-full px-2 py-1.5 text-sm bg-surface-alt border border-theme rounded focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 outline-none"
+										autofocus
+									/>
+									{#if normalizedTagInput && isValidTag && isNewTag}
+										<button
+											type="button"
+											class="mt-1.5 w-full flex items-center gap-2 px-2 py-1.5 text-sm text-primary-600 hover:bg-surface-hover rounded transition-colors"
+											onmousedown={() => handleTagAdd(normalizedTagInput)}
+										>
+											<Plus size={14} />
+											<span>Add <strong>#{normalizedTagInput}</strong> (new)</span>
+										</button>
+									{/if}
+									{#if normalizedTagInput && !isValidTag && normalizedTagInput.length > 0}
+										<p class="mt-1 text-xs text-charcoal-muted">Letters, numbers, and hyphens only</p>
+									{/if}
+								</div>
+
+								<!-- Existing tags list -->
+								<ul class="max-h-48 overflow-auto" role="listbox">
+									{#each filteredTags as tag, index (tag)}
+										<li
+											role="option"
+											aria-selected={index === tagHighlightedIndex}
+											class="px-2 py-1.5 flex items-center justify-between text-sm {index === tagHighlightedIndex ? 'bg-primary-50 text-primary-900' : 'hover:bg-surface-hover'}"
+											onmouseenter={() => (tagHighlightedIndex = index)}
+										>
+											<span class="font-mono text-xs">#{tag}</span>
+											<div class="flex items-center gap-1">
+												<button
+													type="button"
+													class="p-1 rounded hover:bg-success-100 text-success-600 transition-colors"
+													title="Add #{tag} to selected"
+													onmousedown={() => handleTagAdd(tag)}
+												>
+													<Plus size={14} />
+												</button>
+												<button
+													type="button"
+													class="p-1 rounded hover:bg-danger-100 text-danger-500 transition-colors"
+													title="Remove #{tag} from selected"
+													onmousedown={() => handleTagRemove(tag)}
+												>
+													<Minus size={14} />
+												</button>
+											</div>
+										</li>
+									{:else}
+										{#if tagInput.trim()}
+											<li class="px-3 py-2 text-sm text-charcoal-muted">No matching tags</li>
+										{:else}
+											<li class="px-3 py-2 text-sm text-charcoal-muted">No tags yet</li>
+										{/if}
+									{/each}
+								</ul>
+							</div>
+						{/if}
+					</div>
+				{/if}
 
 				<!-- Delete button -->
 				<button

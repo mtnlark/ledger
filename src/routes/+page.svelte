@@ -12,6 +12,7 @@
 	import { getRecurringSuggestions, shouldShowRecurringBanner, type RecurringSuggestion } from '$lib/stores/recurringSuggestions';
 	import { sumCurrency, calculateTotalSpent } from '$lib/utils/currency';
 	import { matchesTag } from '$lib/utils/tags';
+	import { tagIndex } from '$lib/stores/tags.svelte';
 	import { getSelectedMonth, setSelectedMonth } from '$lib/stores/selectedMonth';
 	import { toast } from '$lib/stores/toast';
 	import { handleError } from '$lib/utils/error-handler';
@@ -334,6 +335,18 @@
 		await actions.bulkCategoryChange(ids, categoryId, categories);
 	}
 
+	// Handle bulk tag add — delegates to actions
+	async function handleBulkTagAdd(ids: number[], tag: string) {
+		if (ids.length === 0) return;
+		await actions.bulkAddTag(ids, tag);
+	}
+
+	// Handle bulk tag remove — delegates to actions
+	async function handleBulkTagRemove(ids: number[], tag: string) {
+		if (ids.length === 0) return;
+		await actions.bulkRemoveTag(ids, tag);
+	}
+
 	// Handle opening split modal from edit modal
 	function handleOpenSplit(transaction: Transaction) {
 		editingTransaction = null; // Close edit modal
@@ -582,11 +595,16 @@
 					onDelete={handleDelete}
 					onBulkDelete={handleBulkDelete}
 					onBulkCategoryChange={handleBulkCategoryChange}
+					onBulkTagAdd={handleBulkTagAdd}
+					onBulkTagRemove={handleBulkTagRemove}
+					availableTags={tagIndex.getAllTags()}
 					onAddTransaction={handleOpenQuickAdd}
 					selectionMode={isSelectionMode}
 					onSelectionModeChange={(mode) => isSelectionMode = mode}
 					onTagClick={(tag) => {
-						if (!filters.tags.includes(tag)) {
+						if (filters.tags.includes(tag)) {
+							filters = { ...filters, tags: filters.tags.filter(t => t !== tag) };
+						} else {
 							filters = { ...filters, tags: [...filters.tags, tag] };
 						}
 					}}

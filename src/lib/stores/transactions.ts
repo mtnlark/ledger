@@ -8,7 +8,7 @@ import { getMonthDateRange } from '$lib/utils/date-helpers';
 import { getTransactionCache } from './transactionCache';
 import { sumCurrency } from '$lib/utils/currency';
 import { tagIndex } from './tags.svelte';
-import { replaceTag, stripTag } from '$lib/utils/tags';
+import { replaceTag, stripTag, appendTag } from '$lib/utils/tags';
 import {
 	validateAmount,
 	validateMerchant,
@@ -360,6 +360,83 @@ export async function bulkUpdateCategory(ids: number[], categoryId: number): Pro
 	const cache = getTransactionCache();
 	if (cache.isLoaded) {
 		cache.bulkUpdate(ids, { categoryId, updatedAt });
+	}
+
+	invalidateTransactionCaches();
+	await persistData();
+}
+
+// Bulk add a tag to transactions' notes
+export async function bulkAddTag(ids: number[], tag: string): Promise<void> {
+	if (ids.length === 0) return;
+
+	const normalizedTag = tag.replace(/^#/, '').toLowerCase();
+	const transactions = await db.transactions.where('id').anyOf(ids).toArray();
+	if (transactions.length === 0) return;
+
+	const now = new Date();
+
+	// Update each transaction individually since notes differ
+	await db.transaction('rw', db.transactions, async () => {
+		for (const tx of transactions) {
+			const newNotes = appendTag(tx.notes, normalizedTag);
+			if (newNotes !== (tx.notes || '')) {
+				await db.transactions.update(tx.id!, { notes: newNotes, updatedAt: now });
+			}
+		}
+	});
+
+	// Update cache if loaded
+	const cache = getTransactionCache();
+	if (cache.isLoaded) {
+		for (const tx of transactions) {
+			const newNotes = appendTag(tx.notes, normalizedTag);
+			if (newNotes !== (tx.notes || '')) {
+				cache.update(tx.id!, { notes: newNotes, updatedAt: now });
+			}
+		}
+		tagIndex.rebuild(cache.getAll());
+	}
+
+	invalidateTransactionCaches();
+	await persistData();
+}
+
+// Bulk remove a tag from transactions' notes
+export async function bulkRemoveTag(ids: number[], tag: string): Promise<void> {
+	if (ids.length === 0) return;
+
+	const normalizedTag = tag.replace(/^#/, '').toLowerCase();
+	const transactions = await db.transactions.where('id').anyOf(ids).toArray();
+	if (transactions.length === 0) return;
+
+	const now = new Date();
+
+	// Update each transaction individually since notes differ
+	await db.transaction('rw', db.transactions, async () => {
+		for (const tx of transactions) {
+			if (!tx.notes) continue;
+			const newNotes = stripTag(tx.notes, normalizedTag);
+			if (newNotes !== tx.notes) {
+				await db.transactions.update(tx.id!, {
+					notes: newNotes || undefined,
+					updatedAt: now
+				});
+			}
+		}
+	});
+
+	// Update cache if loaded
+	const cache = getTransactionCache();
+	if (cache.isLoaded) {
+		for (const tx of transactions) {
+			if (!tx.notes) continue;
+			const newNotes = stripTag(tx.notes, normalizedTag);
+			if (newNotes !== tx.notes) {
+				cache.update(tx.id!, { notes: newNotes || undefined, updatedAt: now });
+			}
+		}
+		tagIndex.rebuild(cache.getAll());
 	}
 
 	invalidateTransactionCaches();

@@ -19,6 +19,9 @@
 		onDelete?: (id: number) => void;
 		onBulkDelete?: (ids: number[]) => void;
 		onBulkCategoryChange?: (ids: number[], categoryId: number) => void;
+		onBulkTagAdd?: (ids: number[], tag: string) => void;
+		onBulkTagRemove?: (ids: number[], tag: string) => void;
+		availableTags?: string[];
 		onAddTransaction?: () => void;
 		selectionMode?: boolean;
 		onSelectionModeChange?: (mode: boolean) => void;
@@ -26,7 +29,7 @@
 		allTransactions?: Transaction[];
 	}
 
-	let { transactions, categories, settings, onEdit, onDelete, onBulkDelete, onBulkCategoryChange, onAddTransaction, selectionMode = false, onSelectionModeChange, onTagClick, allTransactions }: Props = $props();
+	let { transactions, categories, settings, onEdit, onDelete, onBulkDelete, onBulkCategoryChange, onBulkTagAdd, onBulkTagRemove, availableTags = [], onAddTransaction, selectionMode = false, onSelectionModeChange, onTagClick, allTransactions }: Props = $props();
 
 	// Selection mode state - use prop if provided, otherwise internal state
 	let internalSelectionMode = $state(false);
@@ -86,6 +89,30 @@
 	function handleBulkCategoryChange(categoryId: number) {
 		if (selectedIds.size > 0 && onBulkCategoryChange) {
 			onBulkCategoryChange(Array.from(selectedIds), categoryId);
+			selectedIds = new Set();
+			if (onSelectionModeChange) {
+				onSelectionModeChange(false);
+			} else {
+				internalSelectionMode = false;
+			}
+		}
+	}
+
+	function handleBulkTagAdd(tag: string) {
+		if (selectedIds.size > 0 && onBulkTagAdd) {
+			onBulkTagAdd(Array.from(selectedIds), tag);
+			selectedIds = new Set();
+			if (onSelectionModeChange) {
+				onSelectionModeChange(false);
+			} else {
+				internalSelectionMode = false;
+			}
+		}
+	}
+
+	function handleBulkTagRemove(tag: string) {
+		if (selectedIds.size > 0 && onBulkTagRemove) {
+			onBulkTagRemove(Array.from(selectedIds), tag);
 			selectedIds = new Set();
 			if (onSelectionModeChange) {
 				onSelectionModeChange(false);
@@ -322,8 +349,11 @@
 	<BulkActionBar
 		selectedCount={selectedIds.size}
 		{categories}
+		{availableTags}
 		onDelete={handleBulkDelete}
 		onCategoryChange={handleBulkCategoryChange}
+		onTagAdd={handleBulkTagAdd}
+		onTagRemove={handleBulkTagRemove}
 		onCancel={handleCancelSelection}
 	/>
 {/if}

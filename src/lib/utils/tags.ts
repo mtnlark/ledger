@@ -92,6 +92,24 @@ export function stripTag(notes: string, tag: string): string {
   return notes.replace(pattern, '').replace(/\s+/g, ' ').trim();
 }
 
+/**
+ * Append a tag to notes text if not already present.
+ * Returns the notes with the tag appended, or unchanged if tag already exists.
+ * Handles undefined/empty notes gracefully.
+ */
+export function appendTag(notes: string | undefined, tag: string): string {
+	const normalizedTag = tag.replace(/^#/, '').toLowerCase();
+	const existing = extractTags(notes);
+	if (existing.includes(normalizedTag)) {
+		return notes || '';
+	}
+	const tagStr = `#${normalizedTag}`;
+	if (!notes || notes.trim() === '') {
+		return tagStr;
+	}
+	return `${notes} ${tagStr}`;
+}
+
 /** Escape special regex characters in a string. */
 function escapeRegex(str: string): string {
   return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');

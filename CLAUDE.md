@@ -21,7 +21,7 @@ See `PRODUCT_ROADMAP.md` for the full development plan. Groups 1–9 are complet
 8. ~~Performance & Tech Debt~~ — N+1 fix, stats dedup, lazy-load, chunk splitting, import/export tests ✅
 9. ~~Startup Perf & Search~~ — Redundant DB scan elimination, query parallelization, search/filter enhancements, pagination, lazy emoji picker, migration version stamp ✅
 
-**Recent**: Month in Review contextual improvements — Anomalies and vs-average insights now show dollar amounts ($725 vs $500 avg). Goal completions surface as hero stat. Needs/wants split suppressed unless skewed (>75% or <25%). Budget context added to spending insights group. Merchant insights show spending totals. vs-average exposes weighted mean and sample size for transparency.
+**Recent**: Tag toggle + bulk tag management — Clicking a filtered tag pill now un-filters it (toggle behavior). Bulk select toolbar adds "Tag" button with dropdown for adding/removing tags across selected transactions. New `appendTag()` utility, `bulkAddTag`/`bulkRemoveTag` store operations and dashboard actions.
 
 ---
 
@@ -229,7 +229,7 @@ ledger/
 │   │   │   ├── trie.ts                # Trie for merchant autocomplete
 │   │   │   ├── pagination.ts          # List pagination utilities
 │   │   │   ├── retry.ts               # Async retry with backoff
-│   │   │   ├── tags.ts                # Tag parsing, replace, strip, total calculation
+│   │   │   ├── tags.ts                # Tag parsing, replace, strip, append, total calculation
 │   │   │   ├── errors.ts              # Error class definitions & type guards
 │   │   │   ├── error-handler.ts       # Centralized error handler (logging + toast)
 │   │   │   ├── week-in-review.ts      # Week in Review calculations + dismiss logic
@@ -263,6 +263,7 @@ ledger/
 │           ├── import.test.ts
 │           ├── stats.test.ts
 │           ├── string-helpers.test.ts
+│           ├── tags.test.ts               # appendTag utility tests
 │           └── week-in-review.test.ts     # Week in Review calculations + dismiss
 ├── src-tauri/
 │   ├── src/
@@ -505,7 +506,7 @@ Sidebar state persists to localStorage (`ledger-sidebar-expanded`).
 ### Tags
 - Hashtag-based tagging in transaction notes field (e.g. `#vacation`, `#italy-trip`)
 - Tag format: letters, numbers, hyphens; must start with letter or number
-- Tag pills displayed on transactions with click-to-filter behavior
+- Tag pills displayed on transactions with click-to-filter toggle behavior (click to filter, click again to un-filter)
 - **Tag popover**: Hover a tag pill to see total spent (user's share) and transaction count
 - **Tag filtering**: Filter transactions by one or more tags in the advanced filters panel
 - **Manage tags**: Inline section in filters panel to rename or delete tags across all transactions
@@ -513,6 +514,10 @@ Sidebar state persists to localStorage (`ledger-sidebar-expanded`).
   - Delete: strips `#tag` from all matching transaction notes
 - **Tag autocomplete**: Suggests existing tags when typing `#` in notes input
 - Helper text below notes input clarifies tag format rules
+- **Bulk tag management**: Add or remove tags from multiple selected transactions via BulkActionBar
+  - Tag button in bulk action bar with dropdown: text input for new tags + existing tag list
+  - Each existing tag has + (add) and − (remove) action buttons
+  - Uses `appendTag()` (idempotent add) and `stripTag()` (remove) utilities
 - Tag index (`TagIndex` class) provides fast lookups, rebuilt from transaction cache
 
 ### Notifications

@@ -5,6 +5,8 @@ import {
 	deleteTransaction as storeDeleteTransaction,
 	bulkDeleteTransactions,
 	bulkUpdateCategory,
+	bulkAddTag as storeBulkAddTag,
+	bulkRemoveTag as storeBulkRemoveTag,
 	splitTransaction as storeSplitTransaction,
 	getTransactionsByMonth,
 	getAllTransactions,
@@ -292,6 +294,46 @@ export function setupDashboardActions(ctx: DashboardContext) {
 							: 'Failed to split transaction'
 				});
 				return false;
+			}
+		},
+
+		/**
+		 * Add a tag to multiple transactions' notes.
+		 */
+		async bulkAddTag(ids: number[], tag: string): Promise<void> {
+			try {
+				await storeBulkAddTag(ids, tag);
+				await reloadAfterMutation();
+				toast.success(
+					ids.length === 1
+						? `Tag #${tag} added`
+						: `Tag #${tag} added to ${ids.length} transactions`
+				);
+			} catch (error) {
+				handleError(error, {
+					context: 'bulkAddTag',
+					userMessage: 'Failed to add tag'
+				});
+			}
+		},
+
+		/**
+		 * Remove a tag from multiple transactions' notes.
+		 */
+		async bulkRemoveTag(ids: number[], tag: string): Promise<void> {
+			try {
+				await storeBulkRemoveTag(ids, tag);
+				await reloadAfterMutation();
+				toast.success(
+					ids.length === 1
+						? `Tag #${tag} removed`
+						: `Tag #${tag} removed from ${ids.length} transactions`
+				);
+			} catch (error) {
+				handleError(error, {
+					context: 'bulkRemoveTag',
+					userMessage: 'Failed to remove tag'
+				});
 			}
 		},
 
