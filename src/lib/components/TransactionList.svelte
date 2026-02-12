@@ -27,9 +27,11 @@
 		onSelectionModeChange?: (mode: boolean) => void;
 		onTagClick?: (tag: string) => void;
 		allTransactions?: Transaction[];
+		/** Key that changes when pagination should reset (month/filter changes). */
+		resetKey?: string;
 	}
 
-	let { transactions, categories, settings, onEdit, onDelete, onBulkDelete, onBulkCategoryChange, onBulkTagAdd, onBulkTagRemove, availableTags = [], onAddTransaction, selectionMode = false, onSelectionModeChange, onTagClick, allTransactions }: Props = $props();
+	let { transactions, categories, settings, onEdit, onDelete, onBulkDelete, onBulkCategoryChange, onBulkTagAdd, onBulkTagRemove, availableTags = [], onAddTransaction, selectionMode = false, onSelectionModeChange, onTagClick, allTransactions, resetKey = '' }: Props = $props();
 
 	// Selection mode state - use prop if provided, otherwise internal state
 	let internalSelectionMode = $state(false);
@@ -145,14 +147,13 @@
 	let hasMore = $derived(transactions.length > displayCount);
 	let displayedTransactions = $derived(transactions.slice(0, displayCount));
 
-	// Reset display count when the transaction list changes (new month, filters, etc.)
-	// NOTE: prevTransactionsRef must be a plain variable, NOT $state.
-	// $state wraps values in reactive Proxies, so `transactions !== Proxy(transactions)`
-	// is always true, causing the $effect to loop infinitely and freeze the app.
-	let prevTransactionsRef: Transaction[] = [];
+	// Reset display count when resetKey changes (month/filter changes).
+	// This intentionally ignores data refreshes (edits) that don't change the viewing context,
+	// allowing users to stay at their current scroll position after editing older transactions.
+	let prevResetKey = '';
 	$effect(() => {
-		if (transactions !== prevTransactionsRef) {
-			prevTransactionsRef = transactions;
+		if (resetKey !== prevResetKey) {
+			prevResetKey = resetKey;
 			displayCount = DEFAULT_PAGE_SIZE;
 		}
 	});

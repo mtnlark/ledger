@@ -137,6 +137,11 @@
 		filters.searchAllTime
 	);
 
+	// Key that changes when pagination should reset (month or filter changes, but NOT data refreshes)
+	let transactionListResetKey = $derived(
+		`${currentMonth}|${filters.searchQuery}|${filters.categoryId}|${filters.dateFrom}|${filters.dateTo}|${filters.searchAllTime}|${filters.tags.join(',')}|${filters.amountMin}|${filters.amountMax}`
+	);
+
 	// Determine which transaction set to filter from
 	let baseTransactions = $derived(needsAllTransactions ? allTransactions : transactions);
 
@@ -591,6 +596,7 @@
 					{categories}
 					{settings}
 					{allTransactions}
+					resetKey={transactionListResetKey}
 					onEdit={handleEdit}
 					onDelete={handleDelete}
 					onBulkDelete={handleBulkDelete}
