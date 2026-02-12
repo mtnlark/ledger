@@ -598,9 +598,10 @@ describe('SavingsContribution Operations', () => {
 			});
 
 			// 6-month window should only include the 500 contribution
+			// Uses actual months spanned (2: last month + current month), not full 6-month window
 			const avg = await getAverageMonthlyContribution(savingsAccountId, 6);
-			// 500 over 6 months = 83.33
-			expect(avg).toBeCloseTo(83.33, 2);
+			// 500 over 2 actual months = 250
+			expect(avg).toBeCloseTo(250, 0);
 		});
 
 		it('handles multiple contributions in same month', async () => {
@@ -731,6 +732,84 @@ describe('SavingsContribution Operations', () => {
 			expect(status!.shortfall).toBe(0);
 		});
 
+		it('returns on track when within 90% tolerance of required pace', async () => {
+			const now = new Date();
+			const targetDate = new Date(now);
+			targetDate.setMonth(targetDate.getMonth() + 10); // 10 months from now
+
+			// Set up account: $0 balance, $5000 target
+			// Required: $5000 / 10 months = $500/month
+			// 90% of required = $450/month
+			await updateSavingsAccount(savingsAccountId, {
+				currentBalance: 0,
+				targetAmount: 5000,
+				targetDate
+			});
+
+			// Add contribution history showing $460/month average (92% of required - within tolerance)
+			for (let i = 1; i <= 6; i++) {
+				const date = new Date(now);
+				date.setMonth(date.getMonth() - i);
+				await addContribution({
+					date,
+					accountId: savingsAccountId,
+					amount: 460,
+					source: 'bank_transfer'
+				});
+			}
+
+			const status = await getGoalStatus(savingsAccountId);
+			expect(status).not.toBeNull();
+			expect(status!.severity).toBe('on_track');
+			expect(status!.isOnTrack).toBe(true);
+		});
+
+		it('returns achievable when surplus covers the shortfall', async () => {
+			const now = new Date();
+			const targetDate = new Date(now);
+			targetDate.setMonth(targetDate.getMonth() + 10); // 10 months from now
+
+			// Add contribution history showing $400/month average
+			// Use dates within the last 5 months to avoid edge cases at the 6-month boundary
+			for (let i = 1; i <= 5; i++) {
+				const date = new Date(now);
+				date.setMonth(date.getMonth() - i);
+				date.setDate(15); // Mid-month to avoid boundary issues
+				await addContribution({
+					date,
+					accountId: savingsAccountId,
+					amount: 400,
+					source: 'bank_transfer'
+				});
+			}
+
+			// Set up account AFTER contributions to control the balance
+			// 5 contributions * $400 = $2000 balance
+			// Average over 6 months = $2000 / 6 = $333.33/mo
+			// Set target so required pace is ~$500/mo
+			// Need $3000 more in 6 months = $500/mo required
+			// 90% of $500 = $450, so $333 is below tolerance
+			// Monthly shortfall = $500 - $333 = $167
+			// Surplus needs to be >= $167
+			await updateSavingsAccount(savingsAccountId, {
+				currentBalance: 2000,
+				targetAmount: 5000, // Need $3000 more in 6 months = $500/mo required
+				targetDate: (() => {
+					const d = new Date(now);
+					d.setMonth(d.getMonth() + 6);
+					return d;
+				})()
+			});
+
+			// avgMonthly ≈ $333, recommendedMonthly = $500
+			// monthlyShortfall ≈ $167, surplus = $200 - should be achievable
+			const status = await getGoalStatus(savingsAccountId, 200);
+			expect(status).not.toBeNull();
+			expect(status!.severity).toBe('achievable');
+			expect(status!.isOnTrack).toBe(true);
+			expect(status!.monthlyShortfall).toBeGreaterThan(100);
+		});
+
 		it('returns off track when current pace is below required pace', async () => {
 			const now = new Date();
 			const targetDate = new Date(now);
@@ -745,6 +824,7 @@ describe('SavingsContribution Operations', () => {
 			});
 
 			// Add contribution history showing only $300/month average
+			// Required is ~$1333, so need 4.4x increase = significantly_behind (>2.5x)
 			for (let i = 1; i <= 6; i++) {
 				const date = new Date(now);
 				date.setMonth(date.getMonth() - i);
@@ -759,8 +839,41 @@ describe('SavingsContribution Operations', () => {
 			const status = await getGoalStatus(savingsAccountId);
 			expect(status).not.toBeNull();
 			expect(status!.isOnTrack).toBe(false);
+			expect(status!.severity).toBe('significantly_behind');
 			expect(status!.shortfall).toBeGreaterThan(0);
 			expect(status!.recommendedMonthly).toBeGreaterThan(300);
+		});
+
+		it('returns behind (not significantly) when increase needed is < 2.5x', async () => {
+			const now = new Date();
+			const targetDate = new Date(now);
+			targetDate.setMonth(targetDate.getMonth() + 10); // 10 months from now
+
+			// Set up account: $0 balance, $6000 target
+			// Required: $6000 / 10 months = $600/month
+			await updateSavingsAccount(savingsAccountId, {
+				currentBalance: 0,
+				targetAmount: 6000,
+				targetDate
+			});
+
+			// Add contribution history showing $300/month average
+			// Required is $600, so need 2x increase (< 2.5x threshold) = behind, not significantly
+			for (let i = 1; i <= 6; i++) {
+				const date = new Date(now);
+				date.setMonth(date.getMonth() - i);
+				await addContribution({
+					date,
+					accountId: savingsAccountId,
+					amount: 300,
+					source: 'bank_transfer'
+				});
+			}
+
+			const status = await getGoalStatus(savingsAccountId);
+			expect(status).not.toBeNull();
+			expect(status!.isOnTrack).toBe(false);
+			expect(status!.severity).toBe('behind');
 		});
 
 		it('handles target date in the past', async () => {

@@ -19,9 +19,11 @@
 		onMoveDown?: () => void;
 		isFirst?: boolean;
 		isLast?: boolean;
+		/** Optional monthly surplus (income - spending - savings). If provided, goals where surplus >= shortfall are marked achievable. */
+		availableSurplus?: number;
 	}
 
-	let { account, contributions, onAddContribution, onEditContribution, onEditAccount, onAccountUpdated, onMoveUp, onMoveDown, isFirst = false, isLast = false }: Props =
+	let { account, contributions, onAddContribution, onEditContribution, onEditAccount, onAccountUpdated, onMoveUp, onMoveDown, isFirst = false, isLast = false, availableSurplus }: Props =
 		$props();
 
 	// Expand/collapse state for contributions list
@@ -43,7 +45,7 @@
 	// Fetch goal status when account has a goal
 	$effect(() => {
 		if (hasGoal && account.id) {
-			getGoalStatus(account.id).then((status) => {
+			getGoalStatus(account.id, availableSurplus).then((status) => {
 				goalStatus = status;
 			});
 		} else {
@@ -251,7 +253,7 @@
 			<!-- Progress Bar -->
 			<div class="relative h-2 bg-surface-alt rounded-full overflow-hidden">
 				<div
-					class="absolute inset-y-0 left-0 rounded-full transition-all duration-300 {goalStatus?.severity === 'completed' || goalStatus?.severity === 'on_track' ? 'bg-success-500' : goalStatus?.severity === 'behind' ? 'bg-primary-400' : 'bg-warning-500'}"
+					class="absolute inset-y-0 left-0 rounded-full transition-all duration-300 {goalStatus?.severity === 'completed' || goalStatus?.severity === 'on_track' || goalStatus?.severity === 'achievable' ? 'bg-success-500' : goalStatus?.severity === 'behind' ? 'bg-primary-400' : 'bg-warning-500'}"
 					style="width: {goalProgress}%"
 				></div>
 			</div>
@@ -275,6 +277,14 @@
 						<span class="text-success-600 flex items-center gap-1">
 							<CheckCircle2 size={12} />
 							On track
+							{#if goalStatus.recommendedMonthly > 0}
+								· {formatCurrencyWhole(goalStatus.recommendedMonthly)}/mo needed
+							{/if}
+						</span>
+					{:else if goalStatus.severity === 'achievable'}
+						<span class="text-success-600 flex items-center gap-1">
+							<TrendingUp size={12} />
+							Achievable
 							{#if goalStatus.recommendedMonthly > 0}
 								· {formatCurrencyWhole(goalStatus.recommendedMonthly)}/mo needed
 							{/if}

@@ -134,11 +134,16 @@ export async function deleteContribution(id: number): Promise<void> {
 // Goal Tracking Functions
 // ============================================================================
 
+// Thresholds for goal pace calculation
+const ON_TRACK_THRESHOLD = 0.90; // Consider on-track if within 90% of required pace
+const SIGNIFICANTLY_BEHIND_MULTIPLIER = 2.5; // Need to increase savings by 2.5x+ = significantly behind
+
 export type GoalSeverity =
 	| 'completed' // >= 100% progress
-	| 'on_track' // Current pace meets required pace
-	| 'behind' // Behind pace, but required rate is < 2x current rate
-	| 'significantly_behind' // Way behind - would need to 2x+ savings rate
+	| 'on_track' // Current pace meets required pace (within tolerance)
+	| 'achievable' // Behind pace, but budget surplus can cover the gap
+	| 'behind' // Behind pace, but required rate is < 2.5x current rate
+	| 'significantly_behind' // Way behind - would need to 2.5x+ savings rate
 	| 'deadline_passed'; // Target date is in the past (checked first)
 
 export interface GoalStatus {
@@ -150,12 +155,16 @@ export interface GoalStatus {
 	severity: GoalSeverity; // Severity level for messaging
 	projectedDateAtCurrentPace: Date | null; // When goal will actually be reached at current pace
 	currentAverageMonthly: number; // Current average monthly contribution (for messaging)
+	monthlyShortfall: number; // How much more per month is needed (recommendedMonthly - avgMonthly)
 }
 
 /**
  * Calculate average monthly contribution for an account over a period.
+ * Uses the actual timespan of contributions (not the full window) to avoid
+ * penalizing new goals or recently-increased contribution rates.
+ *
  * @param accountId - The savings account ID
- * @param months - Number of months to average over (default: all contributions)
+ * @param months - Maximum months to look back (default: all contributions)
  * @returns Average monthly contribution amount
  */
 export async function getAverageMonthlyContribution(
@@ -165,9 +174,11 @@ export async function getAverageMonthlyContribution(
 	let contributions: SavingsContribution[];
 
 	if (months) {
-		// Get contributions from the last N months
-		const endDate = new Date();
-		const startDate = new Date();
+		// Get contributions from the last N months through end of current month
+		// Include future-dated contributions within current month (e.g., scheduled transfers)
+		const now = new Date();
+		const endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999); // End of current month
+		const startDate = new Date(now);
 		startDate.setMonth(startDate.getMonth() - months);
 
 		contributions = await db.savingsContributions
@@ -179,9 +190,24 @@ export async function getAverageMonthlyContribution(
 		// If no contributions in the period, return 0
 		if (contributions.length === 0) return 0;
 
-		// Sum contributions and divide by number of months
+		// Calculate actual months spanned by contributions (not the full window)
+		// This avoids penalizing new goals where contributions only span 1-2 months
+		const dates = contributions.map((c) => c.date.getTime());
+		const earliest = new Date(Math.min(...dates));
+
+		// Months from earliest contribution to now (minimum 1)
+		const actualMonths = Math.max(
+			1,
+			(now.getFullYear() - earliest.getFullYear()) * 12 +
+				(now.getMonth() - earliest.getMonth()) +
+				1 // +1 to include current month
+		);
+
+		// Use the lesser of actual months or the requested window
+		const divisor = Math.min(actualMonths, months);
+
 		const total = sumCurrency(contributions.map((c) => c.amount));
-		return sumCurrency([total / months]);
+		return sumCurrency([total / divisor]);
 	} else {
 		// Get all contributions for this account
 		contributions = await db.savingsContributions
@@ -239,17 +265,19 @@ export function projectGoalCompletion(
 
 /**
  * Determine the severity level of goal progress.
- * Priority order: deadline_passed → completed → on_track → significantly_behind → behind
+ * Priority order: deadline_passed → completed → on_track → achievable → significantly_behind → behind
+ *
+ * @param availableSurplus - Optional monthly surplus (income - spending - current savings).
+ *                           If provided and surplus >= monthly shortfall, returns 'achievable'.
  */
 function computeGoalSeverity(
 	currentBalance: number,
 	targetAmount: number,
 	targetDate: Date | undefined,
 	avgMonthly: number,
-	recommendedMonthly: number
+	recommendedMonthly: number,
+	availableSurplus?: number
 ): GoalSeverity {
-	const now = new Date();
-
 	// Check if target date has passed (if set)
 	if (targetDate) {
 		const deadlineDate = new Date(targetDate);
@@ -273,14 +301,22 @@ function computeGoalSeverity(
 		return avgMonthly > 0 ? 'on_track' : 'behind';
 	}
 
-	// Check if on track (current pace >= required pace)
-	if (avgMonthly >= recommendedMonthly) {
+	// Check if on track (current pace >= required pace, with 10% tolerance buffer)
+	// This means 90% of required pace is still considered "on track"
+	if (avgMonthly >= recommendedMonthly * ON_TRACK_THRESHOLD) {
 		return 'on_track';
 	}
 
-	// Check if significantly behind (would need to 2x+ savings rate)
+	// Check if achievable with available surplus
+	// If the user's surplus can cover the monthly shortfall, it's achievable
+	const monthlyShortfall = recommendedMonthly - avgMonthly;
+	if (availableSurplus !== undefined && availableSurplus >= monthlyShortfall) {
+		return 'achievable';
+	}
+
+	// Check if significantly behind (would need to increase savings by 2.5x+)
 	// If avgMonthly is 0 or very low, this is definitely significantly behind
-	if (avgMonthly <= 0 || recommendedMonthly >= avgMonthly * 2) {
+	if (avgMonthly <= 0 || recommendedMonthly >= avgMonthly * SIGNIFICANTLY_BEHIND_MULTIPLIER) {
 		return 'significantly_behind';
 	}
 
@@ -291,9 +327,14 @@ function computeGoalSeverity(
 /**
  * Check if an account is on track to hit its goal by the target date.
  * @param accountId - The savings account ID
+ * @param availableSurplus - Optional monthly surplus (income - spending - current savings).
+ *                           If provided, goals where surplus >= shortfall are marked 'achievable'.
  * @returns GoalStatus with tracking info, or null if account has no goal
  */
-export async function getGoalStatus(accountId: number): Promise<GoalStatus | null> {
+export async function getGoalStatus(
+	accountId: number,
+	availableSurplus?: number
+): Promise<GoalStatus | null> {
 	const account = await getSavingsAccount(accountId);
 	if (!account || account.targetAmount === undefined) {
 		return null;
@@ -311,7 +352,7 @@ export async function getGoalStatus(accountId: number): Promise<GoalStatus | nul
 
 	// If no target date, just return projection info
 	if (!targetDate) {
-		const severity = computeGoalSeverity(currentBalance, targetAmount, undefined, avgMonthly, 0);
+		const severity = computeGoalSeverity(currentBalance, targetAmount, undefined, avgMonthly, 0, availableSurplus);
 		return {
 			isOnTrack: severity === 'on_track' || severity === 'completed',
 			shortfall: 0,
@@ -320,7 +361,8 @@ export async function getGoalStatus(accountId: number): Promise<GoalStatus | nul
 			monthsRemaining: null,
 			severity,
 			projectedDateAtCurrentPace: projectedCompletion,
-			currentAverageMonthly: avgMonthly
+			currentAverageMonthly: avgMonthly,
+			monthlyShortfall: 0
 		};
 	}
 
@@ -342,7 +384,8 @@ export async function getGoalStatus(accountId: number): Promise<GoalStatus | nul
 			monthsRemaining,
 			severity: 'completed',
 			projectedDateAtCurrentPace: new Date(),
-			currentAverageMonthly: avgMonthly
+			currentAverageMonthly: avgMonthly,
+			monthlyShortfall: 0
 		};
 	}
 
@@ -357,7 +400,8 @@ export async function getGoalStatus(accountId: number): Promise<GoalStatus | nul
 			monthsRemaining: 0,
 			severity: 'deadline_passed',
 			projectedDateAtCurrentPace: projectedCompletion,
-			currentAverageMonthly: avgMonthly
+			currentAverageMonthly: avgMonthly,
+			monthlyShortfall: shortfall
 		};
 	}
 
@@ -365,12 +409,22 @@ export async function getGoalStatus(accountId: number): Promise<GoalStatus | nul
 	const remaining = targetAmount - currentBalance;
 	const recommendedMonthly = sumCurrency([remaining / monthsRemaining]);
 
-	// On track if current pace meets or exceeds required pace
-	const isOnTrack = avgMonthly >= recommendedMonthly;
-	const shortfall = isOnTrack ? 0 : sumCurrency([(recommendedMonthly - avgMonthly) * monthsRemaining]);
+	// Calculate monthly shortfall (how much more per month is needed)
+	const monthlyShortfall = Math.max(0, sumCurrency([recommendedMonthly - avgMonthly]));
 
-	// Compute severity
-	const severity = computeGoalSeverity(currentBalance, targetAmount, targetDate, avgMonthly, recommendedMonthly);
+	// Compute severity (factors in tolerance buffer and surplus)
+	const severity = computeGoalSeverity(
+		currentBalance,
+		targetAmount,
+		targetDate,
+		avgMonthly,
+		recommendedMonthly,
+		availableSurplus
+	);
+
+	// On track if severity indicates so (includes tolerance buffer)
+	const isOnTrack = severity === 'on_track' || severity === 'completed' || severity === 'achievable';
+	const shortfall = isOnTrack ? 0 : sumCurrency([monthlyShortfall * monthsRemaining]);
 
 	return {
 		isOnTrack,
@@ -380,6 +434,7 @@ export async function getGoalStatus(accountId: number): Promise<GoalStatus | nul
 		monthsRemaining,
 		severity,
 		projectedDateAtCurrentPace: projectedCompletion,
-		currentAverageMonthly: avgMonthly
+		currentAverageMonthly: avgMonthly,
+		monthlyShortfall
 	};
 }

@@ -302,6 +302,10 @@
 							<div class="text-xs">
 								{#if progress >= 100}
 									<span class="text-success-600">🎉 Goal reached!</span>
+								{:else if status.severity === 'achievable'}
+									<span class="text-success-600">
+										Achievable with your current surplus
+									</span>
 								{:else if status.isOnTrack}
 									<span class="text-success-600">
 										{#if status.projectedCompletion}
