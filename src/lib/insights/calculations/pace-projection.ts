@@ -9,13 +9,15 @@ import type { PaceProjectionResult } from '../types';
  * Calculate projected spending for the month based on current pace.
  *
  * @param totalSpent Total spent so far this month
- * @param budget Monthly budget (income - savings = available)
+ * @param budget Monthly budget (income)
+ * @param savedFromContributions Amount saved from contributions that affect available
  * @param currentDay Current day of month (1-indexed)
  * @param daysInMonth Total days in the month
  */
 export function calculatePaceProjection(
 	totalSpent: number,
 	budget: MonthlyBudget | null,
+	savedFromContributions: number,
 	currentDay: number,
 	daysInMonth: number
 ): PaceProjectionResult | null {
@@ -24,7 +26,7 @@ export function calculatePaceProjection(
 
 	const dailyAvg = totalSpent / currentDay;
 	const projected = totalSpent + dailyAvg * (daysInMonth - currentDay);
-	const available = budget.income - budget.savedAmount;
+	const available = budget.income - savedFromContributions;
 	const percentOfBudget = available > 0 ? (projected / available) * 100 : 0;
 
 	return {

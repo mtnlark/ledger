@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { TrendingUp, TrendingDown, AlertTriangle, Gauge, Receipt, Store, BarChart3, PiggyBank, ChevronDown, ChevronUp, Trophy, Flame, PartyPopper } from 'lucide-svelte';
 	import { getMonthKey, navigateMonth, parseMonthKey } from '$lib/db';
-	import type { Transaction, Category, MonthlyBudget, SavingsContribution, CompletedGoal, Settings, CategoryBudget } from '$lib/db';
+	import { CONTRIBUTION_SOURCES, type Transaction, type Category, type MonthlyBudget, type SavingsContribution, type CompletedGoal, type Settings, type CategoryBudget } from '$lib/db';
 	import { config } from '$lib/config';
 	import { getInsightsEngine } from '$lib/insights';
 	import { computeStdDev } from '$lib/insights/calculations/stats';
@@ -103,6 +103,14 @@
 	// Transactions up to today (excludes future-dated recurring entries) for pace calculations
 	let pastTransactions = $derived(isCurrentMonth ? filterUpToDate(currentMonthTransactions) : []);
 
+	// Calculate savings that affect available (bank_transfer and other sources only)
+	let savedFromContributions = $derived.by(() => {
+		const affectingAvailable = contributions.filter(
+			(c) => CONTRIBUTION_SOURCES[c.source]?.affectsAvailable
+		);
+		return sumCurrency(affectingAvailable.map((c) => c.amount));
+	});
+
 	// Calculate pace projection (only meaningful for current month)
 	let paceProjection = $derived.by(() => {
 		if (!isCurrentMonth) return null;
@@ -110,7 +118,7 @@
 		const currentDay = today.getDate();
 		const daysInMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
 		const totalSpent = engine.getTotalSpent(pastTransactions, `${selectedMonth}-past`);
-		return engine.getPaceProjection(totalSpent, budget, currentDay, daysInMonth, selectedMonth);
+		return engine.getPaceProjection(totalSpent, budget, savedFromContributions, currentDay, daysInMonth, selectedMonth);
 	});
 
 	// Get previous month for comparison

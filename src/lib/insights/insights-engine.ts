@@ -75,8 +75,8 @@ export class InsightsEngine {
 		) => rawCalculateVelocityComparison(currentTotal, prevTotal, currentDays, prevDays, percentThreshold, historicalMonthlyTotals)
 	);
 	private _calculatePaceProjection = memoByVersionMultiKey(
-		(totalSpent: number, budget: MonthlyBudget | null, currentDay: number, daysInMonth: number) =>
-			rawCalculatePaceProjection(totalSpent, budget, currentDay, daysInMonth)
+		(totalSpent: number, budget: MonthlyBudget | null, savedFromContributions: number, currentDay: number, daysInMonth: number) =>
+			rawCalculatePaceProjection(totalSpent, budget, savedFromContributions, currentDay, daysInMonth)
 	);
 
 	// Single-key memoized (all-time scope)
@@ -220,11 +220,12 @@ export class InsightsEngine {
 	getPaceProjection(
 		totalSpent: number,
 		budget: MonthlyBudget | null,
+		savedFromContributions: number,
 		currentDay: number,
 		daysInMonth: number,
 		key: string
 	): PaceProjectionResult | null {
-		return this._calculatePaceProjection(this.version, key, totalSpent, budget, currentDay, daysInMonth);
+		return this._calculatePaceProjection(this.version, key, totalSpent, budget, savedFromContributions, currentDay, daysInMonth);
 	}
 
 	/** Compute category spending averages across months. */

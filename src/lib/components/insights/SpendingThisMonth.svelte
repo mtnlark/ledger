@@ -4,7 +4,6 @@
 	import { format, getDaysInMonth, getDate } from 'date-fns';
 	import { TrendingUp, TrendingDown, Minus } from 'lucide-svelte';
 	import { getInsightsEngine } from '$lib/insights';
-	import { calculateVelocityComparison } from '$lib/insights/calculations/velocity';
 	import { formatCurrency } from '$lib/utils/format-helpers';
 	import { roundCurrency } from '$lib/utils/currency';
 	import { filterUpToDate } from '$lib/utils/date-helpers';
@@ -44,8 +43,8 @@
 	let sharedCount = $derived(displayTransactions.filter((t) => t.isShared).length);
 	let avgTransaction = $derived(displayTransactions.length > 0 ? totalSpent / displayTransactions.length : 0);
 
-	// Spending velocity comparison (uses displayTransactions which already filters future-dated for current month)
-	let velocityComparison = $derived.by(() => {
+	// Basic pace stats (always computed when we have previous month data)
+	let paceStats = $derived.by(() => {
 		// Get previous month key
 		const currentDate = parseMonthKey(currentMonth);
 		const prevDate = new Date(currentDate);
@@ -63,17 +62,45 @@
 			: getDaysInMonth(currentDate); // Full month if viewing past
 		const prevDays = getDaysInMonth(prevDate);
 
+		if (currentDays === 0 || prevDays === 0) return null;
+
+		const currentDailyAvg = totalSpent / currentDays;
+		const prevDailyAvg = prevTotal / prevDays;
+
+		// Calculate percentage change (for display, even if not "significant")
+		let percentChange = 0;
+		if (prevDailyAvg > 0) {
+			percentChange = Math.round(((currentDailyAvg - prevDailyAvg) / prevDailyAvg) * 100);
+		}
+
+		return {
+			currentDailyAvg,
+			prevDailyAvg,
+			percentChange,
+			isUp: percentChange > 0
+		};
+	});
+
+	// Whether the pace change is significant (for highlighting)
+	let isPaceSignificant = $derived.by(() => {
+		if (!paceStats) return false;
+
 		// Get historical totals for adaptive threshold
 		const historicalTotals = Array.from(monthlyTrends.values());
 
-		return calculateVelocityComparison(
-			totalSpent,
-			prevTotal,
-			currentDays,
-			prevDays,
-			10, // 10% minimum threshold
-			historicalTotals
-		);
+		// Use the same adaptive threshold logic
+		let threshold = 10; // Base 10%
+		if (historicalTotals.length >= 2) {
+			const mean = historicalTotals.reduce((s, v) => s + v, 0) / historicalTotals.length;
+			if (mean > 0) {
+				const variance = historicalTotals.reduce((s, v) => s + (v - mean) ** 2, 0) / historicalTotals.length;
+				const sd = Math.sqrt(variance);
+				const cv = (sd / mean) * 100;
+				threshold = Math.max(cv, 10);
+			}
+		}
+
+		return Math.abs(paceStats.percentChange) >= threshold;
 	});
 
 	// Top 5 merchants by spending (user's portion)
@@ -125,19 +152,19 @@
 					{displayTransactions.length} transaction{transactions.length !== 1 ? 's' : ''}
 				</p>
 			</div>
-			{#if velocityComparison}
+			{#if paceStats && paceStats.percentChange !== 0}
 				<div class="text-right flex items-center gap-2">
-					{#if velocityComparison.isUp}
-						<TrendingUp size={18} class="text-warning-500" />
+					{#if paceStats.isUp}
+						<TrendingUp size={18} class={isPaceSignificant ? 'text-warning-500' : 'text-charcoal-muted'} />
 					{:else}
-						<TrendingDown size={18} class="text-success-500" />
+						<TrendingDown size={18} class={isPaceSignificant ? 'text-success-500' : 'text-charcoal-muted'} />
 					{/if}
 					<div>
-						<p class="font-mono text-lg font-medium {velocityComparison.isUp ? 'text-warning-600' : 'text-success-600'}">
-							{Math.abs(velocityComparison.percentChange)}%
+						<p class="font-mono text-lg font-medium {isPaceSignificant ? (paceStats.isUp ? 'text-warning-600' : 'text-success-600') : 'text-charcoal-soft'}">
+							{Math.abs(paceStats.percentChange)}%
 						</p>
 						<p class="text-sm text-charcoal-muted">
-							{velocityComparison.isUp ? 'faster' : 'slower'}
+							{paceStats.isUp ? 'faster' : 'slower'}
 						</p>
 					</div>
 				</div>
@@ -164,27 +191,33 @@
 			</div>
 		{/if}
 
-		<!-- Spending Velocity -->
-		{#if velocityComparison}
+		<!-- Spending Pace -->
+		{#if paceStats}
 			<div class="bg-surface-alt rounded-lg p-4 border border-theme">
 				<h3 class="text-sm font-medium text-charcoal-soft mb-3">Spending Pace</h3>
 				<div class="flex items-center gap-4">
-					<div class="w-12 h-12 rounded-full flex items-center justify-center {velocityComparison.isUp ? 'bg-warning-100' : 'bg-success-100'}">
-						{#if velocityComparison.isUp}
-							<TrendingUp size={24} class="text-warning-600" />
+					<div class="w-12 h-12 rounded-full flex items-center justify-center {isPaceSignificant ? (paceStats.isUp ? 'bg-warning-100' : 'bg-success-100') : 'bg-surface'}">
+						{#if paceStats.isUp}
+							<TrendingUp size={24} class={isPaceSignificant ? 'text-warning-600' : 'text-charcoal-muted'} />
+						{:else if paceStats.percentChange < 0}
+							<TrendingDown size={24} class={isPaceSignificant ? 'text-success-600' : 'text-charcoal-muted'} />
 						{:else}
-							<TrendingDown size={24} class="text-success-600" />
+							<Minus size={24} class="text-charcoal-muted" />
 						{/if}
 					</div>
 					<div>
 						<p class="text-charcoal">
-							<span class="font-medium {velocityComparison.isUp ? 'text-warning-600' : 'text-success-600'}">
-								{Math.abs(velocityComparison.percentChange)}% {velocityComparison.isUp ? 'faster' : 'slower'}
-							</span>
-							than last month
+							{#if paceStats.percentChange === 0}
+								<span class="font-medium">Same pace</span> as last month
+							{:else}
+								<span class="font-medium {isPaceSignificant ? (paceStats.isUp ? 'text-warning-600' : 'text-success-600') : ''}">
+									{Math.abs(paceStats.percentChange)}% {paceStats.isUp ? 'faster' : 'slower'}
+								</span>
+								than last month
+							{/if}
 						</p>
 						<p class="text-sm text-charcoal-muted mt-0.5">
-							${velocityComparison.currentDailyAvg.toFixed(0)}/day vs. ${velocityComparison.prevDailyAvg.toFixed(0)}/day last month
+							${paceStats.currentDailyAvg.toFixed(0)}/day vs. ${paceStats.prevDailyAvg.toFixed(0)}/day last month
 						</p>
 					</div>
 				</div>
