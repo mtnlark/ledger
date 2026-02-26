@@ -2,7 +2,7 @@
 	import type { Transaction, MonthlyBudget } from '$lib/db';
 	import { parseMonthKey, getMonthKey } from '$lib/db';
 	import { format, getDaysInMonth, getDate } from 'date-fns';
-	import { TrendingUp, TrendingDown, Minus } from 'lucide-svelte';
+	import { TrendingUp, TrendingDown } from 'lucide-svelte';
 	import { getInsightsEngine } from '$lib/insights';
 	import { formatCurrency } from '$lib/utils/format-helpers';
 	import { roundCurrency } from '$lib/utils/currency';
@@ -164,7 +164,7 @@
 							{Math.abs(paceStats.percentChange)}%
 						</p>
 						<p class="text-sm text-charcoal-muted">
-							{paceStats.isUp ? 'faster' : 'slower'}
+							{paceStats.isUp ? 'faster pace' : 'slower pace'}
 						</p>
 					</div>
 				</div>
@@ -188,44 +188,6 @@
 					<p class="font-mono text-lg font-medium text-charcoal">{sharedCount}</p>
 					<p class="text-xs text-charcoal-muted">Shared</p>
 				</div>
-			</div>
-		{/if}
-
-		<!-- Spending Pace -->
-		{#if paceStats}
-			<div class="bg-surface-alt rounded-lg p-4 border border-theme">
-				<h3 class="text-sm font-medium text-charcoal-soft mb-3">Spending Pace</h3>
-				<div class="flex items-center gap-4">
-					<div class="w-12 h-12 rounded-full flex items-center justify-center {isPaceSignificant ? (paceStats.isUp ? 'bg-warning-100' : 'bg-success-100') : 'bg-surface'}">
-						{#if paceStats.isUp}
-							<TrendingUp size={24} class={isPaceSignificant ? 'text-warning-600' : 'text-charcoal-muted'} />
-						{:else if paceStats.percentChange < 0}
-							<TrendingDown size={24} class={isPaceSignificant ? 'text-success-600' : 'text-charcoal-muted'} />
-						{:else}
-							<Minus size={24} class="text-charcoal-muted" />
-						{/if}
-					</div>
-					<div>
-						<p class="text-charcoal">
-							{#if paceStats.percentChange === 0}
-								<span class="font-medium">Same pace</span> as last month
-							{:else}
-								<span class="font-medium {isPaceSignificant ? (paceStats.isUp ? 'text-warning-600' : 'text-success-600') : ''}">
-									{Math.abs(paceStats.percentChange)}% {paceStats.isUp ? 'faster' : 'slower'}
-								</span>
-								than last month
-							{/if}
-						</p>
-						<p class="text-sm text-charcoal-muted mt-0.5">
-							${paceStats.currentDailyAvg.toFixed(0)}/day vs. ${paceStats.prevDailyAvg.toFixed(0)}/day last month
-						</p>
-					</div>
-				</div>
-			</div>
-		{:else if monthlyTrends.size < 2}
-			<div class="bg-surface-alt rounded-lg p-4 border border-theme text-center">
-				<Minus size={20} class="text-charcoal-muted mx-auto mb-2" />
-				<p class="text-sm text-charcoal-muted">Need more data to compare spending pace</p>
 			</div>
 		{/if}
 
