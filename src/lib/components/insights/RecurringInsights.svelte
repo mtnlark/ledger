@@ -649,6 +649,8 @@
 						{#each activeRecurring as item (item.merchant)}
 							{@const freqLabel = item.frequency === 'monthly' ? '/mo' : item.frequency === 'semi-annual' ? '/6mo' : '/yr'}
 							{@const freqDesc = item.frequency === 'monthly' ? 'monthly' : item.frequency === 'semi-annual' ? 'every 6 months' : 'annually'}
+							{@const displayAmount = getDisplayAmount(item.merchant, item.averageUserAmount)}
+							{@const isFixed = hasFixedAmount(item.merchant)}
 							<button
 								type="button"
 								onclick={() => openEditModal(item)}
@@ -668,8 +670,6 @@
 									</p>
 								</div>
 								<div class="text-right flex-shrink-0">
-									{@const displayAmount = getDisplayAmount(item.merchant, item.averageUserAmount)}
-									{@const isFixed = hasFixedAmount(item.merchant)}
 									<p class="font-mono text-sm font-medium text-charcoal">
 										{isFixed ? '' : '~'}{formatCurrency(displayAmount)}{freqLabel}
 									</p>
