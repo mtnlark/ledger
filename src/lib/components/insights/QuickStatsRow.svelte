@@ -54,6 +54,15 @@
 		return total > 0 ? { onTrack, total } : null;
 	});
 
+	// Budget color based on thresholds
+	let budgetColor = $derived.by(() => {
+		if (!budgetStatus) return 'text-charcoal';
+		const { onTrack, total } = budgetStatus;
+		if (onTrack === total) return 'text-success-600'; // All on track
+		if (onTrack >= total / 2) return 'text-warning-600'; // >= half on track
+		return 'text-danger-600'; // < half on track
+	});
+
 	// Savings Rate
 	let savingsRate = $derived.by(() => {
 		if (!budget || budget.income <= 0) return null;
@@ -62,6 +71,9 @@
 		const totalSaved = sumCurrency(affectingAvailable.map((c) => c.amount));
 		return Math.round(calculatePercent(totalSaved, budget.income));
 	});
+
+	// Savings rate color (green if > 0, neutral otherwise)
+	let savingsColor = $derived(savingsRate !== null && savingsRate > 0 ? 'text-success-600' : 'text-charcoal');
 </script>
 
 <div class="grid grid-cols-3 gap-3">
@@ -76,7 +88,7 @@
 	<!-- Budget Status -->
 	<div class="bg-surface rounded-xl p-4 text-center shadow-sm shadow-[var(--color-shadow)]">
 		{#if budgetStatus}
-			<p class="font-mono text-xl font-medium text-charcoal">
+			<p class="font-mono text-xl font-medium {budgetColor}">
 				{budgetStatus.onTrack}/{budgetStatus.total}
 			</p>
 			<p class="text-xs text-charcoal-muted mt-1">
@@ -91,7 +103,7 @@
 	<!-- Savings Rate -->
 	<div class="bg-surface rounded-xl p-4 text-center shadow-sm shadow-[var(--color-shadow)]">
 		{#if savingsRate !== null}
-			<p class="font-mono text-xl font-medium text-charcoal">{savingsRate}%</p>
+			<p class="font-mono text-xl font-medium {savingsColor}">{savingsRate}%</p>
 			<p class="text-xs text-charcoal-muted mt-1">savings rate</p>
 		{:else}
 			<p class="font-mono text-xl font-medium text-charcoal-muted">—</p>
