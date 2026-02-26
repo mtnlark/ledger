@@ -8,31 +8,38 @@
 		description?: string;
 		actionLabel?: string;
 		onAction?: () => void;
+		compact?: boolean;
 	}
 
-	let { icon: Icon = Receipt as ComponentType, title, description, actionLabel, onAction }: Props = $props();
+	let { icon: Icon = Receipt as ComponentType, title, description, actionLabel, onAction, compact = false }: Props = $props();
 </script>
 
-<div class="flex flex-col items-center justify-center py-12 px-6 text-center">
-	<div class="relative w-24 h-24 flex items-center justify-center mb-4">
-		<!-- Decorative hand-drawn rings -->
-		<svg class="absolute inset-0 w-full h-full text-charcoal-muted opacity-[0.15]" viewBox="0 0 96 96" fill="none" stroke="currentColor" stroke-width="1.2" stroke-dasharray="4 3" stroke-linecap="round">
-			<circle cx="48" cy="48" r="44" />
-			<circle cx="48" cy="48" r="36" stroke-dasharray="2 5" />
-		</svg>
-		<!-- Accent dots -->
-		<svg class="absolute inset-0 w-full h-full text-primary-300 opacity-60" viewBox="0 0 96 96" fill="currentColor">
-			<circle cx="14" cy="28" r="2" />
-			<circle cx="82" cy="68" r="1.5" />
-			<circle cx="76" cy="22" r="1" />
-		</svg>
-		<div class="w-14 h-14 rounded-full bg-surface-alt flex items-center justify-center">
-			<Icon size={28} class="text-charcoal-muted" />
+<div class="flex flex-col items-center justify-center text-center {compact ? 'py-6 px-4' : 'py-12 px-6'}">
+	{#if compact}
+		<div class="w-10 h-10 rounded-full bg-surface-alt flex items-center justify-center mb-3">
+			<Icon size={20} class="text-charcoal-muted" />
 		</div>
-	</div>
-	<h3 class="font-display text-lg font-medium text-charcoal mb-1">{title}</h3>
+	{:else}
+		<div class="relative w-24 h-24 flex items-center justify-center mb-4">
+			<!-- Decorative hand-drawn rings -->
+			<svg class="absolute inset-0 w-full h-full text-charcoal-muted opacity-[0.15]" viewBox="0 0 96 96" fill="none" stroke="currentColor" stroke-width="1.2" stroke-dasharray="4 3" stroke-linecap="round">
+				<circle cx="48" cy="48" r="44" />
+				<circle cx="48" cy="48" r="36" stroke-dasharray="2 5" />
+			</svg>
+			<!-- Accent dots -->
+			<svg class="absolute inset-0 w-full h-full text-primary-300 opacity-60" viewBox="0 0 96 96" fill="currentColor">
+				<circle cx="14" cy="28" r="2" />
+				<circle cx="82" cy="68" r="1.5" />
+				<circle cx="76" cy="22" r="1" />
+			</svg>
+			<div class="w-14 h-14 rounded-full bg-surface-alt flex items-center justify-center">
+				<Icon size={28} class="text-charcoal-muted" />
+			</div>
+		</div>
+	{/if}
+	<h3 class="{compact ? 'text-sm font-medium' : 'font-display text-lg font-medium'} text-charcoal mb-1">{title}</h3>
 	{#if description}
-		<p class="text-sm text-charcoal-muted max-w-xs">{description}</p>
+		<p class="{compact ? 'text-xs' : 'text-sm'} text-charcoal-muted max-w-xs">{description}</p>
 	{/if}
 	{#if actionLabel && onAction}
 		<button

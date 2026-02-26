@@ -85,7 +85,7 @@
 
 		<!-- Full calendar heatmap -->
 		<div>
-			<h3 class="text-sm font-medium text-charcoal-soft mb-3">Spending Calendar</h3>
+			<h3 class="text-sm font-semibold text-charcoal-soft mb-3">Spending Calendar</h3>
 			<CalendarHeatmap {dailySpending} year={currentYear} />
 		</div>
 
@@ -139,7 +139,7 @@
 		<!-- Shared Expense Annual Summary -->
 		{#if sharedSummary}
 			<div class="bg-cream-dark rounded-lg p-4 border border-dashed border-theme">
-				<h3 class="text-sm font-medium text-charcoal-soft mb-3">Shared Expenses This Year</h3>
+				<h3 class="text-sm font-semibold text-charcoal-soft mb-3">Shared Expenses This Year</h3>
 				<div class="grid grid-cols-3 gap-4">
 					<div class="text-center">
 						<p class="font-mono text-lg font-medium text-charcoal">{formatCurrencyWhole(sharedSummary.totalShared)}</p>

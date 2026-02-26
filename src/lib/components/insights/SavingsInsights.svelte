@@ -170,7 +170,7 @@
 			<!-- By Account Breakdown -->
 			<div class="bg-cream-dark rounded-lg p-4 border border-dashed border-theme">
 				<div class="flex items-center justify-between mb-3">
-					<h3 class="text-sm font-medium text-charcoal-soft">By Account</h3>
+					<h3 class="text-sm font-semibold text-charcoal-soft">By Account</h3>
 					<a
 						href="/savings"
 						class="text-xs text-primary-600 hover:text-primary-700 font-medium"
@@ -204,7 +204,7 @@
 			<!-- By Source Breakdown (if multiple sources) -->
 			{#if bySource.length > 1}
 				<div>
-					<h3 class="text-sm font-medium text-charcoal-soft mb-3">By Source</h3>
+					<h3 class="text-sm font-semibold text-charcoal-soft mb-3">By Source</h3>
 					<div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
 						{#each bySource as { source, total }}
 							<div class="bg-surface-alt rounded-lg p-3 text-center">
@@ -223,7 +223,7 @@
 		{#if goalInfos.length > 0}
 			<div>
 				<div class="flex items-center justify-between mb-3">
-					<h3 class="text-sm font-medium text-charcoal-soft flex items-center gap-2">
+					<h3 class="text-sm font-semibold text-charcoal-soft flex items-center gap-2">
 						<Target size={14} class="text-primary-500" />
 						Goal Progress
 					</h3>
@@ -353,7 +353,7 @@
 		<!-- Savings Rate Trend -->
 		{#if allBudgets.length > 0 && allContributions.length > 0}
 			<div>
-				<h3 class="text-sm font-medium text-charcoal-soft mb-3">Savings Rate Over Time</h3>
+				<h3 class="text-sm font-semibold text-charcoal-soft mb-3">Savings Rate Over Time</h3>
 				<SavingsRateTrendChart
 					contributions={allContributions}
 					budgets={allBudgets}

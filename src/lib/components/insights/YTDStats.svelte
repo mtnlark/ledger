@@ -152,7 +152,7 @@
 
 	<!-- Top categories -->
 	<div>
-		<h4 class="text-sm font-medium text-charcoal-soft mb-3">Top Categories</h4>
+		<h4 class="text-sm font-semibold text-charcoal-soft mb-3">Top Categories</h4>
 		<div class="space-y-2">
 			{#each topCategories as cat, i}
 				<div class="flex items-center justify-between p-3 bg-surface-hover rounded-lg">
