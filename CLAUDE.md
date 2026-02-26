@@ -7,6 +7,42 @@ Use test-driven development (TDD) best practices when adding new code. Update CL
 
 ---
 
+## Standard Workflow
+
+Standard workflow after implementation: 1) Run all tests 2) Update relevant documentation 3) Commit with descriptive message 4) Build production app 5) Deploy. Do not skip steps unless explicitly told to.
+
+---
+
+## Code Editing
+
+When editing files with tab indentation (especially Svelte/TSX files), prefer using Bash sed commands over the Edit tool to avoid indentation mismatches and repeated failures.
+
+---
+
+## Build & Deploy
+
+After implementing changes, always clear BOTH frontend build artifacts AND the Rust binary cache before building the Tauri app. Run: `rm -rf src-tauri/target/release/bundle && cargo clean -p ledger && npm run build`
+
+---
+
+## Debugging Philosophy
+
+When debugging, do NOT guess at root causes or explain away user observations. Systematically verify each hypothesis with actual data/logs before proposing a fix. If the first fix doesn't work, step back and re-examine assumptions from scratch.
+
+---
+
+## Python / Environment Rules
+
+Always use Python virtual environments (venv) for any Python package installations. Never install packages globally. Create/activate venv first: `python3 -m venv .venv && source .venv/bin/activate`
+
+---
+
+## Styling / Tailwind
+
+When making CSS/styling changes with Tailwind, verify that the relevant directories are included in the Tailwind content config and that utility classes actually apply at the expected specificity. For Tailwind v4, prefer inline styles or explicit class overrides when utility classes don't take effect.
+
+---
+
 ## Active Development
 
 See `PRODUCT_ROADMAP.md` for the full development plan. Groups 1–9 are complete:

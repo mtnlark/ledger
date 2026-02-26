@@ -133,6 +133,11 @@ export interface SavingsContribution {
 	updatedAt: Date;
 }
 
+export interface FixedRecurringAmount {
+	merchant: string; // Normalized merchant name
+	amount: number; // User-specified fixed amount
+}
+
 export interface Settings {
 	id: number; // Always 1 (singleton)
 	partnerName: string;
@@ -143,6 +148,7 @@ export interface Settings {
 	dismissedRecurring: string[]; // Normalized merchant names to hide from recurring detection
 	cancelledSubscriptions: CancelledSubscription[]; // Subscriptions user has marked as cancelled
 	confirmedActiveSubscriptions: string[]; // Normalized merchant names user confirmed are still active (override staleness)
+	fixedRecurringAmounts: FixedRecurringAmount[]; // User-overridden amounts for detected recurring
 	iCloudBackupEnabled: boolean; // Whether to copy backups to iCloud Drive
 	lastAutoSuggestedMonth?: string; // "YYYY-MM" format - tracks when recurring suggestions were last shown
 	completedGoals: CompletedGoal[]; // Archived savings goals that have been completed
@@ -201,6 +207,7 @@ export const DEFAULT_SETTINGS: Settings = {
 	dismissedRecurring: [],
 	cancelledSubscriptions: [],
 	confirmedActiveSubscriptions: [],
+	fixedRecurringAmounts: [],
 	iCloudBackupEnabled: false,
 	completedGoals: [],
 	notificationsEnabled: false,

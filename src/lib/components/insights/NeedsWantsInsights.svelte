@@ -99,23 +99,23 @@
 			<div>
 				<div class="h-8 rounded-full overflow-hidden flex">
 					<div
-						class="bg-primary-500 transition-all duration-500"
+						class="bg-neutral-500 transition-all duration-500"
 						style="width: {currentMonthStats.needsPercent}%"
 					></div>
 					<div
-						class="bg-charcoal-muted/40 transition-all duration-500"
+						class="bg-primary-500 transition-all duration-500"
 						style="width: {currentMonthStats.wantsPercent}%"
 					></div>
 				</div>
 				<div class="flex justify-between mt-2 text-sm">
 					<div class="flex items-center gap-2">
-						<div class="w-3 h-3 rounded bg-primary-500"></div>
+						<div class="w-3 h-3 rounded bg-neutral-500"></div>
 						<span class="text-charcoal-soft">
 							Needs: {formatCurrencyWhole(currentMonthStats.needs)}
 						</span>
 					</div>
 					<div class="flex items-center gap-2">
-						<div class="w-3 h-3 rounded bg-charcoal-muted/40"></div>
+						<div class="w-3 h-3 rounded bg-primary-500"></div>
 						<span class="text-charcoal-soft">
 							Wants: {formatCurrencyWhole(currentMonthStats.wants)}
 						</span>
@@ -125,21 +125,21 @@
 
 			<!-- Stats Grid -->
 			<div class="grid grid-cols-2 gap-4">
-				<div class="bg-primary-50 rounded-lg p-4">
+				<div class="bg-neutral-50 rounded-lg p-4">
 					<p class="text-sm text-charcoal-muted mb-1">This Month - Needs</p>
 					<p class="text-2xl font-mono font-medium text-charcoal">
 						{formatCurrencyWhole(currentMonthStats.needs)}
 					</p>
-					<p class="text-sm text-primary-600 font-medium">
+					<p class="text-sm text-neutral-600 font-medium">
 						{currentMonthStats.needsPercent.toFixed(1)}% of spending
 					</p>
 				</div>
-				<div class="bg-cream rounded-lg p-4">
+				<div class="bg-primary-50 rounded-lg p-4">
 					<p class="text-sm text-charcoal-muted mb-1">This Month - Wants</p>
 					<p class="text-2xl font-mono font-medium text-charcoal">
 						{formatCurrencyWhole(currentMonthStats.wants)}
 					</p>
-					<p class="text-sm text-charcoal-soft font-medium">
+					<p class="text-sm text-primary-600 font-medium">
 						{currentMonthStats.wantsPercent.toFixed(1)}% of spending
 					</p>
 				</div>

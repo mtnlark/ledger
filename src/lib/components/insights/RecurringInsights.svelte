@@ -10,7 +10,9 @@
 	import {
 		dismissRecurring,
 		cancelSubscription,
-		confirmSubscriptionActive
+		confirmSubscriptionActive,
+		setFixedRecurringAmount,
+		removeFixedRecurringAmount
 	} from '$lib/stores/settings';
 	import { normalizeMerchant, subscriptionKey, findSupersededSubscriptionKeys } from '$lib/utils/string-helpers';
 	import { currencyEquals } from '$lib/utils/currency';
@@ -22,6 +24,7 @@
 		allTransactions: Transaction[];
 		cancelledSubscriptions: CancelledSubscription[];
 		confirmedActiveSubscriptions: string[];
+		fixedRecurringAmounts?: Map<string, number>;
 		onDismiss?: () => void;
 		onSubscriptionChange?: () => void;
 	}
@@ -32,9 +35,22 @@
 		allTransactions,
 		cancelledSubscriptions,
 		confirmedActiveSubscriptions,
+		fixedRecurringAmounts = new Map(),
 		onDismiss,
 		onSubscriptionChange
 	}: Props = $props();
+
+	// Helper to get display amount (fixed override or auto-detected)
+	function getDisplayAmount(merchant: string, detectedAmount: number): number {
+		const normalized = normalizeMerchant(merchant);
+		return fixedRecurringAmounts.get(normalized) ?? detectedAmount;
+	}
+
+	// Check if amount has a user override
+	function hasFixedAmount(merchant: string): boolean {
+		const normalized = normalizeMerchant(merchant);
+		return fixedRecurringAmounts.has(normalized);
+	}
 
 
 	// Create category helpers bound to current categories
@@ -94,9 +110,14 @@
 		if (action === 'remove') {
 			await dismissRecurring(editModal.merchant);
 			onDismiss?.();
+		} else if (action === 'fixed' && fixedAmount !== undefined) {
+			await setFixedRecurringAmount(editModal.merchant, fixedAmount);
+			onDismiss?.(); // Trigger refresh to show updated amount
+		} else if (action === 'keep') {
+			// Remove any fixed override, revert to auto-detected
+			await removeFixedRecurringAmount(editModal.merchant);
+			onDismiss?.();
 		}
-		// TODO: Handle 'keep' and 'fixed' actions when backend support is added
-		// For now, these just close the modal
 	}
 
 	// Check if a subscription is stale based on last transaction date
@@ -647,10 +668,14 @@
 									</p>
 								</div>
 								<div class="text-right flex-shrink-0">
+									{@const displayAmount = getDisplayAmount(item.merchant, item.averageUserAmount)}
+									{@const isFixed = hasFixedAmount(item.merchant)}
 									<p class="font-mono text-sm font-medium text-charcoal">
-										~{formatCurrency(item.averageUserAmount)}{freqLabel}
+										{isFixed ? '' : '~'}{formatCurrency(displayAmount)}{freqLabel}
 									</p>
-									{#if item.isShared}
+									{#if isFixed}
+										<p class="text-xs text-primary-600">Custom</p>
+									{:else if item.isShared}
 										<p class="text-xs text-success-600">Shared</p>
 									{:else}
 										<p class="text-xs text-charcoal-muted">

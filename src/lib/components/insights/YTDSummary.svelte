@@ -1,19 +1,16 @@
 <script lang="ts">
-	import { format } from 'date-fns';
-	import type { Transaction, Category, Settings } from '$lib/db';
+	import type { Transaction, Settings } from '$lib/db';
 	import { formatCurrencyWhole } from '$lib/utils/format-helpers';
 	import { roundCurrency } from '$lib/utils/currency';
-	import { extractTags } from '$lib/utils/tags';
 	import { getInsightsEngine } from '$lib/insights';
 	import CalendarHeatmap from './CalendarHeatmap.svelte';
 
 	interface Props {
 		transactions: Transaction[];
-		categories: Category[];
 		settings?: Settings | null;
 	}
 
-	let { transactions, categories, settings = null }: Props = $props();
+	let { transactions, settings = null }: Props = $props();
 
 	const engine = getInsightsEngine();
 	let currentYear = new Date().getFullYear();
@@ -30,21 +27,6 @@
 	let smallestMonth = $derived(ytdStats.smallestMonth);
 	let topMerchant = $derived(ytdStats.topMerchant);
 
-	// Recent 30 days for mini heatmap (UI-only, not worth memoizing in engine)
-	let recentDailySpending = $derived.by(() => {
-		const recent = new Map<string, number>();
-		const today = new Date();
-		for (let i = 29; i >= 0; i--) {
-			const date = new Date(today);
-			date.setDate(date.getDate() - i);
-			const dateKey = format(date, 'yyyy-MM-dd');
-			recent.set(dateKey, dailySpending.get(dateKey) || 0);
-		}
-		return recent;
-	});
-
-	// All-time needs vs wants
-	let needsWantsStats = $derived(engine.getNeedsVsWantsFull(transactions, categories, 'ytd-all-time'));
 
 	// Goals completed this year
 	let goalsCompletedThisYear = $derived.by(() => {
@@ -81,30 +63,6 @@
 		};
 	});
 
-	// Tag spending summary for the year
-	let tagSummary = $derived.by(() => {
-		const tagTotals = new Map<string, { total: number; count: number }>();
-		const yearTransactions = transactions.filter(
-			(t) => new Date(t.date).getFullYear() === currentYear
-		);
-
-		for (const t of yearTransactions) {
-			const tags = extractTags(t.notes);
-			if (tags.length === 0) continue;
-			const userAmount = t.isShared ? t.amount - t.partnerShare : t.amount;
-
-			for (const tag of tags) {
-				const existing = tagTotals.get(tag) || { total: 0, count: 0 };
-				existing.total += userAmount;
-				existing.count += 1;
-				tagTotals.set(tag, existing);
-			}
-		}
-
-		return Array.from(tagTotals.entries())
-			.map(([tag, { total, count }]) => ({ tag, total: roundCurrency(total), count }))
-			.sort((a, b) => b.total - a.total);
-	});
 </script>
 
 <div class="bg-surface rounded-xl shadow-md shadow-[var(--color-shadow)] overflow-hidden">
@@ -114,32 +72,14 @@
 	</div>
 	<div class="px-6 pb-6 space-y-6">
 		<!-- Quick stats preview -->
-		<div class="space-y-3">
-			<div class="flex items-center justify-between">
-				<div>
-					<p class="text-2xl font-bold text-charcoal">${totalSpent.toLocaleString()}</p>
-					<p class="text-sm text-charcoal-muted">Total spent in {currentYear}</p>
-				</div>
-				<div class="text-right">
-					<p class="text-lg font-semibold text-green-600">{noSpendDays}</p>
-					<p class="text-sm text-charcoal-muted">no-spend days</p>
-				</div>
+		<div class="flex items-center justify-between">
+			<div>
+				<p class="text-2xl font-bold text-charcoal">${totalSpent.toLocaleString()}</p>
+				<p class="text-sm text-charcoal-muted">Total spent in {currentYear}</p>
 			</div>
-			<!-- Mini heatmap preview (last 30 days) -->
-			<div class="pt-2">
-				<p class="text-xs text-charcoal-muted mb-1">Last 30 days</p>
-				<div class="flex gap-1">
-					{#each Array.from(recentDailySpending.entries()) as [dateKey, amount]}
-						{@const maxAmount = Math.max(...Array.from(recentDailySpending.values()))}
-						{@const intensity = amount === 0 ? 0 : Math.min(6, Math.max(1, Math.ceil((Math.log(amount + 1) / Math.log(maxAmount + 1)) * 6)))}
-						{@const colors = ['bg-surface-alt', 'bg-success-100', 'bg-success-200', 'bg-success-300', 'bg-success-400', 'bg-success-500', 'bg-success-700']}
-						<div
-							class="{colors[intensity]} rounded-sm"
-							style="width: 8px; height: 8px;"
-							title="{dateKey}: ${amount.toLocaleString()}"
-						></div>
-					{/each}
-				</div>
+			<div class="text-right">
+				<p class="text-lg font-semibold text-green-600">{noSpendDays}</p>
+				<p class="text-sm text-charcoal-muted">no-spend days</p>
 			</div>
 		</div>
 
@@ -192,34 +132,6 @@
 				<div>
 					<p class="font-semibold text-success-700">{goalsCompletedThisYear} Savings Goal{goalsCompletedThisYear !== 1 ? 's' : ''} Completed</p>
 					<p class="text-sm text-success-600">This year</p>
-				</div>
-			</div>
-		{/if}
-
-		<!-- Needs vs Wants Summary (compact) -->
-		{#if needsWantsStats.total > 0}
-			<div class="flex items-center justify-between p-4 bg-cream-dark rounded-lg border border-dashed border-theme">
-				<span class="text-sm text-charcoal-soft">All-time needs vs wants:</span>
-				<span class="font-mono text-sm text-charcoal">
-					{needsWantsStats.needsPercent.toFixed(0)}% needs / {needsWantsStats.wantsPercent.toFixed(0)}% wants
-				</span>
-			</div>
-		{/if}
-
-		<!-- Tag Spending Summary -->
-		{#if tagSummary.length > 0}
-			<div>
-				<h3 class="text-sm font-medium text-charcoal-soft mb-3">Tags This Year</h3>
-				<div class="space-y-2">
-					{#each tagSummary as { tag, total, count }}
-						<div class="flex items-center justify-between py-1.5">
-							<span class="text-sm text-primary-600 font-medium">#{tag}</span>
-							<div class="text-right">
-								<span class="font-mono text-sm text-charcoal">{formatCurrencyWhole(total)}</span>
-								<span class="text-xs text-charcoal-muted ml-2">{count} txn{count !== 1 ? 's' : ''}</span>
-							</div>
-						</div>
-					{/each}
 				</div>
 			</div>
 		{/if}

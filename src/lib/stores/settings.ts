@@ -85,6 +85,54 @@ export async function getDismissedRecurring(): Promise<string[]> {
 	return settings.dismissedRecurring ?? [];
 }
 
+// Set a fixed amount for a detected recurring expense
+export async function setFixedRecurringAmount(merchant: string, amount: number): Promise<void> {
+	const settings = await getSettings();
+	const normalized = normalizeMerchant(merchant);
+	const existing = settings.fixedRecurringAmounts ?? [];
+
+	// Remove any existing entry for this merchant
+	const filtered = existing.filter((f) => f.merchant !== normalized);
+
+	// Add the new fixed amount
+	await db.settings.update(1, {
+		fixedRecurringAmounts: [...filtered, { merchant: normalized, amount }]
+	});
+	invalidateRecurringCache();
+	await persistData();
+}
+
+// Remove a fixed amount override (revert to auto-detected)
+export async function removeFixedRecurringAmount(merchant: string): Promise<void> {
+	const settings = await getSettings();
+	const normalized = normalizeMerchant(merchant);
+	const existing = settings.fixedRecurringAmounts ?? [];
+
+	await db.settings.update(1, {
+		fixedRecurringAmounts: existing.filter((f) => f.merchant !== normalized)
+	});
+	invalidateRecurringCache();
+	await persistData();
+}
+
+// Get fixed amount for a merchant (if set)
+export async function getFixedRecurringAmount(merchant: string): Promise<number | null> {
+	const settings = await getSettings();
+	const normalized = normalizeMerchant(merchant);
+	const found = (settings.fixedRecurringAmounts ?? []).find((f) => f.merchant === normalized);
+	return found?.amount ?? null;
+}
+
+// Get all fixed recurring amounts
+export async function getFixedRecurringAmounts(): Promise<Map<string, number>> {
+	const settings = await getSettings();
+	const map = new Map<string, number>();
+	for (const { merchant, amount } of settings.fixedRecurringAmounts ?? []) {
+		map.set(merchant, amount);
+	}
+	return map;
+}
+
 // Update notification master toggle
 export async function updateNotifications(enabled: boolean): Promise<void> {
 	await db.settings.update(1, { notificationsEnabled: enabled });

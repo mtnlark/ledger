@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { Pencil } from 'lucide-svelte';
 	import ModalContainer from './ModalContainer.svelte';
 	import { formatCurrency } from '$lib/utils/format-helpers';
 
@@ -84,7 +85,10 @@
 					class="mt-0.5"
 				/>
 				<div class="flex-1">
-					<p class="text-sm font-medium text-charcoal">Set fixed amount</p>
+					<div class="flex items-center gap-1.5">
+						<p class="text-sm font-medium text-charcoal">Set fixed amount</p>
+						<Pencil size={12} class="text-charcoal-muted" />
+					</div>
 					<p class="text-xs text-charcoal-muted">
 						{#if selectedAction === 'fixed'}
 							Enter your expected monthly amount

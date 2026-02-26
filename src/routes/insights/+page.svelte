@@ -46,6 +46,7 @@
 	const lazyRecurring = () => import('$lib/components/insights/RecurringInsights.svelte');
 	const lazyYearInReview = () => Promise.all([
 		import('$lib/components/insights/YTDSummary.svelte'),
+		import('$lib/components/insights/TagsYearSummary.svelte'),
 		import('$lib/components/insights/NeedsWantsInsights.svelte')
 	]);
 
@@ -69,6 +70,17 @@
 	let appSettings = $state<Settings | null>(null);
 	let activeTab = $state('overview');
 	let categoryBudgets = $state<CategoryBudget[]>([]);
+
+	// Derived: fixed recurring amounts as a Map for easy lookup
+	let fixedRecurringAmounts = $derived.by(() => {
+		const map = new Map<string, number>();
+		if (appSettings?.fixedRecurringAmounts) {
+			for (const { merchant, amount } of appSettings.fixedRecurringAmounts) {
+				map.set(merchant, amount);
+			}
+		}
+		return map;
+	});
 
 	// Tab change handler
 	function handleTabChange(tab: string) {
@@ -283,14 +295,19 @@
 							{allTransactions}
 							{cancelledSubscriptions}
 							{confirmedActiveSubscriptions}
-							onDismiss={async () => { recurring = await detectRecurringExpenses(); }}
+							{fixedRecurringAmounts}
+							onDismiss={async () => {
+								recurring = await detectRecurringExpenses();
+								appSettings = await getSettings(); // Refresh fixed amounts
+							}}
 							onSubscriptionChange={handleSubscriptionChange}
 						/>
 					{/await}
 
 				{:else if activeTab === 'year-in-review'}
-					{#await lazyYearInReview() then [YTDSummaryMod, NeedsWantsInsightsMod]}
-						<YTDSummaryMod.default transactions={allTransactions} {categories} settings={appSettings} />
+					{#await lazyYearInReview() then [YTDSummaryMod, TagsYearSummaryMod, NeedsWantsInsightsMod]}
+						<YTDSummaryMod.default transactions={allTransactions} settings={appSettings} />
+						<TagsYearSummaryMod.default transactions={allTransactions} />
 						<NeedsWantsInsightsMod.default
 							transactions={selectedMonthTransactions}
 							{categories}
