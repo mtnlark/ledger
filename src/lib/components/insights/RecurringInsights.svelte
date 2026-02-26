@@ -1,10 +1,11 @@
 <script lang="ts">
-	import { RefreshCw, X, Calendar, Zap, AlertCircle } from 'lucide-svelte';
+	import { RefreshCw, Calendar, Zap, AlertCircle } from 'lucide-svelte';
 	import { goto } from '$app/navigation';
 	import type { Category, Transaction, CancelledSubscription } from '$lib/db';
 	import { createCategoryHelpers } from '$lib/utils/category-helpers';
 	import { formatCurrencyWhole, formatCurrency } from '$lib/utils/format-helpers';
 	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
+	import EditDetectedBillModal from '$lib/components/EditDetectedBillModal.svelte';
 	import type { DetectedRecurring } from '$lib/stores/recurring';
 	import {
 		dismissRecurring,
@@ -66,6 +67,36 @@
 	function handleConfirm() {
 		confirmDialog.onConfirm();
 		closeConfirmDialog();
+	}
+
+	// Edit modal state for detected bills
+	let editModal = $state({
+		isOpen: false,
+		merchant: '',
+		amount: 0,
+		isVariable: false
+	});
+
+	function openEditModal(item: DetectedRecurring) {
+		editModal = {
+			isOpen: true,
+			merchant: item.merchant,
+			amount: item.averageUserAmount,
+			isVariable: item.amountType === 'variable'
+		};
+	}
+
+	function closeEditModal() {
+		editModal = { ...editModal, isOpen: false };
+	}
+
+	async function handleEditSave(action: 'keep' | 'fixed' | 'remove', fixedAmount?: number) {
+		if (action === 'remove') {
+			await dismissRecurring(editModal.merchant);
+			onDismiss?.();
+		}
+		// TODO: Handle 'keep' and 'fixed' actions when backend support is added
+		// For now, these just close the modal
 	}
 
 	// Check if a subscription is stale based on last transaction date
@@ -597,7 +628,11 @@
 						{#each activeRecurring as item (item.merchant)}
 							{@const freqLabel = item.frequency === 'monthly' ? '/mo' : item.frequency === 'semi-annual' ? '/6mo' : '/yr'}
 							{@const freqDesc = item.frequency === 'monthly' ? 'monthly' : item.frequency === 'semi-annual' ? 'every 6 months' : 'annually'}
-							<div class="flex items-center gap-3 py-2 px-3 bg-cream/50 rounded-lg group">
+							<button
+								type="button"
+								onclick={() => openEditModal(item)}
+								class="flex items-center gap-3 py-2 px-3 bg-cream/50 rounded-lg w-full text-left hover:bg-cream transition-colors"
+							>
 								<span class="text-lg">{getCategoryIcon(item.categoryId)}</span>
 								<div class="flex-1 min-w-0">
 									<p class="text-sm font-medium text-charcoal truncate">{item.merchant}</p>
@@ -623,15 +658,7 @@
 										</p>
 									{/if}
 								</div>
-								<button
-									onclick={() => handleDismiss(item.merchant)}
-									class="p-1.5 text-charcoal-muted/0 group-hover:text-charcoal-muted hover:!text-danger-500 hover:bg-danger-50 rounded-lg transition-colors flex-shrink-0"
-									aria-label="Dismiss recurring expense"
-									title="Remove from recurring"
-								>
-									<X size={14} />
-								</button>
-							</div>
+							</button>
 						{/each}
 					</div>
 				</div>
@@ -649,4 +676,14 @@
 	variant="warning"
 	onConfirm={handleConfirm}
 	onCancel={closeConfirmDialog}
+/>
+
+<!-- Edit modal for detected bills -->
+<EditDetectedBillModal
+	isOpen={editModal.isOpen}
+	merchant={editModal.merchant}
+	detectedAmount={editModal.amount}
+	isVariable={editModal.isVariable}
+	onSave={handleEditSave}
+	onClose={closeEditModal}
 />
