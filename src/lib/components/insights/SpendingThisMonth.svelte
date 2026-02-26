@@ -2,8 +2,9 @@
 	import type { Transaction, MonthlyBudget } from '$lib/db';
 	import { parseMonthKey, getMonthKey } from '$lib/db';
 	import { format, getDaysInMonth, getDate } from 'date-fns';
-	import { TrendingUp, TrendingDown } from 'lucide-svelte';
+	import { TrendingUp, TrendingDown, Store } from 'lucide-svelte';
 	import { getInsightsEngine } from '$lib/insights';
+	import EmptyState from '$lib/components/EmptyState.svelte';
 	import { formatCurrency } from '$lib/utils/format-helpers';
 	import { roundCurrency } from '$lib/utils/currency';
 	import { filterUpToDate } from '$lib/utils/date-helpers';
@@ -192,10 +193,10 @@
 		{/if}
 
 		<!-- Top Merchants -->
-		{#if topMerchants.length > 0}
-			{@const maxMerchant = topMerchants[0]?.amount || 1}
-			<div>
-				<h3 class="text-sm font-medium text-charcoal-soft mb-3">Top Merchants</h3>
+		<div>
+			<h3 class="text-sm font-semibold text-charcoal-soft mb-3">Top Merchants</h3>
+			{#if topMerchants.length > 0}
+				{@const maxMerchant = topMerchants[0]?.amount || 1}
 				<div class="rounded-lg overflow-hidden">
 					{#each topMerchants as { merchant, amount }, i}
 						{@const pct = (amount / maxMerchant) * 100}
@@ -224,15 +225,22 @@
 						</div>
 					{/each}
 				</div>
-			</div>
-		{/if}
+			{:else}
+				<EmptyState
+					icon={Store}
+					title="No merchant data"
+					description="Add transactions with merchant names to see your top spending locations"
+					compact={true}
+				/>
+			{/if}
+		</div>
 
 		<!-- Personal vs. Shared -->
 		{#if sharedBreakdown.hasShared}
 			{@const personalPercent = totalSpent > 0 ? Math.round((sharedBreakdown.personal / totalSpent) * 100) : 0}
 			{@const sharedPercent = 100 - personalPercent}
 			<div>
-				<h3 class="text-sm font-medium text-charcoal-soft mb-3">Personal vs. Shared</h3>
+				<h3 class="text-sm font-semibold text-charcoal-soft mb-3">Personal vs. Shared</h3>
 				<div class="rounded-lg border border-theme overflow-hidden bg-surface">
 					<!-- Proportional bar -->
 					<div class="h-3 flex rounded-full overflow-hidden mx-4 mt-4">

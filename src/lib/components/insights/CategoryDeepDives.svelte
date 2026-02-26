@@ -11,6 +11,8 @@
 	import CategoryComparison from './CategoryComparison.svelte';
 	import CategoryChipPicker from './CategoryChipPicker.svelte';
 	import CategoryTreemap from './CategoryTreemap.svelte';
+	import EmptyState from '../EmptyState.svelte';
+	import { BarChart3 } from 'lucide-svelte';
 
 	interface Props {
 		currentMonth: string;
@@ -199,8 +201,16 @@
 	{/snippet}
 
 	{#snippet children()}
-		<div class="space-y-6">
-			<!-- Category Treemap -->
+		{#if transactions.length === 0}
+			<EmptyState
+				icon={BarChart3}
+				title="No transactions"
+				description="Add transactions to see category insights"
+				compact={true}
+			/>
+		{:else}
+			<div class="space-y-6">
+				<!-- Category Treemap -->
 			<div>
 				<h3 class="text-sm font-semibold text-charcoal-soft mb-3">Category Breakdown</h3>
 				<CategoryTreemap {transactions} {categories} />
@@ -231,7 +241,7 @@
 			<!-- Category Trends Chart -->
 			{#if selectedCategory && categoryTrendData.size > 0}
 				<div>
-					<h3 class="text-sm font-medium text-charcoal-soft mb-3">
+					<h3 class="text-sm font-semibold text-charcoal-soft mb-3">
 						{selectedCategory.icon} {selectedCategory.name} Over Time
 					</h3>
 					<CategoryTrendsChart
@@ -246,7 +256,7 @@
 
 			<!-- Category Comparison -->
 			<div>
-				<h3 class="text-sm font-medium text-charcoal-soft mb-3">
+				<h3 class="text-sm font-semibold text-charcoal-soft mb-3">
 					{format(parseMonthKey(currentMonth), 'MMMM')} vs {format(parseMonthKey(previousMonth), 'MMMM')}
 				</h3>
 				<CategoryComparison
@@ -258,6 +268,7 @@
 					{categoryStats}
 				/>
 			</div>
-		</div>
+			</div>
+		{/if}
 	{/snippet}
 </InsightGroup>
