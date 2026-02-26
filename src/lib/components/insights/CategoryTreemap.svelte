@@ -75,8 +75,9 @@
 					position: 'middle',
 					color: 'white',
 					font: {
-						size: 14,
-						weight: 'bold'
+						family: "'DM Mono', monospace",
+						size: 13,
+						weight: '500'
 					},
 					formatter: (ctx) => {
 						const item = categoryData[ctx.dataIndex];
