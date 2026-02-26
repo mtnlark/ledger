@@ -2,8 +2,9 @@
 	import { onMount, onDestroy } from 'svelte';
 	import { Chart, type ChartConfiguration } from 'chart.js/auto';
 	import annotationPlugin from 'chartjs-plugin-annotation';
+	import { TreemapController, TreemapElement } from 'chartjs-chart-treemap';
 
-	Chart.register(annotationPlugin);
+	Chart.register(annotationPlugin, TreemapController, TreemapElement);
 
 	interface Props {
 		config: ChartConfiguration;
