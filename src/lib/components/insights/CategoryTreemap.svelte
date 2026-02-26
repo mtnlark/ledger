@@ -75,16 +75,19 @@
 					position: 'middle',
 					color: 'white',
 					font: {
-						size: 12,
+						size: 14,
 						weight: 'bold'
 					},
 					formatter: (ctx) => {
 						const item = categoryData[ctx.dataIndex];
 						if (!item) return '';
-						const pct = totalSpending > 0 ? Math.round((item.amount / totalSpending) * 100) : 0;
-						// Only show label if box is big enough
-						if (ctx.raw.w < 50 || ctx.raw.h < 35) return '';
-						return [item.icon, `$${item.amount.toLocaleString()}`, `${pct}%`];
+						const w = ctx.raw.w;
+						const h = ctx.raw.h;
+						// Tiered display based on box size
+						if (w < 40 || h < 30) return ''; // Too small - nothing
+						if (w < 65 || h < 45) return item.icon; // Small - just icon
+						// Large enough - icon and whole dollar amount
+						return [item.icon, `$${Math.round(item.amount).toLocaleString()}`];
 					}
 				}
 			}]
@@ -105,8 +108,8 @@
 						label: (ctx) => {
 							const item = categoryData[ctx.dataIndex];
 							if (!item) return '';
-							const pct = totalSpending > 0 ? ((item.amount / totalSpending) * 100).toFixed(1) : 0;
-							return `$${item.amount.toLocaleString()} (${pct}%)`;
+							const pct = totalSpending > 0 ? Math.round((item.amount / totalSpending) * 100) : 0;
+							return `$${Math.round(item.amount).toLocaleString()} (${pct}%)`;
 						}
 					}
 				}
