@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { X } from 'lucide-svelte';
 	import ModalContainer from './ModalContainer.svelte';
 	import { formatCurrency } from '$lib/utils/format-helpers';
 
@@ -50,7 +49,7 @@
 </script>
 
 <ModalContainer {isOpen} onClose={onClose} title="Edit Detected Bill">
-	<div class="space-y-4">
+	<div class="px-6 py-4 space-y-4">
 		<div>
 			<p class="font-medium text-charcoal">{merchant}</p>
 			<p class="text-sm text-charcoal-muted">
@@ -86,6 +85,13 @@
 				/>
 				<div class="flex-1">
 					<p class="text-sm font-medium text-charcoal">Set fixed amount</p>
+					<p class="text-xs text-charcoal-muted">
+						{#if selectedAction === 'fixed'}
+							Enter your expected monthly amount
+						{:else}
+							Select to enter a custom amount
+						{/if}
+					</p>
 					{#if selectedAction === 'fixed'}
 						<div class="mt-2">
 							<div class="relative">
@@ -95,7 +101,7 @@
 									step="0.01"
 									min="0.01"
 									bind:value={fixedAmount}
-									class="w-full pl-7 pr-3 py-2 text-sm border border-theme rounded-lg bg-surface focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500"
+									class="w-full pl-7 pr-3 py-2 text-sm border border-theme rounded-lg bg-surface focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 font-mono"
 									placeholder="0.00"
 								/>
 							</div>
@@ -118,10 +124,9 @@
 				</div>
 			</label>
 		</div>
-	</div>
 
-	{#snippet footer()}
-		<div class="flex justify-end gap-3">
+		<!-- Actions -->
+		<div class="flex justify-end gap-3 pt-2">
 			<button
 				type="button"
 				onclick={onClose}
@@ -141,5 +146,5 @@
 				Save
 			</button>
 		</div>
-	{/snippet}
+	</div>
 </ModalContainer>
