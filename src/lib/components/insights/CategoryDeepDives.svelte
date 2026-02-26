@@ -7,10 +7,9 @@
 	import { getInsightsEngine } from '$lib/insights';
 	import { computeCategoryDeepDiveShift } from '$lib/insights/calculations';
 	import InsightGroup from './InsightGroup.svelte';
-	import InsightMetric from './InsightMetric.svelte';
 	import CategoryTrendsChart from './CategoryTrendsChart.svelte';
 	import CategoryComparison from './CategoryComparison.svelte';
-	import CategoryBreakdownChart from '../CategoryBreakdownChart.svelte';
+	import CategoryChipPicker from './CategoryChipPicker.svelte';
 
 	interface Props {
 		currentMonth: string;
@@ -91,7 +90,7 @@
 		if (selectedCV === null) return '';
 		if (selectedCV < cvThresholds.steady) return 'bg-success-500';
 		if (selectedCV <= cvThresholds.moderate) return 'bg-warning-500';
-		return 'bg-danger-500';
+		return 'bg-neutral-500'; // Variable - neutral instead of danger
 	});
 
 	// Calculate spending by category for current month
@@ -200,38 +199,24 @@
 
 	{#snippet children()}
 		<div class="space-y-6">
-			<!-- Category Breakdown Chart -->
-			<CategoryBreakdownChart {transactions} {categories} />
-
 			<!-- Category Selector for Trends -->
 			<div>
-				<label for="category-select" class="block text-sm font-medium text-charcoal-soft mb-2">
+				<label class="block text-sm font-semibold text-charcoal-soft mb-2">
 					Explore Category Trends
 				</label>
-				<select
-					id="category-select"
-					bind:value={selectedCategoryId}
-					onchange={() => hasUserSelected = true}
-					class="w-full px-3 py-2 bg-surface border border-theme rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-charcoal"
-				>
-					{#each sortedCategories as cat}
-						{@const spent = categorySpending.get(cat.id!) || 0}
-						<option value={cat.id}>
-							{cat.icon} {cat.name}{spent > 0 ? ` ($${spent.toLocaleString()})` : ''}
-						</option>
-					{/each}
-				</select>
+				<CategoryChipPicker
+					categories={sortedCategories}
+					selectedId={selectedCategoryId}
+					spending={categorySpending}
+					onSelect={(id) => { selectedCategoryId = id; hasUserSelected = true; }}
+				/>
 
 				{#if selectedStats && selectedStats.mean > 0 && selectedCV !== null}
-					<div class="flex items-center gap-2 mt-2 text-sm text-charcoal-muted">
+					<div class="flex items-center gap-2 mt-3 text-sm text-charcoal-muted">
 						<span class="inline-block w-2.5 h-2.5 rounded-full {cvColor}"></span>
 						<span class="font-medium text-charcoal-soft">{cvLabel}</span>
 						<span>·</span>
 						<span class="font-mono">${Math.round(selectedStats.mean)}/mo ± ${Math.round(selectedStats.stdDev)}</span>
-						{#if selectedStats.stdDev > 0}
-							<span>·</span>
-							<span>Range ${Math.max(0, Math.floor(selectedStats.mean - selectedStats.stdDev))}–${Math.ceil(selectedStats.mean + selectedStats.stdDev)}</span>
-						{/if}
 					</div>
 				{/if}
 			</div>
