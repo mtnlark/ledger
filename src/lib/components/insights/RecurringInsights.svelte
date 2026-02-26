@@ -400,79 +400,110 @@
 
 			<!-- Active Subscriptions Section -->
 			{#if activeSubscriptions.length > 0}
-				<div>
-					<h4 class="text-sm font-medium text-charcoal-muted mb-3 flex items-center gap-2">
-						<RefreshCw size={14} />
-						Subscriptions
-						<span class="text-xs font-normal">({activeSubscriptions.length})</span>
-					</h4>
-
-					<div class="space-y-2">
-						<!-- Monthly Subscriptions -->
-						{#each monthlySubscriptions as sub}
-							{@const userAmount = sub.isShared ? sub.amount - sub.partnerShare : sub.amount}
-							<div class="flex items-center gap-3 py-2 px-3 bg-cream rounded-lg">
-								<span class="text-lg">{getCategoryIcon(sub.categoryId)}</span>
-								<div class="flex-1 min-w-0">
-									<p class="text-sm font-medium text-charcoal truncate">{sub.merchant}</p>
-									<p class="text-xs text-charcoal-muted">{getCategoryName(sub.categoryId)}</p>
-								</div>
-								<div class="text-right">
-									<p class="font-mono text-sm font-medium text-charcoal">
-										{formatCurrency(userAmount)}/mo
-									</p>
-									{#if sub.isShared}
-										<p class="text-xs text-success-600">Shared</p>
-									{/if}
-								</div>
-							</div>
-						{/each}
-
-						<!-- Semi-Annual Subscriptions -->
-						{#each semiAnnualSubscriptions as sub}
-							{@const userAmount = sub.isShared ? sub.amount - sub.partnerShare : sub.amount}
-							{@const monthlyEquiv = userAmount / 6}
-							<div class="flex items-center gap-3 py-2 px-3 bg-cream rounded-lg">
-								<span class="text-lg">{getCategoryIcon(sub.categoryId)}</span>
-								<div class="flex-1 min-w-0">
-									<p class="text-sm font-medium text-charcoal truncate">{sub.merchant}</p>
-									<p class="text-xs text-charcoal-muted">{getCategoryName(sub.categoryId)}</p>
-								</div>
-								<div class="text-right">
-									<p class="font-mono text-sm font-medium text-charcoal">
-										{formatCurrency(userAmount)}/6mo
-									</p>
-									<p class="text-xs text-charcoal-muted">
-										~{formatCurrency(monthlyEquiv)}/mo
-									</p>
-								</div>
-							</div>
-						{/each}
-
-						<!-- Annual Subscriptions -->
-						{#each annualSubscriptions as sub}
-							{@const userAmount = sub.isShared ? sub.amount - sub.partnerShare : sub.amount}
-							{@const monthlyEquiv = userAmount / 12}
-							<div class="flex items-center gap-3 py-2 px-3 bg-cream rounded-lg">
-								<span class="text-lg">{getCategoryIcon(sub.categoryId)}</span>
-								<div class="flex-1 min-w-0">
-									<div class="flex items-center gap-1.5">
-										<p class="text-sm font-medium text-charcoal truncate">{sub.merchant}</p>
-										<Calendar size={12} class="text-charcoal-muted flex-shrink-0" />
+				<div class="space-y-4">
+					<!-- Monthly Subscriptions -->
+					{#if monthlySubscriptions.length > 0}
+						<div>
+							<h4 class="text-sm font-semibold text-charcoal-soft mb-2 pb-2 border-b border-theme flex items-center justify-between">
+								<span class="flex items-center gap-2">
+									<RefreshCw size={14} />
+									Monthly
+								</span>
+								<span class="font-mono text-charcoal">{formatCurrencyWhole(monthlySubCost)}/mo</span>
+							</h4>
+							<div class="space-y-2">
+								{#each monthlySubscriptions as sub}
+									{@const userAmount = sub.isShared ? sub.amount - sub.partnerShare : sub.amount}
+									<div class="flex items-center gap-3 py-2 px-3 bg-cream rounded-lg">
+										<span class="text-lg">{getCategoryIcon(sub.categoryId)}</span>
+										<div class="flex-1 min-w-0">
+											<p class="text-sm font-medium text-charcoal truncate">{sub.merchant}</p>
+											<p class="text-xs text-charcoal-muted">{getCategoryName(sub.categoryId)}</p>
+										</div>
+										<div class="text-right">
+											<p class="font-mono text-sm font-medium text-charcoal">
+												{formatCurrency(userAmount)}/mo
+											</p>
+											{#if sub.isShared}
+												<p class="text-xs text-success-600">Shared</p>
+											{/if}
+										</div>
 									</div>
-									<p class="text-xs text-charcoal-muted">{getCategoryName(sub.categoryId)}</p>
-								</div>
-								<div class="text-right">
-									<p class="font-mono text-sm font-medium text-charcoal">
-										{formatCurrency(userAmount)}/yr
-									</p>
-									<p class="text-xs text-charcoal-muted">
-										~{formatCurrency(monthlyEquiv)}/mo
-									</p>
-								</div>
+								{/each}
 							</div>
-						{/each}
-					</div>
+						</div>
+					{/if}
+
+					<!-- Semi-Annual Subscriptions -->
+					{#if semiAnnualSubscriptions.length > 0}
+						<div>
+							<h4 class="text-sm font-semibold text-charcoal-soft mb-2 pb-2 border-b border-theme flex items-center justify-between">
+								<span>Semi-Annual</span>
+								<span class="font-mono text-charcoal">
+									{formatCurrencyWhole(semiAnnualSubCost)}/6mo
+									<span class="text-xs text-charcoal-muted">(~{formatCurrencyWhole(semiAnnualSubCost / 6)}/mo)</span>
+								</span>
+							</h4>
+							<div class="space-y-2">
+								{#each semiAnnualSubscriptions as sub}
+									{@const userAmount = sub.isShared ? sub.amount - sub.partnerShare : sub.amount}
+									{@const monthlyEquiv = userAmount / 6}
+									<div class="flex items-center gap-3 py-2 px-3 bg-cream rounded-lg">
+										<span class="text-lg">{getCategoryIcon(sub.categoryId)}</span>
+										<div class="flex-1 min-w-0">
+											<p class="text-sm font-medium text-charcoal truncate">{sub.merchant}</p>
+											<p class="text-xs text-charcoal-muted">{getCategoryName(sub.categoryId)}</p>
+										</div>
+										<div class="text-right">
+											<p class="font-mono text-sm font-medium text-charcoal">
+												{formatCurrency(userAmount)}/6mo
+											</p>
+											<p class="text-xs text-charcoal-muted">
+												~{formatCurrency(monthlyEquiv)}/mo
+											</p>
+										</div>
+									</div>
+								{/each}
+							</div>
+						</div>
+					{/if}
+
+					<!-- Annual Subscriptions -->
+					{#if annualSubscriptions.length > 0}
+						<div>
+							<h4 class="text-sm font-semibold text-charcoal-soft mb-2 pb-2 border-b border-theme flex items-center justify-between">
+								<span class="flex items-center gap-2">
+									<Calendar size={14} />
+									Annual
+								</span>
+								<span class="font-mono text-charcoal">
+									{formatCurrencyWhole(annualSubCost)}/yr
+									<span class="text-xs text-charcoal-muted">(~{formatCurrencyWhole(annualSubCost / 12)}/mo)</span>
+								</span>
+							</h4>
+							<div class="space-y-2">
+								{#each annualSubscriptions as sub}
+									{@const userAmount = sub.isShared ? sub.amount - sub.partnerShare : sub.amount}
+									{@const monthlyEquiv = userAmount / 12}
+									<div class="flex items-center gap-3 py-2 px-3 bg-cream rounded-lg">
+										<span class="text-lg">{getCategoryIcon(sub.categoryId)}</span>
+										<div class="flex-1 min-w-0">
+											<p class="text-sm font-medium text-charcoal truncate">{sub.merchant}</p>
+											<p class="text-xs text-charcoal-muted">{getCategoryName(sub.categoryId)}</p>
+										</div>
+										<div class="text-right">
+											<p class="font-mono text-sm font-medium text-charcoal">
+												{formatCurrency(userAmount)}/yr
+											</p>
+											<p class="text-xs text-charcoal-muted">
+												~{formatCurrency(monthlyEquiv)}/mo
+											</p>
+										</div>
+									</div>
+								{/each}
+							</div>
+						</div>
+					{/if}
 				</div>
 			{/if}
 
@@ -509,11 +540,13 @@
 			<!-- Possibly Inactive Subscriptions -->
 			{#if possiblyInactiveSubscriptions.length > 0}
 				<div>
-					<h4 class="text-sm font-medium text-warning-600 mb-3 flex items-center gap-2">
-						<AlertCircle size={14} />
-						Possibly Inactive
-						<span class="text-xs font-normal">({possiblyInactiveSubscriptions.length})</span>
-					</h4>
+					<div class="bg-warning-50 rounded-lg px-4 py-2 mb-3">
+						<h4 class="text-sm font-semibold text-warning-700 flex items-center gap-2">
+							<AlertCircle size={14} />
+							Possibly Inactive
+							<span class="text-xs font-normal">({possiblyInactiveSubscriptions.length})</span>
+						</h4>
+					</div>
 
 					<div class="space-y-2">
 						{#each possiblyInactiveSubscriptions as sub}
