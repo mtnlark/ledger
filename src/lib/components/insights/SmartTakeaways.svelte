@@ -609,9 +609,9 @@
 </script>
 
 {#if hasContent}
-	<div class="{isCurrentMonth ? 'bg-surface' : 'bg-primary-50/40'} rounded-xl overflow-hidden card-primary">
+	<div class="{isCurrentMonth ? 'bg-surface' : 'bg-primary-50/40'} rounded-xl overflow-hidden card-primary border-l-4 border-primary-400">
 		<div class="px-6 py-4">
-			<h2 class="font-display text-lg font-medium text-charcoal mb-3">{title}</h2>
+			<h2 class="font-display text-xl font-medium text-charcoal mb-3">{title}</h2>
 
 			{#if isCurrentMonth}
 				<!-- Current month: bullet list format -->
@@ -644,7 +644,7 @@
 						<button
 							type="button"
 							onclick={() => isExpanded = !isExpanded}
-							class="flex items-center gap-1 text-sm text-primary-600 hover:text-primary-700 font-medium transition-colors"
+							class="flex items-center gap-1 text-sm text-primary-600 font-medium px-3 py-1 rounded-full bg-surface-alt hover:bg-cream-dark transition-colors"
 						>
 							{isExpanded ? 'Show less' : 'See more'}
 							{#if isExpanded}
