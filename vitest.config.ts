@@ -31,7 +31,9 @@ export default defineConfig({
 	},
 	resolve: {
 		alias: {
-			$lib: '/src/lib'
+			$lib: '/src/lib',
+			'$app/navigation': '/src/tests/__mocks__/$app/navigation.ts',
+			'$app/stores': '/src/tests/__mocks__/$app/stores.ts'
 		}
 	}
 });
