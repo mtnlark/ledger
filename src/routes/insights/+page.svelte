@@ -35,7 +35,7 @@
 
 	// Lazy-loaded chart-heavy components (loaded on tab switch)
 	const lazyOverviewCharts = () => Promise.all([
-		import('$lib/components/CategoryBreakdownChart.svelte'),
+		import('$lib/components/insights/TopCategoriesBar.svelte'),
 		import('$lib/components/MonthlyTrendsChart.svelte')
 	]);
 	const lazySpending = () => Promise.all([
@@ -220,16 +220,19 @@
 					/>
 
 					<!-- Lazy-loaded chart components for overview tab -->
-					{#await lazyOverviewCharts() then [CategoryBreakdownChartMod, MonthlyTrendsChartMod]}
-						<!-- Category Breakdown -->
+					{#await lazyOverviewCharts() then [TopCategoriesBarMod, MonthlyTrendsChartMod]}
+						<!-- Where It Goes - Top Categories -->
 						{#if selectedMonthTransactions.length > 0}
 							<div class="bg-surface rounded-xl shadow-md shadow-[var(--color-shadow)] overflow-hidden">
 								<div class="px-6 py-4">
 									<h2 class="font-display text-xl font-medium text-charcoal">Where It Goes</h2>
-									<p class="text-sm text-charcoal-muted mt-0.5">Spending by category</p>
+									<p class="text-sm text-charcoal-muted mt-0.5">Top spending categories</p>
 								</div>
 								<div class="px-6 pb-6">
-									<CategoryBreakdownChartMod.default transactions={selectedMonthTransactions} {categories} />
+									<TopCategoriesBarMod.default
+										transactions={selectedMonthTransactions}
+										{categories}
+									/>
 								</div>
 							</div>
 						{/if}
