@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { RefreshCw, Calendar, Zap, AlertCircle } from 'lucide-svelte';
+	import { RefreshCw, Calendar, Zap, AlertCircle, Pencil } from 'lucide-svelte';
 	import { goto } from '$app/navigation';
 	import type { Category, Transaction, CancelledSubscription } from '$lib/db';
 	import { createCategoryHelpers } from '$lib/utils/category-helpers';
@@ -654,7 +654,7 @@
 							<button
 								type="button"
 								onclick={() => openEditModal(item)}
-								class="flex items-center gap-3 py-2 px-3 bg-cream/50 rounded-lg w-full text-left hover:bg-cream transition-colors"
+								class="group flex items-center gap-3 py-2 px-3 bg-cream/50 rounded-lg w-full text-left hover:bg-cream cursor-pointer transition-colors"
 							>
 								<span class="text-lg">{getCategoryIcon(item.categoryId)}</span>
 								<div class="flex-1 min-w-0">
@@ -683,6 +683,7 @@
 										</p>
 									{/if}
 								</div>
+								<Pencil size={14} class="text-charcoal-muted/0 group-hover:text-charcoal-muted transition-colors flex-shrink-0" />
 							</button>
 						{/each}
 					</div>
