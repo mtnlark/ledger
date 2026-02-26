@@ -10,6 +10,7 @@
 	import CategoryTrendsChart from './CategoryTrendsChart.svelte';
 	import CategoryComparison from './CategoryComparison.svelte';
 	import CategoryChipPicker from './CategoryChipPicker.svelte';
+	import CategoryTreemap from './CategoryTreemap.svelte';
 
 	interface Props {
 		currentMonth: string;
@@ -199,6 +200,12 @@
 
 	{#snippet children()}
 		<div class="space-y-6">
+			<!-- Category Treemap -->
+			<div>
+				<h3 class="text-sm font-semibold text-charcoal-soft mb-3">Category Breakdown</h3>
+				<CategoryTreemap {transactions} {categories} />
+			</div>
+
 			<!-- Category Selector for Trends -->
 			<div>
 				<label class="block text-sm font-semibold text-charcoal-soft mb-2">
