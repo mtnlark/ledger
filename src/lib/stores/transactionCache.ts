@@ -65,6 +65,7 @@ export class TransactionCache {
 	 * Initialize the cache with an async loader function.
 	 * Uses a lock to prevent concurrent initialization.
 	 * Returns immediately if already loaded.
+	 * Resets the lock on error so retries are possible.
 	 */
 	async initializeAsync(loader: () => Promise<Transaction[]>): Promise<void> {
 		if (this._isLoaded) return;
@@ -77,8 +78,14 @@ export class TransactionCache {
 
 		// Start initialization with lock
 		this._initPromise = (async () => {
-			const transactions = await loader();
-			this.initialize(transactions);
+			try {
+				const transactions = await loader();
+				this.initialize(transactions);
+			} catch (error) {
+				// Reset promise so retry is possible on next call
+				this._initPromise = null;
+				throw error;
+			}
 		})();
 
 		await this._initPromise;

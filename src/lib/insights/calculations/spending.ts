@@ -3,6 +3,7 @@
  */
 
 import type { Transaction } from '$lib/db';
+import { sumCurrency } from '$lib/utils/currency';
 
 /**
  * Get user's portion of a transaction amount (accounting for splits).
@@ -14,23 +15,31 @@ export function getUserAmount(transaction: Transaction): number {
 /**
  * Calculate total spending by category for a list of transactions.
  * Returns user's portion for shared transactions.
+ * Uses sumCurrency() to avoid floating-point accumulation errors.
  */
 export function getSpendingByCategory(transactions: Transaction[]): Map<number, number> {
-	const spending = new Map<number, number>();
+	// Collect amounts per category first, then sum with sumCurrency()
+	const amountsByCategory = new Map<number, number[]>();
 	for (const t of transactions) {
 		const amount = getUserAmount(t);
-		spending.set(t.categoryId, (spending.get(t.categoryId) || 0) + amount);
+		if (!amountsByCategory.has(t.categoryId)) {
+			amountsByCategory.set(t.categoryId, []);
+		}
+		amountsByCategory.get(t.categoryId)!.push(amount);
+	}
+
+	// Sum each category's amounts to avoid floating-point drift
+	const spending = new Map<number, number>();
+	for (const [catId, amounts] of amountsByCategory) {
+		spending.set(catId, sumCurrency(amounts));
 	}
 	return spending;
 }
 
 /**
  * Calculate the total user spending across all transactions.
+ * Uses sumCurrency() to avoid floating-point accumulation errors.
  */
 export function getTotalSpent(transactions: Transaction[]): number {
-	let total = 0;
-	for (const t of transactions) {
-		total += getUserAmount(t);
-	}
-	return total;
+	return sumCurrency(transactions.map(t => getUserAmount(t)));
 }

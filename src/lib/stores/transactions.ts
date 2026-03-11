@@ -251,6 +251,8 @@ export async function softDeleteTransaction(id: number): Promise<Transaction | n
 	const cache = getTransactionCache();
 	if (cache.isLoaded) {
 		cache.update(id, { isDeleted: true, deletedAt: now, updatedAt: now });
+		// Remove from tag index since transaction is now hidden
+		tagIndex.removeTransaction({ id: transaction.id!, notes: transaction.notes });
 	}
 
 	invalidateTransactionCaches();
@@ -278,6 +280,10 @@ export async function softDeleteTransactions(ids: number[]): Promise<Transaction
 	const cache = getTransactionCache();
 	if (cache.isLoaded) {
 		cache.bulkUpdate(ids, { isDeleted: true, deletedAt: now, updatedAt: now });
+		// Remove from tag index since transactions are now hidden
+		for (const tx of transactions) {
+			tagIndex.removeTransaction({ id: tx.id!, notes: tx.notes });
+		}
 	}
 
 	invalidateTransactionCaches();
@@ -287,6 +293,9 @@ export async function softDeleteTransactions(ids: number[]): Promise<Transaction
 
 // Restore a soft-deleted transaction
 export async function restoreTransaction(id: number): Promise<void> {
+	// Get transaction first so we can restore its tags
+	const transaction = await db.transactions.get(id);
+
 	const now = new Date();
 	await db.transactions.update(id, {
 		isDeleted: false,
@@ -298,6 +307,10 @@ export async function restoreTransaction(id: number): Promise<void> {
 	const cache = getTransactionCache();
 	if (cache.isLoaded) {
 		cache.update(id, { isDeleted: false, deletedAt: undefined, updatedAt: now });
+		// Re-add to tag index since transaction is visible again
+		if (transaction) {
+			tagIndex.addTransaction({ id, notes: transaction.notes });
+		}
 	}
 
 	invalidateTransactionCaches();
@@ -307,6 +320,9 @@ export async function restoreTransaction(id: number): Promise<void> {
 // Restore multiple soft-deleted transactions
 export async function restoreTransactions(ids: number[]): Promise<void> {
 	if (ids.length === 0) return;
+
+	// Get transactions first so we can restore their tags
+	const transactions = await db.transactions.where('id').anyOf(ids).toArray();
 
 	const now = new Date();
 	await db.transactions.where('id').anyOf(ids).modify({
@@ -319,6 +335,10 @@ export async function restoreTransactions(ids: number[]): Promise<void> {
 	const cache = getTransactionCache();
 	if (cache.isLoaded) {
 		cache.bulkUpdate(ids, { isDeleted: false, deletedAt: undefined, updatedAt: now });
+		// Re-add to tag index since transactions are visible again
+		for (const tx of transactions) {
+			tagIndex.addTransaction({ id: tx.id!, notes: tx.notes });
+		}
 	}
 
 	invalidateTransactionCaches();
