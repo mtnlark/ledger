@@ -3,6 +3,8 @@ import { getAllCategories, getCategoryByName } from '$lib/stores/categories';
 import { excelDateToJS, parseDateString } from '$lib/utils/date-helpers';
 import { persistData } from '$lib/storage';
 import { roundCurrency } from '$lib/utils/currency';
+import { getTransactionCache } from '$lib/stores/transactionCache';
+import { tagIndex } from '$lib/stores/tags.svelte';
 
 export interface ImportedTransaction {
 	date: Date;
@@ -217,6 +219,13 @@ export async function importTransactions(
 	// Persist imported data to file storage (Tauri only)
 	if (imported > 0) {
 		await persistData();
+
+		// Rebuild in-memory caches with imported transactions
+		// This ensures tag index and transaction cache are up-to-date immediately
+		const allTransactions = await db.transactions.toArray();
+		const cache = getTransactionCache();
+		cache.initialize(allTransactions);
+		tagIndex.rebuild(cache.getAll());
 	}
 
 	return {

@@ -6,7 +6,7 @@ import { invalidateRecurringCache } from './recurring';
 import { isSubscriptionCancelled, reactivateSubscription } from './subscriptionSettings';
 import { getMonthDateRange } from '$lib/utils/date-helpers';
 import { getTransactionCache } from './transactionCache';
-import { sumCurrency } from '$lib/utils/currency';
+import { sumCurrency, currencyEquals } from '$lib/utils/currency';
 import { tagIndex } from './tags.svelte';
 import { replaceTag, stripTag, appendTag } from '$lib/utils/tags';
 import {
@@ -480,7 +480,7 @@ export async function splitTransaction(
 
 	// Validate total equals parent amount (within rounding tolerance)
 	const total = splits.reduce((sum, s) => sum + s.amount, 0);
-	if (Math.abs(total - parent.amount) > 0.01) {
+	if (!currencyEquals(total, parent.amount)) {
 		throw new Error('Split amounts must equal original transaction amount');
 	}
 
