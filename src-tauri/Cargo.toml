@@ -1,10 +1,10 @@
 [package]
-name = "app"
+name = "ledger"
 version = "0.1.0"
-description = "A Tauri App"
-authors = ["you"]
-license = ""
-repository = ""
+description = "Personal budget tracking desktop app"
+authors = ["Lev Craig"]
+license = "MIT"
+repository = "https://github.com/mtnlark/ledger"
 edition = "2021"
 rust-version = "1.77.2"
 
