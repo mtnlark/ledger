@@ -218,7 +218,6 @@ ledger/
 │   │   │   ├── EditAccountModal.svelte     # Edit savings account/balance
 │   │   │   ├── RecurringSuggestionsBanner.svelte  # Banner for recurring suggestions
 │   │   │   ├── RecurringSuggestionsModal.svelte   # Modal to review/add recurring
-│   │   │   ├── DashboardInsightWidget.svelte      # Quick insight widget for dashboard
 │   │   │   ├── TagPill.svelte             # Tag pill display with hover popover
 │   │   │   ├── TagPopover.svelte          # Tag hover popover (total + count)
 │   │   │   ├── TagAutocomplete.svelte     # Tag autocomplete for notes input
@@ -249,7 +248,6 @@ ledger/
 │   │   │   ├── currency.ts            # Currency/percentage utilities (rounding, comparison)
 │   │   │   ├── budget-status.ts       # Budget status calculation (under/approaching/at/over)
 │   │   │   ├── budget-alerts.ts       # Budget alert message generation
-│   │   │   ├── dashboard-insight.ts   # Dashboard insight widget calculations
 │   │   │   ├── format-helpers.ts      # Currency/percentage display formatting
 │   │   │   ├── import.ts              # Excel import
 │   │   │   ├── export.ts              # CSV/JSON export
@@ -293,7 +291,6 @@ ledger/
 │       │   └── tagOperations.test.ts      # Tag rename/delete batch operations
 │       └── utils/            # Utility tests
 │           ├── cash-flow.test.ts          # Cash flow + total spent calculations
-│           ├── dashboard-insight.test.ts  # Budget status edges + pace warning
 │           ├── error-handler.test.ts
 │           ├── export.test.ts
 │           ├── import.test.ts
@@ -471,11 +468,6 @@ Sidebar state persists to localStorage (`ledger-sidebar-expanded`).
 - Edit/split transaction modals
 - Bulk action toolbar for multi-select operations
 - Month picker for navigating between months
-- **Quick Insight Widget**: Single rotating insight above cash flow card
-  - Priority order: budget alert (>90%) → pace warning → all on track → transaction count
-  - Clickable to navigate to Budget or Insights page
-  - Dismiss button hides for 24 hours (localStorage)
-  - Configurable thresholds in `config.dashboardInsight`
 - **Recurring suggestions banner**: Prompts to add expected recurring transactions at start of month
   - Two-step flow: selection → confirmation with editable dates/amounts
   - Merges detected recurring with user-tagged subscriptions
@@ -592,7 +584,6 @@ UI state persisted across sessions:
 - `ledger-cashflow-expanded` - Cash flow card state
 - `ledger-addform-expanded` - Transaction form state
 - `ledger-insight-{title}` - Each insight group state
-- `ledger-dashboard-insight-dismissed` - Dashboard insight widget dismiss timestamp
 - `ledger-insights-tab` - Selected insights tab
 - `ledger-notif-daily-last-fired` - Daily notification last-fired date ("YYYY-MM-DD")
 - `ledger-notif-weekly-last-fired` - Weekly notification last-fired date ("YYYY-MM-DD")

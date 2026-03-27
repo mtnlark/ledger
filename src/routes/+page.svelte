@@ -32,10 +32,8 @@
 	import KeyboardShortcuts from '$lib/components/KeyboardShortcuts.svelte';
 	import RecurringSuggestionsBanner from '$lib/components/RecurringSuggestionsBanner.svelte';
 	import RecurringSuggestionsModal from '$lib/components/RecurringSuggestionsModal.svelte';
-	import DashboardInsightWidget from '$lib/components/DashboardInsightWidget.svelte';
-	import WeekInReviewCard from '$lib/components/WeekInReviewCard.svelte';
+		import WeekInReviewCard from '$lib/components/WeekInReviewCard.svelte';
 	import { Plus, Square } from 'lucide-svelte';
-	import { getDaysInMonth } from 'date-fns';
 
 	// State
 	let isLoading = $state(true);
@@ -203,8 +201,6 @@
 
 	// Computed
 	let monthDisplay = $derived(format(parseMonthKey(currentMonth), 'MMMM yyyy'));
-	let daysInCurrentMonth = $derived(getDaysInMonth(parseMonthKey(currentMonth)));
-	let currentDayOfMonth = $derived(new Date().getDate());
 	let totalSpent = $derived(calculateTotalSpent(transactions));
 
 	// Initial data load - runs once on mount
@@ -509,16 +505,6 @@
 				<TransactionListSkeleton count={4} />
 			</div>
 		{:else}
-			<!-- Quick Insight Widget -->
-			<DashboardInsightWidget
-				{currentMonth}
-				{transactions}
-				{budget}
-				{savedFromContributions}
-				currentDay={currentDayOfMonth}
-				daysInMonth={daysInCurrentMonth}
-			/>
-
 			<!-- Week in Review -->
 			<WeekInReviewCard {allTransactions} {categories} />
 
