@@ -1,12 +1,12 @@
 /**
  * Storage operation error codes
  */
-export type StorageErrorCode = 'READ' | 'WRITE' | 'BACKUP' | 'RESTORE' | 'INIT';
+type StorageErrorCode = 'READ' | 'WRITE' | 'BACKUP' | 'RESTORE' | 'INIT';
 
 /**
  * Transaction operation types
  */
-export type TransactionOperation = 'ADD' | 'UPDATE' | 'DELETE' | 'SPLIT' | 'BULK_DELETE' | 'BULK_UPDATE';
+type TransactionOperation = 'ADD' | 'UPDATE' | 'DELETE' | 'SPLIT' | 'BULK_DELETE' | 'BULK_UPDATE';
 
 /**
  * Error thrown during storage operations (file read/write, backup, etc.)

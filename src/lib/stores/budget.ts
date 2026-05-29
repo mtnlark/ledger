@@ -2,7 +2,7 @@ import { db, type MonthlyBudget } from '$lib/db';
 import { persistData } from '$lib/storage';
 import { calculatePercent, roundCoefficient } from '$lib/utils/currency';
 
-export interface CashFlowResult {
+interface CashFlowResult {
 	income: number;
 	saved: number;
 	available: number;

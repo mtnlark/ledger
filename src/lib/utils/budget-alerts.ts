@@ -4,7 +4,7 @@
 
 import { config } from '$lib/config';
 
-export type BudgetAlertType = 'over' | 'at' | 'approaching';
+type BudgetAlertType = 'over' | 'at' | 'approaching';
 
 export interface BudgetAlert {
 	type: BudgetAlertType;

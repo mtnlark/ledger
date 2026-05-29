@@ -145,4 +145,3 @@ export const config = {
 } as const;
 
 /** Type for the config object */
-export type AppConfig = typeof config;

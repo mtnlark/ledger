@@ -4,7 +4,7 @@
  * Efficient prefix-based string matching for autocomplete
  */
 
-export interface TrieNode {
+interface TrieNode {
 	children: Map<string, TrieNode>;
 	isEndOfWord: boolean;
 	value?: string; // Store original casing

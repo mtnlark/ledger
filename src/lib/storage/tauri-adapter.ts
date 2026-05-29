@@ -366,7 +366,7 @@ async function copyBackupToICloud(backupContent: string, backupName: string): Pr
 /**
  * Result of storage initialization
  */
-export type InitializationResult =
+type InitializationResult =
 	| { status: 'loaded' }
 	| { status: 'recovered'; backupName: string }
 	| { status: 'initialized_fresh' }
@@ -609,11 +609,4 @@ export async function saveToFile(): Promise<void> {
 		const message = error instanceof Error ? error.message : String(error);
 		throw new PersistenceError(`Failed to save data: ${message}`, error);
 	}
-}
-
-/**
- * Reset backup debounce timer (for testing)
- */
-export function resetBackupDebounce(): void {
-	lastBackupTime = 0;
 }

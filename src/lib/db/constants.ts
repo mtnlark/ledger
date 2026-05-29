@@ -133,7 +133,7 @@ export interface SavingsContribution {
 	updatedAt: Date;
 }
 
-export interface FixedRecurringAmount {
+interface FixedRecurringAmount {
 	merchant: string; // Normalized merchant name
 	amount: number; // User-specified fixed amount
 }

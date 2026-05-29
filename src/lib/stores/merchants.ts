@@ -30,13 +30,6 @@ export function invalidateMerchantCache(): void {
 }
 
 /**
- * Get the current cache version (for testing/debugging)
- */
-export function getMerchantCacheVersion(): number {
-	return cacheVersion;
-}
-
-/**
  * Build an index of all merchants with their usage statistics
  * Uses cached result if available
  */

@@ -9,7 +9,7 @@ export interface ValidationResult {
 /**
  * Result of split value validation
  */
-export interface SplitValueValidationResult extends ValidationResult {
+interface SplitValueValidationResult extends ValidationResult {
 	correctedValue?: number;
 }
 
@@ -24,7 +24,7 @@ export interface SplitLine {
 /**
  * Result of split lines validation
  */
-export interface SplitLinesValidationResult extends ValidationResult {
+interface SplitLinesValidationResult extends ValidationResult {
 	total: number;
 	remaining: number;
 }

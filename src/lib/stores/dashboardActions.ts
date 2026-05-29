@@ -23,7 +23,7 @@ import { undoStore } from '$lib/stores/undo';
  * Data shape for adding a single transaction.
  * Compatible with both TransactionFormData and QuickAddData.
  */
-export interface AddTransactionData {
+interface AddTransactionData {
 	date: Date;
 	merchant: string;
 	amount: number;
@@ -75,7 +75,7 @@ export interface TransactionUpdateData {
  * Context provided to the dashboard actions factory.
  * Uses accessor functions so state is read at call time, not setup time.
  */
-export interface DashboardContext {
+interface DashboardContext {
 	getCurrentMonth: () => string;
 	hasAllTransactions: () => boolean;
 	reload: (data: {

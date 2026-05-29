@@ -14,7 +14,7 @@ import { config } from '$lib/config';
  */
 export type BudgetStatus = 'under' | 'approaching' | 'at' | 'over';
 
-export interface BudgetStatusResult {
+interface BudgetStatusResult {
 	/** The budget status category */
 	status: BudgetStatus;
 	/** Tailwind class for the progress bar fill color */

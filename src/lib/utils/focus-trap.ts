@@ -43,7 +43,7 @@ function getFocusableElements(container: HTMLElement): HTMLElement[] {
  * @param options - Configuration options
  * @returns A cleanup function to release the trap
  */
-export function createFocusTrap(
+function createFocusTrap(
 	container: HTMLElement,
 	options: {
 		initialFocus?: HTMLElement | null;
@@ -117,7 +117,7 @@ export function createFocusTrap(
  *
  * @param returnFocus - Whether to return focus to the previously focused element
  */
-export function releaseFocusTrap(returnFocus = true): void {
+function releaseFocusTrap(returnFocus = true): void {
 	if (!activeTrap) return;
 
 	document.removeEventListener('keydown', activeTrap.handleKeydown);

@@ -312,14 +312,6 @@ export async function copyBudgetsFromMonth(
 }
 
 /**
- * Calculate total spending for a category in a month (for display)
- * This is exported for use in the Budget page
- */
-export async function getCategorySpending(categoryId: number, month: string): Promise<number> {
-	return getCategorySpendingForMonth(categoryId, month);
-}
-
-/**
  * Get spending for all categories in a month
  * Uses indexed date range query for O(log n) lookup instead of loading all transactions
  * @param month - Month in "YYYY-MM" format

@@ -16,7 +16,7 @@ import {
 } from './stats';
 import { calculatePercent } from '$lib/utils/currency';
 
-export interface SavingsReviewResult {
+interface SavingsReviewResult {
 	/** Total saved this month */
 	totalSaved: number;
 	/** Savings rate as decimal (0.25 = 25%) - null if no income */

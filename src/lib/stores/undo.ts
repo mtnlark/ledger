@@ -7,7 +7,7 @@ import { toast } from './toast';
  * Undo window duration in milliseconds.
  * User has this long to click "Undo" before the toast auto-dismisses.
  */
-export const UNDO_WINDOW_MS = 5000;
+const UNDO_WINDOW_MS = 5000;
 
 interface UndoState {
 	/** The soft-deleted transactions available for undo */

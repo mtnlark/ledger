@@ -6,13 +6,13 @@
 
 import type { Transaction } from '$lib/db';
 
-export interface PaginationResult<T> {
+interface PaginationResult<T> {
 	items: T[];
 	nextCursor: Date | null;
 	hasMore: boolean;
 }
 
-export interface PaginationOptions {
+interface PaginationOptions {
 	limit: number;
 	cursor?: Date | null;
 }
@@ -81,7 +81,7 @@ export function mergePages<T extends { id?: number }>(
 /**
  * Calculate page info for display
  */
-export interface PageInfo {
+interface PageInfo {
 	currentPage: number;
 	totalPages: number;
 	startItem: number;

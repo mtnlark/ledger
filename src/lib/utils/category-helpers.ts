@@ -57,7 +57,7 @@ export function createCategoryHelpers(categories: Category[]) {
 /**
  * Interface for the optimized category lookup
  */
-export interface CategoryLookup {
+interface CategoryLookup {
 	/** Get the full category object (undefined if not found) */
 	get: (categoryId: number) => Category | undefined;
 	/** Get category name with O(1) lookup */

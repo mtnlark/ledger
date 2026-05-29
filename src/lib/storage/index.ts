@@ -129,13 +129,6 @@ function showInitializationFeedback(result: StorageInitResult): void {
 }
 
 /**
- * Get the most recent initialization result (for UI checks)
- */
-export function getLastInitResult(): StorageInitResult | null {
-	return lastInitResult;
-}
-
-/**
  * Check if storage has been initialized
  */
 export function isStorageInitialized(): boolean {

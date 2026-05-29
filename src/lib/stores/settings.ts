@@ -115,24 +115,6 @@ export async function removeFixedRecurringAmount(merchant: string): Promise<void
 	await persistData();
 }
 
-// Get fixed amount for a merchant (if set)
-export async function getFixedRecurringAmount(merchant: string): Promise<number | null> {
-	const settings = await getSettings();
-	const normalized = normalizeMerchant(merchant);
-	const found = (settings.fixedRecurringAmounts ?? []).find((f) => f.merchant === normalized);
-	return found?.amount ?? null;
-}
-
-// Get all fixed recurring amounts
-export async function getFixedRecurringAmounts(): Promise<Map<string, number>> {
-	const settings = await getSettings();
-	const map = new Map<string, number>();
-	for (const { merchant, amount } of settings.fixedRecurringAmounts ?? []) {
-		map.set(merchant, amount);
-	}
-	return map;
-}
-
 // Update notification master toggle
 export async function updateNotifications(enabled: boolean): Promise<void> {
 	await db.settings.update(1, { notificationsEnabled: enabled });
@@ -148,11 +130,5 @@ export async function updateICloudBackup(enabled: boolean): Promise<void> {
 // Dismiss recurring suggestions for the current month
 export async function dismissRecurringSuggestionsForMonth(month: string): Promise<void> {
 	await db.settings.update(1, { lastAutoSuggestedMonth: month });
-	await persistData();
-}
-
-// Reset recurring suggestions dismissal (for testing/debugging)
-export async function resetRecurringSuggestionsDismissal(): Promise<void> {
-	await db.settings.update(1, { lastAutoSuggestedMonth: undefined });
 	await persistData();
 }

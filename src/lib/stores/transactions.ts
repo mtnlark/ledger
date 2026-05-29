@@ -1,5 +1,4 @@
 import { db, calculatePartnerShare, getMonthKey, type Transaction } from '$lib/db';
-import { liveQuery } from 'dexie';
 import { persistData } from '$lib/storage';
 import { invalidateMerchantCache } from './merchants';
 import { invalidateRecurringCache } from './recurring';
@@ -24,20 +23,6 @@ export type { CachedTransaction } from './transactionCache';
 function invalidateTransactionCaches(): void {
 	invalidateMerchantCache();
 	invalidateRecurringCache();
-}
-
-// Reactive transactions for current month
-// Filters out split parent transactions and soft-deleted transactions
-export function createTransactionsStore(month: string) {
-	const { start, end } = getMonthDateRange(month);
-	return liveQuery(() =>
-		db.transactions
-			.where('date')
-			.between(start, end, true, true)
-			.filter((t) => !t.isSplitParent && !t.isDeleted)
-			.reverse()
-			.sortBy('date')
-	);
 }
 
 // Get all transactions for a month using indexed date range query
@@ -289,32 +274,6 @@ export async function softDeleteTransactions(ids: number[]): Promise<Transaction
 	invalidateTransactionCaches();
 	await persistData();
 	return transactions;
-}
-
-// Restore a soft-deleted transaction
-export async function restoreTransaction(id: number): Promise<void> {
-	// Get transaction first so we can restore its tags
-	const transaction = await db.transactions.get(id);
-
-	const now = new Date();
-	await db.transactions.update(id, {
-		isDeleted: false,
-		deletedAt: undefined,
-		updatedAt: now
-	});
-
-	// Update the cache incrementally
-	const cache = getTransactionCache();
-	if (cache.isLoaded) {
-		cache.update(id, { isDeleted: false, deletedAt: undefined, updatedAt: now });
-		// Re-add to tag index since transaction is visible again
-		if (transaction) {
-			tagIndex.addTransaction({ id, notes: transaction.notes });
-		}
-	}
-
-	invalidateTransactionCaches();
-	await persistData();
 }
 
 // Restore multiple soft-deleted transactions
