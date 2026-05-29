@@ -57,7 +57,9 @@ See `PRODUCT_ROADMAP.md` for the full development plan. Groups 1–9 are complet
 8. ~~Performance & Tech Debt~~ — N+1 fix, stats dedup, lazy-load, chunk splitting, import/export tests ✅
 9. ~~Startup Perf & Search~~ — Redundant DB scan elimination, query parallelization, search/filter enhancements, pagination, lazy emoji picker, migration version stamp ✅
 
-**Recent**: Tag toggle + bulk tag management — Clicking a filtered tag pill now un-filters it (toggle behavior). Bulk select toolbar adds "Tag" button with dropdown for adding/removing tags across selected transactions. New `appendTag()` utility, `bulkAddTag`/`bulkRemoveTag` store operations and dashboard actions.
+**Recent**: Codebase cleanup — Removed 9 unused functions and ~20 unused exports (dead-code sweep), and cleared all `svelte-check` type errors (24 → 0). Notable: fixed a latent mobile-only bug in `registerNotificationClickHandler` (`onAction` returns a `PluginListener`, so cleanup must call `unlisten.unregister()`). `npm run check` is now a clean tripwire (13 a11y/reactivity warnings remain).
+
+**Earlier**: Tag toggle + bulk tag management — Clicking a filtered tag pill now un-filters it (toggle behavior). Bulk select toolbar adds "Tag" button with dropdown for adding/removing tags across selected transactions. New `appendTag()` utility, `bulkAddTag`/`bulkRemoveTag` store operations and dashboard actions.
 
 ---
 
