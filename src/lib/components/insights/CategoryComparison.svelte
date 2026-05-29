@@ -111,7 +111,7 @@
 				},
 				tooltip: {
 					callbacks: {
-						label: (ctx) => `${ctx.dataset.label}: $${(ctx.parsed.y ?? 0).toLocaleString()}`
+						label: (ctx) => `${ctx.dataset.label}: $${((ctx.parsed as { y?: number }).y ?? 0).toLocaleString()}`
 					}
 				}
 			},

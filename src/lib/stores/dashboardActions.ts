@@ -75,7 +75,7 @@ export interface TransactionUpdateData {
  * Context provided to the dashboard actions factory.
  * Uses accessor functions so state is read at call time, not setup time.
  */
-interface DashboardContext {
+export interface DashboardContext {
 	getCurrentMonth: () => string;
 	hasAllTransactions: () => boolean;
 	reload: (data: {

@@ -51,7 +51,7 @@ vi.mock('$lib/utils/error-handler', () => ({
 	handleError: vi.fn()
 }));
 
-import { setupDashboardActions } from '$lib/stores/dashboardActions';
+import { setupDashboardActions, type DashboardContext } from '$lib/stores/dashboardActions';
 import {
 	addTransaction,
 	updateTransaction,
@@ -72,11 +72,11 @@ import { handleError } from '$lib/utils/error-handler';
 
 describe('dashboardActions', () => {
 	let actions: ReturnType<typeof setupDashboardActions>;
-	let reloadFn: ReturnType<typeof vi.fn>;
+	let reloadFn: ReturnType<typeof vi.fn<DashboardContext['reload']>>;
 
 	beforeEach(() => {
 		vi.clearAllMocks();
-		reloadFn = vi.fn();
+		reloadFn = vi.fn<DashboardContext['reload']>();
 		actions = setupDashboardActions({
 			getCurrentMonth: () => '2026-01',
 			hasAllTransactions: () => false,

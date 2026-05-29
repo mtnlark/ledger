@@ -36,6 +36,7 @@ describe('migrateFormSplitLinkage', () => {
 			dismissedRecurring: [],
 			cancelledSubscriptions: [],
 			confirmedActiveSubscriptions: [],
+			fixedRecurringAmounts: [],
 			iCloudBackupEnabled: false,
 			completedGoals: [],
 			notificationsEnabled: false,

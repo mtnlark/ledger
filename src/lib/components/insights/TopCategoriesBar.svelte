@@ -72,7 +72,6 @@
 
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import type { Transaction, Category } from '$lib/db';
 	import { formatCurrency } from '$lib/utils/format-helpers';
 
 	interface Props {

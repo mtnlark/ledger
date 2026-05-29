@@ -83,7 +83,7 @@ export async function registerNotificationClickHandler(): Promise<(() => void) |
 			appWindow.setFocus();
 		});
 
-		return () => unlisten();
+		return () => unlisten.unregister();
 	} catch (error) {
 		console.error('Failed to register notification click handler:', error);
 		return null;

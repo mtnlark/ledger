@@ -66,7 +66,7 @@
 				} : undefined,
 				tooltip: {
 					callbacks: {
-						label: (ctx) => `$${(ctx.parsed.y ?? 0).toLocaleString()}`
+						label: (ctx) => `$${((ctx.parsed as { y?: number }).y ?? 0).toLocaleString()}`
 					}
 				}
 			},

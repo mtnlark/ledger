@@ -60,6 +60,7 @@
 		type: 'treemap',
 		data: {
 			datasets: [{
+				data: [], // required by ChartDataset type; auto-generated from `tree` by the plugin
 				tree: categoryData,
 				key: 'amount',
 				backgroundColor: (ctx) => {
@@ -77,7 +78,7 @@
 					font: {
 						family: "'DM Mono', monospace",
 						size: 13,
-						weight: '500'
+						weight: 500
 					},
 					formatter: (ctx) => {
 						const item = categoryData[ctx.dataIndex];

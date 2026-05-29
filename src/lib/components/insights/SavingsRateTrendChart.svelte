@@ -108,7 +108,7 @@
 					callbacks: {
 						label: (ctx) => {
 							const idx = ctx.dataIndex;
-							const yValue = ctx.parsed.y ?? 0;
+							const yValue = (ctx.parsed as { y?: number }).y ?? 0;
 							if (ctx.datasetIndex === 0) {
 								const data = savingsData[idx];
 								return [

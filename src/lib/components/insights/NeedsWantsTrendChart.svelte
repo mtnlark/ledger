@@ -115,7 +115,7 @@
 					callbacks: {
 						label: (ctx) => {
 							const idx = ctx.dataIndex;
-							const yValue = ctx.parsed.y ?? 0;
+							const yValue = (ctx.parsed as { y?: number }).y ?? 0;
 							const data = monthlyData[idx];
 							if (ctx.datasetIndex === 0) {
 								return `Needs: ${yValue.toFixed(1)}% ($${data.needs.toLocaleString()})`;
