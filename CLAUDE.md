@@ -670,6 +670,17 @@ npm run test
 
 ---
 
+## Tools
+
+Standalone reporting utilities (not part of the app):
+
+- **`tools/sankey/`** — Monarch-style money-flow Sankey generator. Produces a self-contained
+  `ledger-sankey.html` (D3 inlined) from live `data.json`. Regenerate with
+  `python3 tools/sankey/gen_sankey.py && open ledger-sankey.html`. Currently scoped to YTD;
+  see `tools/sankey/README.md` for the accounting rules and layout rationale.
+
+---
+
 ## Categories (22 default)
 
 Car, Cash withdrawals, Clothes & accessories, Coffee & snacks, Donations, Electronics, Fitness & wellness, Fun & hobbies, Gas, Gifts, Groceries, Grooming, Health, Home, Household supplies, Insurance, Parking & tolls, Pet, Rent, Restaurants, Travel, Utilities
