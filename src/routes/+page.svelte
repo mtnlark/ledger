@@ -22,6 +22,7 @@
 	import BudgetModal from '$lib/components/BudgetModal.svelte';
 	import EditTransactionModal, { type TransactionUpdateData } from '$lib/components/EditTransactionModal.svelte';
 	import SplitTransactionModal from '$lib/components/SplitTransactionModal.svelte';
+	import EditSplitModal from '$lib/components/EditSplitModal.svelte';
 	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
 	import HeaderNav from '$lib/components/HeaderNav.svelte';
 	import MonthPicker from '$lib/components/MonthPicker.svelte';
@@ -49,6 +50,7 @@
 	let showBudgetModal = $state(false);
 	let editingTransaction = $state<Transaction | null>(null);
 	let splittingTransaction = $state<Transaction | null>(null);
+	let editingSplit = $state<{ parentId: number; children: Transaction[] } | null>(null);
 	let currentMonth = $state(getMonthKey(new Date()));
 	let availableMonths = $state<string[]>([getMonthKey(new Date())]);
 
@@ -360,6 +362,40 @@
 		if (success) splittingTransaction = null;
 	}
 
+	// Handle editing an entire split — open the split editor
+	function handleEditSplit(parentId: number, children: Transaction[]) {
+		editingSplit = { parentId, children };
+	}
+
+	// Handle deleting an entire split — split-specific confirm, then soft-delete all lines (undoable)
+	function handleDeleteSplit(childIds: number[]) {
+		if (childIds.length === 0) return;
+		showConfirmDialog({
+			title: 'Delete Split',
+			message: `Delete this split? All ${childIds.length} category lines will be removed.`,
+			confirmText: 'Delete',
+			variant: 'danger',
+			onConfirm: () => actions.bulkDelete(childIds)
+		});
+	}
+
+	// Handle saving the edited split group — delegates to actions, clears state on success
+	async function handleSaveSplitGroup(
+		parentId: number,
+		shared: {
+			merchant: string;
+			date: Date;
+			isShared: boolean;
+			splitType: 'percentage' | 'fixed';
+			splitValue: number;
+			isSettled: boolean;
+		},
+		lines: { categoryId: number; amount: number; notes?: string }[]
+	) {
+		const success = await actions.updateSplitGroup(parentId, shared, lines);
+		if (success) editingSplit = null;
+	}
+
 	// Handle adding selected recurring suggestions
 	async function handleAddSelectedSuggestions(items: Array<RecurringSuggestion & { date: Date }>) {
 		try {
@@ -585,6 +621,8 @@
 					resetKey={transactionListResetKey}
 					onEdit={handleEdit}
 					onDelete={handleDelete}
+					onEditSplit={handleEditSplit}
+					onDeleteSplit={handleDeleteSplit}
 					onBulkDelete={handleBulkDelete}
 					onBulkCategoryChange={handleBulkCategoryChange}
 					onBulkTagAdd={handleBulkTagAdd}
@@ -636,6 +674,17 @@
 	{categories}
 	onSplit={handleSplitTransaction}
 	onClose={() => splittingTransaction = null}
+/>
+
+<!-- Edit Split Modal -->
+<EditSplitModal
+	isOpen={editingSplit !== null}
+	parentId={editingSplit?.parentId ?? null}
+	children={editingSplit?.children ?? []}
+	{categories}
+	{settings}
+	onSave={handleSaveSplitGroup}
+	onClose={() => editingSplit = null}
 />
 
 <!-- Confirm Dialog -->

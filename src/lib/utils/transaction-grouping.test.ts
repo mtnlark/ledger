@@ -4,7 +4,10 @@ import {
 	sortTransactionsByDate,
 	groupTransactionsByDate,
 	formatDateGroupLabel,
-	type DateGroup
+	buildListRows,
+	groupRowsByDate,
+	type DateGroup,
+	type SplitGroupRow
 } from './transaction-grouping';
 
 // Helper to create mock transactions
@@ -147,6 +150,122 @@ describe('transaction-grouping', () => {
 		it('handles year boundary correctly', () => {
 			const label = formatDateGroupLabel('2024-12-25');
 			expect(label).toBe('Wednesday, December 25');
+		});
+	});
+
+	describe('buildListRows', () => {
+		it('keeps standalone transactions as single rows in order', () => {
+			const rows = buildListRows([
+				createMockTransaction({ id: 1 }),
+				createMockTransaction({ id: 2 }),
+				createMockTransaction({ id: 3 })
+			]);
+
+			expect(rows.map((r) => r.type)).toEqual(['single', 'single', 'single']);
+			expect(rows.map((r) => (r.type === 'single' ? r.transaction.id : null))).toEqual([1, 2, 3]);
+		});
+
+		it('collapses children sharing a parentTransactionId into one split row', () => {
+			const rows = buildListRows([
+				createMockTransaction({ id: 10, parentTransactionId: 5, amount: 30, categoryId: 1 }),
+				createMockTransaction({ id: 11, parentTransactionId: 5, amount: 70, categoryId: 2 })
+			]);
+
+			expect(rows.length).toBe(1);
+			expect(rows[0].type).toBe('split');
+			const split = rows[0] as SplitGroupRow;
+			expect(split.parentId).toBe(5);
+			expect(split.children.map((c) => c.id)).toEqual([10, 11]);
+			expect(split.total).toBe(100);
+			// Dominant = larger child (categoryId 2, amount 70)
+			expect(split.dominantCategoryId).toBe(2);
+		});
+
+		it('places the split row at the position of its first child', () => {
+			const rows = buildListRows([
+				createMockTransaction({ id: 1 }),
+				createMockTransaction({ id: 10, parentTransactionId: 5, amount: 30 }),
+				createMockTransaction({ id: 2 }),
+				createMockTransaction({ id: 11, parentTransactionId: 5, amount: 70 })
+			]);
+
+			// single(1), split(5) at index 1, single(2) at index 2
+			expect(rows.map((r) => r.type)).toEqual(['single', 'split', 'single']);
+			expect((rows[1] as SplitGroupRow).children.map((c) => c.id)).toEqual([10, 11]);
+		});
+
+		it('groups non-adjacent children of the same parent', () => {
+			const rows = buildListRows([
+				createMockTransaction({ id: 10, parentTransactionId: 5, amount: 30 }),
+				createMockTransaction({ id: 99 }),
+				createMockTransaction({ id: 11, parentTransactionId: 5, amount: 70 })
+			]);
+
+			expect(rows.length).toBe(2);
+			expect((rows[0] as SplitGroupRow).children.map((c) => c.id)).toEqual([10, 11]);
+		});
+
+		it('demotes a single visible child back to a single row', () => {
+			const rows = buildListRows([
+				createMockTransaction({ id: 10, parentTransactionId: 5, amount: 30 })
+			]);
+
+			expect(rows.length).toBe(1);
+			expect(rows[0].type).toBe('single');
+			expect(rows[0].type === 'single' && rows[0].transaction.id).toBe(10);
+		});
+
+		it('aggregates shared totals across split children', () => {
+			const rows = buildListRows([
+				createMockTransaction({
+					id: 10,
+					parentTransactionId: 5,
+					amount: 40,
+					isShared: true,
+					partnerShare: 20,
+					isSettled: false
+				}),
+				createMockTransaction({
+					id: 11,
+					parentTransactionId: 5,
+					amount: 60,
+					isShared: true,
+					partnerShare: 30,
+					isSettled: true
+				})
+			]);
+
+			const split = rows[0] as SplitGroupRow;
+			expect(split.allShared).toBe(true);
+			expect(split.anyPending).toBe(true); // child 10 is unsettled
+			expect(split.partnerTotal).toBe(50); // 20 + 30
+			expect(split.youTotal).toBe(50); // (40-20) + (60-30)
+		});
+
+		it('marks allShared false when any child is personal', () => {
+			const rows = buildListRows([
+				createMockTransaction({ id: 10, parentTransactionId: 5, amount: 40, isShared: true, partnerShare: 20 }),
+				createMockTransaction({ id: 11, parentTransactionId: 5, amount: 60, isShared: false, partnerShare: 0 })
+			]);
+
+			expect((rows[0] as SplitGroupRow).allShared).toBe(false);
+		});
+	});
+
+	describe('groupRowsByDate', () => {
+		it('groups rows by date (newest first), counting a split as one row', () => {
+			const rows = buildListRows([
+				createMockTransaction({ id: 1, date: new Date(2025, 0, 15) }),
+				createMockTransaction({ id: 10, parentTransactionId: 5, amount: 30, date: new Date(2025, 0, 15) }),
+				createMockTransaction({ id: 11, parentTransactionId: 5, amount: 70, date: new Date(2025, 0, 15) }),
+				createMockTransaction({ id: 2, date: new Date(2025, 0, 14) })
+			]);
+
+			const groups = groupRowsByDate(rows);
+
+			expect(groups.map((g) => g.dateKey)).toEqual(['2025-01-15', '2025-01-14']);
+			expect(groups[0].rows.length).toBe(2); // single(1) + split
+			expect(groups[1].rows.length).toBe(1);
 		});
 	});
 });

@@ -7,6 +7,7 @@ import {
 	bulkDeleteTransactions,
 	bulkUpdateCategory,
 	splitTransaction,
+	updateSplitGroup,
 	getSplitChildren,
 	isSplitParent,
 	getTransactionsByMonth,
@@ -1416,6 +1417,172 @@ describe('Transaction Operations', () => {
 					{ categoryId: 15, amount: 30 }
 				])
 			).rejects.toThrow('Cannot split a transaction that is already part of a split');
+		});
+	});
+
+	describe('updateSplitGroup', () => {
+		async function makeSplit() {
+			const parentId = await addTransaction({
+				date: new Date(2025, 11, 15),
+				merchant: 'Target',
+				amount: 100,
+				categoryId: 1,
+				isShared: false,
+				splitType: 'percentage',
+				splitValue: 0.5,
+				isSettled: false,
+				isEssential: false,
+				isSubscription: false
+			});
+			await splitTransaction(parentId, [
+				{ categoryId: 11, amount: 60 },
+				{ categoryId: 15, amount: 40 }
+			]);
+			return parentId;
+		}
+
+		const baseShared = {
+			merchant: 'Target',
+			date: new Date(2025, 11, 15),
+			isShared: false,
+			splitType: 'percentage' as const,
+			splitValue: 0.5,
+			isSettled: false
+		};
+
+		it('replaces children with the new lines and keeps the parent hidden', async () => {
+			const parentId = await makeSplit();
+
+			const newIds = await updateSplitGroup(parentId, baseShared, [
+				{ categoryId: 11, amount: 30 },
+				{ categoryId: 12, amount: 20 },
+				{ categoryId: 15, amount: 50 }
+			]);
+
+			expect(newIds).toHaveLength(3);
+			const children = await getSplitChildren(parentId);
+			expect(children).toHaveLength(3);
+			expect(children.map((c) => c.amount).sort((a, b) => a - b)).toEqual([20, 30, 50]);
+
+			const parent = await db.transactions.get(parentId);
+			expect(parent?.isSplitParent).toBe(true);
+			// New total reflects the sum of the new lines.
+			expect(parent?.amount).toBe(100);
+		});
+
+		it('lets the overall total change to the sum of the lines', async () => {
+			const parentId = await makeSplit();
+
+			await updateSplitGroup(parentId, baseShared, [
+				{ categoryId: 11, amount: 80 },
+				{ categoryId: 15, amount: 40 }
+			]);
+
+			const parent = await db.transactions.get(parentId);
+			expect(parent?.amount).toBe(120);
+			const children = await getSplitChildren(parentId);
+			expect(children.reduce((s, c) => s + c.amount, 0)).toBe(120);
+		});
+
+		it('applies updated group-level fields to every child', async () => {
+			const parentId = await makeSplit();
+
+			const newIds = await updateSplitGroup(
+				parentId,
+				{
+					merchant: 'Costco',
+					date: new Date(2025, 11, 20),
+					isShared: true,
+					splitType: 'percentage',
+					splitValue: 0.5,
+					isSettled: false
+				},
+				[
+					{ categoryId: 11, amount: 100 },
+					{ categoryId: 15, amount: 100 }
+				]
+			);
+
+			const child = await db.transactions.get(newIds[0]);
+			expect(child?.merchant).toBe('Costco');
+			expect(child?.isShared).toBe(true);
+			expect(child?.partnerShare).toBe(50); // 50% of 100
+			expect(child?.date.getTime()).toBe(new Date(2025, 11, 20).getTime());
+
+			const parent = await db.transactions.get(parentId);
+			expect(parent?.merchant).toBe('Costco');
+			expect(parent?.isShared).toBe(true);
+		});
+
+		it('inherits isEssential/isSubscription from the parent', async () => {
+			const parentId = await addTransaction({
+				date: new Date(2025, 11, 15),
+				merchant: 'Gym',
+				amount: 100,
+				categoryId: 1,
+				isShared: false,
+				splitType: 'percentage',
+				splitValue: 0.5,
+				isSettled: false,
+				isEssential: true,
+				isSubscription: false
+			});
+			await splitTransaction(parentId, [
+				{ categoryId: 11, amount: 60 },
+				{ categoryId: 15, amount: 40 }
+			]);
+
+			const newIds = await updateSplitGroup(parentId, { ...baseShared, merchant: 'Gym' }, [
+				{ categoryId: 11, amount: 70 },
+				{ categoryId: 15, amount: 30 }
+			]);
+
+			const child = await db.transactions.get(newIds[0]);
+			expect(child?.isEssential).toBe(true);
+		});
+
+		it('throws if fewer than 2 lines are provided', async () => {
+			const parentId = await makeSplit();
+			await expect(
+				updateSplitGroup(parentId, baseShared, [{ categoryId: 11, amount: 100 }])
+			).rejects.toThrow('Must have at least 2 split lines');
+		});
+
+		it('throws when the target is not a split parent', async () => {
+			const id = await addTransaction({
+				date: new Date(2025, 11, 15),
+				merchant: 'Solo',
+				amount: 50,
+				categoryId: 1,
+				isShared: false,
+				splitType: 'percentage',
+				splitValue: 0.5,
+				isSettled: false,
+				isEssential: false,
+				isSubscription: false
+			});
+			await expect(
+				updateSplitGroup(id, baseShared, [
+					{ categoryId: 11, amount: 30 },
+					{ categoryId: 15, amount: 20 }
+				])
+			).rejects.toThrow('Transaction is not a split');
+		});
+
+		it('does not leave the old children behind', async () => {
+			const parentId = await makeSplit();
+			const before = await getSplitChildren(parentId);
+			const beforeIds = before.map((c) => c.id);
+
+			await updateSplitGroup(parentId, baseShared, [
+				{ categoryId: 11, amount: 50 },
+				{ categoryId: 15, amount: 50 }
+			]);
+
+			// None of the original child ids should still exist.
+			for (const oldId of beforeIds) {
+				expect(await db.transactions.get(oldId!)).toBeUndefined();
+			}
 		});
 	});
 

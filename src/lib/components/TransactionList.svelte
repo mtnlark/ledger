@@ -1,10 +1,16 @@
 <script lang="ts">
 	import type { ComponentType } from 'svelte';
-	import { Pencil, Trash2, Receipt, CheckSquare, Square, Check } from 'lucide-svelte';
+	import { slide } from 'svelte/transition';
+	import { Pencil, Trash2, Receipt, CheckSquare, Square, Check, ChevronRight } from 'lucide-svelte';
 	import type { Transaction, Category, Settings } from '$lib/db';
 	import { createCategoryHelpers } from '$lib/utils/category-helpers';
 	import { formatCurrency } from '$lib/utils/format-helpers';
-	import { createDateGroups, type DateGroup } from '$lib/utils/transaction-grouping';
+	import {
+		sortTransactionsByDate,
+		buildListRows,
+		groupRowsByDate,
+		type ListRow
+	} from '$lib/utils/transaction-grouping';
 	import { extractTags, removeTags } from '$lib/utils/tags';
 	import { DEFAULT_PAGE_SIZE } from '$lib/utils/pagination';
 	import EmptyState from './EmptyState.svelte';
@@ -21,6 +27,10 @@
 		onBulkCategoryChange?: (ids: number[], categoryId: number) => void;
 		onBulkTagAdd?: (ids: number[], tag: string) => void;
 		onBulkTagRemove?: (ids: number[], tag: string) => void;
+		/** Edit an entire split as a group (opens the split editor). */
+		onEditSplit?: (parentId: number, children: Transaction[]) => void;
+		/** Delete an entire split (all child lines) at once. */
+		onDeleteSplit?: (childIds: number[]) => void;
 		availableTags?: string[];
 		onAddTransaction?: () => void;
 		selectionMode?: boolean;
@@ -31,7 +41,7 @@
 		resetKey?: string;
 	}
 
-	let { transactions, categories, settings, onEdit, onDelete, onBulkDelete, onBulkCategoryChange, onBulkTagAdd, onBulkTagRemove, availableTags = [], onAddTransaction, selectionMode = false, onSelectionModeChange, onTagClick, allTransactions, resetKey = '' }: Props = $props();
+	let { transactions, categories, settings, onEdit, onDelete, onBulkDelete, onBulkCategoryChange, onBulkTagAdd, onBulkTagRemove, onEditSplit, onDeleteSplit, availableTags = [], onAddTransaction, selectionMode = false, onSelectionModeChange, onTagClick, allTransactions, resetKey = '' }: Props = $props();
 
 	// Selection mode state - use prop if provided, otherwise internal state
 	let internalSelectionMode = $state(false);
@@ -142,12 +152,32 @@
 	let getCategoryIcon = $derived(categoryHelpers.getIcon);
 	let getCategoryColor = $derived(categoryHelpers.getColor);
 
-	// Progressive loading — show DEFAULT_PAGE_SIZE initially, reveal more on demand
-	let displayCount = $state(DEFAULT_PAGE_SIZE);
-	let hasMore = $derived(transactions.length > displayCount);
-	let displayedTransactions = $derived(transactions.slice(0, displayCount));
+	// Split-group expand/collapse state (collapsed by default), keyed by parent id
+	let expandedSplits = $state<Set<number>>(new Set());
 
-	// Reset display count when resetKey changes (month/filter changes).
+	function toggleSplit(parentId: number) {
+		const next = new Set(expandedSplits);
+		if (next.has(parentId)) {
+			next.delete(parentId);
+		} else {
+			next.add(parentId);
+		}
+		expandedSplits = next;
+	}
+
+	// Progressive loading — show DEFAULT_PAGE_SIZE rows initially, reveal more on demand.
+	// We paginate over *rows* (a split group counts as one row) and build them from the
+	// full list before slicing, so a split group is never partially cut at the boundary.
+	let displayCount = $state(DEFAULT_PAGE_SIZE);
+	let allRows = $derived(buildListRows(sortTransactionsByDate(transactions)));
+	let displayedRows = $derived(allRows.slice(0, displayCount));
+	let hasMore = $derived(allRows.length > displayCount);
+	let rowGroups = $derived(groupRowsByDate(displayedRows));
+	let displayedTxCount = $derived(
+		displayedRows.reduce((n, r) => n + (r.type === 'single' ? 1 : r.children.length), 0)
+	);
+
+	// Reset display + expanded state when resetKey changes (month/filter changes).
 	// This intentionally ignores data refreshes (edits) that don't change the viewing context,
 	// allowing users to stay at their current scroll position after editing older transactions.
 	let prevResetKey = '';
@@ -155,16 +185,134 @@
 		if (resetKey !== prevResetKey) {
 			prevResetKey = resetKey;
 			displayCount = DEFAULT_PAGE_SIZE;
+			expandedSplits = new Set();
 		}
 	});
 
 	function showMore() {
-		displayCount = Math.min(displayCount + DEFAULT_PAGE_SIZE, transactions.length);
+		displayCount = Math.min(displayCount + DEFAULT_PAGE_SIZE, allRows.length);
 	}
 
-	// Group transactions by date using the utility function
-	let groupedTransactions = $derived(createDateGroups(displayedTransactions));
+	function rowKey(row: ListRow): string {
+		return row.type === 'single' ? `s${row.transaction.id}` : `g${row.parentId}`;
+	}
 </script>
+
+<!-- Standard transaction card. Reused for single rows and (in selection mode) split children. -->
+{#snippet txCard(transaction: Transaction, animationDelay: number)}
+	{@const tags = extractTags(transaction.notes)}
+	{@const cleanNotes = removeTags(transaction.notes)}
+	<!-- Use button in selection mode for proper keyboard/screen reader support -->
+	<svelte:element
+		this={isSelectionMode ? 'button' : 'div'}
+		type={isSelectionMode ? 'button' : undefined}
+		role={isSelectionMode ? undefined : 'listitem'}
+		class="bg-surface rounded-lg shadow-sm shadow-theme p-4 flex items-center gap-4 transition-colors border-l-4 text-left w-full {isSelectionMode
+			? 'cursor-pointer'
+			: 'hover:bg-surface-hover/50'} {selectedIds.has(transaction.id!) ? 'bg-primary-50 hover:bg-primary-100' : 'hover:bg-surface-hover/50'}"
+		style="border-left-color: {getCategoryColor(transaction.categoryId)}; animation-delay: {animationDelay}ms;"
+		onclick={isSelectionMode ? () => toggleSelection(transaction.id!) : undefined}
+	>
+		<!-- Checkbox (selection mode) -->
+		{#if isSelectionMode}
+			<div
+				class="w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 transition-colors {selectedIds.has(
+					transaction.id!
+				)
+					? 'bg-primary-500 border-primary-500 checkbox-spring'
+					: 'border-theme bg-surface'}"
+			>
+				{#if selectedIds.has(transaction.id!)}
+					<Check size={12} class="text-white" strokeWidth={3} />
+				{/if}
+			</div>
+		{/if}
+
+		<!-- Category Icon -->
+		<div class="text-2xl flex-shrink-0">{getCategoryIcon(transaction.categoryId)}</div>
+
+		<!-- Main Content -->
+		<div class="flex-1 min-w-0">
+			<div class="flex items-center gap-2">
+				<span class="font-medium text-charcoal truncate">{transaction.merchant}</span>
+				{#if transaction.isSubscription}
+					<span
+						class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold uppercase tracking-wide bg-primary-100 text-primary-600"
+					>
+						{transaction.subscriptionFrequency === 'annual' ? 'Annual' : 'Sub'}
+					</span>
+				{/if}
+				{#if transaction.isShared}
+					<span
+						class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold uppercase tracking-wide bg-success-100 text-success-600"
+					>
+						Shared
+					</span>
+				{/if}
+				{#if transaction.isShared && !transaction.isSettled}
+					<span
+						class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold uppercase tracking-wide bg-warning-100 text-warning-600"
+					>
+						Pending
+					</span>
+				{/if}
+			</div>
+			<div class="flex items-center gap-2 text-sm text-charcoal-muted mt-0.5">
+				<span>{getCategoryName(transaction.categoryId)}</span>
+				{#if transaction.isShared}
+					<span>·</span>
+					<span class="text-success-600">
+						{partnerName}: {formatCurrency(transaction.partnerShare)}
+					</span>
+				{/if}
+			</div>
+			{#if cleanNotes || tags.length > 0}
+				<div class="mt-1 flex flex-wrap items-center gap-1">
+					{#if cleanNotes}
+						<p class="text-xs text-charcoal-muted/70 italic truncate mr-1">{cleanNotes}</p>
+					{/if}
+					{#each tags as tag (tag)}
+						<TagPill {tag} onClick={onTagClick} transactions={allTransactions ?? []} />
+					{/each}
+				</div>
+			{/if}
+		</div>
+
+		<!-- Amount -->
+		<div class="text-right flex-shrink-0">
+			<div class="font-mono font-medium text-charcoal">{formatCurrency(transaction.amount)}</div>
+			{#if transaction.isShared}
+				<div class="text-xs text-charcoal-muted font-mono">
+					You: {formatCurrency(transaction.amount - transaction.partnerShare)}
+				</div>
+			{/if}
+		</div>
+
+		<!-- Actions (hidden in selection mode) -->
+		{#if !isSelectionMode && (onEdit || onDelete)}
+			<div class="flex gap-1 flex-shrink-0">
+				{#if onEdit}
+					<button
+						onclick={(e) => { e.stopPropagation(); onEdit?.(transaction); }}
+						class="p-2 text-charcoal-muted hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors"
+						aria-label="Edit transaction"
+					>
+						<Pencil size={16} />
+					</button>
+				{/if}
+				{#if onDelete}
+					<button
+						onclick={(e) => { e.stopPropagation(); onDelete?.(transaction.id!); }}
+						class="p-2 text-charcoal-muted hover:text-danger-500 hover:bg-danger-50 rounded-lg transition-colors"
+						aria-label="Delete transaction"
+					>
+						<Trash2 size={16} />
+					</button>
+				{/if}
+			</div>
+		{/if}
+	</svelte:element>
+{/snippet}
 
 <div class="space-y-5">
 	{#if transactions.length === 0}
@@ -204,124 +352,173 @@
 			</div>
 		{/if}
 
-		{#each groupedTransactions as group, groupIndex (group.dateKey)}
+		{#each rowGroups as group, groupIndex (group.dateKey)}
 			<!-- Date Header -->
 			<div class="animate-enter" style="animation-delay: {groupIndex * 50}ms;">
 				<h3 class="text-sm font-medium text-charcoal-muted mb-3 px-1">{group.label}</h3>
 				<div class="space-y-2">
-					{#each group.transactions as transaction, txIndex (transaction.id)}
-						{@const tags = extractTags(transaction.notes)}
-						{@const cleanNotes = removeTags(transaction.notes)}
-						<!-- Use button in selection mode for proper keyboard/screen reader support -->
-						<svelte:element
-							this={isSelectionMode ? 'button' : 'div'}
-							type={isSelectionMode ? 'button' : undefined}
-							role={isSelectionMode ? undefined : 'listitem'}
-							class="bg-surface rounded-lg shadow-sm shadow-theme p-4 flex items-center gap-4 transition-colors border-l-4 text-left w-full {isSelectionMode
-								? 'cursor-pointer'
-								: 'hover:bg-surface-hover/50'} {selectedIds.has(transaction.id!) ? 'bg-primary-50 hover:bg-primary-100' : 'hover:bg-surface-hover/50'}"
-							style="border-left-color: {getCategoryColor(transaction.categoryId)}; animation-delay: {(groupIndex * 50) + (txIndex * 30)}ms;"
-							onclick={isSelectionMode ? () => toggleSelection(transaction.id!) : undefined}
-						>
-							<!-- Checkbox (selection mode) -->
-							{#if isSelectionMode}
-								<div
-									class="w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 transition-colors {selectedIds.has(
-										transaction.id!
-									)
-										? 'bg-primary-500 border-primary-500 checkbox-spring'
-										: 'border-theme bg-surface'}"
-								>
-									{#if selectedIds.has(transaction.id!)}
-										<Check size={12} class="text-white" strokeWidth={3} />
-									{/if}
-								</div>
-							{/if}
+					{#each group.rows as row, rowIndex (rowKey(row))}
+						{@const delay = (groupIndex * 50) + (rowIndex * 30)}
+						{#if row.type === 'single'}
+							{@render txCard(row.transaction, delay)}
+						{:else if isSelectionMode}
+							<!-- In selection mode, splits render flat so each child stays individually selectable -->
+							{#each row.children as child, childIndex (child.id)}
+								{@render txCard(child, delay + childIndex * 15)}
+							{/each}
+						{:else}
+							{@const isExpanded = expandedSplits.has(row.parentId)}
+							<!-- Collapsible split group -->
+							<div
+								class="bg-surface rounded-lg shadow-sm shadow-theme border-l-4 transition-colors hover:bg-surface-hover/50"
+								style="border-left-color: {getCategoryColor(row.dominantCategoryId)}; animation-delay: {delay}ms;"
+							>
+								<div class="flex items-center gap-3 p-4">
+									<button
+										type="button"
+										onclick={() => toggleSplit(row.parentId)}
+										aria-expanded={isExpanded}
+										class="flex items-center gap-3 flex-1 min-w-0 text-left"
+									>
+										<ChevronRight
+											size={18}
+											class="text-charcoal-muted flex-shrink-0 transition-transform {isExpanded ? 'rotate-90' : ''}"
+										/>
+										<div class="text-2xl flex-shrink-0">{getCategoryIcon(row.dominantCategoryId)}</div>
 
-							<!-- Category Icon -->
-							<div class="text-2xl flex-shrink-0">{getCategoryIcon(transaction.categoryId)}</div>
+										<div class="flex-1 min-w-0">
+											<div class="flex items-center gap-2">
+												<span class="font-medium text-charcoal truncate">{row.merchant}</span>
+												<span
+													class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold uppercase tracking-wide bg-surface-alt text-charcoal-muted border border-theme"
+												>
+													Split
+												</span>
+												{#if row.allShared}
+													<span
+														class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold uppercase tracking-wide bg-success-100 text-success-600"
+													>
+														Shared
+													</span>
+												{/if}
+												{#if row.anyPending}
+													<span
+														class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold uppercase tracking-wide bg-warning-100 text-warning-600"
+													>
+														Pending
+													</span>
+												{/if}
+											</div>
+											<div class="flex items-center gap-2 text-sm text-charcoal-muted mt-0.5">
+												<span>{row.children.length} categories</span>
+												{#if row.allShared}
+													<span>·</span>
+													<span class="text-success-600">
+														{partnerName}: {formatCurrency(row.partnerTotal)}
+													</span>
+												{/if}
+											</div>
+										</div>
 
-							<!-- Main Content -->
-							<div class="flex-1 min-w-0">
-								<div class="flex items-center gap-2">
-									<span class="font-medium text-charcoal truncate">{transaction.merchant}</span>
-									{#if transaction.isSubscription}
-										<span
-											class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold uppercase tracking-wide bg-primary-100 text-primary-600"
-										>
-											{transaction.subscriptionFrequency === 'annual' ? 'Annual' : 'Sub'}
-										</span>
-									{/if}
-									{#if transaction.isShared}
-										<span
-											class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold uppercase tracking-wide bg-success-100 text-success-600"
-										>
-											Shared
-										</span>
-									{/if}
-									{#if transaction.isShared && !transaction.isSettled}
-										<span
-											class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold uppercase tracking-wide bg-warning-100 text-warning-600"
-										>
-											Pending
-										</span>
+										<div class="text-right flex-shrink-0">
+											<div class="font-mono font-medium text-charcoal">{formatCurrency(row.total)}</div>
+											{#if row.allShared}
+												<div class="text-xs text-charcoal-muted font-mono">
+													You: {formatCurrency(row.youTotal)}
+												</div>
+											{/if}
+										</div>
+									</button>
+
+									<!-- Group-level actions, aligned with single-row controls -->
+									{#if onEditSplit || onDeleteSplit}
+										<div class="flex gap-1 flex-shrink-0">
+											{#if onEditSplit}
+												<button
+													type="button"
+													onclick={() => onEditSplit?.(row.parentId, row.children)}
+													class="p-2 text-charcoal-muted hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors"
+													aria-label="Edit split"
+												>
+													<Pencil size={16} />
+												</button>
+											{/if}
+											{#if onDeleteSplit}
+												<button
+													type="button"
+													onclick={() => onDeleteSplit?.(row.children.map((c) => c.id!))}
+													class="p-2 text-charcoal-muted hover:text-danger-500 hover:bg-danger-50 rounded-lg transition-colors"
+													aria-label="Delete split"
+												>
+													<Trash2 size={16} />
+												</button>
+											{/if}
+										</div>
 									{/if}
 								</div>
-								<div class="flex items-center gap-2 text-sm text-charcoal-muted mt-0.5">
-									<span>{getCategoryName(transaction.categoryId)}</span>
-									{#if transaction.isShared}
-										<span>·</span>
-										<span class="text-success-600">
-											{partnerName}: {formatCurrency(transaction.partnerShare)}
-										</span>
-									{/if}
-								</div>
-								{#if cleanNotes || tags.length > 0}
-									<div class="mt-1 flex flex-wrap items-center gap-1">
-										{#if cleanNotes}
-											<p class="text-xs text-charcoal-muted/70 italic truncate mr-1">{cleanNotes}</p>
-										{/if}
-										{#each tags as tag (tag)}
-											<TagPill {tag} onClick={onTagClick} transactions={allTransactions ?? []} />
-										{/each}
+
+								{#if isExpanded}
+									<div transition:slide={{ duration: 150 }} class="pl-6 pr-4 pb-4 pt-1">
+										<!-- Inner wrapper carries the rail so it ends at the last line, not the card edge -->
+										<div class="border-l-2 border-theme pl-4 pt-3 space-y-2">
+											{#each row.children as child (child.id)}
+												{@const childTags = extractTags(child.notes)}
+												{@const childNotes = removeTags(child.notes)}
+												<div
+													class="bg-surface-alt rounded-lg p-3 flex items-center gap-3"
+													role="listitem"
+												>
+													<div class="text-xl flex-shrink-0">{getCategoryIcon(child.categoryId)}</div>
+													<div class="flex-1 min-w-0">
+														<span class="font-medium text-charcoal text-sm truncate">{getCategoryName(child.categoryId)}</span>
+														{#if childNotes || childTags.length > 0}
+															<div class="mt-0.5 flex flex-wrap items-center gap-1">
+																{#if childNotes}
+																	<p class="text-xs text-charcoal-muted/70 italic truncate mr-1">{childNotes}</p>
+																{/if}
+																{#each childTags as tag (tag)}
+																	<TagPill {tag} onClick={onTagClick} transactions={allTransactions ?? []} />
+																{/each}
+															</div>
+														{/if}
+													</div>
+													<div class="text-right flex-shrink-0">
+														<div class="font-mono text-sm text-charcoal">{formatCurrency(child.amount)}</div>
+														{#if child.isShared}
+															<div class="text-xs text-charcoal-muted font-mono">
+																You: {formatCurrency(child.amount - child.partnerShare)}
+															</div>
+														{/if}
+													</div>
+													{#if onEdit || onDelete}
+														<div class="flex gap-1 flex-shrink-0">
+															{#if onEdit}
+																<button
+																	onclick={() => onEdit?.(child)}
+																	class="p-1.5 text-charcoal-muted hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors"
+																	aria-label="Edit transaction"
+																>
+																	<Pencil size={14} />
+																</button>
+															{/if}
+															{#if onDelete}
+																<button
+																	onclick={() => onDelete?.(child.id!)}
+																	class="p-1.5 text-charcoal-muted hover:text-danger-500 hover:bg-danger-50 rounded-lg transition-colors"
+																	aria-label="Delete transaction"
+																>
+																	<Trash2 size={14} />
+																</button>
+															{/if}
+														</div>
+													{/if}
+												</div>
+											{/each}
+										</div>
 									</div>
 								{/if}
 							</div>
-
-							<!-- Amount -->
-							<div class="text-right flex-shrink-0">
-								<div class="font-mono font-medium text-charcoal">{formatCurrency(transaction.amount)}</div>
-								{#if transaction.isShared}
-									<div class="text-xs text-charcoal-muted font-mono">
-										You: {formatCurrency(transaction.amount - transaction.partnerShare)}
-									</div>
-								{/if}
-							</div>
-
-							<!-- Actions (hidden in selection mode) -->
-							{#if !isSelectionMode && (onEdit || onDelete)}
-								<div class="flex gap-1 flex-shrink-0">
-									{#if onEdit}
-										<button
-											onclick={(e) => { e.stopPropagation(); onEdit?.(transaction); }}
-											class="p-2 text-charcoal-muted hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors"
-											aria-label="Edit transaction"
-										>
-											<Pencil size={16} />
-										</button>
-									{/if}
-									{#if onDelete}
-										<button
-											onclick={(e) => { e.stopPropagation(); onDelete?.(transaction.id!); }}
-											class="p-2 text-charcoal-muted hover:text-danger-500 hover:bg-danger-50 rounded-lg transition-colors"
-											aria-label="Delete transaction"
-										>
-											<Trash2 size={16} />
-										</button>
-									{/if}
-								</div>
-							{/if}
-						</svelte:element>
+						{/if}
 					{/each}
 				</div>
 			</div>
@@ -331,7 +528,7 @@
 		{#if hasMore}
 			<div class="flex flex-col items-center gap-1 pt-2">
 				<span class="text-xs text-charcoal-muted">
-					Showing {displayedTransactions.length} of {transactions.length} transactions
+					Showing {displayedTxCount} of {transactions.length} transactions
 				</span>
 				<button
 					type="button"

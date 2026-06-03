@@ -57,7 +57,9 @@ See `PRODUCT_ROADMAP.md` for the full development plan. Groups 1–9 are complet
 8. ~~Performance & Tech Debt~~ — N+1 fix, stats dedup, lazy-load, chunk splitting, import/export tests ✅
 9. ~~Startup Perf & Search~~ — Redundant DB scan elimination, query parallelization, search/filter enhancements, pagination, lazy emoji picker, migration version stamp ✅
 
-**Recent**: Codebase cleanup — Removed 9 unused functions and ~20 unused exports (dead-code sweep), and cleared all `svelte-check` type errors (24 → 0). Notable: fixed a latent mobile-only bug in `registerNotificationClickHandler` (`onAction` returns a `PluginListener`, so cleanup must call `unlisten.unregister()`). `npm run check` is now a clean tripwire (13 a11y/reactivity warnings remain).
+**Recent**: Split transactions are now visually linked on the dashboard — children collapse into a single expandable summary row (`buildListRows`/`groupRowsByDate` in `transaction-grouping.ts`) instead of appearing as separate same-merchant rows. The summary row also has group-level Edit (`EditSplitModal` + `updateSplitGroup()`) and Delete actions, aligning splits with normal transactions.
+
+**Earlier**: Codebase cleanup — Removed 9 unused functions and ~20 unused exports (dead-code sweep), and cleared all `svelte-check` type errors (24 → 0). Notable: fixed a latent mobile-only bug in `registerNotificationClickHandler` (`onAction` returns a `PluginListener`, so cleanup must call `unlisten.unregister()`). `npm run check` is now a clean tripwire (13 a11y/reactivity warnings remain).
 
 **Earlier**: Tag toggle + bulk tag management — Clicking a filtered tag pill now un-filters it (toggle behavior). Bulk select toolbar adds "Tag" button with dropdown for adding/removing tags across selected transactions. New `appendTag()` utility, `bulkAddTag`/`bulkRemoveTag` store operations and dashboard actions.
 
@@ -188,6 +190,7 @@ ledger/
 │   │   │   ├── TransactionFilters.svelte
 │   │   │   ├── EditTransactionModal.svelte
 │   │   │   ├── SplitTransactionModal.svelte
+│   │   │   ├── EditSplitModal.svelte     # Edit an entire split (group fields + category lines)
 │   │   │   ├── CashFlowCard.svelte
 │   │   │   ├── CashFlowCardSkeleton.svelte
 │   │   │   ├── SettlementTracker.svelte
@@ -261,7 +264,7 @@ ledger/
 │   │   │   ├── modal-helpers.ts       # Modal event handlers (backdrop click, escape key)
 │   │   │   ├── form-validation.ts     # Shared form validation helpers
 │   │   │   ├── transaction-validation.ts  # Transaction data validation
-│   │   │   ├── transaction-grouping.ts    # Group transactions by date/category
+│   │   │   ├── transaction-grouping.ts    # Group txns by date; collapse split children into list rows (buildListRows/groupRowsByDate)
 │   │   │   ├── trie.ts                # Trie for merchant autocomplete
 │   │   │   ├── pagination.ts          # List pagination utilities
 │   │   │   ├── retry.ts               # Async retry with backoff
@@ -465,7 +468,9 @@ Sidebar state persists to localStorage (`ledger-sidebar-expanded`).
 ### Dashboard
 - Cash flow summary (income, saved, available, spent, surplus)
 - Collapsible "Add Transaction" form with merchant autocomplete
-- Transaction list with search/filters (searches merchant names and notes), amount range filter, progressive pagination (50 at a time)
+- Transaction list with search/filters (searches merchant names and notes), amount range filter, progressive pagination (50 rows at a time)
+- **Split transaction nesting**: Children of a split (sharing `parentTransactionId`) collapse into one summary row (merchant + "Split" badge + total + your-share) with a chevron to expand the indented per-category breakdown. Grouping/pagination happen at the row level so a split is never cut at the page boundary; groups left with <2 visible children (e.g. after a category filter) fall back to a plain row. Selection mode renders splits flat so each child stays individually selectable.
+  - **Group edit/delete**: The summary row has Edit/Delete controls mirroring normal rows. Edit opens `EditSplitModal` (group-level merchant/date/shared + editable category lines incl. per-line notes/tags); save calls `updateSplitGroup()` which keeps the hidden parent, recreates children from the new lines, and lets the total change to the sum of lines (`isEssential`/`isSubscription` inherited from the parent). Delete uses `onDeleteSplit(childIds)` → split-specific confirm ("Delete this split?") → soft-delete with undo (children only; total restores together). Individual lines keep their own per-row edit/delete in the expanded view.
 - Quick-add FAB for fast entry
 - Edit/split transaction modals
 - Bulk action toolbar for multi-select operations

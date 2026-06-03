@@ -8,6 +8,8 @@ import {
 	bulkAddTag as storeBulkAddTag,
 	bulkRemoveTag as storeBulkRemoveTag,
 	splitTransaction as storeSplitTransaction,
+	updateSplitGroup as storeUpdateSplitGroup,
+	type SplitGroupUpdate,
 	getTransactionsByMonth,
 	getAllTransactions,
 	getAvailableMonths,
@@ -292,6 +294,31 @@ export function setupDashboardActions(ctx: DashboardContext) {
 						error instanceof Error
 							? error.message
 							: 'Failed to split transaction'
+				});
+				return false;
+			}
+		},
+
+		/**
+		 * Edit an existing split as a whole: update group-level fields and the
+		 * category breakdown in one step.
+		 * @returns true on success, false on error
+		 */
+		async updateSplitGroup(
+			parentId: number,
+			shared: SplitGroupUpdate,
+			lines: { categoryId: number; amount: number; notes?: string }[]
+		): Promise<boolean> {
+			try {
+				await storeUpdateSplitGroup(parentId, shared, lines);
+				await reloadAfterMutation();
+				toast.success('Split updated');
+				return true;
+			} catch (error) {
+				handleError(error, {
+					context: 'updateSplitGroup',
+					userMessage:
+						error instanceof Error ? error.message : 'Failed to update split'
 				});
 				return false;
 			}

@@ -511,6 +511,130 @@ export async function getSplitChildren(parentId: number): Promise<Transaction[]>
 	return db.transactions.where('parentTransactionId').equals(parentId).toArray();
 }
 
+// Shared (group-level) fields applied to every line of a split when editing.
+export interface SplitGroupUpdate {
+	merchant: string;
+	date: Date;
+	isShared: boolean;
+	splitType: 'percentage' | 'fixed';
+	splitValue: number;
+	isSettled: boolean;
+}
+
+// Edit an existing split as a whole: update the group-level fields and replace
+// the category breakdown. The parent (isSplitParent) record is kept and stays
+// hidden; old children are removed and recreated from the new lines. The new
+// total is simply the sum of the lines (the editor lets you change the amount).
+// isEssential/isSubscription are inherited from the parent, mirroring how splits
+// are created. Returns the new child ids.
+export async function updateSplitGroup(
+	parentId: number,
+	shared: SplitGroupUpdate,
+	lines: { categoryId: number; amount: number; notes?: string }[]
+): Promise<number[]> {
+	if (lines.length < 2) {
+		throw new Error('Must have at least 2 split lines');
+	}
+
+	const parent = await db.transactions.get(parentId);
+	if (!parent) {
+		throw new Error('Transaction not found');
+	}
+	if (!parent.isSplitParent) {
+		throw new Error('Transaction is not a split');
+	}
+
+	const now = new Date();
+	const total = sumCurrency(lines.map((l) => l.amount));
+	const settledDate = shared.isSettled ? (parent.settledDate ?? now) : undefined;
+
+	// Remove the existing children before recreating from the new lines.
+	const oldChildren = await db.transactions
+		.where('parentTransactionId')
+		.equals(parentId)
+		.toArray();
+	const oldChildIds = oldChildren.map((c) => c.id!).filter((id) => id != null);
+	if (oldChildIds.length > 0) {
+		await db.transactions.bulkDelete(oldChildIds);
+	}
+
+	// Update the parent in place (remains isSplitParent, so still hidden).
+	await db.transactions.update(parentId, {
+		merchant: shared.merchant,
+		date: shared.date,
+		amount: total,
+		isShared: shared.isShared,
+		splitType: shared.splitType,
+		splitValue: shared.splitValue,
+		isSettled: shared.isSettled,
+		settledDate,
+		partnerShare: shared.isShared
+			? calculatePartnerShare(total, shared.splitType, shared.splitValue)
+			: 0,
+		updatedAt: now
+	});
+
+	// Recreate children from the new lines.
+	const childIds: number[] = [];
+	const childTransactions: Transaction[] = [];
+	for (const line of lines) {
+		const partnerShare = shared.isShared
+			? calculatePartnerShare(line.amount, shared.splitType, shared.splitValue)
+			: 0;
+
+		const childData: Omit<Transaction, 'id'> = {
+			date: shared.date,
+			merchant: shared.merchant,
+			amount: line.amount,
+			categoryId: line.categoryId,
+			isShared: shared.isShared,
+			splitType: shared.splitType,
+			splitValue: shared.splitValue,
+			partnerShare,
+			isSettled: shared.isSettled,
+			settledDate,
+			notes: line.notes,
+			isEssential: parent.isEssential,
+			isSubscription: parent.isSubscription,
+			subscriptionFrequency: parent.subscriptionFrequency,
+			parentTransactionId: parentId,
+			createdAt: now,
+			updatedAt: now
+		};
+
+		const childId = (await db.transactions.add(childData)) as number;
+		childIds.push(childId);
+		childTransactions.push({ ...childData, id: childId } as Transaction);
+	}
+
+	// Reconcile the cache incrementally.
+	const cache = getTransactionCache();
+	if (cache.isLoaded) {
+		if (oldChildIds.length > 0) {
+			cache.bulkRemove(oldChildIds);
+		}
+		cache.update(parentId, {
+			merchant: shared.merchant,
+			date: shared.date,
+			amount: total,
+			isShared: shared.isShared,
+			splitType: shared.splitType,
+			splitValue: shared.splitValue,
+			isSettled: shared.isSettled,
+			settledDate,
+			updatedAt: now
+		});
+		for (const child of childTransactions) {
+			cache.add({ ...child, id: child.id! });
+		}
+		tagIndex.rebuild(cache.getAll());
+	}
+
+	invalidateTransactionCaches();
+	await persistData();
+	return childIds;
+}
+
 // Check if a transaction has been split (has children)
 export async function isSplitParent(id: number): Promise<boolean> {
 	const children = await db.transactions.where('parentTransactionId').equals(id).count();
