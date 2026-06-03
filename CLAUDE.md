@@ -513,6 +513,7 @@ Sidebar state persists to localStorage (`ledger-sidebar-expanded`).
 - **Overview tab**: Smart Takeaways (forward-looking current month / retrospective past month), Quick Stats Row (total spent, budget status, savings rate)
   - Highlights: pace projection, anomalies (with dollar amounts), category shifts
   - Pace projection and velocity exclude future-dated transactions via `filterUpToDate()`
+  - Pace projection is suppressed early in the month (until `ceil(daysInMonth × config.insights.pace.minMonthFraction)`, default 0.25 ≈ day 8) so a single large early charge doesn't extrapolate to a wildly inflated month-end number; other Highlights fill the slot meanwhile
   - Month in Review (past months): hero stat + grouped insights with 12-month rolling window
   - Hero priority chain: rank superlative → goal completion → savings highest → vs-average → rank quartile → savings above avg → category standout → total
   - Anomalies show dollar context ($current vs $avg avg), vs-average shows typical month amount + sample size

@@ -158,7 +158,7 @@ describe('InsightsEngine', () => {
 			const budget = { month: '2025-01', income: 5000, savedAmount: 0 };
 			const savedFromContributions = 1000;
 
-			const result = engine.getPaceProjection(1000, budget, savedFromContributions, 15, 31, '2025-01');
+			const result = engine.getPaceProjection(1000, budget, savedFromContributions, 15, 31, 0.25, '2025-01');
 			expect(result).not.toBeNull();
 			expect(result!.available).toBe(4000);
 		});

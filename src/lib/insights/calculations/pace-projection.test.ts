@@ -54,6 +54,39 @@ describe('calculatePaceProjection', () => {
 		expect(result!.percentOfBudget).toBe(0);
 	});
 
+	describe('early-month suppression (minMonthFraction)', () => {
+		it('does not suppress when minMonthFraction is omitted (default 0)', () => {
+			// Day 1 of the month would normally extrapolate wildly, but with no fraction
+			// the projection is still returned (backward-compatible default).
+			const result = calculatePaceProjection(500, budget, savedFromContributions, 1, 30);
+			expect(result).not.toBeNull();
+		});
+
+		it('returns null before the fraction cutoff', () => {
+			// 30-day month, 0.25 -> ceil(7.5) = day 8. Day 5 is below the cutoff.
+			const result = calculatePaceProjection(900, budget, savedFromContributions, 5, 30, 0.25);
+			expect(result).toBeNull();
+		});
+
+		it('returns a projection once the cutoff day is reached', () => {
+			// 30-day month, 0.25 -> day 8. Day 8 is the first day shown.
+			const result = calculatePaceProjection(1150, budget, savedFromContributions, 8, 30, 0.25);
+			expect(result).not.toBeNull();
+		});
+
+		it('adapts the cutoff to month length (February)', () => {
+			// 28-day month, 0.25 -> ceil(7) = day 7.
+			expect(calculatePaceProjection(800, budget, savedFromContributions, 6, 28, 0.25)).toBeNull();
+			expect(calculatePaceProjection(800, budget, savedFromContributions, 7, 28, 0.25)).not.toBeNull();
+		});
+
+		it('adapts the cutoff to month length (31-day month)', () => {
+			// 31-day month, 0.25 -> ceil(7.75) = day 8.
+			expect(calculatePaceProjection(800, budget, savedFromContributions, 7, 31, 0.25)).toBeNull();
+			expect(calculatePaceProjection(800, budget, savedFromContributions, 8, 31, 0.25)).not.toBeNull();
+		});
+	});
+
 	it('uses savedFromContributions instead of budget.savedAmount', () => {
 		// Budget with deprecated savedAmount field (should be ignored)
 		const budgetWithOldField: MonthlyBudget = {

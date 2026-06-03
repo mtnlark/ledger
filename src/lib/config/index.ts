@@ -129,6 +129,16 @@ export const config = {
 			/** Minimum percent change to show comparison (also floor for adaptive threshold) */
 			percentThreshold: 5
 		},
+		/** Spending pace projection */
+		pace: {
+			/**
+			 * Hide the pace projection until at least this fraction of the month has
+			 * elapsed. Early in the month a single large charge extrapolates to a wildly
+			 * inflated (and stressful) month-end number, so we wait for a stabler sample.
+			 * 0.25 ≈ day 8 for 30/31-day months, day 7 for February.
+			 */
+			minMonthFraction: 0.25
+		},
 		/** Top merchant detection */
 		topMerchant: {
 			/** Minimum visits to show merchant */

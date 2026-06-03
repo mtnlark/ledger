@@ -118,7 +118,7 @@
 		const currentDay = today.getDate();
 		const daysInMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
 		const totalSpent = engine.getTotalSpent(pastTransactions, `${selectedMonth}-past`);
-		return engine.getPaceProjection(totalSpent, budget, savedFromContributions, currentDay, daysInMonth, selectedMonth);
+		return engine.getPaceProjection(totalSpent, budget, savedFromContributions, currentDay, daysInMonth, config.insights.pace.minMonthFraction, selectedMonth);
 	});
 
 	// Get previous month for comparison
