@@ -396,17 +396,23 @@
 							{@const isExpanded = expandedSplits.has(row.parentId)}
 							<!-- Collapsible split group -->
 							<div>
-								<div class="group/split flex items-center gap-3 px-4 py-3 transition-colors hover:bg-surface-hover/50">
-									<button
-										type="button"
+									<!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -- row click is a pointer convenience; the chevron button is the accessible toggle -->
+									<div
+										class="group/split flex items-center gap-3 px-4 py-3 transition-colors hover:bg-surface-hover/50 cursor-pointer"
 										onclick={() => toggleSplit(row.parentId)}
-										aria-expanded={isExpanded}
-										class="flex items-center gap-3 flex-1 min-w-0 text-left"
 									>
-										<ChevronRight
-											size={18}
-											class="text-charcoal-muted flex-shrink-0 transition-transform {isExpanded ? 'rotate-90' : ''}"
-										/>
+										<button
+											type="button"
+											onclick={(e) => { e.stopPropagation(); toggleSplit(row.parentId); }}
+											aria-expanded={isExpanded}
+											aria-label="{isExpanded ? 'Collapse' : 'Expand'} split details for {row.merchant}"
+											class="flex-shrink-0 text-charcoal-muted hover:text-charcoal p-1 -m-1 rounded transition-colors"
+										>
+											<ChevronRight
+												size={18}
+												class="transition-transform {isExpanded ? 'rotate-90' : ''}"
+											/>
+										</button>
 										<div
 											class="category-chip category-icon-box w-9 h-9 text-lg"
 											style="background-color: {getCategoryColor(row.dominantCategoryId)}1F;"
@@ -414,7 +420,16 @@
 
 										<div class="flex-1 min-w-0">
 											<div class="flex items-center gap-2">
-												<span class="font-medium text-charcoal truncate">{row.merchant}</span>
+												{#if onMerchantClick && !isSelectionMode}
+													<button
+														type="button"
+														onclick={(e) => { e.stopPropagation(); onMerchantClick?.(row.merchant); }}
+														class="font-medium text-charcoal truncate text-left hover:text-primary-600 underline decoration-dotted decoration-transparent hover:decoration-primary-400 underline-offset-2 transition-colors"
+														title="View merchant report"
+													>{row.merchant}</button>
+												{:else}
+													<span class="font-medium text-charcoal truncate">{row.merchant}</span>
+												{/if}
 												<span class="badge bg-surface-alt text-charcoal-soft">Split</span>
 												{#if row.anyPending}
 													<span class="badge bg-warning-100 text-warning-600">Pending</span>
@@ -439,7 +454,6 @@
 												<div class="font-mono font-medium text-charcoal">{formatCurrency(row.total)}</div>
 											{/if}
 										</div>
-									</button>
 
 									<!-- Group-level actions, aligned with single-row controls -->
 									{#if onEditSplit || onDeleteSplit}
@@ -447,7 +461,7 @@
 											{#if onEditSplit}
 												<button
 													type="button"
-													onclick={() => onEditSplit?.(row.parentId, row.children)}
+													onclick={(e) => { e.stopPropagation(); onEditSplit?.(row.parentId, row.children); }}
 													class="p-2 text-charcoal-muted hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors"
 													aria-label="Edit split"
 												>
@@ -457,7 +471,7 @@
 											{#if onDeleteSplit}
 												<button
 													type="button"
-													onclick={() => onDeleteSplit?.(row.children.map((c) => c.id!))}
+													onclick={(e) => { e.stopPropagation(); onDeleteSplit?.(row.children.map((c) => c.id!)); }}
 													class="p-2 text-charcoal-muted hover:text-danger-500 hover:bg-danger-50 rounded-lg transition-colors"
 													aria-label="Delete split"
 												>
