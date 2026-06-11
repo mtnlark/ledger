@@ -198,8 +198,8 @@
 	}
 </script>
 
-<!-- Standard transaction card. Reused for single rows and (in selection mode) split children. -->
-{#snippet txCard(transaction: Transaction, animationDelay: number)}
+<!-- Standard transaction row. Reused for single rows and (in selection mode) split children. -->
+{#snippet txCard(transaction: Transaction)}
 	{@const tags = extractTags(transaction.notes)}
 	{@const cleanNotes = removeTags(transaction.notes)}
 	<!-- Use button in selection mode for proper keyboard/screen reader support -->
@@ -207,10 +207,9 @@
 		this={isSelectionMode ? 'button' : 'div'}
 		type={isSelectionMode ? 'button' : undefined}
 		role={isSelectionMode ? undefined : 'listitem'}
-		class="bg-surface rounded-lg shadow-sm shadow-theme p-4 flex items-center gap-4 transition-colors border-l-4 text-left w-full {isSelectionMode
+		class="group/row px-4 py-3 flex items-center gap-3 transition-colors text-left w-full {isSelectionMode
 			? 'cursor-pointer'
-			: 'hover:bg-surface-hover/50'} {selectedIds.has(transaction.id!) ? 'bg-primary-50 hover:bg-primary-100' : 'hover:bg-surface-hover/50'}"
-		style="border-left-color: {getCategoryColor(transaction.categoryId)}; animation-delay: {animationDelay}ms;"
+			: ''} {selectedIds.has(transaction.id!) ? 'bg-primary-50 hover:bg-primary-100' : 'hover:bg-surface-hover/50'}"
 		onclick={isSelectionMode ? () => toggleSelection(transaction.id!) : undefined}
 	>
 		<!-- Checkbox (selection mode) -->
@@ -229,32 +228,24 @@
 		{/if}
 
 		<!-- Category Icon -->
-		<div class="text-2xl flex-shrink-0">{getCategoryIcon(transaction.categoryId)}</div>
+		<div
+			class="category-chip category-icon-box w-9 h-9 text-lg"
+			style="background-color: {getCategoryColor(transaction.categoryId)}1F;"
+		>{getCategoryIcon(transaction.categoryId)}</div>
 
 		<!-- Main Content -->
 		<div class="flex-1 min-w-0">
 			<div class="flex items-center gap-2">
 				<span class="font-medium text-charcoal truncate">{transaction.merchant}</span>
 				{#if transaction.isSubscription}
-					<span
-						class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold uppercase tracking-wide bg-primary-100 text-primary-600"
-					>
+					<span class="badge bg-primary-100 text-primary-600">
 						{transaction.subscriptionFrequency === 'annual' ? 'Annual' : 'Sub'}
 					</span>
 				{/if}
-				{#if transaction.isShared}
-					<span
-						class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold uppercase tracking-wide bg-success-100 text-success-600"
-					>
-						Shared
-					</span>
-				{/if}
 				{#if transaction.isShared && !transaction.isSettled}
-					<span
-						class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold uppercase tracking-wide bg-warning-100 text-warning-600"
-					>
-						Pending
-					</span>
+					<span class="badge bg-warning-100 text-warning-600">Pending</span>
+				{:else if transaction.isShared}
+					<span class="badge bg-success-100 text-success-600">Shared</span>
 				{/if}
 			</div>
 			<div class="flex items-center gap-2 text-sm text-charcoal-muted mt-0.5">
@@ -290,7 +281,7 @@
 
 		<!-- Actions (hidden in selection mode) -->
 		{#if !isSelectionMode && (onEdit || onDelete)}
-			<div class="flex gap-1 flex-shrink-0">
+			<div class="flex gap-1 flex-shrink-0 opacity-0 group-hover/row:opacity-100 focus-within:opacity-100 transition-opacity">
 				{#if onEdit}
 					<button
 						onclick={(e) => { e.stopPropagation(); onEdit?.(transaction); }}
@@ -355,25 +346,21 @@
 		{#each rowGroups as group, groupIndex (group.dateKey)}
 			<!-- Date Header -->
 			<div class="animate-enter" style="animation-delay: {groupIndex * 50}ms;">
-				<h3 class="text-sm font-medium text-charcoal-muted mb-3 px-1">{group.label}</h3>
-				<div class="space-y-2">
-					{#each group.rows as row, rowIndex (rowKey(row))}
-						{@const delay = (groupIndex * 50) + (rowIndex * 30)}
+				<h3 class="text-xs font-medium uppercase tracking-wider text-charcoal-muted mb-2 px-1">{group.label}</h3>
+				<div class="bg-surface rounded-xl shadow-sm shadow-theme overflow-hidden divide-y divide-dashed divide-theme-dashed">
+					{#each group.rows as row (rowKey(row))}
 						{#if row.type === 'single'}
-							{@render txCard(row.transaction, delay)}
+							{@render txCard(row.transaction)}
 						{:else if isSelectionMode}
 							<!-- In selection mode, splits render flat so each child stays individually selectable -->
-							{#each row.children as child, childIndex (child.id)}
-								{@render txCard(child, delay + childIndex * 15)}
+							{#each row.children as child (child.id)}
+								{@render txCard(child)}
 							{/each}
 						{:else}
 							{@const isExpanded = expandedSplits.has(row.parentId)}
 							<!-- Collapsible split group -->
-							<div
-								class="bg-surface rounded-lg shadow-sm shadow-theme border-l-4 transition-colors hover:bg-surface-hover/50"
-								style="border-left-color: {getCategoryColor(row.dominantCategoryId)}; animation-delay: {delay}ms;"
-							>
-								<div class="flex items-center gap-3 p-4">
+							<div>
+								<div class="group/split flex items-center gap-3 px-4 py-3 transition-colors hover:bg-surface-hover/50">
 									<button
 										type="button"
 										onclick={() => toggleSplit(row.parentId)}
@@ -384,29 +371,19 @@
 											size={18}
 											class="text-charcoal-muted flex-shrink-0 transition-transform {isExpanded ? 'rotate-90' : ''}"
 										/>
-										<div class="text-2xl flex-shrink-0">{getCategoryIcon(row.dominantCategoryId)}</div>
+										<div
+											class="category-chip category-icon-box w-9 h-9 text-lg"
+											style="background-color: {getCategoryColor(row.dominantCategoryId)}1F;"
+										>{getCategoryIcon(row.dominantCategoryId)}</div>
 
 										<div class="flex-1 min-w-0">
 											<div class="flex items-center gap-2">
 												<span class="font-medium text-charcoal truncate">{row.merchant}</span>
-												<span
-													class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold uppercase tracking-wide bg-surface-alt text-charcoal-muted border border-theme"
-												>
-													Split
-												</span>
-												{#if row.allShared}
-													<span
-														class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold uppercase tracking-wide bg-success-100 text-success-600"
-													>
-														Shared
-													</span>
-												{/if}
+												<span class="badge bg-surface-alt text-charcoal-soft">Split</span>
 												{#if row.anyPending}
-													<span
-														class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold uppercase tracking-wide bg-warning-100 text-warning-600"
-													>
-														Pending
-													</span>
+													<span class="badge bg-warning-100 text-warning-600">Pending</span>
+												{:else if row.allShared}
+													<span class="badge bg-success-100 text-success-600">Shared</span>
 												{/if}
 											</div>
 											<div class="flex items-center gap-2 text-sm text-charcoal-muted mt-0.5">
@@ -432,7 +409,7 @@
 
 									<!-- Group-level actions, aligned with single-row controls -->
 									{#if onEditSplit || onDeleteSplit}
-										<div class="flex gap-1 flex-shrink-0">
+										<div class="flex gap-1 flex-shrink-0 opacity-0 group-hover/split:opacity-100 focus-within:opacity-100 transition-opacity">
 											{#if onEditSplit}
 												<button
 													type="button"
@@ -465,10 +442,13 @@
 												{@const childTags = extractTags(child.notes)}
 												{@const childNotes = removeTags(child.notes)}
 												<div
-													class="bg-surface-alt rounded-lg p-3 flex items-center gap-3"
+													class="group/child bg-surface-alt rounded-lg p-3 flex items-center gap-3"
 													role="listitem"
 												>
-													<div class="text-xl flex-shrink-0">{getCategoryIcon(child.categoryId)}</div>
+													<div
+														class="category-chip category-icon-box w-8 h-8 text-base"
+														style="background-color: {getCategoryColor(child.categoryId)}1F;"
+													>{getCategoryIcon(child.categoryId)}</div>
 													<div class="flex-1 min-w-0">
 														<span class="font-medium text-charcoal text-sm truncate">{getCategoryName(child.categoryId)}</span>
 														{#if childNotes || childTags.length > 0}
@@ -491,7 +471,7 @@
 														{/if}
 													</div>
 													{#if onEdit || onDelete}
-														<div class="flex gap-1 flex-shrink-0">
+														<div class="flex gap-1 flex-shrink-0 opacity-0 group-hover/child:opacity-100 focus-within:opacity-100 transition-opacity">
 															{#if onEdit}
 																<button
 																	onclick={() => onEdit?.(child)}

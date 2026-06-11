@@ -84,7 +84,7 @@
   --color-text: var(--color-charcoal);
   --color-text-soft: var(--color-charcoal-soft);
   --color-text-muted: var(--color-charcoal-muted);
-  --color-shadow: rgba(156, 163, 175, 0.5);
+  --color-shadow: rgba(45, 42, 38, 0.12);
   --color-ledger-line: rgba(45, 42, 38, 0.2);
 
   /* Typography */
@@ -272,6 +272,28 @@
   /* Semantic shadow utility */
   .shadow-theme {
     --tw-shadow-color: var(--color-shadow);
+  }
+
+  /* Quiet status badge (sentence case, soft pill) */
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.125rem 0.5rem;
+    border-radius: 9999px;
+    font-size: 0.6875rem;
+    line-height: 1rem;
+    font-weight: 500;
+    letter-spacing: 0.01em;
+    white-space: nowrap;
+  }
+
+  /* Category icon chip: emoji centered in a soft color-tinted box */
+  .category-chip {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 0.625rem;
+    flex-shrink: 0;
   }
 
   /* Ledger-style dotted leader line */

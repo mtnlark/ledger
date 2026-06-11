@@ -53,11 +53,10 @@
 	class="flex fixed left-0 top-0 h-full bg-surface border-r border-dashed border-theme-dashed z-30 flex-col transition-all duration-300 ease-in-out {isExpanded ? 'w-52' : 'w-16'}"
 >
 	<!-- Logo/Brand area -->
-	<div class="h-16 flex items-center border-b border-dashed border-theme-dashed {isExpanded ? 'mx-2 px-3' : 'justify-center'}">
+	<div class="h-16 flex items-center border-b border-dashed border-theme-dashed {isExpanded ? 'mx-2 px-3 gap-2.5' : 'justify-center'}">
+		<span class="w-8 h-8 rounded-lg bg-primary-500 text-white font-display text-base font-semibold flex items-center justify-center flex-shrink-0" aria-hidden="true">L</span>
 		{#if isExpanded}
-			<span class="font-display text-lg font-medium text-primary-600 whitespace-nowrap">Ledger</span>
-		{:else}
-			<span class="font-display text-xl font-bold text-primary-600">L</span>
+			<span class="font-display text-lg font-medium text-charcoal whitespace-nowrap">Ledger</span>
 		{/if}
 	</div>
 
@@ -68,11 +67,14 @@
 			<a
 				href={item.href}
 				onclick={() => handleNavClick(item.href)}
-				class="flex items-center gap-3 mx-2 px-3 py-2.5 rounded-lg transition-colors {active
+				class="relative flex items-center gap-3 mx-2 px-3 py-2.5 rounded-lg transition-colors {active
 					? 'bg-primary-50 text-primary-700'
 					: 'text-charcoal-soft hover:bg-surface-hover'}"
 				title={isExpanded ? undefined : item.label}
 			>
+				{#if active}
+					<span class="absolute left-0 top-1/2 -translate-y-1/2 h-5 w-[3px] rounded-full bg-primary-500" aria-hidden="true"></span>
+				{/if}
 				<span class={bouncingHref === item.href ? 'icon-bounce' : ''}>
 					<item.icon size={20} strokeWidth={active ? 2.5 : 2} />
 				</span>
