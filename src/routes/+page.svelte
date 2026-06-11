@@ -33,12 +33,18 @@
 	import RecurringSuggestionsModal from '$lib/components/RecurringSuggestionsModal.svelte';
 	import WeekInReviewCard from '$lib/components/WeekInReviewCard.svelte';
 	import TopCategoriesBar from '$lib/components/insights/TopCategoriesBar.svelte';
-	import { Plus, Square } from 'lucide-svelte';
+	import { Plus, Square, CalendarClock } from 'lucide-svelte';
 
 	// State
+	const SHOW_UPCOMING_KEY = 'ledger-show-upcoming';
+
 	let isLoading = $state(true);
 	let isSelectionMode = $state(false);
 	let addModalOpen = $state(false);
+	// Height of the sticky heading+toolbar block; date headers stick just below it
+	let toolbarHeight = $state(0);
+	// Future-dated transactions are hidden by default (toggle persists)
+	let showUpcoming = $state(false);
 	let searchInputRef = $state<HTMLInputElement | null>(null);
 	let categories = $state<Category[]>([]);
 	let transactions = $state<Transaction[]>([]); // Current month's transactions
@@ -135,14 +141,14 @@
 
 	// Key that changes when pagination should reset (month or filter changes, but NOT data refreshes)
 	let transactionListResetKey = $derived(
-		`${currentMonth}|${filters.searchQuery}|${filters.categoryId}|${filters.dateFrom}|${filters.dateTo}|${filters.searchAllTime}|${filters.tags.join(',')}|${filters.amountMin}|${filters.amountMax}`
+		`${currentMonth}|${filters.searchQuery}|${filters.categoryId}|${filters.dateFrom}|${filters.dateTo}|${filters.searchAllTime}|${filters.tags.join(',')}|${filters.amountMin}|${filters.amountMax}|${showUpcoming}`
 	);
 
 	// Determine which transaction set to filter from
 	let baseTransactions = $derived(needsAllTransactions ? allTransactions : transactions);
 
-	// Filtered transactions
-	let filteredTransactions = $derived.by(() => {
+	// Filtered transactions (search/category/date/tag/amount — before the upcoming filter)
+	let searchFilteredTransactions = $derived.by(() => {
 		let result = baseTransactions;
 
 		// Filter by search query (merchant name and notes)
@@ -188,6 +194,29 @@
 		return result;
 	});
 
+	// Upcoming (future-dated) transactions are hidden by default so logging in on
+	// the 3rd doesn't show the whole month's recurring entries. Exception: when
+	// deliberately viewing a future month, everything is upcoming — hiding would
+	// blank the page, so the filter is skipped.
+	let isFutureMonthView = $derived(currentMonth > getMonthKey(new Date()));
+
+	let upcomingCount = $derived.by(() => {
+		if (isFutureMonthView) return 0;
+		const today = startOfDay(new Date());
+		return searchFilteredTransactions.filter((t) => startOfDay(new Date(t.date)) > today).length;
+	});
+
+	let filteredTransactions = $derived.by(() => {
+		if (showUpcoming || isFutureMonthView) return searchFilteredTransactions;
+		const today = startOfDay(new Date());
+		return searchFilteredTransactions.filter((t) => startOfDay(new Date(t.date)) <= today);
+	});
+
+	function toggleUpcoming() {
+		showUpcoming = !showUpcoming;
+		localStorage.setItem(SHOW_UPCOMING_KEY, String(showUpcoming));
+	}
+
 	async function handleFilterChange(newFilters: FilterState) {
 		// If all-time search or date filters are being applied, load all transactions
 		const needsAll = newFilters.dateFrom !== '' || newFilters.dateTo !== '' || newFilters.searchAllTime;
@@ -213,8 +242,9 @@
 		isLoading = true;
 		try {
 			await initializeStorage();
-			// Restore selected month from localStorage
+			// Restore selected month and upcoming-visibility from localStorage
 			currentMonth = getSelectedMonth();
+			showUpcoming = localStorage.getItem(SHOW_UPCOMING_KEY) === 'true';
 
 			// Parallelize independent queries
 			const [cats, s, allTxns] = await Promise.all([
@@ -528,58 +558,77 @@
 			<div class="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_330px] gap-6 items-start">
 				<!-- Main column: ledger -->
 				<div class="min-w-0 space-y-3 order-last lg:order-none">
-					<!-- Heading + actions -->
-					<div class="flex items-center justify-between">
-						<h2 class="font-display text-xl font-medium text-charcoal">
-							{#if filters.searchAllTime}
-								All Transactions
-							{:else if filters.searchQuery || filters.categoryId !== null || filters.dateFrom || filters.dateTo || filters.amountMin || filters.amountMax}
-								Filtered Transactions
-							{:else}
-								Transactions
-							{/if}
-						</h2>
-						<div class="flex items-center gap-2">
-							{#if filteredTransactions.length > 0 && !isSelectionMode}
-								<button
-									type="button"
-									onclick={() => isSelectionMode = true}
-									class="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg transition-colors text-charcoal-muted hover:text-charcoal hover:bg-cream"
-								>
-									<Square size={16} />
-									<span>Select</span>
-								</button>
-							{/if}
+						<!-- Sticky header: heading + search stay reachable while scrolling -->
+						<div
+							class="sticky top-0 z-20 bg-cream -mx-3 px-3 pt-1 pb-2 space-y-3"
+							bind:clientHeight={toolbarHeight}
+						>
+							<!-- Heading + actions -->
+							<div class="flex items-center justify-between">
+								<h2 class="font-display text-xl font-medium text-charcoal">
+									{#if filters.searchAllTime}
+										All Transactions
+									{:else if filters.searchQuery || filters.categoryId !== null || filters.dateFrom || filters.dateTo || filters.amountMin || filters.amountMax}
+										Filtered Transactions
+									{:else}
+										Transactions
+									{/if}
+								</h2>
+								<div class="flex items-center gap-2">
+									{#if filteredTransactions.length > 0 && !isSelectionMode}
+										<button
+											type="button"
+											onclick={() => isSelectionMode = true}
+											class="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg transition-colors text-charcoal-muted hover:text-charcoal hover:bg-cream"
+										>
+											<Square size={16} />
+											<span>Select</span>
+										</button>
+									{/if}
+									<button
+										type="button"
+										onclick={() => addModalOpen = true}
+										class="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg bg-primary-500 text-white hover:bg-primary-600 transition-colors btn-press"
+									>
+										<Plus size={16} />
+										<span>Add</span>
+									</button>
+								</div>
+							</div>
+
+							<!-- Search & filters toolbar -->
+							<TransactionFilters
+								{categories}
+								{filters}
+								onFilterChange={handleFilterChange}
+								resultCount={filteredTransactions.length}
+								totalCount={transactions.length}
+								allTimeCount={allTransactions.length}
+								onSearchInputRef={setSearchInputRef}
+								{allTransactions}
+								onTagsChanged={async () => {
+									transactions = await getTransactionsByMonth(currentMonth);
+									allTransactions = await getAllTransactions();
+								}}
+							/>
+						</div>
+
+						<!-- Upcoming (future-dated) transactions toggle -->
+						{#if upcomingCount > 0}
 							<button
 								type="button"
-								onclick={() => addModalOpen = true}
-								class="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg bg-primary-500 text-white hover:bg-primary-600 transition-colors btn-press"
+								onclick={toggleUpcoming}
+								class="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium text-charcoal-muted hover:text-charcoal border border-dashed border-theme rounded-xl hover:bg-surface-hover/50 transition-colors"
 							>
-								<Plus size={16} />
-								<span>Add</span>
+								<CalendarClock size={15} />
+								<span>{showUpcoming ? 'Hide upcoming transactions' : `Show ${upcomingCount} upcoming ${upcomingCount === 1 ? 'transaction' : 'transactions'}`}</span>
 							</button>
-						</div>
-					</div>
-
-					<!-- Search & filters toolbar -->
-					<TransactionFilters
-				{categories}
-				{filters}
-				onFilterChange={handleFilterChange}
-				resultCount={filteredTransactions.length}
-				totalCount={transactions.length}
-				allTimeCount={allTransactions.length}
-				onSearchInputRef={setSearchInputRef}
-				{allTransactions}
-				onTagsChanged={async () => {
-					transactions = await getTransactionsByMonth(currentMonth);
-					allTransactions = await getAllTransactions();
-				}}
-			/>
+						{/if}
 
 					<!-- Transaction List -->
 					<TransactionList
 					transactions={filteredTransactions}
+					stickyOffset={toolbarHeight}
 					{categories}
 					{settings}
 					{allTransactions}

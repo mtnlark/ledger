@@ -475,6 +475,8 @@ Sidebar state persists to localStorage (`ledger-sidebar-expanded`).
 - **Single add-transaction entry point**: toolbar "Add" button / ⌘N opens `AddTransactionModal` (wraps the full `TransactionForm`: split mode, shared, subscription, tags). The inline form card and QuickAddFAB are retired.
 - Transaction list with search/filters (searches merchant names and notes), amount range filter, progressive pagination (50 rows at a time); search/filters render as a slim toolbar, advanced filters in a card below
 - Day-grouped cards with dashed hairline dividers; sticky date headers show day totals (your share); shared rows show your share as the primary amount with "of $full" beneath; monthly/semi-annual subscriptions show a ↻ icon (annual keeps its badge)
+- **Sticky list header**: the Transactions heading + search toolbar stick to the viewport top (`bind:clientHeight` → `toolbarHeight`); date headers stick below it via the `stickyOffset` prop on `TransactionList`
+- **Upcoming transactions hidden by default**: future-dated transactions are filtered out with a dashed "Show N upcoming" toggle row (persisted to `ledger-show-upcoming`); the filter is skipped when viewing a future month, where everything would be upcoming
 - **Split transaction nesting**: Children of a split (sharing `parentTransactionId`) collapse into one summary row (merchant + "Split" badge + total + your-share) with a chevron to expand the indented per-category breakdown. Grouping/pagination happen at the row level so a split is never cut at the page boundary; groups left with <2 visible children (e.g. after a category filter) fall back to a plain row. Selection mode renders splits flat so each child stays individually selectable.
   - **Group edit/delete**: The summary row has Edit/Delete controls mirroring normal rows. Edit opens `EditSplitModal` (group-level merchant/date/shared + editable category lines incl. per-line notes/tags); save calls `updateSplitGroup()` which keeps the hidden parent, recreates children from the new lines, and lets the total change to the sum of lines (`isEssential`/`isSubscription` inherited from the parent). Delete uses `onDeleteSplit(childIds)` → split-specific confirm ("Delete this split?") → soft-delete with undo (children only; total restores together). Individual lines keep their own per-row edit/delete in the expanded view.
 - Edit/split transaction modals
@@ -594,6 +596,7 @@ Sidebar state persists to localStorage (`ledger-sidebar-expanded`).
 
 UI state persisted across sessions:
 - `ledger-sidebar-expanded` - Sidebar collapse state
+- `ledger-show-upcoming` - Whether future-dated transactions are visible on the dashboard
 - `ledger-insight-{title}` - Each insight group state
 - `ledger-insights-tab` - Selected insights tab
 - `ledger-notif-daily-last-fired` - Daily notification last-fired date ("YYYY-MM-DD")

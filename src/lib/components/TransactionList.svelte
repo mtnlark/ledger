@@ -40,9 +40,11 @@
 		allTransactions?: Transaction[];
 		/** Key that changes when pagination should reset (month/filter changes). */
 		resetKey?: string;
+		/** Viewport offset for sticky date headers (height of any sticky toolbar above the list). */
+		stickyOffset?: number;
 	}
 
-	let { transactions, categories, settings, onEdit, onDelete, onBulkDelete, onBulkCategoryChange, onBulkTagAdd, onBulkTagRemove, onEditSplit, onDeleteSplit, availableTags = [], onAddTransaction, selectionMode = false, onSelectionModeChange, onTagClick, allTransactions, resetKey = '' }: Props = $props();
+	let { transactions, categories, settings, onEdit, onDelete, onBulkDelete, onBulkCategoryChange, onBulkTagAdd, onBulkTagRemove, onEditSplit, onDeleteSplit, availableTags = [], onAddTransaction, selectionMode = false, onSelectionModeChange, onTagClick, allTransactions, resetKey = '', stickyOffset = 0 }: Props = $props();
 
 	// Selection mode state - use prop if provided, otherwise internal state
 	let internalSelectionMode = $state(false);
@@ -363,7 +365,10 @@
 		{#each rowGroups as group, groupIndex (group.dateKey)}
 			<!-- Date Header -->
 			<div class="animate-enter" style="animation-delay: {groupIndex * 50}ms;">
-				<div class="sticky top-0 z-10 bg-cream flex items-baseline justify-between mb-2 px-1 py-1.5">
+				<div
+					class="sticky z-10 bg-cream flex items-baseline justify-between mb-2 px-1 py-1.5"
+					style="top: {stickyOffset}px"
+				>
 					<h3 class="text-xs font-medium uppercase tracking-wider text-charcoal-muted">{group.label}</h3>
 					<span class="font-mono text-xs text-charcoal-muted">{formatCurrency(groupTotal(group.rows))}</span>
 				</div>
