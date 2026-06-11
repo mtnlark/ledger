@@ -7,7 +7,9 @@ import type {
 	CategoryBudget,
 	Settings,
 	SavingsAccount,
-	SavingsContribution
+	SavingsContribution,
+	LinkedAccount,
+	BalanceSnapshot
 } from './constants';
 import { DEFAULT_CATEGORIES, DEFAULT_SETTINGS } from './constants';
 
@@ -23,7 +25,13 @@ export type {
 	ContributionSource,
 	SavingsAccount,
 	SavingsContribution,
-	Settings
+	Settings,
+	AccountClass,
+	LinkedAccountType,
+	BalanceSource,
+	SyncStatus,
+	LinkedAccount,
+	BalanceSnapshot
 } from './constants';
 
 export {
@@ -44,6 +52,8 @@ class LedgerDB extends Dexie {
 	settings!: EntityTable<Settings, 'id'>;
 	savingsAccounts!: EntityTable<SavingsAccount, 'id'>;
 	savingsContributions!: EntityTable<SavingsContribution, 'id'>;
+	linkedAccounts!: EntityTable<LinkedAccount, 'id'>;
+	balanceSnapshots!: EntityTable<BalanceSnapshot, 'id'>;
 
 	constructor() {
 		super('LedgerDB');
@@ -81,6 +91,19 @@ class LedgerDB extends Dexie {
 			settings: 'id',
 			savingsAccounts: '++id, name, accountType, sortOrder',
 			savingsContributions: '++id, date, accountId, source, [accountId+date]'
+		});
+
+		// Version 5: Add net-worth tables (linked accounts + balance snapshots)
+		this.version(5).stores({
+			transactions: '++id, date, merchant, categoryId, isShared, isSettled, parentTransactionId, [date+merchant+amount]',
+			categories: '++id, name, isActive, sortOrder',
+			monthlyBudgets: '++id, &month',
+			categoryBudgets: '++id, month, categoryId, [month+categoryId]',
+			settings: 'id',
+			savingsAccounts: '++id, name, accountType, sortOrder',
+			savingsContributions: '++id, date, accountId, source, [accountId+date]',
+			linkedAccounts: '++id, institution, accountClass, accountType, sortOrder, isActive',
+			balanceSnapshots: '++id, accountId, capturedAt, [accountId+capturedAt]'
 		});
 	}
 }

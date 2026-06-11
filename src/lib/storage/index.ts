@@ -183,14 +183,16 @@ export async function withPersistence<T>(operation: () => Promise<T>): Promise<T
  * Get all current data (useful for export/backup)
  */
 export async function getAllData(): Promise<StoredData> {
-	const [transactions, categories, monthlyBudgets, categoryBudgets, settings, savingsAccounts, savingsContributions] = await Promise.all([
+	const [transactions, categories, monthlyBudgets, categoryBudgets, settings, savingsAccounts, savingsContributions, linkedAccounts, balanceSnapshots] = await Promise.all([
 		db.transactions.toArray(),
 		db.categories.toArray(),
 		db.monthlyBudgets.toArray(),
 		db.categoryBudgets.toArray(),
 		db.settings.get(1),
 		db.savingsAccounts.toArray(),
-		db.savingsContributions.toArray()
+		db.savingsContributions.toArray(),
+		db.linkedAccounts.toArray(),
+		db.balanceSnapshots.toArray()
 	]);
 
 	return {
@@ -202,7 +204,9 @@ export async function getAllData(): Promise<StoredData> {
 		categoryBudgets,
 		settings: settings ?? DEFAULT_SETTINGS,
 		savingsAccounts,
-		savingsContributions
+		savingsContributions,
+		linkedAccounts,
+		balanceSnapshots
 	};
 }
 
@@ -212,7 +216,7 @@ export async function getAllData(): Promise<StoredData> {
 export async function replaceAllData(data: StoredData): Promise<void> {
 	await db.transaction(
 		'rw',
-		[db.transactions, db.categories, db.monthlyBudgets, db.categoryBudgets, db.settings, db.savingsAccounts, db.savingsContributions],
+		[db.transactions, db.categories, db.monthlyBudgets, db.categoryBudgets, db.settings, db.savingsAccounts, db.savingsContributions, db.linkedAccounts, db.balanceSnapshots],
 		async () => {
 			await db.transactions.clear();
 			await db.categories.clear();
@@ -220,6 +224,8 @@ export async function replaceAllData(data: StoredData): Promise<void> {
 			await db.categoryBudgets.clear();
 			await db.savingsAccounts.clear();
 			await db.savingsContributions.clear();
+			await db.linkedAccounts.clear();
+			await db.balanceSnapshots.clear();
 
 			if (data.categories.length > 0) {
 				await db.categories.bulkPut(data.categories);
@@ -272,6 +278,24 @@ export async function replaceAllData(data: StoredData): Promise<void> {
 					updatedAt: new Date(sc.updatedAt)
 				}));
 				await db.savingsContributions.bulkPut(savingsContributions);
+			}
+
+			if (data.linkedAccounts && data.linkedAccounts.length > 0) {
+				const linkedAccounts = data.linkedAccounts.map((la) => ({
+					...la,
+					lastSyncedAt: la.lastSyncedAt ? new Date(la.lastSyncedAt) : undefined,
+					createdAt: new Date(la.createdAt),
+					updatedAt: new Date(la.updatedAt)
+				}));
+				await db.linkedAccounts.bulkPut(linkedAccounts);
+			}
+
+			if (data.balanceSnapshots && data.balanceSnapshots.length > 0) {
+				const balanceSnapshots = data.balanceSnapshots.map((bs) => ({
+					...bs,
+					capturedAt: new Date(bs.capturedAt)
+				}));
+				await db.balanceSnapshots.bulkPut(balanceSnapshots);
 			}
 
 			if (data.settings) {

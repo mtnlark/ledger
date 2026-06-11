@@ -226,3 +226,50 @@ export const DEFAULT_SAVINGS_ACCOUNTS: Omit<SavingsAccount, 'id' | 'createdAt' |
 	{ name: 'Roth IRA', accountType: 'retirement', icon: '🌳', color: '#7B9E87', sortOrder: 4 },
 	{ name: 'Brokerage', accountType: 'investment', icon: '🪴', color: '#8B7355', sortOrder: 5 }
 ];
+
+// ============================================
+// Net Worth (LinkedAccount / BalanceSnapshot)
+// Separate from SavingsAccount by design: savings tracks INTENT (contributions,
+// goals); linked accounts track ACTUAL balances. Synced balances must never
+// write to SavingsAccount.currentBalance. See NET_WORTH_PLAN.md §7.
+// ============================================
+
+export type AccountClass = 'asset' | 'liability';
+
+export type LinkedAccountType =
+	| 'checking'
+	| 'savings'
+	| 'credit'
+	| 'investment'
+	| 'retirement'
+	| 'loan'
+	| 'other';
+
+export type BalanceSource = 'manual' | 'simplefin';
+
+export type SyncStatus = 'ok' | 'stale' | 'error' | 'never';
+
+export interface LinkedAccount {
+	id?: number;
+	name: string; // user-facing, e.g. "Chase Checking"
+	institution: string; // "Chase", "Fidelity", ...
+	accountClass: AccountClass; // drives net-worth sign (v1 UI is assets-only)
+	accountType: LinkedAccountType;
+	currentBalance: number; // latest known balance (signed positive; class controls +/-)
+	source: BalanceSource;
+	simplefinId?: string; // upstream account id when source === 'simplefin'
+	lastSyncedAt?: Date;
+	lastSyncStatus: SyncStatus;
+	sortOrder: number;
+	isActive: boolean; // hide closed accounts without deleting history
+	createdAt: Date;
+	updatedAt: Date;
+}
+
+export interface BalanceSnapshot {
+	id?: number;
+	accountId: number; // references LinkedAccount.id
+	balance: number;
+	source: BalanceSource;
+	capturedAt: Date; // at most one snapshot per account per day (same-day overwrites)
+}

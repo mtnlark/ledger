@@ -5,7 +5,9 @@ import type {
 	CategoryBudget,
 	Settings,
 	SavingsAccount,
-	SavingsContribution
+	SavingsContribution,
+	LinkedAccount,
+	BalanceSnapshot
 } from '$lib/db';
 
 // Data structure for file storage
@@ -20,6 +22,8 @@ export interface StoredData {
 	settings: Settings;
 	savingsAccounts?: SavingsAccount[];
 	savingsContributions?: SavingsContribution[];
+	linkedAccounts?: LinkedAccount[];
+	balanceSnapshots?: BalanceSnapshot[];
 }
 
 /**

@@ -457,7 +457,7 @@ async function runMigrationsIfNeeded(): Promise<void> {
 async function loadDataIntoDexie(data: StoredData): Promise<void> {
 	await db.transaction(
 		'rw',
-		[db.transactions, db.categories, db.monthlyBudgets, db.categoryBudgets, db.settings, db.savingsAccounts, db.savingsContributions],
+		[db.transactions, db.categories, db.monthlyBudgets, db.categoryBudgets, db.settings, db.savingsAccounts, db.savingsContributions, db.linkedAccounts, db.balanceSnapshots],
 		async () => {
 			// Clear existing data
 			await db.transactions.clear();
@@ -466,6 +466,8 @@ async function loadDataIntoDexie(data: StoredData): Promise<void> {
 			await db.categoryBudgets.clear();
 			await db.savingsAccounts.clear();
 			await db.savingsContributions.clear();
+			await db.linkedAccounts.clear();
+			await db.balanceSnapshots.clear();
 
 			// Load categories
 			if (data.categories && data.categories.length > 0) {
@@ -526,6 +528,25 @@ async function loadDataIntoDexie(data: StoredData): Promise<void> {
 				await db.savingsContributions.bulkPut(savingsContributions);
 			}
 
+			// Load linked accounts + balance snapshots (convert date strings)
+			if (data.linkedAccounts && data.linkedAccounts.length > 0) {
+				const linkedAccounts = data.linkedAccounts.map((la) => ({
+					...la,
+					lastSyncedAt: la.lastSyncedAt ? new Date(la.lastSyncedAt) : undefined,
+					createdAt: new Date(la.createdAt),
+					updatedAt: new Date(la.updatedAt)
+				}));
+				await db.linkedAccounts.bulkPut(linkedAccounts);
+			}
+
+			if (data.balanceSnapshots && data.balanceSnapshots.length > 0) {
+				const balanceSnapshots = data.balanceSnapshots.map((bs) => ({
+					...bs,
+					capturedAt: new Date(bs.capturedAt)
+				}));
+				await db.balanceSnapshots.bulkPut(balanceSnapshots);
+			}
+
 			// Load settings
 			if (data.settings) {
 				await db.settings.put({ ...data.settings, id: 1 });
@@ -581,14 +602,16 @@ export async function saveToFile(): Promise<void> {
 	}
 
 	// Get all data from Dexie
-	const [transactions, categories, monthlyBudgets, categoryBudgets, settings, savingsAccounts, savingsContributions] = await Promise.all([
+	const [transactions, categories, monthlyBudgets, categoryBudgets, settings, savingsAccounts, savingsContributions, linkedAccounts, balanceSnapshots] = await Promise.all([
 		db.transactions.toArray(),
 		db.categories.toArray(),
 		db.monthlyBudgets.toArray(),
 		db.categoryBudgets.toArray(),
 		db.settings.get(1),
 		db.savingsAccounts.toArray(),
-		db.savingsContributions.toArray()
+		db.savingsContributions.toArray(),
+		db.linkedAccounts.toArray(),
+		db.balanceSnapshots.toArray()
 	]);
 
 	const data: StoredData = {
@@ -600,7 +623,9 @@ export async function saveToFile(): Promise<void> {
 		categoryBudgets,
 		settings: settings ?? DEFAULT_SETTINGS,
 		savingsAccounts,
-		savingsContributions
+		savingsContributions,
+		linkedAccounts,
+		balanceSnapshots
 	};
 
 	try {
