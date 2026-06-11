@@ -15,7 +15,8 @@
 		{ keys: ['⌘', '2'], description: 'Go to Budget', action: 'nav' },
 		{ keys: ['⌘', '3'], description: 'Go to Savings', action: 'nav' },
 		{ keys: ['⌘', '4'], description: 'Go to Insights', action: 'nav' },
-		{ keys: ['⌘', '5'], description: 'Go to Shared', action: 'nav' }
+		{ keys: ['⌘', '5'], description: 'Go to Shared', action: 'nav' },
+		{ keys: ['⌘', '6'], description: 'Go to Net Worth', action: 'nav' }
 	];
 
 	function handleKeydown(e: KeyboardEvent) {
@@ -35,7 +36,7 @@
 		const isMeta = e.metaKey || e.ctrlKey;
 
 		// Page navigation shortcuts
-		const navRoutes: Record<string, string> = { '1': '/', '2': '/budget', '3': '/savings', '4': '/insights', '5': '/shared' };
+		const navRoutes: Record<string, string> = { '1': '/', '2': '/budget', '3': '/savings', '4': '/insights', '5': '/shared', '6': '/networth' };
 		if (isMeta && navRoutes[e.key]) {
 			e.preventDefault();
 			goto(navRoutes[e.key]);
