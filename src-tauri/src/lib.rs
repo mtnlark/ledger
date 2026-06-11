@@ -88,7 +88,9 @@ pub fn run() {
       {
         use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
         TrayIconBuilder::with_id("ledger-tray")
-          .icon(app.default_window_icon().unwrap().clone())
+          // Monochrome template glyph: macOS recolors it for light/dark menu bars
+          .icon(tauri::image::Image::from_bytes(include_bytes!("../icons/tray.png"))?)
+          .icon_as_template(true)
           .tooltip("Ledger — quick add")
           .on_tray_icon_event(|tray, event| {
             if let TrayIconEvent::Click {

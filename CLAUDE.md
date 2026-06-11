@@ -570,7 +570,7 @@ Sidebar state persists to localStorage (`ledger-sidebar-expanded`).
 - Tag index (`TagIndex` class) provides fast lookups, rebuilt from transaction cache
 
 ### Menu-bar Quick Add
-- Tray icon (left-click) toggles a small always-on-top `quick-add` window rendering the full `TransactionForm`
+- Tray icon (left-click) toggles a small always-on-top `quick-add` window rendering the full `TransactionForm`. The icon is a monochrome template glyph (`icons/tray.png`, generated 44px "L in rounded card") with `icon_as_template(true)` so macOS recolors it for light/dark menu bars (needs `image-png` cargo feature)
 - **Single-writer rule**: both windows share one IndexedDB origin. The quick window reads categories/settings (and merchant autocomplete) directly from shared Dexie but NEVER calls `initializeStorage()` (it clears+reloads shared tables) and never writes. Submits are emitted as `ledger://quick-add-submit` (date as ISO string); the main window's layout listener performs the add, toasts, and dispatches `ledger:transactions-changed` (DOM event) so the dashboard refreshes.
 - Layout renders a bare shell for `/quick-add` (no SideNav/KeyboardShortcuts) and skips the purge + notification effects there
 - Rust: `SUPPRESS_NEXT_ACTIVATE` atomic stops the macOS activation observer from popping the main window when the tray opens the quick window; the existing CloseRequested handler hides (not closes) the quick window
