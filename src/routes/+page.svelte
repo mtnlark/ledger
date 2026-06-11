@@ -32,11 +32,14 @@
 	import RecurringSuggestionsBanner from '$lib/components/RecurringSuggestionsBanner.svelte';
 	import RecurringSuggestionsModal from '$lib/components/RecurringSuggestionsModal.svelte';
 	import WeekInReviewCard from '$lib/components/WeekInReviewCard.svelte';
+	import StaleLedgerBanner from '$lib/components/StaleLedgerBanner.svelte';
 	import TopCategoriesBar from '$lib/components/insights/TopCategoriesBar.svelte';
 	import { Plus, Square, CalendarClock } from 'lucide-svelte';
 
 	// State
 	const SHOW_UPCOMING_KEY = 'ledger-show-upcoming';
+	const STALE_NUDGE_KEY = 'ledger-stale-nudge-dismissed';
+	const STALE_THRESHOLD_DAYS = 7;
 
 	let isLoading = $state(true);
 	let isSelectionMode = $state(false);
@@ -45,6 +48,8 @@
 	let toolbarHeight = $state(0);
 	// Future-dated transactions are hidden by default (toggle persists)
 	let showUpcoming = $state(false);
+	// Stale-ledger nudge: shown when nothing has been entered for a week
+	let staleNudgeDismissedAt = $state<string | null>(null);
 	let searchInputRef = $state<HTMLInputElement | null>(null);
 	let categories = $state<Category[]>([]);
 	let transactions = $state<Transaction[]>([]); // Current month's transactions
@@ -129,7 +134,8 @@
 		searchAllTime: false,
 		tags: [],
 		amountMin: '',
-		amountMax: ''
+		amountMax: '',
+		sharedStatus: ''
 	});
 
 	// Check if we're using filters that require all transactions
@@ -141,7 +147,7 @@
 
 	// Key that changes when pagination should reset (month or filter changes, but NOT data refreshes)
 	let transactionListResetKey = $derived(
-		`${currentMonth}|${filters.searchQuery}|${filters.categoryId}|${filters.dateFrom}|${filters.dateTo}|${filters.searchAllTime}|${filters.tags.join(',')}|${filters.amountMin}|${filters.amountMax}|${showUpcoming}`
+		`${currentMonth}|${filters.searchQuery}|${filters.categoryId}|${filters.dateFrom}|${filters.dateTo}|${filters.searchAllTime}|${filters.tags.join(',')}|${filters.amountMin}|${filters.amountMax}|${filters.sharedStatus}|${showUpcoming}`
 	);
 
 	// Determine which transaction set to filter from
@@ -181,6 +187,17 @@
 			result = result.filter(tx => filters.tags.some(tag => matchesTag(tx, tag)));
 		}
 
+		// Filter by shared status (settlement history: shared + settled + all time)
+		if (filters.sharedStatus === 'shared') {
+			result = result.filter(t => t.isShared);
+		} else if (filters.sharedStatus === 'pending') {
+			result = result.filter(t => t.isShared && !t.isSettled);
+		} else if (filters.sharedStatus === 'settled') {
+			result = result.filter(t => t.isShared && t.isSettled);
+		} else if (filters.sharedStatus === 'personal') {
+			result = result.filter(t => !t.isShared);
+		}
+
 		// Filter by amount range
 		if (filters.amountMin) {
 			const min = parseFloat(filters.amountMin);
@@ -211,6 +228,33 @@
 		const today = startOfDay(new Date());
 		return searchFilteredTransactions.filter((t) => startOfDay(new Date(t.date)) <= today);
 	});
+
+	// Days since the most recent entry (createdAt = entry activity, not transaction date)
+	let daysSinceEntry = $derived.by(() => {
+		if (allTransactions.length === 0) return 0;
+		const latest = allTransactions.reduce(
+			(max, t) => Math.max(max, new Date(t.createdAt).getTime()),
+			0
+		);
+		return Math.floor((Date.now() - latest) / 86_400_000);
+	});
+
+	let showStaleNudge = $derived.by(() => {
+		if (isLoading || daysSinceEntry < STALE_THRESHOLD_DAYS) return false;
+		// Dismissal re-arms after another threshold period
+		if (staleNudgeDismissedAt) {
+			const sinceDismiss = Math.floor(
+				(Date.now() - new Date(staleNudgeDismissedAt).getTime()) / 86_400_000
+			);
+			if (sinceDismiss < STALE_THRESHOLD_DAYS) return false;
+		}
+		return true;
+	});
+
+	function dismissStaleNudge() {
+		staleNudgeDismissedAt = new Date().toISOString();
+		localStorage.setItem(STALE_NUDGE_KEY, staleNudgeDismissedAt);
+	}
 
 	function toggleUpcoming() {
 		showUpcoming = !showUpcoming;
@@ -245,6 +289,7 @@
 			// Restore selected month and upcoming-visibility from localStorage
 			currentMonth = getSelectedMonth();
 			showUpcoming = localStorage.getItem(SHOW_UPCOMING_KEY) === 'true';
+			staleNudgeDismissedAt = localStorage.getItem(STALE_NUDGE_KEY);
 
 			// Parallelize independent queries
 			const [cats, s, allTxns] = await Promise.all([
@@ -552,6 +597,17 @@
 				/>
 			</div>
 		{/if}
+
+		<!-- Stale Ledger Nudge -->
+		{#if showStaleNudge}
+			<div class="mb-6">
+				<StaleLedgerBanner
+					{daysSinceEntry}
+					onAddTransaction={() => addModalOpen = true}
+					onDismiss={dismissStaleNudge}
+				/>
+			</div>
+		{/if}
 		{#if isLoading}
 			<!-- Skeleton loading states -->
 			<div class="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_330px] gap-6 items-start">
@@ -574,7 +630,7 @@
 								<h2 class="font-display text-xl font-medium text-charcoal">
 									{#if filters.searchAllTime}
 										All Transactions
-									{:else if filters.searchQuery || filters.categoryId !== null || filters.dateFrom || filters.dateTo || filters.amountMin || filters.amountMax}
+									{:else if filters.searchQuery || filters.categoryId !== null || filters.dateFrom || filters.dateTo || filters.amountMin || filters.amountMax || filters.sharedStatus}
 										Filtered Transactions
 									{:else}
 										Transactions

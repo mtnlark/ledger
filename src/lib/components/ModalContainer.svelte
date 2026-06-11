@@ -26,8 +26,9 @@
 		children
 	}: Props = $props();
 
-	// Generate a unique ID for accessibility if not provided
-	const generatedTitleId = titleId ?? `modal-title-${Math.random().toString(36).substring(2, 9)}`;
+	// Generate a unique fallback ID for accessibility if none is provided
+	const fallbackTitleId = `modal-title-${Math.random().toString(36).substring(2, 9)}`;
+	let resolvedTitleId = $derived(titleId ?? fallbackTitleId);
 
 	// Max width classes
 	const maxWidthClasses: Record<string, string> = {
@@ -71,7 +72,7 @@
 			transition:scale={{ duration: 200, start: 0.95 }}
 			role="dialog"
 			aria-modal="true"
-			aria-labelledby={generatedTitleId}
+			aria-labelledby={resolvedTitleId}
 			tabindex="-1"
 			onclick={(e) => e.stopPropagation()}
 			use:focusTrap
@@ -80,7 +81,7 @@
 			<div
 				class="px-6 py-4 border-b border-dashed border-theme-dashed flex items-center justify-between"
 			>
-				<h2 id={generatedTitleId} class="font-display text-xl font-medium text-charcoal">
+				<h2 id={resolvedTitleId} class="font-display text-xl font-medium text-charcoal">
 					{title}
 				</h2>
 				{#if showCloseButton}

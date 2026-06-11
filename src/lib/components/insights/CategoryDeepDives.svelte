@@ -107,6 +107,7 @@
 	// Track if user has manually selected a category
 	let hasUserSelected = $state(false);
 	// Track month changes - captures initial value, updated manually in $effect below
+	// svelte-ignore state_referenced_locally
 	let lastMonth = $state(currentMonth);
 
 	// Reset user selection when month changes
@@ -218,9 +219,9 @@
 
 			<!-- Category Selector for Trends -->
 			<div>
-				<label class="block text-sm font-semibold text-charcoal-soft mb-2">
+				<p class="block text-sm font-semibold text-charcoal-soft mb-2">
 					Explore Category Trends
-				</label>
+				</p>
 				<CategoryChipPicker
 					categories={sortedCategories}
 					selectedId={selectedCategoryId}

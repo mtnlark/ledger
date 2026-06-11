@@ -66,7 +66,9 @@
 	let isShared = $state(false);
 	let isSettled = $state(false);
 	// Initial values from settings (intentionally not reactive - form defaults only)
+	// svelte-ignore state_referenced_locally
 	let splitType = $state<'percentage' | 'fixed'>(settings.defaultSplitType);
+	// svelte-ignore state_referenced_locally
 	let splitValue = $state(settings.defaultSplitValue);
 	let notes = $state('');
 	let isEssential = $state(false);

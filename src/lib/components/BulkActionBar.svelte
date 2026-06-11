@@ -215,6 +215,7 @@
 							>
 								<!-- Tag input -->
 								<div class="p-2 border-b border-theme">
+									<!-- svelte-ignore a11y_autofocus -- focus moves into the just-opened dropdown -->
 									<input
 										type="text"
 										bind:value={tagInput}

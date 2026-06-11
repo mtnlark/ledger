@@ -15,7 +15,7 @@
 	];
 </script>
 
-<nav aria-label="Insights tabs" role="tablist" class="flex gap-6 overflow-x-auto border-b border-theme">
+<div aria-label="Insights tabs" role="tablist" class="flex gap-6 overflow-x-auto border-b border-theme">
 	{#each tabs as tab}
 		<button
 			type="button"
@@ -34,4 +34,4 @@
 			{/if}
 		</button>
 	{/each}
-</nav>
+</div>

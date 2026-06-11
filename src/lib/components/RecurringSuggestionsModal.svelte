@@ -358,10 +358,11 @@
 						<!-- Date and Amount inputs -->
 						<div class="grid grid-cols-2 gap-3">
 							<div>
-								<label class="block text-xs font-medium text-charcoal-muted mb-1">
+								<label for="confirm-date-{suggestion.id}" class="block text-xs font-medium text-charcoal-muted mb-1">
 									Date
 								</label>
 								<input
+									id="confirm-date-{suggestion.id}"
 									type="date"
 									value={data?.date ?? ''}
 									onchange={(e) => updateConfirmationDate(suggestion.id, e.currentTarget.value)}
@@ -369,12 +370,13 @@
 								/>
 							</div>
 							<div>
-								<label class="block text-xs font-medium text-charcoal-muted mb-1">
+								<label for="confirm-amount-{suggestion.id}" class="block text-xs font-medium text-charcoal-muted mb-1">
 									Amount
 								</label>
 								<div class="relative">
 									<span class="absolute left-3 top-1/2 -translate-y-1/2 text-charcoal-muted">$</span>
 									<input
+										id="confirm-amount-{suggestion.id}"
 										type="text"
 										inputmode="decimal"
 										value={data?.amount ?? ''}

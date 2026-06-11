@@ -66,7 +66,7 @@
 		<!-- Stats Grid -->
 		<div class="grid grid-cols-2 gap-3">
 			<!-- Total Spent -->
-			<div class="bg-white/60 rounded-lg px-3 py-2">
+			<div class="bg-surface/60 rounded-lg px-3 py-2">
 				<p class="text-xs text-charcoal-muted mb-0.5">Total Spent</p>
 				<div class="flex items-center gap-1.5">
 					<span class="font-mono text-base font-semibold text-charcoal">{formatCurrency(review.totalSpent)}</span>
@@ -90,13 +90,13 @@
 			</div>
 
 			<!-- Transaction Count -->
-			<div class="bg-white/60 rounded-lg px-3 py-2">
+			<div class="bg-surface/60 rounded-lg px-3 py-2">
 				<p class="text-xs text-charcoal-muted mb-0.5">Transactions</p>
 				<span class="font-mono text-base font-semibold text-charcoal">{review.txCount}</span>
 			</div>
 
 			<!-- Top Category -->
-			<div class="bg-white/60 rounded-lg px-3 py-2">
+			<div class="bg-surface/60 rounded-lg px-3 py-2">
 				<p class="text-xs text-charcoal-muted mb-0.5">Top Category</p>
 				{#if review.topCategory}
 					<div class="flex items-center gap-1 min-w-0">
@@ -112,7 +112,7 @@
 			</div>
 
 			<!-- Top Merchant -->
-			<div class="bg-white/60 rounded-lg px-3 py-2">
+			<div class="bg-surface/60 rounded-lg px-3 py-2">
 				<p class="text-xs text-charcoal-muted mb-0.5">Top Merchant</p>
 				{#if review.topMerchant}
 					<span class="text-sm font-medium text-charcoal truncate block">{review.topMerchant.name}</span>

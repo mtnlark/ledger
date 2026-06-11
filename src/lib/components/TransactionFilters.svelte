@@ -7,6 +7,8 @@
 	import { calculateTagTotal } from '$lib/utils/tags';
 	import { formatCurrency } from '$lib/utils/format-helpers';
 
+	export type SharedStatusFilter = '' | 'shared' | 'pending' | 'settled' | 'personal';
+
 	export interface FilterState {
 		searchQuery: string;
 		categoryId: number | null;
@@ -16,6 +18,7 @@
 		tags: string[];
 		amountMin: string;
 		amountMax: string;
+		sharedStatus: SharedStatusFilter;
 	}
 
 	interface Props {
@@ -50,7 +53,9 @@
 	// Local search input state — updates immediately while debouncing parent callback.
 	// In Svelte 5, value={expr} resets the DOM input when the component re-renders for
 	// any reason. Using bind:value with local state prevents keystroke loss during debounce.
+	// svelte-ignore state_referenced_locally
 	let localSearchQuery = $state(filters.searchQuery);
+	// svelte-ignore state_referenced_locally
 	let lastSentQuery = filters.searchQuery;
 
 	// Sync from parent only on external changes (e.g., Clear All, tag click filter)
@@ -74,7 +79,8 @@
 		filters.searchAllTime ||
 		filters.tags.length > 0 ||
 		filters.amountMin !== '' ||
-		filters.amountMax !== ''
+		filters.amountMax !== '' ||
+		filters.sharedStatus !== ''
 	);
 
 	let hasAdvancedFilters = $derived(
@@ -83,7 +89,8 @@
 		filters.dateTo !== '' ||
 		filters.tags.length > 0 ||
 		filters.amountMin !== '' ||
-		filters.amountMax !== ''
+		filters.amountMax !== '' ||
+		filters.sharedStatus !== ''
 	);
 
 	// Debounce search input — local state updates immediately, parent after 200ms
@@ -122,7 +129,8 @@
 			searchAllTime: false,
 			tags: [],
 			amountMin: '',
-			amountMax: ''
+			amountMax: '',
+			sharedStatus: ''
 		});
 	}
 
@@ -253,6 +261,23 @@
 							{category.icon} {category.name}
 						</option>
 					{/each}
+				</select>
+			</div>
+
+			<!-- Shared Status Filter -->
+			<div>
+				<label for="shared-filter" class="block text-xs font-medium text-charcoal-muted mb-1">Shared status</label>
+				<select
+					id="shared-filter"
+					value={filters.sharedStatus}
+					onchange={(e) => onFilterChange({ ...filters, sharedStatus: e.currentTarget.value as SharedStatusFilter })}
+					class="w-full px-3 py-2 bg-cream rounded-lg border border-transparent focus:border-primary-300 focus:ring-2 focus:ring-primary-100 focus:bg-surface transition-all text-charcoal"
+				>
+					<option value="">All transactions</option>
+					<option value="shared">Shared (any)</option>
+					<option value="pending">Shared · pending settlement</option>
+					<option value="settled">Shared · settled</option>
+					<option value="personal">Not shared</option>
 				</select>
 			</div>
 

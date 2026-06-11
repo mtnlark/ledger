@@ -18,6 +18,7 @@
 	let storageKey = $derived(`ledger-insight-${title.toLowerCase().replace(/\s+/g, '-')}`);
 
 	// Initial value from prop, overridden by localStorage in onMount (intentionally not reactive)
+	// svelte-ignore state_referenced_locally
 	let isExpanded = $state(defaultExpanded);
 
 	onMount(() => {
