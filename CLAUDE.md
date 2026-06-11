@@ -57,7 +57,7 @@ See `PRODUCT_ROADMAP.md` for the full development plan. Groups 1–9 are complet
 8. ~~Performance & Tech Debt~~ — N+1 fix, stats dedup, lazy-load, chunk splitting, import/export tests ✅
 9. ~~Startup Perf & Search~~ — Redundant DB scan elimination, query parallelization, search/filter enhancements, pagination, lazy emoji picker, migration version stamp ✅
 
-**Recent**: Trust & insight features — Stale-ledger nudge (dashboard banner when nothing entered for 7+ days, dismissal re-arms after a week, `ledger-stale-nudge-dismissed`). Shared-status filter (shared/pending/settled/personal) in advanced filters — with All Time this doubles as settlement history. Insights Overview gains a "Versus a Typical Month" variance card (`VarianceBreakdown.svelte`, per-category deltas vs 6-month baseline, day-clipped for partial months). Merchant + tag report cards (`ReportCardModal` + `utils/report-cards.ts`): click a merchant name on a row, or the chart icon on an active tag filter chip — stats, trailing-12-month bars, top categories. svelte-check is now fully clean (0 errors, 0 warnings). NOT YET BUILT: menu-bar quick add (approved; see memory handoff note).
+**Recent**: Trust & insight features — Stale-ledger nudge (dashboard banner when nothing entered for 7+ days, dismissal re-arms after a week, `ledger-stale-nudge-dismissed`). Shared-status filter (shared/pending/settled/personal) in advanced filters — with All Time this doubles as settlement history. Insights Overview gains a "Versus a Typical Month" variance card (`VarianceBreakdown.svelte`, per-category deltas vs 6-month baseline, day-clipped for partial months). Merchant + tag report cards (`ReportCardModal` + `utils/report-cards.ts`): click a merchant name on a row, or the chart icon on an active tag filter chip — stats, trailing-12-month bars, top categories. svelte-check is now fully clean (0 errors, 0 warnings). Menu-bar quick add is live: tray icon toggles a small capture window (`/quick-add` route) that reads shared Dexie and hands submits to the main window via Tauri event (single-writer). Split-group merchant names now open the merchant report card (header restructured: row click toggles, chevron is the accessible control).
 
 **Earlier**: Design language rolled out app-wide — All pages now use in-content Fraunces titles (HeaderNav deleted); KeyboardShortcuts moved to the root layout with a handler registry (`stores/shortcuts.ts`) so ⌘1–5/⌘N/⌘K work on every page. Budget and Savings are two-column (main list + sticky 330px rail with vertically stacked summary cards). Insights: title row with month picker, underline-style tabs (InsightTabs), two-up chart grid on the Overview tab. Shared: plain-language hero balance ("{partner} owes you"), gradient removed, list rows use category chips + dashed dividers, static Tips card deleted. Dashboard additions: sticky Transactions heading + search toolbar (measured via bind:clientHeight, offsets sticky date headers), and future-dated transactions hidden behind a "Show N upcoming" toggle (`ledger-show-upcoming`).
 
@@ -284,12 +284,13 @@ ledger/
 │   │   └── assets/
 │   │       └── favicon.svg
 │   ├── routes/
-│   │   ├── +layout.svelte    # App shell with SideNav
+│   │   ├── +layout.svelte    # App shell with SideNav (bare shell + submit listener for quick-add window)
 │   │   ├── +layout.ts
 │   │   ├── +page.svelte      # Dashboard
 │   │   ├── budget/+page.svelte
 │   │   ├── savings/+page.svelte  # Savings tracking
 │   │   ├── insights/+page.svelte
+│   │   ├── quick-add/+page.svelte # Menu-bar quick-add window (reads shared Dexie, submits via Tauri event)
 │   │   ├── shared/+page.svelte
 │   │   └── settings/+page.svelte
 │   └── tests/
@@ -314,7 +315,7 @@ ledger/
 ├── src-tauri/
 │   ├── src/
 │   │   ├── main.rs
-│   │   └── lib.rs            # Tauri plugins setup
+│   │   └── lib.rs            # Tauri plugins setup + tray icon / quick-add window toggle
 │   ├── capabilities/
 │   │   └── default.json      # Capability configuration
 │   ├── icons/                # App icons (all sizes)
@@ -567,6 +568,12 @@ Sidebar state persists to localStorage (`ledger-sidebar-expanded`).
   - Each existing tag has + (add) and − (remove) action buttons
   - Uses `appendTag()` (idempotent add) and `stripTag()` (remove) utilities
 - Tag index (`TagIndex` class) provides fast lookups, rebuilt from transaction cache
+
+### Menu-bar Quick Add
+- Tray icon (left-click) toggles a small always-on-top `quick-add` window rendering the full `TransactionForm`
+- **Single-writer rule**: both windows share one IndexedDB origin. The quick window reads categories/settings (and merchant autocomplete) directly from shared Dexie but NEVER calls `initializeStorage()` (it clears+reloads shared tables) and never writes. Submits are emitted as `ledger://quick-add-submit` (date as ISO string); the main window's layout listener performs the add, toasts, and dispatches `ledger:transactions-changed` (DOM event) so the dashboard refreshes.
+- Layout renders a bare shell for `/quick-add` (no SideNav/KeyboardShortcuts) and skips the purge + notification effects there
+- Rust: `SUPPRESS_NEXT_ACTIVATE` atomic stops the macOS activation observer from popping the main window when the tray opens the quick window; the existing CloseRequested handler hides (not closes) the quick window
 
 ### Notifications
 - Native macOS notifications via Tauri plugin (opt-in)

@@ -4,14 +4,16 @@
 	import SideNav from '$lib/components/SideNav.svelte';
 	import ToastContainer from '$lib/components/ToastContainer.svelte';
 	import KeyboardShortcuts from '$lib/components/KeyboardShortcuts.svelte';
+	import { page } from '$app/stores';
 	import { settings, updateSettings } from '$lib/stores/settings';
 	import { applyTheme, initThemeListener } from '$lib/stores/theme';
 	import { initNotifications, cleanupNotifications, isNotificationPermissionGranted } from '$lib/notifications';
-	import { purgeDeletedTransactions } from '$lib/stores/transactions';
-	import { registerStorageCallbacks } from '$lib/storage';
+	import { purgeDeletedTransactions, addTransaction } from '$lib/stores/transactions';
+	import { registerStorageCallbacks, initializeStorage } from '$lib/storage';
+	import type { TransactionFormData } from '$lib/components/TransactionForm.svelte';
 	import { toast } from '$lib/stores/toast';
 	import { db } from '$lib/db';
-	import { onDestroy } from 'svelte';
+	import { onDestroy, onMount } from 'svelte';
 
 	// Wire storage layer UI feedback to toast (keeps storage UI-agnostic)
 	registerStorageCallbacks({
@@ -21,12 +23,16 @@
 
 	let { children } = $props();
 
+	// The menu-bar quick-add window renders this same layout; it gets a bare
+	// shell and skips anything that writes or schedules (single-writer rule).
+	let isQuickWindow = $derived($page.url.pathname.startsWith('/quick-add'));
+
 	let cleanupListener: (() => void) | null = null;
 	let hasPurgedDeleted = false;
 
 	// One-time startup cleanup: permanently remove soft-deleted transactions from previous sessions
 	$effect(() => {
-		if (hasPurgedDeleted) return;
+		if (hasPurgedDeleted || isQuickWindow) return;
 		hasPurgedDeleted = true;
 
 		purgeDeletedTransactions().then((count) => {
@@ -48,6 +54,7 @@
 
 	// Notification scheduler — restarts whenever notification settings change
 	$effect(() => {
+		if (isQuickWindow) return;
 		const s = $settings;
 		if (!s?.notificationsEnabled) {
 			cleanupNotifications();
@@ -79,6 +86,36 @@
 		return () => cleanupNotifications();
 	});
 
+	// Receive transactions submitted from the quick-add window. This window is
+	// the single writer of data.json; the quick window only reads shared Dexie.
+	let unlistenQuickAdd: (() => void) | null = null;
+
+	onMount(() => {
+		if (isQuickWindow) return;
+		(async () => {
+			try {
+				const { listen } = await import('@tauri-apps/api/event');
+				unlistenQuickAdd = await listen<Omit<TransactionFormData, 'date'> & { date: string }>(
+					'ledger://quick-add-submit',
+					async (event) => {
+						try {
+							await initializeStorage();
+							await addTransaction({ ...event.payload, date: new Date(event.payload.date) });
+							toast.success('Transaction added');
+							window.dispatchEvent(new CustomEvent('ledger:transactions-changed'));
+						} catch (error) {
+							console.error('Quick add failed:', error);
+							toast.error('Failed to add transaction');
+						}
+					}
+				);
+			} catch {
+				// Not running inside Tauri (tests / plain web) — quick add unavailable
+			}
+		})();
+		return () => unlistenQuickAdd?.();
+	});
+
 	onDestroy(() => {
 		cleanupListener?.();
 		cleanupNotifications();
@@ -89,25 +126,30 @@
 	<link rel="icon" href={favicon} />
 </svelte:head>
 
-<a
-	href="#main-content"
-	class="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-[100] focus:px-4 focus:py-2 focus:bg-primary-500 focus:text-white focus:rounded-lg focus:font-medium focus:text-sm focus:shadow-lg"
->
-	Skip to content
-</a>
+{#if isQuickWindow}
+	<!-- Quick-add window: bare shell, no nav or app-wide shortcuts -->
+	{@render children()}
+{:else}
+	<a
+		href="#main-content"
+		class="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-[100] focus:px-4 focus:py-2 focus:bg-primary-500 focus:text-white focus:rounded-lg focus:font-medium focus:text-sm focus:shadow-lg"
+	>
+		Skip to content
+	</a>
 
-<div class="flex min-h-screen">
-	<!-- Sidebar navigation -->
-	<SideNav />
+	<div class="flex min-h-screen">
+		<!-- Sidebar navigation -->
+		<SideNav />
 
-	<!-- Main content -->
-	<div class="flex-1" id="main-content">
-		{@render children()}
+		<!-- Main content -->
+		<div class="flex-1" id="main-content">
+			{@render children()}
+		</div>
 	</div>
-</div>
 
-<!-- Toast Notifications -->
-<ToastContainer />
+	<!-- Toast Notifications -->
+	<ToastContainer />
 
-<!-- App-wide keyboard shortcuts (pages register context-specific handlers) -->
-<KeyboardShortcuts />
+	<!-- App-wide keyboard shortcuts (pages register context-specific handlers) -->
+	<KeyboardShortcuts />
+{/if}

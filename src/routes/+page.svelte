@@ -568,6 +568,18 @@
 		}
 	}
 
+	// Refresh when a quick-add from the menu-bar window lands (event from layout)
+	$effect(() => {
+		const month = currentMonth;
+		const handler = async () => {
+			transactions = await getTransactionsByMonth(month);
+			allTransactions = await getAllTransactions();
+			availableMonths = await getAvailableMonths();
+		};
+		window.addEventListener('ledger:transactions-changed', handler);
+		return () => window.removeEventListener('ledger:transactions-changed', handler);
+	});
+
 	// Refresh categories/settings when navigating back to this page
 	// This ensures changes made on Settings page are picked up without full reload
 	afterNavigate(async () => {

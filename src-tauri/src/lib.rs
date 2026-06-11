@@ -1,4 +1,10 @@
+use std::sync::atomic::{AtomicBool, Ordering};
+
 use tauri::Manager;
+
+/// When the tray opens the quick-add window the app activates; without this
+/// guard the macOS activation observer below would also pop the main window.
+static SUPPRESS_NEXT_ACTIVATE: AtomicBool = AtomicBool::new(false);
 
 /// Register a macOS observer for NSApplicationDidBecomeActiveNotification.
 /// When the app is activated (notification click, Cmd+Tab, etc.), show and focus the main window.
@@ -13,6 +19,9 @@ fn observe_app_activation(app_handle: tauri::AppHandle) {
     &*NSString::from_str("NSApplicationDidBecomeActiveNotification");
 
   let block = RcBlock::new(move |_notif: NonNull<NSNotification>| {
+    if SUPPRESS_NEXT_ACTIVATE.swap(false, Ordering::SeqCst) {
+      return;
+    }
     if let Some(window) = app_handle.get_webview_window("main") {
       window.show().unwrap_or_default();
       window.set_focus().unwrap_or_default();
@@ -26,6 +35,35 @@ fn observe_app_activation(app_handle: tauri::AppHandle) {
 
   // Leak the block so it lives for the app's lifetime
   std::mem::forget(block);
+}
+
+/// Show/hide the small quick-add capture window from the tray icon.
+/// Created lazily on first use; afterwards it is only hidden, never closed.
+fn toggle_quick_add(app: &tauri::AppHandle) {
+  if let Some(window) = app.get_webview_window("quick-add") {
+    if window.is_visible().unwrap_or(false) {
+      window.hide().unwrap_or_default();
+    } else {
+      SUPPRESS_NEXT_ACTIVATE.store(true, Ordering::SeqCst);
+      window.show().unwrap_or_default();
+      window.set_focus().unwrap_or_default();
+    }
+  } else {
+    SUPPRESS_NEXT_ACTIVATE.store(true, Ordering::SeqCst);
+    let window = tauri::WebviewWindowBuilder::new(
+      app,
+      "quick-add",
+      tauri::WebviewUrl::App("/quick-add".into()),
+    )
+    .title("Quick Add — Ledger")
+    .inner_size(440.0, 640.0)
+    .resizable(false)
+    .always_on_top(true)
+    .build();
+    if let Ok(window) = window {
+      window.set_focus().unwrap_or_default();
+    }
+  }
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -45,6 +83,25 @@ pub fn run() {
       // On macOS, observe app activation to show the window on notification click
       #[cfg(target_os = "macos")]
       observe_app_activation(app.handle().clone());
+
+      // Menu-bar quick add: left-clicking the tray icon toggles a small capture window
+      {
+        use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
+        TrayIconBuilder::with_id("ledger-tray")
+          .icon(app.default_window_icon().unwrap().clone())
+          .tooltip("Ledger — quick add")
+          .on_tray_icon_event(|tray, event| {
+            if let TrayIconEvent::Click {
+              button: MouseButton::Left,
+              button_state: MouseButtonState::Up,
+              ..
+            } = event
+            {
+              toggle_quick_add(tray.app_handle());
+            }
+          })
+          .build(app)?;
+      }
 
       Ok(())
     })
