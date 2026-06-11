@@ -26,6 +26,7 @@
 	import MonthPicker from '$lib/components/MonthPicker.svelte';
 	import SmartTakeaways from '$lib/components/insights/SmartTakeaways.svelte';
 	import InsightTabs from '$lib/components/insights/InsightTabs.svelte';
+	import VarianceBreakdown from '$lib/components/insights/VarianceBreakdown.svelte';
 	import QuickStatsRow from '$lib/components/insights/QuickStatsRow.svelte';
 	import { detectRecurringExpenses, type DetectedRecurring } from '$lib/stores/recurring';
 	import { getCancelledSubscriptions, getConfirmedActiveSubscriptions, getSettings } from '$lib/stores/settings';
@@ -227,6 +228,13 @@
 						{categoryBudgets}
 						{budget}
 						contributions={selectedMonthContributions}
+					/>
+
+					<!-- Why is this month different? -->
+					<VarianceBreakdown
+						transactions={allTransactions}
+						{categories}
+						{selectedMonth}
 					/>
 
 					<!-- Lazy-loaded chart components for overview tab -->
