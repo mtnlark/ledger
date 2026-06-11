@@ -57,7 +57,9 @@ See `PRODUCT_ROADMAP.md` for the full development plan. Groups 1–9 are complet
 8. ~~Performance & Tech Debt~~ — N+1 fix, stats dedup, lazy-load, chunk splitting, import/export tests ✅
 9. ~~Startup Perf & Search~~ — Redundant DB scan elimination, query parallelization, search/filter enhancements, pagination, lazy emoji picker, migration version stamp ✅
 
-**Recent**: Look-and-feel refresh — Transaction list rows are grouped into one card per date with dashed hairline dividers (no more shadow-per-row or `border-l-4` color stripes); category emoji render in soft color-tinted chips (`.category-chip` utility, `{hex}1F` 12% alpha tint); status badges use the new quiet `.badge` utility (sentence-case pills; a shared transaction shows *either* "Pending" or "Shared", not both); row edit/delete actions reveal on hover (`group/row` + `focus-within` for keyboard). Shadow token warmed: `--color-shadow` is now charcoal-tinted `rgba(45,42,38,0.12)` instead of cool gray. Sidebar got a terracotta logo chip + active-item accent bar.
+**Recent**: Monarch-style dashboard restructure — Two-column dashboard: ledger in the main column, sticky right rail (Cash Flow, Week in Review, Top Categories). The month name is now the page title (`MonthPicker variant="title"`). One add-transaction entry point: `AddTransactionModal` (full `TransactionForm` refactored to a pure form, no card chrome) via "Add" button or ⌘N; QuickAddFAB and the inline form card deleted. Ledger refinements: sticky date headers with day totals (your share), your-share-first amounts on shared rows ("of $full" beneath), muted partner line (green reserved for positive states), ↻ icon for monthly subs. TransactionFilters is a slim toolbar (search + All Time + Filters buttons) with the advanced panel as a card. Also: `prefers-reduced-motion` support, and divider color utilities now cover Tailwind v4's `:not(:last-child)` divide selector (first-divider dark bug).
+
+**Earlier**: Look-and-feel refresh — Transaction list rows are grouped into one card per date with dashed hairline dividers (no more shadow-per-row or `border-l-4` color stripes); category emoji render in soft color-tinted chips (`.category-chip` utility, `{hex}1F` 12% alpha tint); status badges use the new quiet `.badge` utility (sentence-case pills; a shared transaction shows *either* "Pending" or "Shared", not both); row edit/delete actions reveal on hover (`group/row` + `focus-within` for keyboard). Shadow token warmed: `--color-shadow` is now charcoal-tinted `rgba(45,42,38,0.12)` instead of cool gray. Sidebar got a terracotta logo chip + active-item accent bar.
 
 **Earlier**: Split transactions are now visually linked on the dashboard — children collapse into a single expandable summary row (`buildListRows`/`groupRowsByDate` in `transaction-grouping.ts`) instead of appearing as separate same-merchant rows. The summary row also has group-level Edit (`EditSplitModal` + `updateSplitGroup()`) and Delete actions, aligning splits with normal transactions.
 
@@ -196,7 +198,7 @@ ledger/
 │   │   │   ├── CashFlowCard.svelte
 │   │   │   ├── CashFlowCardSkeleton.svelte
 │   │   │   ├── SettlementTracker.svelte
-│   │   │   ├── QuickAddFAB.svelte
+│   │   │   ├── AddTransactionModal.svelte # Add-transaction modal (wraps TransactionForm)
 │   │   │   ├── BulkActionBar.svelte
 │   │   │   ├── BudgetModal.svelte
 │   │   │   ├── BudgetProgressBar.svelte
@@ -468,12 +470,13 @@ Sidebar state persists to localStorage (`ledger-sidebar-expanded`).
 ## Key Features
 
 ### Dashboard
-- Cash flow summary (income, saved, available, spent, surplus)
-- Collapsible "Add Transaction" form with merchant autocomplete
-- Transaction list with search/filters (searches merchant names and notes), amount range filter, progressive pagination (50 rows at a time)
+- **Two-column layout** (`max-w-6xl`): ledger in the main column; sticky right rail with Cash Flow card (always expanded), Week in Review, and Top Categories (reuses `insights/TopCategoriesBar`)
+- Month title in Fraunces doubles as the month picker (`MonthPicker variant="title"`); the dashboard has no HeaderNav
+- **Single add-transaction entry point**: toolbar "Add" button / ⌘N opens `AddTransactionModal` (wraps the full `TransactionForm`: split mode, shared, subscription, tags). The inline form card and QuickAddFAB are retired.
+- Transaction list with search/filters (searches merchant names and notes), amount range filter, progressive pagination (50 rows at a time); search/filters render as a slim toolbar, advanced filters in a card below
+- Day-grouped cards with dashed hairline dividers; sticky date headers show day totals (your share); shared rows show your share as the primary amount with "of $full" beneath; monthly/semi-annual subscriptions show a ↻ icon (annual keeps its badge)
 - **Split transaction nesting**: Children of a split (sharing `parentTransactionId`) collapse into one summary row (merchant + "Split" badge + total + your-share) with a chevron to expand the indented per-category breakdown. Grouping/pagination happen at the row level so a split is never cut at the page boundary; groups left with <2 visible children (e.g. after a category filter) fall back to a plain row. Selection mode renders splits flat so each child stays individually selectable.
   - **Group edit/delete**: The summary row has Edit/Delete controls mirroring normal rows. Edit opens `EditSplitModal` (group-level merchant/date/shared + editable category lines incl. per-line notes/tags); save calls `updateSplitGroup()` which keeps the hidden parent, recreates children from the new lines, and lets the total change to the sum of lines (`isEssential`/`isSubscription` inherited from the parent). Delete uses `onDeleteSplit(childIds)` → split-specific confirm ("Delete this split?") → soft-delete with undo (children only; total restores together). Individual lines keep their own per-row edit/delete in the expanded view.
-- Quick-add FAB for fast entry
 - Edit/split transaction modals
 - Bulk action toolbar for multi-select operations
 - Month picker for navigating between months
@@ -591,8 +594,6 @@ Sidebar state persists to localStorage (`ledger-sidebar-expanded`).
 
 UI state persisted across sessions:
 - `ledger-sidebar-expanded` - Sidebar collapse state
-- `ledger-cashflow-expanded` - Cash flow card state
-- `ledger-addform-expanded` - Transaction form state
 - `ledger-insight-{title}` - Each insight group state
 - `ledger-insights-tab` - Selected insights tab
 - `ledger-notif-daily-last-fired` - Daily notification last-fired date ("YYYY-MM-DD")

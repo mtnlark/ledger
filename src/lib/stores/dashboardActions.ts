@@ -122,7 +122,7 @@ export function setupDashboardActions(ctx: DashboardContext) {
 	return {
 		/**
 		 * Add a single transaction.
-		 * Used by both the inline form and QuickAddFAB.
+		 * Used by the add-transaction modal.
 		 */
 		async addTransaction(data: AddTransactionData): Promise<void> {
 			try {

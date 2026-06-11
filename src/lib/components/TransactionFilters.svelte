@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Search, Filter, X, ChevronDown, ChevronUp, Globe } from 'lucide-svelte';
+	import { Search, Filter, X, ChevronDown, Globe } from 'lucide-svelte';
 	import { slide } from 'svelte/transition';
 	import type { Category, Transaction } from '$lib/db';
 	import { tagIndex } from '$lib/stores/tags.svelte';
@@ -182,10 +182,9 @@
 	}
 </script>
 
-<div class="bg-surface rounded-xl shadow-md shadow-[var(--color-shadow)] overflow-hidden">
-	<!-- Search Bar -->
-	<div class="px-4 py-3">
-		<div class="flex gap-2">
+<div class="space-y-2">
+	<!-- Toolbar: search + scope + filters toggle -->
+	<div class="flex gap-2">
 			<div class="relative flex-1">
 				<Search size={18} class="absolute left-3 top-1/2 -translate-y-1/2 text-charcoal-muted pointer-events-none" />
 				<input
@@ -195,7 +194,7 @@
 					aria-label="Search transactions"
 					bind:value={localSearchQuery}
 					oninput={(e) => handleSearchInput(e.currentTarget.value)}
-					class="w-full pl-10 pr-10 py-2.5 bg-cream rounded-lg border border-transparent focus:border-primary-300 focus:ring-2 focus:ring-primary-100 focus:bg-surface transition-all text-charcoal placeholder:text-charcoal-muted/60"
+					class="w-full pl-10 pr-10 py-2 bg-surface rounded-lg border border-theme focus:border-primary-300 transition-all text-charcoal placeholder:text-charcoal-muted/60"
 				/>
 				{#if localSearchQuery}
 					<button
@@ -211,40 +210,34 @@
 			<button
 				onclick={toggleSearchAllTime}
 				title={filters.searchAllTime ? "Searching all time" : "Search all time"}
-				class="flex items-center gap-1.5 px-3 py-2.5 rounded-lg border transition-all text-sm font-medium whitespace-nowrap {filters.searchAllTime
+				class="flex items-center gap-1.5 px-3 py-2 rounded-lg border transition-all text-sm font-medium whitespace-nowrap {filters.searchAllTime
 					? 'bg-primary-100 border-primary-300 text-primary-700'
-					: 'bg-cream border-transparent text-charcoal-muted hover:text-charcoal hover:border-primary-200'}"
+					: 'bg-surface border-theme text-charcoal-muted hover:text-charcoal'}"
 			>
 				<Globe size={16} />
 				<span class="hidden sm:inline">All Time</span>
 			</button>
-		</div>
-	</div>
 
-	<!-- Filter Toggle -->
-	<button
-		onclick={() => showAdvanced = !showAdvanced}
-		class="w-full px-4 py-2 flex items-center justify-between text-sm text-charcoal-muted hover:bg-cream/50 transition-colors border-t border-dashed border-theme-dashed"
-	>
-		<div class="flex items-center gap-2">
-			<Filter size={16} />
-			<span>Filters</span>
-			{#if hasAdvancedFilters}
-				<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-primary-100 text-primary-600">
-					Active
-				</span>
-			{/if}
-		</div>
-		{#if showAdvanced}
-			<ChevronUp size={16} />
-		{:else}
-			<ChevronDown size={16} />
-		{/if}
-	</button>
+			<!-- Filters Toggle -->
+			<button
+				onclick={() => showAdvanced = !showAdvanced}
+				class="flex items-center gap-1.5 px-3 py-2 rounded-lg border transition-all text-sm font-medium whitespace-nowrap {showAdvanced || hasAdvancedFilters
+					? 'bg-primary-100 border-primary-300 text-primary-700'
+					: 'bg-surface border-theme text-charcoal-muted hover:text-charcoal'}"
+				aria-expanded={showAdvanced}
+			>
+				<Filter size={16} />
+				<span class="hidden sm:inline">Filters</span>
+				{#if hasAdvancedFilters}
+					<span class="w-1.5 h-1.5 rounded-full bg-primary-500" aria-hidden="true"></span>
+				{/if}
+				<ChevronDown size={14} class="transition-transform {showAdvanced ? 'rotate-180' : ''}" />
+			</button>
+	</div>
 
 	<!-- Advanced Filters (collapsible) -->
 	{#if showAdvanced}
-		<div transition:slide={{ duration: 150 }} class="px-4 pb-4 pt-2 border-t border-dashed border-theme-dashed space-y-3">
+		<div transition:slide={{ duration: 150 }} class="bg-surface rounded-xl shadow-sm shadow-theme p-4 space-y-3">
 			<!-- Category Filter -->
 			<div>
 				<label for="category-filter" class="block text-xs font-medium text-charcoal-muted mb-1">Category</label>
@@ -448,7 +441,7 @@
 
 	<!-- Results count & Clear button -->
 	{#if hasActiveFilters}
-		<div class="px-4 py-2.5 bg-surface-alt/50 border-t border-dashed border-theme-dashed flex items-center justify-between">
+		<div class="px-1 flex items-center justify-between">
 			<span class="text-sm text-charcoal-muted">
 				{#if resultCount !== undefined}
 					{#if filters.searchAllTime && allTimeCount !== undefined}

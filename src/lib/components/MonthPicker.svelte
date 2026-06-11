@@ -7,9 +7,11 @@
 		currentMonth: string;
 		availableMonths: string[];
 		onMonthChange: (month: string) => void;
+		/** 'title' renders the month name as a Fraunces page heading (used on the dashboard). */
+		variant?: 'compact' | 'title';
 	}
 
-	let { currentMonth, availableMonths, onMonthChange }: Props = $props();
+	let { currentMonth, availableMonths, onMonthChange, variant = 'compact' }: Props = $props();
 
 	// Check if we're viewing the actual current month
 	let actualCurrentMonth = getMonthKey(new Date());
@@ -95,12 +97,14 @@
 	<div class="relative">
 		<button
 			onclick={() => (isOpen = !isOpen)}
-			class="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-charcoal hover:bg-surface-hover rounded-lg transition-colors min-w-[140px] justify-center"
+			class="flex items-center rounded-lg transition-colors hover:bg-surface-hover {variant === 'title'
+				? 'gap-2 px-2 py-1 font-display text-2xl font-medium text-charcoal'
+				: 'gap-1.5 px-3 py-1.5 text-sm font-medium text-charcoal min-w-[140px] justify-center'}"
 			aria-expanded={isOpen}
 			aria-haspopup="listbox"
 		>
 			<span class={isNavigating ? 'opacity-50 transition-opacity' : 'transition-opacity'}>{formatMonth(currentMonth)}</span>
-			<ChevronDown size={16} class="text-charcoal-muted transition-transform {isOpen ? 'rotate-180' : ''}" />
+			<ChevronDown size={variant === 'title' ? 20 : 16} class="text-charcoal-muted transition-transform {isOpen ? 'rotate-180' : ''}" />
 		</button>
 
 		{#if isOpen}

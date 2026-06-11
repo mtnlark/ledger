@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { ComponentType } from 'svelte';
 	import { slide } from 'svelte/transition';
-	import { Pencil, Trash2, Receipt, CheckSquare, Square, Check, ChevronRight } from 'lucide-svelte';
+	import { Pencil, Trash2, Receipt, CheckSquare, Square, Check, ChevronRight, Repeat } from 'lucide-svelte';
 	import type { Transaction, Category, Settings } from '$lib/db';
 	import { createCategoryHelpers } from '$lib/utils/category-helpers';
 	import { formatCurrency } from '$lib/utils/format-helpers';
@@ -12,6 +12,7 @@
 		type ListRow
 	} from '$lib/utils/transaction-grouping';
 	import { extractTags, removeTags } from '$lib/utils/tags';
+	import { sumCurrency } from '$lib/utils/currency';
 	import { DEFAULT_PAGE_SIZE } from '$lib/utils/pagination';
 	import EmptyState from './EmptyState.svelte';
 	import BulkActionBar from './BulkActionBar.svelte';
@@ -196,6 +197,17 @@
 	function rowKey(row: ListRow): string {
 		return row.type === 'single' ? `s${row.transaction.id}` : `g${row.parentId}`;
 	}
+
+	// Day totals reflect what hits your budget: your share for shared rows
+	function userShare(t: Transaction): number {
+		return t.isShared ? t.amount - t.partnerShare : t.amount;
+	}
+
+	function groupTotal(rows: ListRow[]): number {
+		return sumCurrency(
+			rows.flatMap((r) => (r.type === 'single' ? [userShare(r.transaction)] : r.children.map(userShare)))
+		);
+	}
 </script>
 
 <!-- Standard transaction row. Reused for single rows and (in selection mode) split children. -->
@@ -238,9 +250,16 @@
 			<div class="flex items-center gap-2">
 				<span class="font-medium text-charcoal truncate">{transaction.merchant}</span>
 				{#if transaction.isSubscription}
-					<span class="badge bg-primary-100 text-primary-600">
-						{transaction.subscriptionFrequency === 'annual' ? 'Annual' : 'Sub'}
-					</span>
+					{#if transaction.subscriptionFrequency === 'annual'}
+						<span class="badge bg-primary-100 text-primary-600">Annual</span>
+					{:else}
+						<span
+							class="text-charcoal-muted flex-shrink-0"
+							title="{transaction.subscriptionFrequency === 'semi-annual' ? 'Semi-annual' : 'Monthly'} subscription"
+						>
+							<Repeat size={13} />
+						</span>
+					{/if}
 				{/if}
 				{#if transaction.isShared && !transaction.isSettled}
 					<span class="badge bg-warning-100 text-warning-600">Pending</span>
@@ -252,9 +271,7 @@
 				<span>{getCategoryName(transaction.categoryId)}</span>
 				{#if transaction.isShared}
 					<span>·</span>
-					<span class="text-success-600">
-						{partnerName}: {formatCurrency(transaction.partnerShare)}
-					</span>
+					<span>{partnerName}: {formatCurrency(transaction.partnerShare)}</span>
 				{/if}
 			</div>
 			{#if cleanNotes || tags.length > 0}
@@ -269,13 +286,13 @@
 			{/if}
 		</div>
 
-		<!-- Amount -->
+		<!-- Amount (your share first; full charge as context) -->
 		<div class="text-right flex-shrink-0">
-			<div class="font-mono font-medium text-charcoal">{formatCurrency(transaction.amount)}</div>
 			{#if transaction.isShared}
-				<div class="text-xs text-charcoal-muted font-mono">
-					You: {formatCurrency(transaction.amount - transaction.partnerShare)}
-				</div>
+				<div class="font-mono font-medium text-charcoal">{formatCurrency(transaction.amount - transaction.partnerShare)}</div>
+				<div class="text-xs text-charcoal-muted font-mono">of {formatCurrency(transaction.amount)}</div>
+			{:else}
+				<div class="font-mono font-medium text-charcoal">{formatCurrency(transaction.amount)}</div>
 			{/if}
 		</div>
 
@@ -346,7 +363,10 @@
 		{#each rowGroups as group, groupIndex (group.dateKey)}
 			<!-- Date Header -->
 			<div class="animate-enter" style="animation-delay: {groupIndex * 50}ms;">
-				<h3 class="text-xs font-medium uppercase tracking-wider text-charcoal-muted mb-2 px-1">{group.label}</h3>
+				<div class="sticky top-0 z-10 bg-cream flex items-baseline justify-between mb-2 px-1 py-1.5">
+					<h3 class="text-xs font-medium uppercase tracking-wider text-charcoal-muted">{group.label}</h3>
+					<span class="font-mono text-xs text-charcoal-muted">{formatCurrency(groupTotal(group.rows))}</span>
+				</div>
 				<div class="bg-surface rounded-xl shadow-sm shadow-theme overflow-hidden divide-y divide-dashed divide-theme-dashed">
 					{#each group.rows as row (rowKey(row))}
 						{#if row.type === 'single'}
@@ -390,19 +410,17 @@
 												<span>{row.children.length} categories</span>
 												{#if row.allShared}
 													<span>·</span>
-													<span class="text-success-600">
-														{partnerName}: {formatCurrency(row.partnerTotal)}
-													</span>
+													<span>{partnerName}: {formatCurrency(row.partnerTotal)}</span>
 												{/if}
 											</div>
 										</div>
 
 										<div class="text-right flex-shrink-0">
-											<div class="font-mono font-medium text-charcoal">{formatCurrency(row.total)}</div>
 											{#if row.allShared}
-												<div class="text-xs text-charcoal-muted font-mono">
-													You: {formatCurrency(row.youTotal)}
-												</div>
+												<div class="font-mono font-medium text-charcoal">{formatCurrency(row.youTotal)}</div>
+												<div class="text-xs text-charcoal-muted font-mono">of {formatCurrency(row.total)}</div>
+											{:else}
+												<div class="font-mono font-medium text-charcoal">{formatCurrency(row.total)}</div>
 											{/if}
 										</div>
 									</button>
@@ -463,11 +481,11 @@
 														{/if}
 													</div>
 													<div class="text-right flex-shrink-0">
-														<div class="font-mono text-sm text-charcoal">{formatCurrency(child.amount)}</div>
 														{#if child.isShared}
-															<div class="text-xs text-charcoal-muted font-mono">
-																You: {formatCurrency(child.amount - child.partnerShare)}
-															</div>
+															<div class="font-mono text-sm text-charcoal">{formatCurrency(child.amount - child.partnerShare)}</div>
+															<div class="text-xs text-charcoal-muted font-mono">of {formatCurrency(child.amount)}</div>
+														{:else}
+															<div class="font-mono text-sm text-charcoal">{formatCurrency(child.amount)}</div>
 														{/if}
 													</div>
 													{#if onEdit || onDelete}

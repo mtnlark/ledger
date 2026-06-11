@@ -17,29 +17,28 @@
 	import { toast } from '$lib/stores/toast';
 	import { handleError } from '$lib/utils/error-handler';
 	import TransactionList from '$lib/components/TransactionList.svelte';
-	import TransactionForm from '$lib/components/TransactionForm.svelte';
+	import AddTransactionModal from '$lib/components/AddTransactionModal.svelte';
 	import CashFlowCard from '$lib/components/CashFlowCard.svelte';
 	import BudgetModal from '$lib/components/BudgetModal.svelte';
 	import EditTransactionModal, { type TransactionUpdateData } from '$lib/components/EditTransactionModal.svelte';
 	import SplitTransactionModal from '$lib/components/SplitTransactionModal.svelte';
 	import EditSplitModal from '$lib/components/EditSplitModal.svelte';
 	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
-	import HeaderNav from '$lib/components/HeaderNav.svelte';
 	import MonthPicker from '$lib/components/MonthPicker.svelte';
 	import CashFlowCardSkeleton from '$lib/components/CashFlowCardSkeleton.svelte';
 	import TransactionListSkeleton from '$lib/components/TransactionListSkeleton.svelte';
 	import TransactionFilters, { type FilterState } from '$lib/components/TransactionFilters.svelte';
-	import QuickAddFAB from '$lib/components/QuickAddFAB.svelte';
 	import KeyboardShortcuts from '$lib/components/KeyboardShortcuts.svelte';
 	import RecurringSuggestionsBanner from '$lib/components/RecurringSuggestionsBanner.svelte';
 	import RecurringSuggestionsModal from '$lib/components/RecurringSuggestionsModal.svelte';
-		import WeekInReviewCard from '$lib/components/WeekInReviewCard.svelte';
+	import WeekInReviewCard from '$lib/components/WeekInReviewCard.svelte';
+	import TopCategoriesBar from '$lib/components/insights/TopCategoriesBar.svelte';
 	import { Plus, Square } from 'lucide-svelte';
 
 	// State
 	let isLoading = $state(true);
 	let isSelectionMode = $state(false);
-	let quickAddOpen = $state(false);
+	let addModalOpen = $state(false);
 	let searchInputRef = $state<HTMLInputElement | null>(null);
 	let categories = $state<Category[]>([]);
 	let transactions = $state<Transaction[]>([]); // Current month's transactions
@@ -53,9 +52,6 @@
 	let editingSplit = $state<{ parentId: number; children: Transaction[] } | null>(null);
 	let currentMonth = $state(getMonthKey(new Date()));
 	let availableMonths = $state<string[]>([getMonthKey(new Date())]);
-
-	// Transaction form state
-	let formExpanded = $state(false);
 
 	// Recurring suggestions state
 	let showRecurringBanner = $state(false);
@@ -479,7 +475,7 @@
 	// Keyboard shortcut handlers
 	function handleOpenQuickAdd() {
 		if (!isLoading) {
-			quickAddOpen = true;
+			addModalOpen = true;
 		}
 	}
 
@@ -498,72 +494,75 @@
 </svelte:head>
 
 <div class="min-h-screen">
-	<!-- Header with month picker -->
-	<HeaderNav title="">
-		<MonthPicker
-			{currentMonth}
-			{availableMonths}
-			onMonthChange={handleMonthChange}
-		/>
-	</HeaderNav>
-
-	<!-- Recurring Suggestions Banner -->
-	{#if showRecurringBanner && !isLoading}
-		<div class="max-w-4xl mx-auto px-4 pt-4">
-			<RecurringSuggestionsBanner
-				suggestionCount={recurringSuggestions.length}
-				onReview={() => showRecurringSuggestionsModal = true}
-				onDismiss={handleDismissRecurringSuggestions}
+	<!-- Main Content -->
+	<main class="max-w-6xl mx-auto px-6 py-6" aria-live="polite">
+		<!-- Month title -->
+		<div class="mb-5 -ml-2">
+			<MonthPicker
+				variant="title"
+				{currentMonth}
+				{availableMonths}
+				onMonthChange={handleMonthChange}
 			/>
 		</div>
-	{/if}
 
-	<!-- Main Content -->
-	<main class="max-w-4xl mx-auto px-4 py-6 space-y-6" aria-live="polite">
+		<!-- Recurring Suggestions Banner -->
+		{#if showRecurringBanner && !isLoading}
+			<div class="mb-6">
+				<RecurringSuggestionsBanner
+					suggestionCount={recurringSuggestions.length}
+					onReview={() => showRecurringSuggestionsModal = true}
+					onDismiss={handleDismissRecurringSuggestions}
+				/>
+			</div>
+		{/if}
 		{#if isLoading}
 			<!-- Skeleton loading states -->
-			<CashFlowCardSkeleton />
-			<div class="bg-surface rounded-xl shadow-md shadow-[var(--color-shadow)] p-6">
-				<div class="animate-pulse h-6 w-32 bg-cream-dark rounded mb-4"></div>
-				<div class="space-y-4">
-					<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-						<div class="h-10 bg-cream-dark rounded-lg"></div>
-						<div class="h-10 bg-cream-dark rounded-lg"></div>
-					</div>
-					<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-						<div class="h-10 bg-cream-dark rounded-lg"></div>
-						<div class="h-10 bg-cream-dark rounded-lg"></div>
-					</div>
+			<div class="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_330px] gap-6 items-start">
+				<div class="min-w-0">
+					<TransactionListSkeleton count={6} />
 				</div>
-			</div>
-			<div>
-				<div class="animate-pulse h-6 w-40 bg-cream-dark rounded mb-3"></div>
-				<TransactionListSkeleton count={4} />
+				<CashFlowCardSkeleton />
 			</div>
 		{:else}
-			<!-- Week in Review -->
-			<WeekInReviewCard {allTransactions} {categories} />
+			<div class="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_330px] gap-6 items-start">
+				<!-- Main column: ledger -->
+				<div class="min-w-0 space-y-3 order-last lg:order-none">
+					<!-- Heading + actions -->
+					<div class="flex items-center justify-between">
+						<h2 class="font-display text-xl font-medium text-charcoal">
+							{#if filters.searchAllTime}
+								All Transactions
+							{:else if filters.searchQuery || filters.categoryId !== null || filters.dateFrom || filters.dateTo || filters.amountMin || filters.amountMax}
+								Filtered Transactions
+							{:else}
+								Transactions
+							{/if}
+						</h2>
+						<div class="flex items-center gap-2">
+							{#if filteredTransactions.length > 0 && !isSelectionMode}
+								<button
+									type="button"
+									onclick={() => isSelectionMode = true}
+									class="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg transition-colors text-charcoal-muted hover:text-charcoal hover:bg-cream"
+								>
+									<Square size={16} />
+									<span>Select</span>
+								</button>
+							{/if}
+							<button
+								type="button"
+								onclick={() => addModalOpen = true}
+								class="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg bg-primary-500 text-white hover:bg-primary-600 transition-colors btn-press"
+							>
+								<Plus size={16} />
+								<span>Add</span>
+							</button>
+						</div>
+					</div>
 
-			<!-- Cash Flow Summary -->
-			<CashFlowCard
-				{budget}
-				{totalSpent}
-				{savedFromContributions}
-				{monthDisplay}
-				onEditBudget={() => showBudgetModal = true}
-			/>
-
-			<!-- Transaction Form -->
-			<TransactionForm
-				{categories}
-				{settings}
-				bind:isExpanded={formExpanded}
-				onSubmit={actions.addTransaction}
-				onSplitSubmit={actions.addSplitTransactions}
-			/>
-
-			<!-- Transaction Search & Filters -->
-			<TransactionFilters
+					<!-- Search & filters toolbar -->
+					<TransactionFilters
 				{categories}
 				{filters}
 				onFilterChange={handleFilterChange}
@@ -578,42 +577,8 @@
 				}}
 			/>
 
-			<!-- Transaction List -->
-			<div>
-				<div class="flex items-center justify-between mb-4">
-					<h2 class="font-display text-xl font-medium text-charcoal">
-						{#if filters.searchAllTime}
-							All Transactions
-						{:else if filters.searchQuery || filters.categoryId !== null || filters.dateFrom || filters.dateTo || filters.amountMin || filters.amountMax}
-							Filtered Transactions
-						{:else}
-							Recent Transactions
-						{/if}
-					</h2>
-					<div class="flex items-center gap-2">
-						{#if !formExpanded}
-							<button
-								type="button"
-								onclick={() => formExpanded = true}
-								class="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg transition-colors text-primary-600 hover:text-primary-700 hover:bg-primary-50"
-							>
-								<Plus size={16} />
-								<span>Add</span>
-							</button>
-						{/if}
-						{#if filteredTransactions.length > 0 && !isSelectionMode}
-							<button
-								type="button"
-								onclick={() => isSelectionMode = true}
-								class="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg transition-colors text-charcoal-muted hover:text-charcoal hover:bg-cream"
-							>
-								<Square size={16} />
-								<span>Select</span>
-							</button>
-						{/if}
-					</div>
-				</div>
-				<TransactionList
+					<!-- Transaction List -->
+					<TransactionList
 					transactions={filteredTransactions}
 					{categories}
 					{settings}
@@ -638,7 +603,25 @@
 							filters = { ...filters, tags: [...filters.tags, tag] };
 						}
 					}}
-				/>
+					/>
+				</div>
+
+				<!-- Right rail: summaries -->
+				<aside class="space-y-4 lg:sticky lg:top-6">
+					<CashFlowCard
+						{budget}
+						{totalSpent}
+						{savedFromContributions}
+						onEditBudget={() => showBudgetModal = true}
+					/>
+					<WeekInReviewCard {allTransactions} {categories} />
+					{#if transactions.length > 0}
+						<div class="bg-surface rounded-xl shadow-sm shadow-theme p-4">
+							<h3 class="text-xs font-medium uppercase tracking-wider text-charcoal-muted mb-3">Top Categories</h3>
+							<TopCategoriesBar {transactions} {categories} limit={5} />
+						</div>
+					{/if}
+				</aside>
 			</div>
 		{/if}
 	</main>
@@ -710,15 +693,15 @@
 	onClose={() => showRecurringSuggestionsModal = false}
 />
 
-<!-- Quick Add FAB -->
-{#if !isLoading}
-	<QuickAddFAB
-		{categories}
-		{settings}
-		onSubmit={actions.addTransaction}
-		bind:isOpen={quickAddOpen}
-	/>
-{/if}
+<!-- Add Transaction Modal -->
+<AddTransactionModal
+	isOpen={addModalOpen}
+	{categories}
+	{settings}
+	onSubmit={actions.addTransaction}
+	onSplitSubmit={actions.addSplitTransactions}
+	onClose={() => addModalOpen = false}
+/>
 
 <!-- Keyboard Shortcuts -->
 <KeyboardShortcuts
