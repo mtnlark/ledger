@@ -17,6 +17,7 @@
 	import { getSelectedMonth, setSelectedMonth } from '$lib/stores/selectedMonth';
 	import { toast } from '$lib/stores/toast';
 	import { handleError } from '$lib/utils/error-handler';
+	import { formatCurrency } from '$lib/utils/format-helpers';
 	import TransactionList from '$lib/components/TransactionList.svelte';
 	import AddTransactionModal from '$lib/components/AddTransactionModal.svelte';
 	import CashFlowCard from '$lib/components/CashFlowCard.svelte';
@@ -33,6 +34,8 @@
 	import RecurringSuggestionsModal from '$lib/components/RecurringSuggestionsModal.svelte';
 	import WeekInReviewCard from '$lib/components/WeekInReviewCard.svelte';
 	import StaleLedgerBanner from '$lib/components/StaleLedgerBanner.svelte';
+	import ReportCardModal, { type ReportStat } from '$lib/components/ReportCardModal.svelte';
+	import { computeMerchantReport, computeTagReport } from '$lib/utils/report-cards';
 	import TopCategoriesBar from '$lib/components/insights/TopCategoriesBar.svelte';
 	import { Plus, Square, CalendarClock } from 'lucide-svelte';
 
@@ -50,6 +53,9 @@
 	let showUpcoming = $state(false);
 	// Stale-ledger nudge: shown when nothing has been entered for a week
 	let staleNudgeDismissedAt = $state<string | null>(null);
+	// Report cards (merchant / tag drill-downs)
+	let merchantReportFor = $state<string | null>(null);
+	let tagReportFor = $state<string | null>(null);
 	let searchInputRef = $state<HTMLInputElement | null>(null);
 	let categories = $state<Category[]>([]);
 	let transactions = $state<Transaction[]>([]); // Current month's transactions
@@ -249,6 +255,32 @@
 			if (sinceDismiss < STALE_THRESHOLD_DAYS) return false;
 		}
 		return true;
+	});
+
+	let merchantReport = $derived(
+		merchantReportFor ? computeMerchantReport(allTransactions, categories, merchantReportFor) : null
+	);
+	let merchantReportStats = $derived.by((): ReportStat[] => {
+		if (!merchantReport) return [];
+		return [
+			{ label: 'Total spent', value: formatCurrency(merchantReport.total), sub: 'your share, all time' },
+			{ label: 'Visits', value: String(merchantReport.visits) },
+			{ label: 'Average per visit', value: formatCurrency(merchantReport.average) },
+			{ label: 'Last visit', value: format(merchantReport.lastDate, 'MMM d, yyyy') }
+		];
+	});
+
+	let tagReport = $derived(
+		tagReportFor ? computeTagReport(allTransactions, categories, tagReportFor) : null
+	);
+	let tagReportStats = $derived.by((): ReportStat[] => {
+		if (!tagReport) return [];
+		return [
+			{ label: 'Total spent', value: formatCurrency(tagReport.total), sub: 'your share, all time' },
+			{ label: 'Transactions', value: String(tagReport.count) },
+			{ label: 'First used', value: format(tagReport.firstDate, 'MMM d, yyyy') },
+			{ label: 'Last used', value: format(tagReport.lastDate, 'MMM d, yyyy') }
+		];
 	});
 
 	function dismissStaleNudge() {
@@ -691,6 +723,7 @@
 					<TransactionList
 					transactions={filteredTransactions}
 					stickyOffset={toolbarHeight}
+					onMerchantClick={(m) => merchantReportFor = m}
 					{categories}
 					{settings}
 					{allTransactions}
@@ -803,6 +836,28 @@
 	onDismiss={handleDismissRecurringSuggestions}
 	onClose={() => showRecurringSuggestionsModal = false}
 />
+
+<!-- Merchant / Tag report cards -->
+{#if merchantReport}
+	<ReportCardModal
+		isOpen={true}
+		title={merchantReport.merchant}
+		stats={merchantReportStats}
+		monthly={merchantReport.monthly}
+		topCategories={merchantReport.topCategories}
+		onClose={() => merchantReportFor = null}
+	/>
+{/if}
+{#if tagReport}
+	<ReportCardModal
+		isOpen={true}
+		title={'#' + tagReport.tag}
+		stats={tagReportStats}
+		monthly={tagReport.monthly}
+		topCategories={tagReport.topCategories}
+		onClose={() => tagReportFor = null}
+	/>
+{/if}
 
 <!-- Add Transaction Modal -->
 <AddTransactionModal

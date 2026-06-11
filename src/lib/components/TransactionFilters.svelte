@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Search, Filter, X, ChevronDown, Globe } from 'lucide-svelte';
+	import { Search, Filter, X, ChevronDown, Globe, BarChart3 } from 'lucide-svelte';
 	import { slide } from 'svelte/transition';
 	import type { Category, Transaction } from '$lib/db';
 	import { tagIndex } from '$lib/stores/tags.svelte';
@@ -31,9 +31,11 @@
 		onSearchInputRef?: (el: HTMLInputElement | null) => void;
 		allTransactions?: Transaction[];
 		onTagsChanged?: () => void;
+		/** Opens the tag report card. */
+		onTagReport?: (tag: string) => void;
 	}
 
-	let { categories, filters, onFilterChange, resultCount, totalCount, allTimeCount, onSearchInputRef, allTransactions = [], onTagsChanged }: Props = $props();
+	let { categories, filters, onFilterChange, resultCount, totalCount, allTimeCount, onSearchInputRef, allTransactions = [], onTagsChanged, onTagReport }: Props = $props();
 
 	let searchInput = $state<HTMLInputElement | null>(null);
 
@@ -394,6 +396,17 @@
 						{#each filters.tags as tag (tag)}
 							<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-primary-100 text-primary-700">
 								{tag}
+								{#if onTagReport}
+									<button
+										type="button"
+										onclick={() => onTagReport?.(tag)}
+										aria-label="View {tag} report"
+										title="View tag report"
+										class="hover:text-primary-900"
+									>
+										<BarChart3 size={12} />
+									</button>
+								{/if}
 								<button
 									type="button"
 									onclick={() => onFilterChange({ ...filters, tags: filters.tags.filter(t => t !== tag) })}

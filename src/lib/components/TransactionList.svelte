@@ -42,9 +42,11 @@
 		resetKey?: string;
 		/** Viewport offset for sticky date headers (height of any sticky toolbar above the list). */
 		stickyOffset?: number;
+		/** Opens the merchant report card. */
+		onMerchantClick?: (merchant: string) => void;
 	}
 
-	let { transactions, categories, settings, onEdit, onDelete, onBulkDelete, onBulkCategoryChange, onBulkTagAdd, onBulkTagRemove, onEditSplit, onDeleteSplit, availableTags = [], onAddTransaction, selectionMode = false, onSelectionModeChange, onTagClick, allTransactions, resetKey = '', stickyOffset = 0 }: Props = $props();
+	let { transactions, categories, settings, onEdit, onDelete, onBulkDelete, onBulkCategoryChange, onBulkTagAdd, onBulkTagRemove, onEditSplit, onDeleteSplit, availableTags = [], onAddTransaction, selectionMode = false, onSelectionModeChange, onTagClick, allTransactions, resetKey = '', stickyOffset = 0, onMerchantClick }: Props = $props();
 
 	// Selection mode state - use prop if provided, otherwise internal state
 	let internalSelectionMode = $state(false);
@@ -250,7 +252,16 @@
 		<!-- Main Content -->
 		<div class="flex-1 min-w-0">
 			<div class="flex items-center gap-2">
-				<span class="font-medium text-charcoal truncate">{transaction.merchant}</span>
+				{#if onMerchantClick && !isSelectionMode}
+					<button
+						type="button"
+						onclick={(e) => { e.stopPropagation(); onMerchantClick?.(transaction.merchant); }}
+						class="font-medium text-charcoal truncate text-left hover:text-primary-600 underline decoration-dotted decoration-transparent hover:decoration-primary-400 underline-offset-2 transition-colors"
+						title="View merchant report"
+					>{transaction.merchant}</button>
+				{:else}
+					<span class="font-medium text-charcoal truncate">{transaction.merchant}</span>
+				{/if}
 				{#if transaction.isSubscription}
 					{#if transaction.subscriptionFrequency === 'annual'}
 						<span class="badge bg-primary-100 text-primary-600">Annual</span>
