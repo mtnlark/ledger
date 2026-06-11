@@ -309,13 +309,17 @@
     background-color: var(--color-border-dashed);
   }
 
-  /* Semantic dividers */
-  .divide-theme > :not([hidden]) ~ :not([hidden]) {
-    --tw-divide-opacity: 1;
+  /* Semantic dividers.
+     Tailwind v4's divide-y draws border-bottom on `> :not(:last-child)`; the
+     legacy `~` selector only matches children 2..n, leaving the first row's
+     divider at the default currentColor. Cover both selector schemes. */
+  .divide-theme > :not([hidden]) ~ :not([hidden]),
+  .divide-theme > :not(:last-child) {
     border-color: var(--color-border) !important;
   }
 
-  .divide-theme-dashed > :not([hidden]) ~ :not([hidden]) {
+  .divide-theme-dashed > :not([hidden]) ~ :not([hidden]),
+  .divide-theme-dashed > :not(:last-child) {
     border-color: var(--color-border-dashed) !important;
   }
 
@@ -326,7 +330,9 @@
 
   /* Subtler dividers in dark mode */
   .dark .divide-theme > :not([hidden]) ~ :not([hidden]),
-  .dark .divide-y > :not([hidden]) ~ :not([hidden]) {
+  .dark .divide-theme > :not(:last-child),
+  .dark .divide-y > :not([hidden]) ~ :not([hidden]),
+  .dark .divide-y > :not(:last-child) {
     border-color: rgba(250, 248, 245, 0.06) !important;
   }
 
@@ -402,4 +408,18 @@
     100% { transform: scale(1); }
   }
 
+}
+
+/* Respect the OS-level reduced motion preference. The !important rules also
+   neutralize Svelte's JS-driven transitions, whose inline styles lose to
+   author-stylesheet !important declarations. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
