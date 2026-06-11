@@ -3,6 +3,7 @@
 	import favicon from '$lib/assets/favicon.svg';
 	import SideNav from '$lib/components/SideNav.svelte';
 	import ToastContainer from '$lib/components/ToastContainer.svelte';
+	import KeyboardShortcuts from '$lib/components/KeyboardShortcuts.svelte';
 	import { settings, updateSettings } from '$lib/stores/settings';
 	import { applyTheme, initThemeListener } from '$lib/stores/theme';
 	import { initNotifications, cleanupNotifications, isNotificationPermissionGranted } from '$lib/notifications';
@@ -107,3 +108,6 @@
 
 <!-- Toast Notifications -->
 <ToastContainer />
+
+<!-- App-wide keyboard shortcuts (pages register context-specific handlers) -->
+<KeyboardShortcuts />

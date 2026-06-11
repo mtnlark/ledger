@@ -9,7 +9,6 @@
 	import { isICloudAvailable, getICloudBackupDir } from '$lib/storage/tauri-adapter';
 	import { getTransactionsByMonth, getAvailableMonths } from '$lib/stores/transactions';
 	import { getAllCategories } from '$lib/stores/categories';
-	import HeaderNav from '$lib/components/HeaderNav.svelte';
 	import CategoryManager from '$lib/components/CategoryManager.svelte';
 	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
 	import { readExcelFile, parseExpensesSheet, importTransactions, type ImportResult } from '$lib/utils/import';
@@ -317,10 +316,9 @@
 
 <div class="min-h-screen">
 	<!-- Header -->
-	<HeaderNav title="Settings" showBack={true} />
-
 	<!-- Main Content -->
-	<main class="max-w-4xl mx-auto px-4 py-6 space-y-6">
+	<main class="max-w-4xl mx-auto px-6 py-6 space-y-6">
+		<h1 class="font-display text-2xl font-medium text-charcoal">Settings</h1>
 		{#if isLoading}
 			<div class="flex items-center justify-center py-12">
 				<div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>

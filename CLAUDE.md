@@ -57,7 +57,9 @@ See `PRODUCT_ROADMAP.md` for the full development plan. Groups 1–9 are complet
 8. ~~Performance & Tech Debt~~ — N+1 fix, stats dedup, lazy-load, chunk splitting, import/export tests ✅
 9. ~~Startup Perf & Search~~ — Redundant DB scan elimination, query parallelization, search/filter enhancements, pagination, lazy emoji picker, migration version stamp ✅
 
-**Recent**: Monarch-style dashboard restructure — Two-column dashboard: ledger in the main column, sticky right rail (Cash Flow, Week in Review, Top Categories). The month name is now the page title (`MonthPicker variant="title"`). One add-transaction entry point: `AddTransactionModal` (full `TransactionForm` refactored to a pure form, no card chrome) via "Add" button or ⌘N; QuickAddFAB and the inline form card deleted. Ledger refinements: sticky date headers with day totals (your share), your-share-first amounts on shared rows ("of $full" beneath), muted partner line (green reserved for positive states), ↻ icon for monthly subs. TransactionFilters is a slim toolbar (search + All Time + Filters buttons) with the advanced panel as a card. Also: `prefers-reduced-motion` support, and divider color utilities now cover Tailwind v4's `:not(:last-child)` divide selector (first-divider dark bug).
+**Recent**: Design language rolled out app-wide — All pages now use in-content Fraunces titles (HeaderNav deleted); KeyboardShortcuts moved to the root layout with a handler registry (`stores/shortcuts.ts`) so ⌘1–5/⌘N/⌘K work on every page. Budget and Savings are two-column (main list + sticky 330px rail with vertically stacked summary cards). Insights: title row with month picker, underline-style tabs (InsightTabs), two-up chart grid on the Overview tab. Shared: plain-language hero balance ("{partner} owes you"), gradient removed, list rows use category chips + dashed dividers, static Tips card deleted. Dashboard additions: sticky Transactions heading + search toolbar (measured via bind:clientHeight, offsets sticky date headers), and future-dated transactions hidden behind a "Show N upcoming" toggle (`ledger-show-upcoming`).
+
+**Earlier**: Monarch-style dashboard restructure — Two-column dashboard: ledger in the main column, sticky right rail (Cash Flow, Week in Review, Top Categories). The month name is now the page title (`MonthPicker variant="title"`). One add-transaction entry point: `AddTransactionModal` (full `TransactionForm` refactored to a pure form, no card chrome) via "Add" button or ⌘N; QuickAddFAB and the inline form card deleted. Ledger refinements: sticky date headers with day totals (your share), your-share-first amounts on shared rows ("of $full" beneath), muted partner line (green reserved for positive states), ↻ icon for monthly subs. TransactionFilters is a slim toolbar (search + All Time + Filters buttons) with the advanced panel as a card. Also: `prefers-reduced-motion` support, and divider color utilities now cover Tailwind v4's `:not(:last-child)` divide selector (first-divider dark bug).
 
 **Earlier**: Look-and-feel refresh — Transaction list rows are grouped into one card per date with dashed hairline dividers (no more shadow-per-row or `border-l-4` color stripes); category emoji render in soft color-tinted chips (`.category-chip` utility, `{hex}1F` 12% alpha tint); status badges use the new quiet `.badge` utility (sentence-case pills; a shared transaction shows *either* "Pending" or "Shared", not both); row edit/delete actions reveal on hover (`group/row` + `focus-within` for keyboard). Shadow token warmed: `--color-shadow` is now charcoal-tinted `rgba(45,42,38,0.12)` instead of cool gray. Sidebar got a terracotta logo chip + active-item accent bar.
 
@@ -159,6 +161,7 @@ ledger/
 │   │   │   ├── tags.ts              # TagIndex class for tag lookups (incremental + bulk)
 │   │   │   ├── tags.svelte.ts       # Reactive TagIndex wrapper ($state version)
 │   │   │   ├── selectedMonth.ts    # UI state for month selection
+│   │   │   ├── shortcuts.ts        # Registry for page-specific keyboard shortcut handlers
 │   │   │   ├── theme.ts            # Light/dark/system theme
 │   │   │   ├── toast.ts            # Toast notification system
 │   │   │   └── undo.ts             # Undo store for recoverable deletions
@@ -187,7 +190,6 @@ ledger/
 │   │   │       └── stats.ts          # Shared statistical helpers (stdDev, zScore)
 │   │   ├── components/
 │   │   │   ├── SideNav.svelte         # Collapsible sidebar
-│   │   │   ├── HeaderNav.svelte       # Page headers
 │   │   │   ├── TransactionForm.svelte
 │   │   │   ├── TransactionList.svelte
 │   │   │   ├── TransactionListSkeleton.svelte
@@ -231,7 +233,7 @@ ledger/
 │   │   │   ├── TagPopover.svelte          # Tag hover popover (total + count)
 │   │   │   ├── TagAutocomplete.svelte     # Tag autocomplete for notes input
 │   │   │   ├── WeekInReviewCard.svelte    # Week in Review dashboard card
-│   │   │   ├── KeyboardShortcuts.svelte  # Global keyboard shortcut handler
+│   │   │   ├── KeyboardShortcuts.svelte  # App-wide shortcuts (mounted in layout; pages register handlers via stores/shortcuts.ts)
 │   │   │   ├── __tests__/             # Component test utilities
 │   │   │   │   ├── setup.ts
 │   │   │   │   └── test-utils.test.ts

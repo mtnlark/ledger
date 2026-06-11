@@ -8,7 +8,6 @@
 	import { getSettings } from '$lib/stores/settings';
 	import { toast } from '$lib/stores/toast';
 	import SettlementTracker from '$lib/components/SettlementTracker.svelte';
-	import HeaderNav from '$lib/components/HeaderNav.svelte';
 	import Skeleton from '$lib/components/Skeleton.svelte';
 
 	// State
@@ -76,11 +75,9 @@
 </svelte:head>
 
 <div class="min-h-screen">
-	<!-- Header -->
-	<HeaderNav title="Shared" showBack={true} />
-
 	<!-- Main Content -->
-	<main class="max-w-4xl mx-auto px-4 py-6 space-y-6">
+	<main class="max-w-4xl mx-auto px-6 py-6 space-y-6">
+		<h1 class="font-display text-2xl font-medium text-charcoal">Shared</h1>
 		{#if isLoading}
 			<!-- Settlement tracker skeleton -->
 			<div class="bg-surface rounded-xl shadow-md shadow-[var(--color-shadow)] overflow-hidden">
@@ -115,15 +112,6 @@
 				onMarkSettled={handleMarkSettled}
 			/>
 
-			<!-- Quick Tips -->
-			<div class="bg-primary-50 rounded-xl p-5 border border-primary-200">
-				<h3 class="font-medium text-primary-800 mb-2">Tips</h3>
-				<ul class="text-sm text-primary-800 space-y-1">
-					<li>• Select transactions and mark them as settled after repayment</li>
-					<li>• Use "Select All" to settle everything at once</li>
-					<li>• Settled transactions won't appear in this list</li>
-				</ul>
-			</div>
 		{/if}
 	</main>
 </div>

@@ -2,13 +2,7 @@
 	import { X, Command } from 'lucide-svelte';
 	import { slide, fade } from 'svelte/transition';
 	import { goto } from '$app/navigation';
-
-	interface Props {
-		onOpenQuickAdd?: () => void;
-		onFocusSearch?: () => void;
-	}
-
-	let { onOpenQuickAdd, onFocusSearch }: Props = $props();
+	import { getShortcutHandlers } from '$lib/stores/shortcuts';
 
 	let showHelp = $state(false);
 
@@ -50,10 +44,10 @@
 
 		if (isMeta && e.key === 'k') {
 			e.preventDefault();
-			onFocusSearch?.();
+			getShortcutHandlers().focusSearch?.();
 		} else if (isMeta && e.key === 'n') {
 			e.preventDefault();
-			onOpenQuickAdd?.();
+			getShortcutHandlers().openQuickAdd?.();
 		} else if (isMeta && e.key === '/') {
 			e.preventDefault();
 			showHelp = !showHelp;

@@ -87,22 +87,22 @@
 	style="transition-timing-function: cubic-bezier(0.16, 1, 0.3, 1);"
 >
 	<!-- Header with outstanding balance -->
-	<div class="px-6 py-5 border-b border-dashed border-theme-dashed bg-gradient-to-r from-success-50 to-success-100/50">
-		<div class="flex items-center justify-between mb-1">
-			<h2 class="text-sm font-medium text-charcoal-soft">Outstanding Balance with {settings.partnerName || 'Partner'}</h2>
-		</div>
-		<p class="font-mono text-3xl font-medium text-charcoal">
+	<div class="px-6 py-5 border-b border-dashed border-theme-dashed">
+		<h2 class="text-xs font-medium uppercase tracking-wider text-charcoal-muted mb-1.5">
+			Outstanding with {settings.partnerName || 'Partner'}
+		</h2>
+		<p class="font-mono text-4xl font-medium {outstandingBalance > 0 ? 'text-charcoal' : 'text-success-500'}">
 			{formatCurrency(outstandingBalance)}
 		</p>
 		{#if outstandingBalance > 0}
-			<p class="text-sm text-charcoal-muted mt-1">owed to you</p>
+			<p class="text-sm text-charcoal-muted mt-1.5">{settings.partnerName || 'Your partner'} owes you</p>
 		{:else}
-			<p class="text-sm text-success-600 mt-1 inline-flex items-center gap-1">All settled! <Check size={14} strokeWidth={3} /></p>
+			<p class="text-sm text-success-600 mt-1.5 inline-flex items-center gap-1">All settled! <Check size={14} strokeWidth={3} /></p>
 		{/if}
 	</div>
 
 	<!-- Transaction list -->
-	<div class="divide-y divide-theme">
+	<div class="divide-y divide-dashed divide-theme-dashed">
 		{#if transactions.length === 0}
 			<EmptyState
 				icon={PartyPopper as ComponentType}
@@ -140,8 +140,7 @@
 			{#each transactions as transaction (transaction.id)}
 				<button
 					onclick={() => toggleSelection(transaction.id!)}
-					class="w-full px-6 py-4 flex items-center gap-4 hover:bg-cream/50 transition-colors text-left border-l-4"
-					style="border-left-color: {getCategoryColor(transaction.categoryId)};"
+					class="w-full px-5 py-3.5 flex items-center gap-3 hover:bg-surface-hover/50 transition-colors text-left"
 					aria-pressed={selectedIds.has(transaction.id!)}
 					aria-label="{selectedIds.has(transaction.id!) ? 'Deselect' : 'Select'} {transaction.merchant} — {formatCurrency(transaction.partnerShare)}"
 				>
@@ -159,7 +158,10 @@
 					</div>
 
 					<!-- Icon -->
-					<span class="text-xl">{getCategoryIcon(transaction.categoryId)}</span>
+					<div
+						class="category-chip category-icon-box w-9 h-9 text-lg"
+						style="background-color: {getCategoryColor(transaction.categoryId)}1F;"
+					>{getCategoryIcon(transaction.categoryId)}</div>
 
 					<!-- Details -->
 					<div class="flex-1 min-w-0">

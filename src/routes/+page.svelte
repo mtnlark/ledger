@@ -13,6 +13,7 @@
 	import { sumCurrency, calculateTotalSpent } from '$lib/utils/currency';
 	import { matchesTag } from '$lib/utils/tags';
 	import { tagIndex } from '$lib/stores/tags.svelte';
+	import { registerShortcutHandlers } from '$lib/stores/shortcuts';
 	import { getSelectedMonth, setSelectedMonth } from '$lib/stores/selectedMonth';
 	import { toast } from '$lib/stores/toast';
 	import { handleError } from '$lib/utils/error-handler';
@@ -28,7 +29,6 @@
 	import CashFlowCardSkeleton from '$lib/components/CashFlowCardSkeleton.svelte';
 	import TransactionListSkeleton from '$lib/components/TransactionListSkeleton.svelte';
 	import TransactionFilters, { type FilterState } from '$lib/components/TransactionFilters.svelte';
-	import KeyboardShortcuts from '$lib/components/KeyboardShortcuts.svelte';
 	import RecurringSuggestionsBanner from '$lib/components/RecurringSuggestionsBanner.svelte';
 	import RecurringSuggestionsModal from '$lib/components/RecurringSuggestionsModal.svelte';
 	import WeekInReviewCard from '$lib/components/WeekInReviewCard.svelte';
@@ -513,6 +513,12 @@
 		searchInputRef?.focus();
 	}
 
+	// Register page-specific shortcuts (⌘N add, ⌘K search) with the app-wide handler
+	$effect(() => registerShortcutHandlers({
+		openQuickAdd: handleOpenQuickAdd,
+		focusSearch: handleFocusSearch
+	}));
+
 	// Expose ref setter for TransactionFilters to use
 	function setSearchInputRef(el: HTMLInputElement | null) {
 		searchInputRef = el;
@@ -750,10 +756,4 @@
 	onSubmit={actions.addTransaction}
 	onSplitSubmit={actions.addSplitTransactions}
 	onClose={() => addModalOpen = false}
-/>
-
-<!-- Keyboard Shortcuts -->
-<KeyboardShortcuts
-	onOpenQuickAdd={handleOpenQuickAdd}
-	onFocusSearch={handleFocusSearch}
 />

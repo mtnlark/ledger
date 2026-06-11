@@ -16,7 +16,6 @@
 	import { formatCurrency, formatCurrencyWhole } from '$lib/utils/format-helpers';
 	import { sumCurrency } from '$lib/utils/currency';
 	import { Plus } from 'lucide-svelte';
-	import HeaderNav from '$lib/components/HeaderNav.svelte';
 	import MonthPicker from '$lib/components/MonthPicker.svelte';
 	import Skeleton from '$lib/components/Skeleton.svelte';
 	import SavingsAccountCard from '$lib/components/SavingsAccountCard.svelte';
@@ -188,11 +187,12 @@
 </svelte:head>
 
 <div class="min-h-screen">
-	<HeaderNav title="Savings">
-		<MonthPicker {currentMonth} {availableMonths} onMonthChange={handleMonthChange} />
-	</HeaderNav>
-
-	<main class="pt-20 pb-8 px-6 max-w-4xl mx-auto" aria-live="polite">
+	<main class="max-w-6xl mx-auto px-6 py-6" aria-live="polite">
+		<!-- Title + month picker -->
+		<div class="flex items-center justify-between mb-5">
+			<h1 class="font-display text-2xl font-medium text-charcoal">Savings</h1>
+			<MonthPicker {currentMonth} {availableMonths} onMonthChange={handleMonthChange} />
+		</div>
 		{#if isLoading}
 			<!-- Loading Skeleton -->
 			<div class="space-y-6">
@@ -222,42 +222,9 @@
 				</div>
 			</div>
 		{:else}
-			<div class="space-y-6">
-				<!-- Summary Card -->
-				<div class="bg-surface rounded-xl shadow-md shadow-theme p-6">
-					<h2 class="font-display text-lg font-medium text-charcoal mb-4">Savings Summary</h2>
-					<div class="flex flex-wrap gap-x-8 gap-y-4">
-						<div>
-							<span class="text-sm text-charcoal-muted">Saved This Month</span>
-							<p class="font-mono text-xl font-medium text-success-600">
-								{formatCurrencyWhole(totalSavedThisMonth)}
-							</p>
-						</div>
-						{#if monthlyIncome > 0}
-							<div class="border-l border-theme pl-8">
-								<span class="text-sm text-charcoal-muted">Savings Rate</span>
-								<p class="font-mono text-xl font-medium text-charcoal">
-									{Math.round(savingsRate * 100)}%
-								</p>
-								<p class="text-xs text-charcoal-muted mt-0.5">
-									of {formatCurrencyWhole(monthlyIncome)} income
-								</p>
-							</div>
-						{/if}
-						{#if totalAffectingAvailable !== totalSavedThisMonth}
-							<div class="border-l border-theme pl-8">
-								<span class="text-sm text-charcoal-muted">From Take-Home</span>
-								<p class="font-mono text-xl font-medium text-charcoal">
-									{formatCurrencyWhole(totalAffectingAvailable)}
-								</p>
-								<p class="text-xs text-charcoal-muted mt-0.5">
-									reduces available to spend
-								</p>
-							</div>
-						{/if}
-					</div>
-				</div>
-
+			<div class="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_330px] gap-6 items-start">
+				<!-- Main column: accounts -->
+				<div class="min-w-0 space-y-4 order-last lg:order-none">
 				<!-- Quick Actions -->
 				<div class="flex flex-wrap gap-3">
 					<button
@@ -309,6 +276,45 @@
 						{/each}
 					</div>
 				{/if}
+				</div>
+
+				<!-- Right rail: summary -->
+				<aside class="space-y-4 lg:sticky lg:top-6">
+				<!-- Summary Card -->
+				<div class="bg-surface rounded-xl shadow-md shadow-theme p-5">
+					<h2 class="text-xs font-medium uppercase tracking-wider text-charcoal-muted mb-4">Savings Summary</h2>
+					<div class="space-y-4">
+						<div>
+							<span class="text-sm text-charcoal-muted">Saved This Month</span>
+							<p class="font-mono text-xl font-medium text-success-600">
+								{formatCurrencyWhole(totalSavedThisMonth)}
+							</p>
+						</div>
+						{#if monthlyIncome > 0}
+							<div>
+								<span class="text-sm text-charcoal-muted">Savings Rate</span>
+								<p class="font-mono text-xl font-medium text-charcoal">
+									{Math.round(savingsRate * 100)}%
+								</p>
+								<p class="text-xs text-charcoal-muted mt-0.5">
+									of {formatCurrencyWhole(monthlyIncome)} income
+								</p>
+							</div>
+						{/if}
+						{#if totalAffectingAvailable !== totalSavedThisMonth}
+							<div>
+								<span class="text-sm text-charcoal-muted">From Take-Home</span>
+								<p class="font-mono text-xl font-medium text-charcoal">
+									{formatCurrencyWhole(totalAffectingAvailable)}
+								</p>
+								<p class="text-xs text-charcoal-muted mt-0.5">
+									reduces available to spend
+								</p>
+							</div>
+						{/if}
+					</div>
+				</div>
+				</aside>
 			</div>
 		{/if}
 	</main>

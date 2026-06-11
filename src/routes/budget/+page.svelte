@@ -21,7 +21,6 @@
 	import { sumCurrency, roundCurrency } from '$lib/utils/currency';
 	import { getBudgetStatus } from '$lib/utils/budget-status';
 	import { Sparkles, Copy, AlertTriangle, X } from 'lucide-svelte';
-	import HeaderNav from '$lib/components/HeaderNav.svelte';
 	import MonthPicker from '$lib/components/MonthPicker.svelte';
 	import CategoryBudgetList from '$lib/components/CategoryBudgetList.svelte';
 	import Skeleton from '$lib/components/Skeleton.svelte';
@@ -250,15 +249,16 @@
 </svelte:head>
 
 <div class="min-h-screen">
-	<HeaderNav title="Budget">
-		<MonthPicker
-			{currentMonth}
-			{availableMonths}
-			onMonthChange={handleMonthChange}
-		/>
-	</HeaderNav>
-
-	<main class="pt-20 pb-8 px-6 max-w-4xl mx-auto" aria-live="polite">
+	<main class="max-w-6xl mx-auto px-6 py-6" aria-live="polite">
+		<!-- Title + month picker -->
+		<div class="flex items-center justify-between mb-5">
+			<h1 class="font-display text-2xl font-medium text-charcoal">Budget</h1>
+			<MonthPicker
+				{currentMonth}
+				{availableMonths}
+				onMonthChange={handleMonthChange}
+			/>
+		</div>
 		{#if isLoading}
 			<!-- Loading Skeleton -->
 			<div class="space-y-6">
@@ -286,20 +286,59 @@
 				</div>
 			</div>
 		{:else}
-			<div class="space-y-6">
+			<div class="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_330px] gap-6 items-start">
+				<!-- Main column: category budgets -->
+				<div class="min-w-0 space-y-4 order-last lg:order-none">
+				<!-- Quick Actions -->
+				<div class="flex flex-wrap gap-3">
+					<button
+						onclick={handleSuggestAll}
+						disabled={!hasSuggestionsToApply}
+						class="inline-flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm
+							transition-colors disabled:opacity-50 disabled:cursor-not-allowed
+							{hasSuggestionsToApply
+								? 'bg-primary-50 text-primary-700 hover:bg-primary-100'
+								: 'bg-surface-alt text-charcoal-muted'}"
+					>
+						<Sparkles size={16} />
+						Suggest All
+					</button>
+					<button
+						onclick={handleCopyFromLastMonth}
+						class="inline-flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm
+							bg-surface-alt text-charcoal-soft hover:bg-surface-hover transition-colors"
+					>
+						<Copy size={16} />
+						Copy from Last Month
+					</button>
+				</div>
+
+				<!-- Category Budgets List -->
+				<CategoryBudgetList
+					{categories}
+					{budgets}
+					{spending}
+					{suggestions}
+					onSaveBudget={handleSaveBudget}
+					onDeleteBudget={handleDeleteBudget}
+				/>
+				</div>
+
+				<!-- Right rail: summary & alerts -->
+				<aside class="space-y-4 lg:sticky lg:top-6">
 				<!-- Summary Card -->
-				<div class="bg-surface rounded-xl shadow-md shadow-theme p-6">
-					<h2 class="font-display text-lg font-medium text-charcoal mb-4">Budget Summary</h2>
+				<div class="bg-surface rounded-xl shadow-md shadow-theme p-5">
+					<h2 class="text-xs font-medium uppercase tracking-wider text-charcoal-muted mb-4">Budget Summary</h2>
 					{#if totalBudgeted > 0}
 						{@const overallStatus = getBudgetStatus(Math.round(budgetedSpent), Math.round(totalBudgeted))}
-						<div class="flex flex-wrap gap-x-8 gap-y-4 items-start">
+						<div class="space-y-4">
 							<div>
 								<span class="text-sm text-charcoal-muted">Total Budgeted</span>
 								<p class="font-mono text-xl font-medium text-charcoal">
 									{formatCurrencyWhole(totalBudgeted)}
 								</p>
 							</div>
-							<div class="border-l border-theme pl-8">
+							<div>
 								<span class="text-sm text-charcoal-muted">Spent</span>
 								<p class="font-mono text-xl font-medium text-charcoal">
 									{formatCurrencyWhole(budgetedSpent)}
@@ -308,7 +347,7 @@
 									{Math.round(overallStatus.percentSpent)}% of budget
 								</p>
 							</div>
-							<div class="border-l border-theme pl-8">
+							<div>
 								<span class="text-sm text-charcoal-muted">Remaining</span>
 								<p
 									class="font-mono text-xl font-medium {budgetRemaining >= 0
@@ -323,7 +362,7 @@
 									{/if}
 								</p>
 							</div>
-							<div class="flex-1 self-center min-w-[120px]">
+							<div class="pt-1">
 								<div
 									class="h-2 bg-surface-alt rounded-full overflow-hidden shadow-[inset_0_1px_2px_rgba(45,42,38,0.08)]"
 								>
@@ -335,14 +374,14 @@
 							</div>
 						</div>
 					{:else}
-						<div class="flex flex-wrap gap-x-8 gap-y-4">
+						<div class="space-y-4">
 							<div>
 								<span class="text-sm text-charcoal-muted">Total Budgeted</span>
 								<p class="font-mono text-xl font-medium text-charcoal">
 									{formatCurrencyWhole(totalBudgeted)}
 								</p>
 							</div>
-							<div class="border-l border-theme pl-8">
+							<div>
 								<span class="text-sm text-charcoal-muted">Spent</span>
 								<p class="font-mono text-xl font-medium text-charcoal">
 									{formatCurrencyWhole(budgetedSpent)}
@@ -453,40 +492,7 @@
 						</ul>
 					</div>
 				{/if}
-
-				<!-- Quick Actions -->
-				<div class="flex flex-wrap gap-3">
-					<button
-						onclick={handleSuggestAll}
-						disabled={!hasSuggestionsToApply}
-						class="inline-flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm
-							transition-colors disabled:opacity-50 disabled:cursor-not-allowed
-							{hasSuggestionsToApply
-								? 'bg-primary-50 text-primary-700 hover:bg-primary-100'
-								: 'bg-surface-alt text-charcoal-muted'}"
-					>
-						<Sparkles size={16} />
-						Suggest All
-					</button>
-					<button
-						onclick={handleCopyFromLastMonth}
-						class="inline-flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm
-							bg-surface-alt text-charcoal-soft hover:bg-surface-hover transition-colors"
-					>
-						<Copy size={16} />
-						Copy from Last Month
-					</button>
-				</div>
-
-				<!-- Category Budgets List -->
-				<CategoryBudgetList
-					{categories}
-					{budgets}
-					{spending}
-					{suggestions}
-					onSaveBudget={handleSaveBudget}
-					onDeleteBudget={handleDeleteBudget}
-				/>
+				</aside>
 			</div>
 		{/if}
 	</main>

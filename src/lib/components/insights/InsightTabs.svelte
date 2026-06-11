@@ -15,20 +15,23 @@
 	];
 </script>
 
-<nav aria-label="Insights tabs" role="tablist" class="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
+<nav aria-label="Insights tabs" role="tablist" class="flex gap-6 overflow-x-auto border-b border-theme">
 	{#each tabs as tab}
 		<button
 			type="button"
 			role="tab"
 			aria-selected={activeTab === tab.id}
 			aria-controls="insights-tabpanel"
-			class="px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors
+			class="relative pb-2.5 pt-1 text-sm font-medium whitespace-nowrap transition-colors
 				{activeTab === tab.id
-					? 'bg-primary-500 text-white shadow-sm'
-					: 'bg-surface-alt text-charcoal-soft hover:bg-cream-dark'}"
+					? 'text-charcoal'
+					: 'text-charcoal-muted hover:text-charcoal'}"
 			onclick={() => onTabChange(tab.id)}
 		>
 			{tab.label}
+			{#if activeTab === tab.id}
+				<span class="absolute inset-x-0 bottom-0 h-0.5 rounded-full bg-primary-500" aria-hidden="true"></span>
+			{/if}
 		</button>
 	{/each}
 </nav>

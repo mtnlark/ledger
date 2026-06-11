@@ -22,7 +22,6 @@
 	import { getBudgetForMonth, getAllBudgets } from '$lib/stores/budget';
 	import { getAllSavingsAccounts } from '$lib/stores/savingsAccounts';
 	import { getAllContributionsForMonth, getAllContributions } from '$lib/stores/savingsContributions';
-	import HeaderNav from '$lib/components/HeaderNav.svelte';
 	import Skeleton from '$lib/components/Skeleton.svelte';
 	import MonthPicker from '$lib/components/MonthPicker.svelte';
 	import SmartTakeaways from '$lib/components/insights/SmartTakeaways.svelte';
@@ -173,11 +172,19 @@
 </svelte:head>
 
 <div class="min-h-screen">
-	<!-- Header -->
-	<HeaderNav title="Insights" showBack={true} />
-
 	<!-- Main Content -->
-	<main class="max-w-4xl mx-auto px-4 py-6 space-y-6" aria-live="polite">
+	<main class="max-w-6xl mx-auto px-6 py-6 space-y-6" aria-live="polite">
+		<!-- Title + month picker -->
+		<div class="flex items-center justify-between">
+			<h1 class="font-display text-2xl font-medium text-charcoal">Insights</h1>
+			{#if !isLoading}
+				<MonthPicker
+					currentMonth={selectedMonth}
+					{availableMonths}
+					onMonthChange={handleMonthChange}
+				/>
+			{/if}
+		</div>
 		{#if isLoading}
 			<!-- Loading skeletons -->
 			{#each Array(3) as _}
@@ -195,15 +202,6 @@
 				</div>
 			{/each}
 		{:else}
-			<!-- Page-level Month Picker -->
-			<div class="flex justify-end">
-				<MonthPicker
-					currentMonth={selectedMonth}
-					{availableMonths}
-					onMonthChange={handleMonthChange}
-				/>
-			</div>
-
 			<!-- Tab Navigation -->
 			<InsightTabs {activeTab} onTabChange={handleTabChange} />
 
@@ -233,6 +231,7 @@
 
 					<!-- Lazy-loaded chart components for overview tab -->
 					{#await lazyOverviewCharts() then [TopCategoriesBarMod, MonthlyTrendsChartMod]}
+						<div class="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
 						<!-- Where It Goes - Top Categories -->
 						{#if selectedMonthTransactions.length > 0}
 							<div class="bg-surface rounded-xl shadow-md shadow-[var(--color-shadow)] overflow-hidden">
@@ -261,6 +260,7 @@
 								</div>
 							</div>
 						{/if}
+						</div>
 					{/await}
 
 				{:else if activeTab === 'spending'}
