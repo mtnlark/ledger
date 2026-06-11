@@ -294,7 +294,27 @@
 		loadData();
 	});
 
+	// Section navigation (one section shown at a time, like macOS System Settings)
+	const SETTINGS_SECTION_KEY = 'ledger-settings-section';
+	const sections = [
+		{ id: 'sharing', label: 'Expense Sharing' },
+		{ id: 'appearance', label: 'Appearance' },
+		{ id: 'notifications', label: 'Notifications' },
+		{ id: 'shortcuts', label: 'Keyboard Shortcuts' },
+		{ id: 'categories', label: 'Categories' },
+		{ id: 'data', label: 'Data & Backup' },
+		{ id: 'about', label: 'About' }
+	];
+	let activeSection = $state('sharing');
+
+	function selectSection(id: string) {
+		activeSection = id;
+		localStorage.setItem(SETTINGS_SECTION_KEY, id);
+	}
+
 	onMount(() => {
+		const storedSection = localStorage.getItem(SETTINGS_SECTION_KEY);
+		if (storedSection && sections.some((s) => s.id === storedSection)) activeSection = storedSection;
 		// Reload data when page becomes visible (e.g., switching browser tabs)
 		function handleVisibilityChange() {
 			if (document.visibilityState === 'visible' && !isLoading) {
@@ -317,13 +337,36 @@
 <div class="min-h-screen">
 	<!-- Header -->
 	<!-- Main Content -->
-	<main class="max-w-4xl mx-auto px-6 py-6 space-y-6">
+	<main class="max-w-5xl mx-auto px-6 py-6 space-y-6">
 		<h1 class="font-display text-2xl font-medium text-charcoal">Settings</h1>
 		{#if isLoading}
 			<div class="flex items-center justify-center py-12">
 				<div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
 			</div>
 		{:else}
+			<div class="grid grid-cols-1 sm:grid-cols-[200px_minmax(0,1fr)] gap-6 items-start">
+				<!-- Section nav -->
+				<nav class="sm:sticky sm:top-6 flex sm:flex-col gap-1 overflow-x-auto" aria-label="Settings sections">
+					{#each sections as section (section.id)}
+						<button
+							type="button"
+							onclick={() => selectSection(section.id)}
+							aria-current={activeSection === section.id ? 'true' : undefined}
+							class="relative text-left px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors {activeSection === section.id
+								? 'bg-primary-50 text-primary-700'
+								: 'text-charcoal-soft hover:bg-surface-hover'}"
+						>
+							{#if activeSection === section.id}
+								<span class="absolute left-0 top-1/2 -translate-y-1/2 h-5 w-[3px] rounded-full bg-primary-500" aria-hidden="true"></span>
+							{/if}
+							{section.label}
+						</button>
+					{/each}
+				</nav>
+
+				<!-- Active section -->
+				<div class="min-w-0 space-y-6">
+				{#if activeSection === 'sharing'}
 			<!-- Partner Settings -->
 			<div class="bg-surface rounded-xl shadow-md shadow-[var(--color-shadow)] overflow-hidden">
 				<div class="px-6 py-4 border-b border-dashed border-theme-dashed">
@@ -426,7 +469,9 @@
 					</div>
 				</div>
 			</div>
+				{/if}
 
+				{#if activeSection === 'appearance'}
 			<!-- Appearance -->
 			<div class="bg-surface rounded-xl shadow-md shadow-[var(--color-shadow)] overflow-hidden">
 				<div class="px-6 py-4 border-b border-dashed border-theme-dashed">
@@ -456,7 +501,9 @@
 					</div>
 				</div>
 			</div>
+				{/if}
 
+				{#if activeSection === 'notifications'}
 			<!-- Notifications -->
 			<div class="bg-surface rounded-xl shadow-md shadow-[var(--color-shadow)] overflow-hidden">
 				<div class="px-6 py-4 border-b border-dashed border-theme-dashed">
@@ -563,7 +610,9 @@
 					{/if}
 				</div>
 			</div>
+				{/if}
 
+				{#if activeSection === 'shortcuts'}
 			<!-- Keyboard Shortcuts -->
 			<div class="bg-surface rounded-xl shadow-md shadow-[var(--color-shadow)] overflow-hidden">
 				<div class="px-6 py-4 border-b border-dashed border-theme-dashed">
@@ -591,7 +640,9 @@
 					</div>
 				</div>
 			</div>
+				{/if}
 
+				{#if activeSection === 'categories'}
 			<!-- Category Management -->
 			<div class="bg-surface rounded-xl shadow-md shadow-[var(--color-shadow)] overflow-hidden">
 				<div class="px-6 py-4 border-b border-dashed border-theme-dashed">
@@ -603,7 +654,9 @@
 					<CategoryManager {categories} onUpdate={reloadCategories} />
 				</div>
 			</div>
+				{/if}
 
+				{#if activeSection === 'data'}
 			<!-- Data Management -->
 			<div class="bg-surface rounded-xl shadow-md shadow-[var(--color-shadow)] overflow-hidden">
 				<div class="px-6 py-4 border-b border-dashed border-theme-dashed">
@@ -755,7 +808,9 @@
 					</div>
 				</div>
 			</div>
+				{/if}
 
+				{#if activeSection === 'about'}
 			<!-- About -->
 			<div class="bg-surface rounded-xl shadow-md shadow-[var(--color-shadow)] overflow-hidden">
 				<div class="px-6 py-4 border-b border-dashed border-theme-dashed">
@@ -766,6 +821,9 @@
 						Ledger is a local-first app for personal budget tracking with expense splitting.
 						All data is stored locally on your device.
 					</p>
+				</div>
+			</div>
+				{/if}
 				</div>
 			</div>
 		{/if}

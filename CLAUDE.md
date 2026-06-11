@@ -542,6 +542,7 @@ Sidebar state persists to localStorage (`ledger-sidebar-expanded`).
 - Batch settlement marking
 
 ### Settings
+- **Section nav layout**: sticky left nav (Expense Sharing / Appearance / Notifications / Keyboard Shortcuts / Categories / Data & Backup / About) shows one section at a time; selection persists to `ledger-settings-section`
 - Partner name configuration
 - Default split settings
 - Category management (add/edit/reorder)
@@ -601,6 +602,7 @@ UI state persisted across sessions:
 - `ledger-show-upcoming` - Whether future-dated transactions are visible on the dashboard
 - `ledger-insight-{title}` - Each insight group state
 - `ledger-insights-tab` - Selected insights tab
+- `ledger-settings-section` - Selected settings section
 - `ledger-notif-daily-last-fired` - Daily notification last-fired date ("YYYY-MM-DD")
 - `ledger-notif-weekly-last-fired` - Weekly notification last-fired date ("YYYY-MM-DD")
 - `ledger-notif-monthly-last-fired` - Monthly notification last-fired month ("YYYY-MM")
