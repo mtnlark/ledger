@@ -7,6 +7,12 @@ import {
 	computeWeightedStdDev
 } from '$lib/insights/calculations/stats';
 import { config } from '$lib/config';
+import {
+	computeEffectiveBudgets,
+	previousMonthKey,
+	type RolloverOptions,
+	type RolloverResult
+} from '$lib/utils/budget-rollover';
 
 /**
  * Get all category budgets for a specific month
@@ -81,6 +87,49 @@ export async function deleteCategoryBudget(categoryId: number, month: string): P
 		await db.categoryBudgets.delete(existing.id!);
 		await persistData();
 	}
+}
+
+/**
+ * Set whether a category's budget rolls unused amounts into next month.
+ * Separate from saveCategoryBudget so amount edits never touch the flag.
+ */
+export async function setCategoryBudgetRollover(
+	categoryId: number,
+	month: string,
+	rollsOver: boolean
+): Promise<void> {
+	const existing = await getCategoryBudget(categoryId, month);
+	if (!existing) return;
+	await db.categoryBudgets.update(existing.id!, { rollsOver, updatedAt: new Date() });
+	await persistData();
+}
+
+/**
+ * Effective budgets for a month: base amounts plus rollover surpluses chained
+ * from prior months, and the pool-level deficit carried from last month.
+ * See utils/budget-rollover.ts for the semantics.
+ */
+export async function getEffectiveBudgetsForMonth(
+	month: string,
+	options: RolloverOptions = {}
+): Promise<RolloverResult> {
+	const maxChainMonths = options.maxChainMonths ?? 24;
+	const allRows = await db.categoryBudgets.where('month').belowOrEqual(month).toArray();
+
+	// Spending is only needed for window months that actually have budget rows
+	const rowMonths = new Set(allRows.map((r) => r.month));
+	const fetchMonths: string[] = [];
+	let cursor = month;
+	for (let i = 0; i < maxChainMonths; i++) {
+		cursor = previousMonthKey(cursor);
+		if (rowMonths.has(cursor)) fetchMonths.push(cursor);
+	}
+
+	const spendingEntries = await Promise.all(
+		fetchMonths.map(async (m) => [m, await getAllCategorySpending(m)] as const)
+	);
+
+	return computeEffectiveBudgets(allRows, new Map(spendingEntries), month, options);
 }
 
 /**
@@ -302,6 +351,7 @@ export async function copyBudgetsFromMonth(
 				month: targetMonth,
 				categoryId: budget.categoryId,
 				budgetAmount: budget.budgetAmount,
+				rollsOver: budget.rollsOver,
 				createdAt: now,
 				updatedAt: now
 			});

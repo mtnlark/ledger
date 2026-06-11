@@ -1,7 +1,8 @@
 <script lang="ts">
 	import { afterNavigate } from '$app/navigation';
 	import { fade } from 'svelte/transition';
-	import { getMonthKey, navigateMonth, type Category, type CategoryBudget, type MonthlyBudget } from '$lib/db';
+	import { format } from 'date-fns';
+	import { getMonthKey, navigateMonth, parseMonthKey, type Category, type CategoryBudget, type MonthlyBudget } from '$lib/db';
 	import { initializeStorage } from '$lib/storage';
 	import { getAllCategories } from '$lib/stores/categories';
 	import {
@@ -10,8 +11,11 @@
 		deleteCategoryBudget,
 		generateAllSuggestions,
 		getAllCategorySpending,
-		copyBudgetsFromMonth
+		copyBudgetsFromMonth,
+		getEffectiveBudgetsForMonth,
+		setCategoryBudgetRollover
 	} from '$lib/stores/categoryBudget';
+	import type { RolloverResult } from '$lib/utils/budget-rollover';
 	import { getBudgetForMonth } from '$lib/stores/budget';
 	import { getContributionsAffectingAvailable } from '$lib/stores/savingsContributions';
 	import { getSelectedMonth, setSelectedMonth } from '$lib/stores/selectedMonth';
@@ -34,6 +38,7 @@
 	let spending = $state<Map<number, number>>(new Map());
 	let suggestions = $state<Map<number, number>>(new Map());
 	let monthlyBudget = $state<MonthlyBudget | null>(null);
+	let rollover = $state<RolloverResult | null>(null);
 	let totalSaved = $state(0);
 	let currentMonth = $state(getMonthKey(new Date()));
 	let availableMonths = $state<string[]>([getMonthKey(new Date())]);
@@ -45,7 +50,14 @@
 	let budgetedSpent = $derived(
 		sumCurrency(Array.from(budgets.keys()).map((categoryId) => spending.get(categoryId) || 0))
 	);
-	let budgetRemaining = $derived(roundCurrency(totalBudgeted - budgetedSpent));
+	// Effective total = base budgets + rollover surpluses − last month's overspend pool.
+	// The income-allocation bar intentionally keeps the BASE total: carryovers are
+	// funded by prior months' income, not this month's.
+	let effectiveTotalBudgeted = $derived(rollover ? rollover.effectiveTotal : totalBudgeted);
+	let budgetRemaining = $derived(roundCurrency(effectiveTotalBudgeted - budgetedSpent));
+	let deficitMonthLabel = $derived(
+		rollover ? format(parseMonthKey(rollover.prevMonth), 'MMMM') : ''
+	);
 
 	// Income allocation
 	let income = $derived(monthlyBudget?.income ?? 0);
@@ -113,7 +125,7 @@
 				categoryId,
 				categoryName: category?.name ?? 'Unknown',
 				categoryIcon: category?.icon ?? '📦',
-				budgetAmount: budget.budgetAmount,
+				budgetAmount: rollover?.byCategory.get(categoryId)?.effective ?? budget.budgetAmount,
 				spent: spending.get(categoryId) || 0
 			};
 		}).filter((data) => categories.some((c) => c.id === data.categoryId));
@@ -154,12 +166,13 @@
 
 	// Fetch data for a month, then update all state atomically to prevent UI mismatch
 	async function loadMonthData(month: string) {
-		const [budgetList, spendingMap, suggestionMap, monthBudget, contributions] = await Promise.all([
+		const [budgetList, spendingMap, suggestionMap, monthBudget, contributions, rolloverResult] = await Promise.all([
 			getCategoryBudgetsForMonth(month),
 			getAllCategorySpending(month),
 			generateAllSuggestions(month),
 			getBudgetForMonth(month),
-			getContributionsAffectingAvailable(month)
+			getContributionsAffectingAvailable(month),
+			getEffectiveBudgetsForMonth(month)
 		]);
 
 		// Update all state atomically
@@ -169,6 +182,7 @@
 		spending = spendingMap;
 		suggestions = suggestionMap;
 		monthlyBudget = monthBudget;
+		rollover = rolloverResult;
 		totalSaved = sumCurrency(contributions.map((c) => c.amount));
 	}
 
@@ -185,6 +199,16 @@
 		} catch (error) {
 			console.error('Failed to save budget:', error);
 			toast.error('Failed to save budget');
+		}
+	}
+
+	async function handleToggleRollover(categoryId: number, rollsOver: boolean) {
+		try {
+			await setCategoryBudgetRollover(categoryId, currentMonth, rollsOver);
+			await loadMonthData(currentMonth);
+		} catch (error) {
+			console.error('Failed to update rollover:', error);
+			toast.error('Failed to update rollover');
 		}
 	}
 
@@ -319,8 +343,10 @@
 					{budgets}
 					{spending}
 					{suggestions}
+					rollover={rollover?.byCategory}
 					onSaveBudget={handleSaveBudget}
 					onDeleteBudget={handleDeleteBudget}
+					onToggleRollover={handleToggleRollover}
 				/>
 				</div>
 
@@ -330,12 +356,12 @@
 				<div class="bg-surface rounded-xl shadow-md shadow-theme p-5">
 					<h2 class="text-xs font-medium uppercase tracking-wider text-charcoal-muted mb-4">Budget Summary</h2>
 					{#if totalBudgeted > 0}
-						{@const overallStatus = getBudgetStatus(Math.round(budgetedSpent), Math.round(totalBudgeted))}
+						{@const overallStatus = getBudgetStatus(Math.round(budgetedSpent), Math.round(effectiveTotalBudgeted))}
 						<div class="space-y-4">
 							<div>
 								<span class="text-sm text-charcoal-muted">Total Budgeted</span>
 								<p class="font-mono text-xl font-medium text-charcoal">
-									{formatCurrencyWhole(totalBudgeted)}
+									{formatCurrencyWhole(effectiveTotalBudgeted)}
 								</p>
 							</div>
 							<div>
@@ -378,7 +404,7 @@
 							<div>
 								<span class="text-sm text-charcoal-muted">Total Budgeted</span>
 								<p class="font-mono text-xl font-medium text-charcoal">
-									{formatCurrencyWhole(totalBudgeted)}
+									{formatCurrencyWhole(effectiveTotalBudgeted)}
 								</p>
 							</div>
 							<div>
@@ -397,6 +423,12 @@
 					{:else if totalBudgeted > 0}
 						<p class="text-xs text-charcoal-muted mt-3">
 							All categories with spending have budgets set
+						</p>
+					{/if}
+
+					{#if rollover && rollover.deficitCarried > 0}
+						<p class="text-xs text-warning-600 mt-2" title="Overspend on rollover categories reduces this month's overall budget rather than any single category">
+							−{formatCurrencyWhole(rollover.deficitCarried)} overspend carried from {deficitMonthLabel} (already deducted)
 						</p>
 					{/if}
 

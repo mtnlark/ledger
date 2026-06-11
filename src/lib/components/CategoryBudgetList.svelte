@@ -6,17 +6,21 @@
 	import CategoryBudgetCard from './CategoryBudgetCard.svelte';
 	import EmptyState from './EmptyState.svelte';
 	import type { Category, CategoryBudget } from '$lib/db';
+	import type { EffectiveBudget } from '$lib/utils/budget-rollover';
 
 	interface Props {
 		categories: Category[];
 		budgets: Map<number, CategoryBudget>;
 		spending: Map<number, number>;
 		suggestions: Map<number, number>;
-		onSaveBudget: (categoryId: number, amount: number) => void;
-		onDeleteBudget: (categoryId: number) => void;
+		/** Per-category effective budgets (carryover + rollsOver flag). */
+		rollover?: Map<number, EffectiveBudget>;
+		onSaveBudget: (categoryId: number, amount: number) => void | Promise<void>;
+		onDeleteBudget: (categoryId: number) => void | Promise<void>;
+		onToggleRollover?: (categoryId: number, rollsOver: boolean) => void | Promise<void>;
 	}
 
-	let { categories, budgets, spending, suggestions, onSaveBudget, onDeleteBudget }: Props =
+	let { categories, budgets, spending, suggestions, rollover, onSaveBudget, onDeleteBudget, onToggleRollover }: Props =
 		$props();
 
 	// Track collapsed state for "No Activity" section
@@ -81,8 +85,13 @@
 						{spent}
 						budgetAmount={budget.budgetAmount}
 						suggestedAmount={suggestions.get(category.id!) || 0}
+						carryover={rollover?.get(category.id!)?.carryover ?? 0}
+						rollsOver={rollover?.get(category.id!)?.rollsOver ?? false}
 						onSaveBudget={(amount) => onSaveBudget(category.id!, amount)}
 						onDeleteBudget={() => onDeleteBudget(category.id!)}
+						onToggleRollover={onToggleRollover
+							? (r) => onToggleRollover(category.id!, r)
+							: undefined}
 					/>
 				{/each}
 			</div>

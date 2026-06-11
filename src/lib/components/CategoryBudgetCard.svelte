@@ -1,17 +1,23 @@
 <script lang="ts">
-	import { Pencil, Check, X, Sparkles } from 'lucide-svelte';
+	import { Pencil, Check, X, Sparkles, Repeat } from 'lucide-svelte';
 	import BudgetProgressBar from './BudgetProgressBar.svelte';
 	import type { Category } from '$lib/db';
 	import { formatCurrencyWhole } from '$lib/utils/format-helpers';
+	import { roundCurrency } from '$lib/utils/currency';
 
 	interface Props {
 		category: Category;
 		spent: number;
 		budgetAmount: number | null;
 		suggestedAmount?: number;
-		onSaveBudget: (amount: number) => void;
-		onDeleteBudget: () => void;
+		/** Surplus rolled into this category from last month (≥ 0). */
+		carryover?: number;
+		/** Whether this month's budget rolls unused amounts forward. */
+		rollsOver?: boolean;
+		onSaveBudget: (amount: number) => void | Promise<void>;
+		onDeleteBudget: () => void | Promise<void>;
 		onAcceptSuggestion?: () => void;
+		onToggleRollover?: (rollsOver: boolean) => void | Promise<void>;
 	}
 
 	let {
@@ -19,18 +25,23 @@
 		spent,
 		budgetAmount,
 		suggestedAmount = 0,
+		carryover = 0,
+		rollsOver = false,
 		onSaveBudget,
 		onDeleteBudget,
-		onAcceptSuggestion
+		onAcceptSuggestion,
+		onToggleRollover
 	}: Props = $props();
 
 	// Editing state
 	let isEditing = $state(false);
 	let editValue = $state('');
+	let editRollsOver = $state(false);
 	let inputRef = $state<HTMLInputElement | null>(null);
 
 	function startEditing() {
 		editValue = budgetAmount ? String(budgetAmount) : '';
+		editRollsOver = rollsOver;
 		isEditing = true;
 		// Use queueMicrotask for better screen reader UX vs autofocus attribute
 		queueMicrotask(() => inputRef?.focus());
@@ -41,14 +52,18 @@
 		editValue = '';
 	}
 
-	function saveEdit() {
+	async function saveEdit() {
 		const amount = parseFloat(editValue);
-		if (!isNaN(amount) && amount > 0) {
-			onSaveBudget(amount);
-		} else if (editValue === '' || editValue === '0') {
-			onDeleteBudget();
-		}
 		isEditing = false;
+		if (!isNaN(amount) && amount > 0) {
+			// Await so the row exists before the rollover flag is written to it
+			await onSaveBudget(amount);
+			if (editRollsOver !== rollsOver) {
+				await onToggleRollover?.(editRollsOver);
+			}
+		} else if (editValue === '' || editValue === '0') {
+			await onDeleteBudget();
+		}
 	}
 
 	function handleKeydown(e: KeyboardEvent) {
@@ -60,6 +75,7 @@
 	}
 
 	let hasBudget = $derived(budgetAmount !== null && budgetAmount > 0);
+	let effectiveBudget = $derived(hasBudget ? roundCurrency(budgetAmount! + carryover) : null);
 	let showSuggestion = $derived(!hasBudget && suggestedAmount > 0);
 </script>
 
@@ -78,6 +94,16 @@
 	<div class="flex-1 min-w-0">
 		<div class="flex items-center gap-2 mb-1">
 			<span class="font-medium text-charcoal truncate">{category.name}</span>
+			{#if carryover > 0}
+				<span
+					class="font-mono text-xs text-success-600 shrink-0"
+					title="Includes {formatCurrencyWhole(carryover)} rolled over from last month"
+				>+{formatCurrencyWhole(carryover)}</span>
+			{:else if rollsOver}
+				<span class="text-charcoal-muted/70 shrink-0" title="Unused budget rolls over to next month">
+					<Repeat size={12} />
+				</span>
+			{/if}
 			{#if showSuggestion && onAcceptSuggestion}
 				<button
 					onclick={onAcceptSuggestion}
@@ -92,16 +118,29 @@
 		</div>
 
 		{#if hasBudget}
-			<BudgetProgressBar spent={spent} budget={budgetAmount!} showLabel={false} size="sm" />
+			<BudgetProgressBar spent={spent} budget={effectiveBudget!} showLabel={false} size="sm" />
 		{:else}
 			<div class="h-1.5 bg-surface-alt rounded-full"></div>
 		{/if}
 	</div>
 
 	<!-- Amount Display / Edit -->
-	<div class="flex items-center gap-3 shrink-0 w-40 justify-end">
+	<div class="flex items-center gap-3 shrink-0 justify-end {isEditing ? '' : 'w-40'}">
 		{#if isEditing}
 			<div class="flex items-center gap-2">
+				{#if onToggleRollover}
+					<button
+						type="button"
+						onclick={() => (editRollsOver = !editRollsOver)}
+						aria-pressed={editRollsOver}
+						class="p-1.5 rounded-md transition-colors {editRollsOver
+							? 'text-primary-600 bg-primary-50'
+							: 'text-charcoal-muted hover:bg-surface-alt'}"
+						title="Roll over unused budget to next month"
+					>
+						<Repeat size={16} />
+					</button>
+				{/if}
 				<span class="text-charcoal-muted font-mono">$</span>
 				<input
 					type="text"
@@ -132,7 +171,12 @@
 			<div class="text-right min-w-24">
 				<span class="font-mono text-sm text-charcoal">{formatCurrencyWhole(spent)}</span>
 				{#if hasBudget}
-					<span class="font-mono text-sm text-charcoal-muted"> / {formatCurrencyWhole(budgetAmount!)}</span>
+					<span
+						class="font-mono text-sm text-charcoal-muted"
+						title={carryover > 0
+							? `${formatCurrencyWhole(budgetAmount!)} budget + ${formatCurrencyWhole(carryover)} rolled over`
+							: undefined}
+					> / {formatCurrencyWhole(effectiveBudget!)}</span>
 				{/if}
 			</div>
 			<button

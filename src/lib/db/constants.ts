@@ -46,6 +46,7 @@ export interface CategoryBudget {
 	month: string; // "YYYY-MM" format
 	categoryId: number; // References Category.id
 	budgetAmount: number; // Target spending limit
+	rollsOver?: boolean; // Unused budget rolls into next month's effective budget (default false)
 	createdAt: Date;
 	updatedAt: Date;
 }

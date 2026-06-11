@@ -8,7 +8,9 @@ import {
 	calculateSuggestedBudget,
 	generateAllSuggestions,
 	copyBudgetsFromMonth,
-	getAllCategorySpending
+	getAllCategorySpending,
+	setCategoryBudgetRollover,
+	getEffectiveBudgetsForMonth
 } from './categoryBudget';
 
 describe('CategoryBudget Operations', () => {
@@ -477,4 +479,67 @@ describe('CategoryBudget Operations', () => {
 			expect(spending.get(1)).toBe(60); // Only the child transaction
 		});
 	});
+	describe('rollover', () => {
+		async function addSpend(dateStr: string, categoryId: number, amount: number) {
+			await db.transactions.add({
+				date: new Date(`${dateStr}T12:00:00`),
+				merchant: 'Test',
+				amount,
+				categoryId,
+				isShared: false,
+				splitType: 'percentage',
+				splitValue: 0.5,
+				partnerShare: 0,
+				isSettled: false,
+				isEssential: false,
+				isSubscription: false,
+				createdAt: new Date(),
+				updatedAt: new Date()
+			});
+		}
+
+		it('setCategoryBudgetRollover sets the flag and save preserves it', async () => {
+			await saveCategoryBudget(1, '2024-06', 200);
+			await setCategoryBudgetRollover(1, '2024-06', true);
+			expect((await getCategoryBudget(1, '2024-06'))?.rollsOver).toBe(true);
+
+			// Amount edits must not clear the flag
+			await saveCategoryBudget(1, '2024-06', 250);
+			expect((await getCategoryBudget(1, '2024-06'))?.rollsOver).toBe(true);
+		});
+
+		it('setCategoryBudgetRollover is a no-op without an existing budget', async () => {
+			await setCategoryBudgetRollover(1, '2024-06', true);
+			expect(await getCategoryBudget(1, '2024-06')).toBeNull();
+		});
+
+		it('copyBudgetsFromMonth carries the rollsOver flag', async () => {
+			await saveCategoryBudget(1, '2024-06', 200);
+			await setCategoryBudgetRollover(1, '2024-06', true);
+			await copyBudgetsFromMonth('2024-06', '2024-07');
+			expect((await getCategoryBudget(1, '2024-07'))?.rollsOver).toBe(true);
+		});
+
+		it('getEffectiveBudgetsForMonth carries surplus and pools deficits', async () => {
+			// Category 1: rollover, underspent in June by 50
+			await saveCategoryBudget(1, '2024-06', 200);
+			await setCategoryBudgetRollover(1, '2024-06', true);
+			await addSpend('2024-06-10', 1, 150);
+			await saveCategoryBudget(1, '2024-07', 200);
+
+			// Category 2: rollover, overspent in June by 30
+			await saveCategoryBudget(2, '2024-06', 100);
+			await setCategoryBudgetRollover(2, '2024-06', true);
+			await addSpend('2024-06-12', 2, 130);
+			await saveCategoryBudget(2, '2024-07', 100);
+
+			const result = await getEffectiveBudgetsForMonth('2024-07');
+			expect(result.byCategory.get(1)).toMatchObject({ base: 200, carryover: 50, effective: 250 });
+			expect(result.byCategory.get(2)).toMatchObject({ base: 100, carryover: 0, effective: 100 });
+			expect(result.deficitCarried).toBe(30);
+			expect(result.effectiveTotal).toBe(320);
+			expect(result.prevMonth).toBe('2024-06');
+		});
+	});
+
 });

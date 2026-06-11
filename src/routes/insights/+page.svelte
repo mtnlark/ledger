@@ -30,7 +30,8 @@
 	import QuickStatsRow from '$lib/components/insights/QuickStatsRow.svelte';
 	import { detectRecurringExpenses, type DetectedRecurring } from '$lib/stores/recurring';
 	import { getCancelledSubscriptions, getConfirmedActiveSubscriptions, getSettings } from '$lib/stores/settings';
-	import { getCategoryBudgetsForMonth } from '$lib/stores/categoryBudget';
+	import { getEffectiveBudgetsForMonth } from '$lib/stores/categoryBudget';
+	import type { RolloverResult } from '$lib/utils/budget-rollover';
 	import type { CategoryBudget } from '$lib/db';
 
 	// Lazy-loaded chart-heavy components (loaded on tab switch)
@@ -110,7 +111,7 @@
 			selectedMonthTransactions = await getTransactionsByMonth(selectedMonth);
 			budget = await getBudgetForMonth(selectedMonth);
 			selectedMonthContributions = await getAllContributionsForMonth(selectedMonth);
-			categoryBudgets = await getCategoryBudgetsForMonth(selectedMonth);
+			categoryBudgets = effectiveBudgetRows(await getEffectiveBudgetsForMonth(selectedMonth), selectedMonth);
 			// Get trends for all available months
 			monthlyTrends = await getMonthlySpendingTrends(availableMonths);
 		} catch (error) {
@@ -121,6 +122,18 @@
 		}
 	}
 
+	// Present effective budgets (base + rollover) in the CategoryBudget shape that
+	// QuickStatsRow / SmartTakeaways consume — they only read budgetAmount.
+	function effectiveBudgetRows(result: RolloverResult, month: string): CategoryBudget[] {
+		return [...result.byCategory.values()].map((e) => ({
+			month,
+			categoryId: e.categoryId,
+			budgetAmount: e.effective,
+			createdAt: new Date(),
+			updatedAt: new Date()
+		}));
+	}
+
 	// Handle month change - update transactions and budget for selected month
 	// Fetch data first, then update all state atomically to prevent UI mismatch
 	async function handleMonthChange(month: string) {
@@ -128,13 +141,13 @@
 			getTransactionsByMonth(month),
 			getBudgetForMonth(month),
 			getAllContributionsForMonth(month),
-			getCategoryBudgetsForMonth(month)
+			getEffectiveBudgetsForMonth(month)
 		]);
 		selectedMonth = month;
 		selectedMonthTransactions = txns;
 		budget = monthBudget;
 		selectedMonthContributions = monthContributions;
-		categoryBudgets = monthCategoryBudgets;
+		categoryBudgets = effectiveBudgetRows(monthCategoryBudgets, month);
 	}
 
 	// Reload subscription-related data when subscriptions change

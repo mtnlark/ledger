@@ -57,7 +57,9 @@ See `PRODUCT_ROADMAP.md` for the full development plan. Groups 1–9 are complet
 8. ~~Performance & Tech Debt~~ — N+1 fix, stats dedup, lazy-load, chunk splitting, import/export tests ✅
 9. ~~Startup Perf & Search~~ — Redundant DB scan elimination, query parallelization, search/filter enhancements, pagination, lazy emoji picker, migration version stamp ✅
 
-**Recent**: Trust & insight features — Stale-ledger nudge (dashboard banner when nothing entered for 7+ days, dismissal re-arms after a week, `ledger-stale-nudge-dismissed`). Shared-status filter (shared/pending/settled/personal) in advanced filters — with All Time this doubles as settlement history. Insights Overview gains a "Versus a Typical Month" variance card (`VarianceBreakdown.svelte`, per-category deltas vs 6-month baseline, day-clipped for partial months). Merchant + tag report cards (`ReportCardModal` + `utils/report-cards.ts`): click a merchant name on a row, or the chart icon on an active tag filter chip — stats, trailing-12-month bars, top categories. svelte-check is now fully clean (0 errors, 0 warnings). Menu-bar quick add is live: tray icon toggles a small capture window (`/quick-add` route) that reads shared Dexie and hands submits to the main window via Tauri event (single-writer). Split-group merchant names now open the merchant report card (header restructured: row click toggles, chevron is the accessible control).
+**Recent**: Budget rollover — see Budget section for semantics (surpluses chain per category; deficits pool one month). `CategoryBudget.rollsOver` field (no migration needed; undefined = off).
+
+**Earlier**: Trust & insight features — Stale-ledger nudge (dashboard banner when nothing entered for 7+ days, dismissal re-arms after a week, `ledger-stale-nudge-dismissed`). Shared-status filter (shared/pending/settled/personal) in advanced filters — with All Time this doubles as settlement history. Insights Overview gains a "Versus a Typical Month" variance card (`VarianceBreakdown.svelte`, per-category deltas vs 6-month baseline, day-clipped for partial months). Merchant + tag report cards (`ReportCardModal` + `utils/report-cards.ts`): click a merchant name on a row, or the chart icon on an active tag filter chip — stats, trailing-12-month bars, top categories. svelte-check is now fully clean (0 errors, 0 warnings). Menu-bar quick add is live: tray icon toggles a small capture window (`/quick-add` route) that reads shared Dexie and hands submits to the main window via Tauri event (single-writer). Split-group merchant names now open the merchant report card (header restructured: row click toggles, chevron is the accessible control).
 
 **Earlier**: Design language rolled out app-wide — All pages now use in-content Fraunces titles (HeaderNav deleted); KeyboardShortcuts moved to the root layout with a handler registry (`stores/shortcuts.ts`) so ⌘1–5/⌘N/⌘K work on every page. Budget and Savings are two-column (main list + sticky 330px rail with vertically stacked summary cards). Insights: title row with month picker, underline-style tabs (InsightTabs), two-up chart grid on the Overview tab. Shared: plain-language hero balance ("{partner} owes you"), gradient removed, list rows use category chips + dashed dividers, static Tips card deleted. Dashboard additions: sticky Transactions heading + search toolbar (measured via bind:clientHeight, offsets sticky date headers), and future-dated transactions hidden behind a "Show N upcoming" toggle (`ledger-show-upcoming`).
 
@@ -416,6 +418,7 @@ interface CategoryBudget {
   month: string;           // "YYYY-MM" format
   categoryId: number;      // References Category.id
   budgetAmount: number;    // Target spending limit
+  rollsOver?: boolean;     // Unused budget rolls into next month's effective budget
   createdAt: Date;
   updatedAt: Date;
 }
@@ -495,6 +498,7 @@ Sidebar state persists to localStorage (`ledger-sidebar-expanded`).
 
 ### Budget
 - Per-category budget tracking
+- **Budget rollover** (opt-in per category-month, ↻ toggle in the card's edit state): surpluses on `rollsOver` rows carry into the same category's next month and chain across consecutive rollover months (gap or flag-off breaks the chain; 24-month cap). **Deficits never reduce a category** — last month's overspend on rollover rows is pooled into `deficitCarried`, shown as a summary note and deducted from the effective total (one-month memory). Math in `utils/budget-rollover.ts` (`computeEffectiveBudgets`), orchestrated by `getEffectiveBudgetsForMonth()`; flag set via `setCategoryBudgetRollover()`, propagated by Copy from Last Month. Effective budgets flow to cards, summary metrics, alerts, and Insights budget stats; the income-allocation bar intentionally keeps BASE totals (carryover is prior months' income).
 - Visual progress bars showing spending vs budget
 - Summary card scoped to budgeted categories: total budgeted, spent (with % of budget), remaining
   - Inline progress bar fills remaining horizontal space in the metrics row
