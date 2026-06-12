@@ -651,4 +651,15 @@ Schema changes (Goals, Notifications settings) need migrations. Test migrations 
 
 ---
 
+## Shipped Post-Roadmap
+
+- **Budget rollover** (June 2026): opt-in per category-month; surpluses chain per category, deficits pool one month at the summary level.
+- **Net Worth page + SimpleFIN sync** (June 2026): LinkedAccount/BalanceSnapshot model, manual + read-only synced balances (Keychain-held credential), daily snapshots, trend chart. See `NET_WORTH_PLAN.md`.
+
+## Future Candidates
+
+- **Intent-vs-actual reconciliation (net worth v2)**: optionally link a `LinkedAccount` to a `SavingsAccount` (`savingsAccountId`) and surface the delta — "planned − actual = committed but not yet settled" (pending transfers). Purely additive; never overwrites either side. Context: NET_WORTH_PLAN.md §7.
+
+---
+
 *This document should be updated as features ship or priorities change.*

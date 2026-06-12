@@ -57,7 +57,9 @@ See `PRODUCT_ROADMAP.md` for the full development plan. Groups 1–9 are complet
 8. ~~Performance & Tech Debt~~ — N+1 fix, stats dedup, lazy-load, chunk splitting, import/export tests ✅
 9. ~~Startup Perf & Search~~ — Redundant DB scan elimination, query parallelization, search/filter enhancements, pagination, lazy emoji picker, migration version stamp ✅
 
-**Recent**: Budget rollover — see Budget section for semantics (surpluses chain per category; deficits pool one month). `CategoryBudget.rollsOver` field (no migration needed; undefined = off).
+**Recent**: Net Worth page + SimpleFIN sync — see the Net Worth feature section. New tables `linkedAccounts`/`balanceSnapshots` (Dexie v5, all six storage touchpoints), `utils/net-worth.ts`, `services/simplefin.ts`, `src-tauri/src/simplefin.rs` (first `invoke_handler` commands). Lev links real accounts post-ship via Settings → Connected Accounts.
+
+**Earlier**: Budget rollover — see Budget section for semantics (surpluses chain per category; deficits pool one month). `CategoryBudget.rollsOver` field (no migration needed; undefined = off).
 
 **Earlier**: Trust & insight features — Stale-ledger nudge (dashboard banner when nothing entered for 7+ days, dismissal re-arms after a week, `ledger-stale-nudge-dismissed`). Shared-status filter (shared/pending/settled/personal) in advanced filters — with All Time this doubles as settlement history. Insights Overview gains a "Versus a Typical Month" variance card (`VarianceBreakdown.svelte`, per-category deltas vs 6-month baseline, day-clipped for partial months). Merchant + tag report cards (`ReportCardModal` + `utils/report-cards.ts`): click a merchant name on a row, or the chart icon on an active tag filter chip — stats, trailing-12-month bars, top categories. svelte-check is now fully clean (0 errors, 0 warnings). Menu-bar quick add is live: tray icon toggles a small capture window (`/quick-add` route) that reads shared Dexie and hands submits to the main window via Tauri event (single-writer). Split-group merchant names now open the merchant report card (header restructured: row click toggles, chevron is the accessible control).
 
@@ -156,6 +158,7 @@ ledger/
 │   │   │   ├── categoryBudget.ts   # Per-category budget tracking
 │   │   │   ├── savingsAccounts.ts  # Savings account CRUD
 │   │   │   ├── savingsContributions.ts  # Contribution tracking + goal projections
+│   │   │   ├── linkedAccounts.ts   # Net-worth accounts + balance snapshots (recordBalance = one snapshot/account/day)
 │   │   │   ├── merchants.ts
 │   │   │   ├── recurring.ts
 │   │   │   ├── recurringCache.ts       # Recurring detection cache management
@@ -292,6 +295,7 @@ ledger/
 │   │   ├── budget/+page.svelte
 │   │   ├── savings/+page.svelte  # Savings tracking
 │   │   ├── insights/+page.svelte
+│   │   ├── networth/+page.svelte # Net worth: hero+chart, accounts, rail breakdown + SimpleFIN sync card
 │   │   ├── quick-add/+page.svelte # Menu-bar quick-add window (reads shared Dexie, submits via Tauri event)
 │   │   ├── shared/+page.svelte
 │   │   └── settings/+page.svelte
@@ -317,7 +321,8 @@ ledger/
 ├── src-tauri/
 │   ├── src/
 │   │   ├── main.rs
-│   │   └── lib.rs            # Tauri plugins setup + tray icon / quick-add window toggle
+│   │   ├── lib.rs            # Tauri plugins setup + tray icon / quick-add window toggle + invoke_handler
+│   │   └── simplefin.rs      # SimpleFIN client: claim/fetch/unlink; access URL lives in macOS Keychain only
 │   ├── capabilities/
 │   │   └── default.json      # Capability configuration
 │   ├── icons/                # App icons (all sizes)
@@ -573,6 +578,12 @@ Sidebar state persists to localStorage (`ledger-sidebar-expanded`).
   - Uses `appendTag()` (idempotent add) and `stripTag()` (remove) utilities
 - Tag index (`TagIndex` class) provides fast lookups, rebuilt from transaction cache
 
+### Net Worth
+- `/networth` (⌘6): hero total + 30-day delta over an area chart, accounts as divider rows (type icon chips, Synced/Stale/Sync-error badges), rail breakdown by account type + SimpleFIN sync card (Refresh, last-synced)
+- **Intent vs actual (critical rule)**: `LinkedAccount` (actual balances) is deliberately separate from `SavingsAccount` (intent: contributions, goals). Synced balances must NEVER write to `SavingsAccount.currentBalance` — it would erase the "planned as spent" signal and corrupt goal math. See NET_WORTH_PLAN.md §7.
+- Snapshots: `recordBalance()` updates `currentBalance` AND upserts that day's `BalanceSnapshot` (max one per account per day, same-day overwrites). Manual balance edits in `LinkedAccountModal` flow through it so history accrues. Series math in `utils/net-worth.ts` (forward-fill per account).
+- **SimpleFIN (read-only)**: Rust commands in `simplefin.rs`; the access URL is a credential held ONLY in the macOS Keychain (service `app.ledger.desktop.simplefin`) — JS never sees it, so it can never reach data.json or iCloud backups. Linking in Settings → Connected Accounts (setup token, or a raw access URL for the public demo). Sync: app-open max once/day (`ledger-simplefin-last-sync`) + manual Refresh; per-account failures mark error/stale and never block others. Dexie `version(5)`.
+
 ### Menu-bar Quick Add
 - Tray icon (left-click) toggles a small always-on-top `quick-add` window rendering the full `TransactionForm`. The icon is a monochrome template glyph (`icons/tray.png`, generated 44px "L in rounded card") with `icon_as_template(true)` so macOS recolors it for light/dark menu bars (needs `image-png` cargo feature)
 - **Single-writer rule**: both windows share one IndexedDB origin. The quick window reads categories/settings (and merchant autocomplete) directly from shared Dexie but NEVER calls `initializeStorage()` (it clears+reloads shared tables) and never writes. Submits are emitted as `ledger://quick-add-submit` (date as ISO string); the main window's layout listener performs the add, toasts, and dispatches `ledger:transactions-changed` (DOM event) so the dashboard refreshes.
@@ -614,6 +625,7 @@ UI state persisted across sessions:
 - `ledger-sidebar-expanded` - Sidebar collapse state
 - `ledger-show-upcoming` - Whether future-dated transactions are visible on the dashboard
 - `ledger-stale-nudge-dismissed` - ISO date the stale-ledger nudge was last dismissed
+- `ledger-simplefin-last-sync` - "YYYY-MM-DD" of the last app-open SimpleFIN sync (max once/day)
 - `ledger-insight-{title}` - Each insight group state
 - `ledger-insights-tab` - Selected insights tab
 - `ledger-settings-section` - Selected settings section
