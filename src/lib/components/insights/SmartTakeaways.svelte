@@ -609,7 +609,7 @@
 </script>
 
 {#if hasContent}
-	<div class="{isCurrentMonth ? 'bg-surface' : 'bg-primary-50/40'} rounded-xl overflow-hidden card-primary border-l-4 border-primary-400">
+	<div class="bg-surface rounded-xl shadow-md shadow-[var(--color-shadow)] overflow-hidden">
 		<div class="px-6 py-4">
 			<h2 class="font-display text-xl font-medium text-charcoal mb-3">{title}</h2>
 

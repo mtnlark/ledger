@@ -385,30 +385,15 @@
 <div class="bg-surface rounded-xl shadow-md shadow-[var(--color-shadow)] overflow-hidden">
 	<div class="px-6 py-4">
 		<h2 class="font-display text-xl font-medium text-charcoal">Recurring Expenses</h2>
-		<p class="text-sm text-charcoal-muted mt-0.5">Subscriptions and recurring bills</p>
+		<p class="text-sm text-charcoal-muted mt-0.5">
+			{#if hasData}
+				{activeSubscriptions.length} subscription{activeSubscriptions.length !== 1 ? 's' : ''} · {activeRecurring.length} bill{activeRecurring.length !== 1 ? 's' : ''}
+			{:else}
+				Subscriptions and recurring bills
+			{/if}
+		</p>
 	</div>
 	<div class="px-6 pb-6 space-y-6">
-		<!-- Summary counts row -->
-		{#if !hasData}
-			<p class="text-charcoal-muted text-sm">No recurring expenses yet</p>
-		{:else}
-			<div class="flex items-center gap-4">
-				<div>
-					<span class="font-mono text-lg font-medium text-charcoal">
-						{formatCurrencyWhole(totalMonthlyRecurring)}
-					</span>
-					<span class="text-sm text-charcoal-muted ml-1">/mo</span>
-				</div>
-				<div class="text-charcoal-muted">|</div>
-				<div class="text-sm text-charcoal-muted">
-					{activeSubscriptions.length} sub{activeSubscriptions.length !== 1 ? 's' : ''}, {activeRecurring.length} bill{activeRecurring.length !== 1 ? 's' : ''}
-					{#if possiblyInactiveSubscriptions.length > 0}
-						<span class="text-warning-600 ml-1">({possiblyInactiveSubscriptions.length} inactive?)</span>
-					{/if}
-				</div>
-			</div>
-		{/if}
-
 		{#if !hasData}
 			<div class="text-center py-6">
 				<RefreshCw size={32} class="mx-auto text-charcoal-muted/50 mb-3" />

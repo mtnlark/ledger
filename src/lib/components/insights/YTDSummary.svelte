@@ -74,11 +74,11 @@
 		<!-- Quick stats preview -->
 		<div class="flex items-center justify-between">
 			<div>
-				<p class="text-2xl font-bold text-charcoal">${totalSpent.toLocaleString()}</p>
+				<p class="font-mono text-2xl font-medium text-charcoal">{formatCurrencyWhole(totalSpent)}</p>
 				<p class="text-sm text-charcoal-muted">Total spent in {currentYear}</p>
 			</div>
 			<div class="text-right">
-				<p class="text-lg font-semibold text-green-600">{noSpendDays}</p>
+				<p class="font-mono text-lg font-medium text-success-600">{noSpendDays}</p>
 				<p class="text-sm text-charcoal-muted">no-spend days</p>
 			</div>
 		</div>

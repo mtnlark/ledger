@@ -150,7 +150,7 @@
 					{formatCurrency(totalSpent)}
 				</p>
 				<p class="text-sm text-charcoal-muted">
-					{displayTransactions.length} transaction{transactions.length !== 1 ? 's' : ''}
+					{displayTransactions.length} transaction{displayTransactions.length !== 1 ? 's' : ''}
 				</p>
 			</div>
 			{#if paceStats && paceStats.percentChange !== 0}
@@ -174,11 +174,7 @@
 
 		<!-- Quick Stats -->
 		{#if transactions.length > 0}
-			<div class="grid grid-cols-3 gap-3">
-				<div class="bg-surface-alt rounded-lg p-3 text-center">
-					<p class="font-mono text-lg font-medium text-charcoal">{displayTransactions.length}</p>
-					<p class="text-xs text-charcoal-muted">Transactions</p>
-				</div>
+			<div class="grid grid-cols-2 gap-3">
 				<div class="bg-surface-alt rounded-lg p-3 text-center">
 					<p class="font-mono text-lg font-medium text-charcoal">
 						{formatCurrency(roundCurrency(avgTransaction))}

@@ -370,13 +370,6 @@
     box-shadow: 0 8px 25px -5px var(--color-shadow), 0 4px 10px -5px var(--color-shadow);
   }
 
-  /* Primary card: elevated importance */
-  .card-primary {
-    box-shadow: 0 4px 16px -2px var(--color-shadow);
-    border-left: 3px solid var(--color-primary-500, #C45D3A);
-  }
-
-
   /* Checkbox spring animation */
   .checkbox-spring {
     animation: spring-in 0.3s var(--ease-out-expo);

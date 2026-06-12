@@ -125,7 +125,7 @@
 
 			<!-- Stats Grid -->
 			<div class="grid grid-cols-2 gap-4">
-				<div class="bg-neutral-50 rounded-lg p-4">
+				<div class="bg-surface-alt rounded-lg p-4">
 					<p class="text-sm text-charcoal-muted mb-1">This Month - Needs</p>
 					<p class="text-2xl font-mono font-medium text-charcoal">
 						{formatCurrencyWhole(currentMonthStats.needs)}

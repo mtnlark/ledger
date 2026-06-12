@@ -96,7 +96,7 @@ See `PRODUCT_ROADMAP.md` for the full development plan. Groups 1–9 are complet
 - Custom "Warm Ledger" design system with terracotta/cream palette
 
 ### Charts: **Chart.js**
-- Category breakdown pie/donut charts
+- Top-categories bars, category treemap, category/savings/needs-wants trend lines
 - Monthly spending trends
 
 ---
@@ -216,7 +216,6 @@ ledger/
 │   │   │   ├── CategoryManager.svelte
 │   │   │   ├── CategoryCombobox.svelte
 │   │   │   ├── CategoryEditModal.svelte
-│   │   │   ├── CategoryBreakdownChart.svelte
 │   │   │   ├── MonthlyTrendsChart.svelte
 │   │   │   ├── MonthPicker.svelte
 │   │   │   ├── MerchantAutocomplete.svelte
@@ -246,11 +245,9 @@ ledger/
 │   │   │   │   └── test-utils.test.ts
 │   │   │   └── insights/              # Insight components
 │   │   │       ├── InsightGroup.svelte
-│   │   │       ├── InsightMetric.svelte
 │   │   │       ├── SmartTakeaways.svelte
 │   │   │       ├── SpendingThisMonth.svelte
 │   │   │       ├── YTDSummary.svelte
-│   │   │       ├── YTDStats.svelte
 │   │   │       ├── NeedsWantsInsights.svelte
 │   │   │       ├── RecurringInsights.svelte
 │   │   │       ├── CategoryDeepDives.svelte
@@ -541,7 +538,7 @@ Sidebar state persists to localStorage (`ledger-sidebar-expanded`).
   - Budget context in spending group: over/under count for budgeted categories
   - Needs/wants only shown when skewed (>75% or <25%), with descriptive prefix
   - Positive-only savings insights (never flags low rates due to paycheck timing)
-- **Spending tab**: Total + velocity, top 5 merchants, shared vs personal breakdown, category breakdown chart, category deep dives with trend charts, month-over-month comparison
+- **Spending tab**: Total + velocity, top 5 merchants, shared vs personal breakdown, category treemap, category deep dives with trend charts, month-over-month comparison
   - Variability classification (Steady/Moderate/Variable) uses only completed months
     — current calendar month excluded to prevent partial-month distortion of weighted stats
 - **Savings tab**: Contribution breakdown by account/source, goal progress, savings rate trend chart

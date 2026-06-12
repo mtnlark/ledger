@@ -13,6 +13,7 @@
 	import CategoryTreemap from './CategoryTreemap.svelte';
 	import EmptyState from '../EmptyState.svelte';
 	import { BarChart3 } from 'lucide-svelte';
+	import { formatCurrency, formatCurrencyWhole } from '$lib/utils/format-helpers';
 
 	interface Props {
 		currentMonth: string;
@@ -188,11 +189,11 @@
 					</div>
 				</div>
 				<div class="text-right">
-					<p class="text-lg font-semibold text-charcoal font-mono">
-						${topChange.current.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+					<p class="text-lg font-medium text-charcoal font-mono">
+						{formatCurrency(topChange.current)}
 					</p>
 					<p class="text-xs text-charcoal-muted">
-						{diff > 0 ? '+' : ''}{diff < 0 ? '-' : ''}${Math.abs(diff).toFixed(0)} vs last month
+						{diff > 0 ? '+' : diff < 0 ? '−' : ''}{formatCurrencyWhole(Math.abs(diff))} vs last month
 					</p>
 				</div>
 			{:else}
@@ -234,7 +235,7 @@
 						<span class="inline-block w-2.5 h-2.5 rounded-full {cvColor}"></span>
 						<span class="font-medium text-charcoal-soft">{cvLabel}</span>
 						<span>·</span>
-						<span class="font-mono">${Math.round(selectedStats.mean)}/mo ± ${Math.round(selectedStats.stdDev)}</span>
+						<span class="font-mono">{formatCurrencyWhole(selectedStats.mean)}/mo ± {formatCurrencyWhole(selectedStats.stdDev)}</span>
 					</div>
 				{/if}
 			</div>
@@ -247,7 +248,7 @@
 					</h3>
 					<CategoryTrendsChart
 						categoryName={selectedCategory.name}
-						categoryColor={selectedCategory.color || '#3b82f6'}
+						categoryColor={selectedCategory.color || '#C45D3A'}
 						trendData={categoryTrendData}
 						mean={selectedStats?.mean}
 						stdDev={selectedStats?.stdDev}
