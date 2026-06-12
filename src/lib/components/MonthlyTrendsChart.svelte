@@ -151,7 +151,7 @@
 					ticks: {
 						color: theme.textColor,
 						font: {
-							family: "'DM Sans', system-ui"
+							family: "'Instrument Sans', system-ui"
 						}
 					},
 					grid: {

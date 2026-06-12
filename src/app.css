@@ -90,7 +90,7 @@
   /* Typography */
   --font-display: 'Fraunces', Georgia, serif;
   --font-mono: 'DM Mono', 'SF Mono', ui-monospace, monospace;
-  --font-body: 'DM Sans', system-ui, sans-serif;
+  --font-body: 'Instrument Sans', system-ui, sans-serif;
 
   /* Animation */
   --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);

@@ -125,7 +125,7 @@ See `PRODUCT_ROADMAP.md` for the full development plan. Groups 1–9 are complet
 
 ### Typography
 - **Display**: Fraunces (serif, for headings)
-- **Body**: DM Sans (sans-serif)
+- **Body**: Instrument Sans (sans-serif)
 - **Mono**: DM Mono (for amounts)
 
 ---
