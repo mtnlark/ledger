@@ -2,7 +2,7 @@
 	import { onMount } from 'svelte';
 	import { afterNavigate } from '$app/navigation';
 	import { format } from 'date-fns';
-	import { Plus, Pencil, ChevronUp, ChevronDown, Landmark, PiggyBank, TrendingUp, ShieldCheck, Wallet, CreditCard, Banknote } from 'lucide-svelte';
+	import { Plus, Pencil, ChevronUp, ChevronDown, ChevronRight, Landmark, PiggyBank, TrendingUp, ShieldCheck, Wallet, CreditCard, Banknote } from 'lucide-svelte';
 	import type { ComponentType } from 'svelte';
 	import type { AccountClass, LinkedAccount, BalanceSnapshot, LinkedAccountType } from '$lib/db';
 	import { initializeStorage } from '$lib/storage';
@@ -16,6 +16,7 @@
 		swapLinkedAccountOrder
 	} from '$lib/stores/linkedAccounts';
 	import { calculateNetWorth, buildNetWorthSeries, seriesDelta } from '$lib/utils/net-worth';
+	import { sumCurrency } from '$lib/utils/currency';
 	import { syncBalances } from '$lib/services/simplefin';
 	import { formatCurrency, formatCurrencyWhole } from '$lib/utils/format-helpers';
 	import { toast } from '$lib/stores/toast';
@@ -50,6 +51,39 @@
 	// Sections keep store order (sortOrder); hidden accounts stay in place, dimmed
 	let assetAccounts = $derived(accounts.filter((a) => a.accountClass !== 'liability'));
 	let liabilityAccounts = $derived(accounts.filter((a) => a.accountClass === 'liability'));
+
+	// Collapsible type subgroups within each section
+	const COLLAPSED_KEY = 'ledger-networth-collapsed';
+	const ASSET_TYPE_ORDER: LinkedAccountType[] = ['checking', 'savings', 'investment', 'retirement', 'other'];
+	const LIABILITY_TYPE_ORDER: LinkedAccountType[] = ['credit', 'loan'];
+	let collapsedGroups = $state<Set<string>>(new Set());
+
+	function toggleGroup(key: string) {
+		const next = new Set(collapsedGroups);
+		if (next.has(key)) next.delete(key);
+		else next.add(key);
+		collapsedGroups = next;
+		localStorage.setItem(COLLAPSED_KEY, JSON.stringify([...next]));
+	}
+
+	function groupByType(list: LinkedAccount[], preferredOrder: LinkedAccountType[]) {
+		const present = [...new Set(list.map((a) => a.accountType))];
+		const ordered = [
+			...preferredOrder.filter((t) => present.includes(t)),
+			...present.filter((t) => !preferredOrder.includes(t))
+		];
+		return ordered.map((type) => {
+			const group = list.filter((a) => a.accountType === type);
+			return {
+				type,
+				accounts: group,
+				subtotal: sumCurrency(group.filter((a) => a.isActive).map((a) => a.currentBalance))
+			};
+		});
+	}
+
+	let assetGroups = $derived(groupByType(assetAccounts, ASSET_TYPE_ORDER));
+	let liabilityGroups = $derived(groupByType(liabilityAccounts, LIABILITY_TYPE_ORDER));
 	let lastUpdated = $derived(
 		accounts.length > 0
 			? accounts.reduce((max, a) => (a.updatedAt > max ? a.updatedAt : max), accounts[0].updatedAt)
@@ -115,6 +149,12 @@
 	});
 
 	onMount(() => {
+		try {
+			const stored = localStorage.getItem(COLLAPSED_KEY);
+			if (stored) collapsedGroups = new Set(JSON.parse(stored));
+		} catch {
+			// Ignore malformed state
+		}
 		// Refresh after a SimpleFIN sync completes (dispatched from the layout)
 		const handler = () => loadData();
 		window.addEventListener('ledger:networth-changed', handler);
@@ -140,6 +180,9 @@
 		isActive: boolean;
 	}) {
 		try {
+			// Liabilities store "amount owed" as positive; class carries the sign.
+			// Also repairs accounts synced as negative assets before re-typing.
+			const balance = data.accountClass === 'liability' ? Math.abs(data.balance) : data.balance;
 			if (editingAccount) {
 				await updateLinkedAccount(editingAccount.id!, {
 					name: data.name,
@@ -148,9 +191,9 @@
 					accountClass: data.accountClass,
 					isActive: data.isActive
 				});
-				if (data.balance !== editingAccount.currentBalance) {
+				if (balance !== editingAccount.currentBalance) {
 					// Manual balance updates flow through recordBalance so history accrues
-					await recordBalance(editingAccount.id!, data.balance, 'manual');
+					await recordBalance(editingAccount.id!, balance, 'manual');
 				}
 				toast.success('Account updated');
 			} else {
@@ -159,7 +202,7 @@
 					institution: data.institution,
 					accountClass: data.accountClass,
 					accountType: data.accountType,
-					initialBalance: data.balance
+					initialBalance: balance
 				});
 				toast.success('Account added');
 			}
@@ -193,77 +236,100 @@
 	<title>Net Worth - Ledger</title>
 </svelte:head>
 
-{#snippet accountsSection(title: string, list: LinkedAccount[])}
+{#snippet accountsSection(title: string, cls: string, groups: Array<{ type: LinkedAccountType; accounts: LinkedAccount[]; subtotal: number }>)}
 	<div>
 		<h2 class="text-xs font-medium uppercase tracking-wider text-charcoal-muted mb-2 px-1">
-			{title} ({list.length})
+			{title} ({groups.reduce((n, g) => n + g.accounts.length, 0)})
 		</h2>
 		<div class="bg-surface rounded-xl shadow-sm shadow-theme overflow-hidden divide-y divide-dashed divide-theme-dashed">
-			{#each list as account, index (account.id)}
-				{@const meta = TYPE_META[account.accountType]}
-				{@const Icon = meta.icon}
-				<div class="group/row px-4 py-3 flex items-center gap-3 transition-colors hover:bg-surface-hover/50 {account.isActive ? '' : 'opacity-50'}">
-					<div class="category-chip w-9 h-9 bg-surface-alt text-charcoal-soft">
-						<Icon size={17} />
-					</div>
-					<div class="flex-1 min-w-0">
-						<div class="flex items-center gap-2">
-							<span class="font-medium text-charcoal truncate">{account.name}</span>
-							{#if !account.isActive}
-								<span class="badge bg-surface-alt text-charcoal-muted">Hidden</span>
-							{/if}
-							{#if account.source === 'simplefin'}
-								{#if account.lastSyncStatus === 'error'}
-									<span class="badge bg-danger-100 text-danger-600" title="Last sync failed — balance may be outdated; update it manually if needed">Sync error</span>
-								{:else if account.lastSyncStatus === 'stale'}
-									<span class="badge bg-warning-100 text-warning-600" title="Account not found upstream — balance kept from last successful sync">Stale</span>
-								{:else}
-									<span class="badge bg-primary-100 text-primary-600" title="Balance syncs from SimpleFIN">Synced</span>
-								{/if}
-							{/if}
+			{#each groups as group (group.type)}
+				{@const key = `${cls}:${group.type}`}
+				{@const collapsed = collapsedGroups.has(key)}
+				<div>
+					<button
+						type="button"
+						onclick={() => toggleGroup(key)}
+						aria-expanded={!collapsed}
+						class="w-full px-4 py-2.5 flex items-center gap-2 text-left bg-surface-alt/50 hover:bg-surface-alt transition-colors"
+					>
+						<ChevronRight size={14} class="text-charcoal-muted flex-shrink-0 transition-transform {collapsed ? '' : 'rotate-90'}" />
+						<span class="text-xs font-medium uppercase tracking-wider text-charcoal-muted">{TYPE_META[group.type].label} ({group.accounts.length})</span>
+						<span class="flex-1"></span>
+						<span class="font-mono text-xs text-charcoal-muted">{formatCurrencyWhole(group.subtotal)}</span>
+					</button>
+					{#if !collapsed}
+						<div class="divide-y divide-dashed divide-theme-dashed border-t border-dashed border-theme-dashed">
+							{#each group.accounts as account, index (account.id)}
+								{@const meta = TYPE_META[account.accountType]}
+								{@const Icon = meta.icon}
+								<div class="group/row px-4 py-3 flex items-center gap-3 transition-colors hover:bg-surface-hover/50 {account.isActive ? '' : 'opacity-50'}">
+									<div class="category-chip w-9 h-9 bg-surface-alt text-charcoal-soft">
+										<Icon size={17} />
+									</div>
+									<div class="flex-1 min-w-0">
+										<div class="flex items-center gap-2">
+											<span class="font-medium text-charcoal truncate">{account.name}</span>
+											{#if !account.isActive}
+												<span class="badge bg-surface-alt text-charcoal-muted">Hidden</span>
+											{/if}
+											{#if account.source === 'simplefin'}
+												{#if account.lastSyncStatus === 'error'}
+													<span class="badge bg-danger-100 text-danger-600" title="Last sync failed — balance may be outdated; update it manually if needed">Sync error</span>
+												{:else if account.lastSyncStatus === 'stale'}
+													<span class="badge bg-warning-100 text-warning-600" title="Account not found upstream — balance kept from last successful sync">Stale</span>
+												{:else}
+													<span class="badge bg-success-100 text-success-600" title="Balance syncs from SimpleFIN">Synced</span>
+												{/if}
+											{:else}
+												<span class="badge bg-success-100 text-success-600" title="Balance entered manually">Manual</span>
+											{/if}
+										</div>
+										<div class="flex items-center gap-2 text-sm text-charcoal-muted mt-0.5">
+											{#if account.institution}
+												<span>{account.institution}</span>
+												<span>·</span>
+											{/if}
+											<span>{meta.label}</span>
+										</div>
+									</div>
+									<div class="text-right flex-shrink-0">
+										<div class="font-mono font-medium text-charcoal">{formatCurrency(account.currentBalance)}</div>
+										<div class="text-xs text-charcoal-muted">
+											Updated {format(account.updatedAt, 'MMM d')}
+										</div>
+									</div>
+									<div class="flex gap-0.5 flex-shrink-0 opacity-0 group-hover/row:opacity-100 focus-within:opacity-100 transition-opacity">
+										<button
+											type="button"
+											onclick={() => handleMove(group.accounts, index, -1)}
+											disabled={index === 0}
+											class="p-1.5 text-charcoal-muted hover:text-charcoal hover:bg-surface-alt rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+											aria-label="Move {account.name} up"
+										>
+											<ChevronUp size={14} />
+										</button>
+										<button
+											type="button"
+											onclick={() => handleMove(group.accounts, index, 1)}
+											disabled={index === group.accounts.length - 1}
+											class="p-1.5 text-charcoal-muted hover:text-charcoal hover:bg-surface-alt rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+											aria-label="Move {account.name} down"
+										>
+											<ChevronDown size={14} />
+										</button>
+										<button
+											type="button"
+											onclick={() => openEdit(account)}
+											class="p-1.5 text-charcoal-muted hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors"
+											aria-label="Edit {account.name}"
+										>
+											<Pencil size={16} />
+										</button>
+									</div>
+								</div>
+							{/each}
 						</div>
-						<div class="flex items-center gap-2 text-sm text-charcoal-muted mt-0.5">
-							{#if account.institution}
-								<span>{account.institution}</span>
-								<span>·</span>
-							{/if}
-							<span>{meta.label}</span>
-						</div>
-					</div>
-					<div class="text-right flex-shrink-0">
-						<div class="font-mono font-medium text-charcoal">{formatCurrency(account.currentBalance)}</div>
-						<div class="text-xs text-charcoal-muted">
-							Updated {format(account.updatedAt, 'MMM d')}
-						</div>
-					</div>
-					<div class="flex gap-0.5 flex-shrink-0 opacity-0 group-hover/row:opacity-100 focus-within:opacity-100 transition-opacity">
-						<button
-							type="button"
-							onclick={() => handleMove(list, index, -1)}
-							disabled={index === 0}
-							class="p-1.5 text-charcoal-muted hover:text-charcoal hover:bg-surface-alt rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-							aria-label="Move {account.name} up"
-						>
-							<ChevronUp size={14} />
-						</button>
-						<button
-							type="button"
-							onclick={() => handleMove(list, index, 1)}
-							disabled={index === list.length - 1}
-							class="p-1.5 text-charcoal-muted hover:text-charcoal hover:bg-surface-alt rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-							aria-label="Move {account.name} down"
-						>
-							<ChevronDown size={14} />
-						</button>
-						<button
-							type="button"
-							onclick={() => openEdit(account)}
-							class="p-1.5 text-charcoal-muted hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors"
-							aria-label="Edit {account.name}"
-						>
-							<Pencil size={16} />
-						</button>
-					</div>
+					{/if}
 				</div>
 			{/each}
 		</div>
@@ -340,9 +406,9 @@
 					</div>
 
 					<!-- Accounts: assets and liabilities sections -->
-					{@render accountsSection('Assets', assetAccounts)}
-					{#if liabilityAccounts.length > 0}
-						{@render accountsSection('Liabilities', liabilityAccounts)}
+					{@render accountsSection('Assets', 'asset', assetGroups)}
+					{#if liabilityGroups.length > 0}
+						{@render accountsSection('Liabilities', 'liability', liabilityGroups)}
 					{/if}
 				</div>
 
