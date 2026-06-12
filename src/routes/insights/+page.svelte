@@ -27,6 +27,10 @@
 	import SmartTakeaways from '$lib/components/insights/SmartTakeaways.svelte';
 	import InsightTabs from '$lib/components/insights/InsightTabs.svelte';
 	import VarianceBreakdown from '$lib/components/insights/VarianceBreakdown.svelte';
+	import NetWorthOverviewCard from '$lib/components/insights/NetWorthOverviewCard.svelte';
+	import NetWorthYearCard from '$lib/components/insights/NetWorthYearCard.svelte';
+	import { getAllLinkedAccounts, getAllSnapshots } from '$lib/stores/linkedAccounts';
+	import type { LinkedAccount, BalanceSnapshot } from '$lib/db';
 	import QuickStatsRow from '$lib/components/insights/QuickStatsRow.svelte';
 	import { detectRecurringExpenses, type DetectedRecurring } from '$lib/stores/recurring';
 	import { getCancelledSubscriptions, getConfirmedActiveSubscriptions, getSettings } from '$lib/stores/settings';
@@ -71,6 +75,8 @@
 	let appSettings = $state<Settings | null>(null);
 	let activeTab = $state('overview');
 	let categoryBudgets = $state<CategoryBudget[]>([]);
+	let linkedAccounts = $state<LinkedAccount[]>([]);
+	let balanceSnapshots = $state<BalanceSnapshot[]>([]);
 
 	// Derived: fixed recurring amounts as a Map for easy lookup
 	let fixedRecurringAmounts = $derived.by(() => {
@@ -114,6 +120,11 @@
 			categoryBudgets = effectiveBudgetRows(await getEffectiveBudgetsForMonth(selectedMonth), selectedMonth);
 			// Get trends for all available months
 			monthlyTrends = await getMonthlySpendingTrends(availableMonths);
+			// Net worth data (month-independent)
+			[linkedAccounts, balanceSnapshots] = await Promise.all([
+				getAllLinkedAccounts(),
+				getAllSnapshots()
+			]);
 		} catch (error) {
 			console.error('Failed to load data:', error);
 		} finally {
@@ -121,6 +132,17 @@
 			hasLoadedOnce = true;
 		}
 	}
+
+	// Mean spending over the last 6 completed months (current month excluded) — runway denominator
+	let avgMonthlySpend = $derived.by(() => {
+		const currentKey = getMonthKey(new Date());
+		const completed = [...monthlyTrends.entries()]
+			.filter(([month]) => month < currentKey)
+			.sort((a, b) => b[0].localeCompare(a[0]))
+			.slice(0, 6);
+		if (completed.length === 0) return 0;
+		return completed.reduce((sum, [, total]) => sum + total, 0) / completed.length;
+	});
 
 	// Present effective budgets (base + rollover) in the CategoryBudget shape that
 	// QuickStatsRow / SmartTakeaways consume — they only read budgetAmount.
@@ -250,6 +272,14 @@
 						{selectedMonth}
 					/>
 
+					<!-- Actual wealth: net worth, monthly delta, runway -->
+					<NetWorthOverviewCard
+						accounts={linkedAccounts}
+						snapshots={balanceSnapshots}
+						{selectedMonth}
+						{avgMonthlySpend}
+					/>
+
 					<!-- Lazy-loaded chart components for overview tab -->
 					{#await lazyOverviewCharts() then [TopCategoriesBarMod, MonthlyTrendsChartMod]}
 						<div class="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
@@ -328,6 +358,7 @@
 				{:else if activeTab === 'year-in-review'}
 					{#await lazyYearInReview() then [YTDSummaryMod, TagsYearSummaryMod, NeedsWantsInsightsMod]}
 						<YTDSummaryMod.default transactions={allTransactions} settings={appSettings} />
+						<NetWorthYearCard accounts={linkedAccounts} snapshots={balanceSnapshots} />
 						<TagsYearSummaryMod.default transactions={allTransactions} />
 						<NeedsWantsInsightsMod.default
 							transactions={selectedMonthTransactions}

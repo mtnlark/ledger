@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { calculateNetWorth, buildNetWorthSeries, seriesDelta, accountClassForType } from './net-worth';
+import { calculateNetWorth, buildNetWorthSeries, seriesDelta, accountClassForType, liquidBalance, monthlyNetWorthDelta, netWorthMilestones } from './net-worth';
 import type { LinkedAccount, BalanceSnapshot } from '$lib/db';
 
 let nextId = 1;
@@ -122,5 +122,52 @@ describe('accountClassForType', () => {
 		expect(accountClassForType('investment')).toBe('asset');
 		expect(accountClassForType('retirement')).toBe('asset');
 		expect(accountClassForType('other')).toBe('asset');
+	});
+});
+
+describe('liquidBalance', () => {
+	it('counts checking, savings, and investment; excludes retirement, other, liabilities, inactive', () => {
+		const accounts = [
+			account({ accountType: 'checking', currentBalance: 1000 }),
+			account({ accountType: 'savings', currentBalance: 2000 }),
+			account({ accountType: 'investment', currentBalance: 3000 }), // SGOV et al.
+			account({ accountType: 'retirement', currentBalance: 9999 }),
+			account({ accountType: 'other', currentBalance: 12150 }), // the car
+			account({ accountType: 'credit', accountClass: 'liability', currentBalance: 500 }),
+			account({ accountType: 'checking', currentBalance: 777, isActive: false })
+		];
+		expect(liquidBalance(accounts)).toBe(6000);
+	});
+});
+
+describe('monthlyNetWorthDelta', () => {
+	const series = [
+		{ date: '2026-05-10', total: 1000 },
+		{ date: '2026-05-28', total: 1200 },
+		{ date: '2026-06-15', total: 1500 }
+	];
+
+	it('compares the month-end value against the prior month-end', () => {
+		expect(monthlyNetWorthDelta(series, '2026-06')).toBe(300);
+		expect(monthlyNetWorthDelta(series, '2026-05')).toBeNull(); // no April baseline
+	});
+
+	it('returns null when nothing was recorded in the month', () => {
+		expect(monthlyNetWorthDelta(series, '2026-07')).toBeNull();
+	});
+});
+
+describe('netWorthMilestones', () => {
+	it('detects upward threshold crossings only', () => {
+		const series = [
+			{ date: '2026-01-31', total: 8000 },
+			{ date: '2026-02-28', total: 12000 }, // crosses 10k
+			{ date: '2026-03-31', total: 9000 }, // dip — no milestone
+			{ date: '2026-04-30', total: 21000 } // crosses 20k (10k already counted)
+		];
+		expect(netWorthMilestones(series)).toEqual([
+			{ date: '2026-02-28', amount: 10000 },
+			{ date: '2026-04-30', amount: 20000 }
+		]);
 	});
 });

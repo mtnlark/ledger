@@ -100,3 +100,64 @@ export function seriesDelta(series: NetWorthPoint[], days: number): number | nul
 	if (!baseline) return null;
 	return roundCurrency(latest.total - baseline.total);
 }
+
+/**
+ * Liquid types for runway purposes. Investment (brokerage) counts by Lev's
+ * choice — cash-equivalents like SGOV live there. Retirement is locked up;
+ * 'other' is excluded (it holds illiquid assets like vehicles).
+ */
+const LIQUID_TYPES: ReadonlySet<LinkedAccountType> = new Set(['checking', 'savings', 'investment']);
+
+export function liquidBalance(accounts: LinkedAccount[]): number {
+	return roundCurrency(
+		accounts
+			.filter((a) => a.isActive && a.accountClass !== 'liability' && LIQUID_TYPES.has(a.accountType))
+			.reduce((sum, a) => sum + a.currentBalance, 0)
+	);
+}
+
+function lastPointAtOrBefore(series: NetWorthPoint[], cutoff: string): NetWorthPoint | null {
+	let found: NetWorthPoint | null = null;
+	for (const point of series) {
+		if (point.date <= cutoff) found = point;
+		else break;
+	}
+	return found;
+}
+
+/**
+ * Net worth change across a calendar month: last point in (or carried into)
+ * the month minus the last point at or before the previous month's end.
+ * Null when there's no baseline or no movement recorded in the month.
+ */
+export function monthlyNetWorthDelta(series: NetWorthPoint[], monthKey: string): number | null {
+	const [y, m] = monthKey.split('-').map(Number);
+	const prevKey = m === 1 ? `${y - 1}-12` : `${y}-${String(m - 1).padStart(2, '0')}`;
+	const endOfPrev = `${prevKey}-31`;
+	const endOfMonth = `${monthKey}-31`;
+
+	const baseline = lastPointAtOrBefore(series, endOfPrev);
+	const end = lastPointAtOrBefore(series, endOfMonth);
+	if (!baseline || !end || end.date <= endOfPrev) return null;
+	return roundCurrency(end.total - baseline.total);
+}
+
+export interface NetWorthMilestone {
+	date: string;
+	amount: number; // the threshold crossed, e.g. 50000
+}
+
+/** Upward crossings of round thresholds (default $10k steps). */
+export function netWorthMilestones(series: NetWorthPoint[], step = 10_000): NetWorthMilestone[] {
+	const milestones: NetWorthMilestone[] = [];
+	for (let i = 1; i < series.length; i++) {
+		const prev = series[i - 1].total;
+		const curr = series[i].total;
+		if (curr <= prev) continue;
+		const crossed = Math.floor(curr / step) * step;
+		if (crossed > prev && crossed > 0) {
+			milestones.push({ date: series[i].date, amount: crossed });
+		}
+	}
+	return milestones;
+}

@@ -531,7 +531,7 @@ Sidebar state persists to localStorage (`ledger-sidebar-expanded`).
 - **Tab-based architecture** with 5 tabs: Overview, Spending, Savings, Recurring, Year in Review
   - Selected tab persisted to localStorage (`ledger-insights-tab`)
   - Month picker remains global, applies to all tabs
-- **Overview tab**: Smart Takeaways (forward-looking current month / retrospective past month), Quick Stats Row (total spent, budget status, savings rate)
+- **Overview tab**: Smart Takeaways (forward-looking current month / retrospective past month), Quick Stats Row (total spent, budget status, savings rate), "Versus a Typical Month" variance card, Wealth card (`NetWorthOverviewCard`: net worth total, monthly delta, runway = liquid balances ÷ 6-month avg spend; liquid = checking + savings + investment — brokerage counts per Lev (SGOV as cash-equivalent), retirement/other excluded)
   - Highlights: pace projection, anomalies (with dollar amounts), category shifts
   - Pace projection and velocity exclude future-dated transactions via `filterUpToDate()`
   - Pace projection is suppressed early in the month (until `ceil(daysInMonth × config.insights.pace.minMonthFraction)`, default 0.25 ≈ day 8) so a single large early charge doesn't extrapolate to a wildly inflated month-end number; other Highlights fill the slot meanwhile
@@ -546,7 +546,7 @@ Sidebar state persists to localStorage (`ledger-sidebar-expanded`).
     — current calendar month excluded to prevent partial-month distortion of weighted stats
 - **Savings tab**: Contribution breakdown by account/source, goal progress, savings rate trend chart
 - **Recurring tab**: Active subscriptions, upcoming annual renewals, possibly inactive alerts, detected recurring bills
-- **Year in Review tab**: Calendar heatmap, best/worst spending months, needs vs wants with trend chart, tag spending summary, shared expense annual summary, YTD stats
+- **Year in Review tab**: Calendar heatmap, best/worst spending months, needs vs wants with trend chart, tag spending summary, shared expense annual summary, YTD stats, Net Worth year card (`NetWorthYearCard`: delta since start of year or first record, now/then, $10k milestone crossings)
 
 ### Shared Expenses
 - Outstanding balance with partner
