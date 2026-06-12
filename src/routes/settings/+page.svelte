@@ -19,6 +19,7 @@
 		getAllLinkedAccounts,
 		addLinkedAccount,
 		updateLinkedAccount,
+		deleteLinkedAccount,
 		recordBalance,
 		setSyncStatus
 	} from '$lib/stores/linkedAccounts';
@@ -317,6 +318,8 @@
 	let sfUpstream = $state<MappedSimplefinAccount[] | null>(null);
 	let sfAccounts = $state<LinkedAccount[]>([]);
 	let sfMapping = $state<Record<string, string>>({});
+	let sfConfirmingUnlink = $state(false);
+	let sfUnlinkMode = $state<'keep' | 'remove'>('keep');
 
 	let sfManualAccounts = $derived(sfAccounts.filter((a) => a.source === 'manual'));
 
@@ -395,19 +398,29 @@
 		}
 	}
 
-	async function sfDisconnect() {
+	async function sfDisconnect(mode: 'keep' | 'remove') {
 		if (sfBusy) return;
 		sfBusy = true;
 		try {
 			await sfUnlink();
-			// Accounts revert to manual; balances and history are kept
-			for (const account of sfAccounts.filter((a) => a.source === 'simplefin')) {
-				await updateLinkedAccount(account.id!, { source: 'manual' });
+			const synced = sfAccounts.filter((a) => a.source === 'simplefin');
+			if (mode === 'remove') {
+				// Demo/test cleanup: drop the accounts and their snapshot history
+				for (const account of synced) {
+					await deleteLinkedAccount(account.id!);
+				}
+				toast.success('SimpleFIN disconnected — synced accounts removed');
+			} else {
+				// Safe default for real accounts: keep balances + history as manual
+				for (const account of synced) {
+					await updateLinkedAccount(account.id!, { source: 'manual' });
+				}
+				toast.success('SimpleFIN disconnected — accounts kept as manual');
 			}
 			sfLinked = false;
 			sfUpstream = null;
+			sfConfirmingUnlink = false;
 			await sfRefreshLocal();
-			toast.success('SimpleFIN disconnected — accounts kept as manual');
 		} catch (error) {
 			toast.error(String(error));
 		} finally {
@@ -982,11 +995,42 @@
 									</button>
 									<button
 										type="button"
-										onclick={sfDisconnect}
+										onclick={() => { sfUnlinkMode = 'keep'; sfConfirmingUnlink = true; }}
 										disabled={sfBusy}
 										class="px-3 py-1.5 text-sm font-medium text-danger-600 hover:bg-danger-50 rounded-lg transition-colors disabled:opacity-50"
 									>
 										Unlink
+									</button>
+								</div>
+							</div>
+						{/if}
+
+						{#if sfConfirmingUnlink}
+							<div class="bg-warning-50 border border-warning-200 rounded-lg p-4 space-y-3">
+								<p class="text-sm font-medium text-charcoal">Unlink SimpleFIN?</p>
+								<label class="flex items-start gap-2 cursor-pointer">
+									<input type="radio" bind:group={sfUnlinkMode} value="keep" class="mt-0.5" />
+									<span class="text-sm text-charcoal-soft">Keep the synced accounts as manual<span class="block text-xs text-charcoal-muted">Balances and history stay on the Net Worth page; you update them yourself</span></span>
+								</label>
+								<label class="flex items-start gap-2 cursor-pointer">
+									<input type="radio" bind:group={sfUnlinkMode} value="remove" class="mt-0.5" />
+									<span class="text-sm text-charcoal-soft">Remove the synced accounts<span class="block text-xs text-charcoal-muted">Deletes them and their balance history — right choice for demo accounts</span></span>
+								</label>
+								<div class="flex justify-end gap-2 pt-1">
+									<button
+										type="button"
+										onclick={() => (sfConfirmingUnlink = false)}
+										class="px-3 py-1.5 text-sm font-medium border border-theme text-charcoal-soft rounded-lg hover:bg-surface-alt transition-colors"
+									>
+										Cancel
+									</button>
+									<button
+										type="button"
+										onclick={() => sfDisconnect(sfUnlinkMode)}
+										disabled={sfBusy}
+										class="px-3 py-1.5 text-sm font-medium bg-danger-500 text-white rounded-lg hover:bg-danger-600 transition-colors disabled:opacity-50"
+									>
+										{sfBusy ? 'Unlinking…' : 'Unlink'}
 									</button>
 								</div>
 							</div>
