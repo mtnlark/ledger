@@ -9,7 +9,6 @@
 	export interface VarianceItem {
 		categoryId: number;
 		name: string;
-		icon: string;
 		current: number;
 		baseline: number;
 		delta: number;
@@ -137,7 +136,6 @@
 			items.push({
 				categoryId: id,
 				name: cat?.name ?? 'Unknown',
-				icon: cat?.icon ?? '📁',
 				current,
 				baseline,
 				delta,
@@ -197,7 +195,7 @@
 					onclick={() => onCategoryClick?.(item.categoryId)}
 					title={onCategoryClick ? `Explore ${item.name} in Category Deep Dives` : undefined}
 					class="flex items-center gap-3 w-full text-left px-2 -mx-2 py-0.5 rounded-lg {onCategoryClick ? 'hover:bg-surface-alt transition-colors cursor-pointer' : 'cursor-default'}">
-					<span class="w-6 text-center shrink-0">{item.icon}</span>
+					<span class="w-2 h-2 rounded-full shrink-0" style="background-color: {categories.find((c) => c.id === item.categoryId)?.color || '#C45D3A'};" aria-hidden="true"></span>
 					<span class="text-sm text-charcoal truncate min-w-0 flex-1">
 						{item.name}
 						{#if item.isUnusual}

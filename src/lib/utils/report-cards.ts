@@ -11,7 +11,6 @@ export interface MonthlySpend {
 export interface CategorySpend {
 	categoryId: number;
 	name: string;
-	icon: string;
 	amount: number;
 }
 
@@ -109,7 +108,6 @@ function buildReport(
 			return {
 				categoryId,
 				name: cat?.name ?? 'Unknown',
-				icon: cat?.icon ?? '📁',
 				amount: roundCurrency(amount)
 			};
 		})

@@ -331,12 +331,12 @@
 
 		// Priority 6: Category standout (notable category change)
 		if (monthReview?.categoryStandout && monthReview.categoryStandout.diff >= 50) {
-			const { name, icon, diff, isIncrease } = monthReview.categoryStandout;
+			const { name, diff, isIncrease } = monthReview.categoryStandout;
 			return {
 				type: 'categoryStandout' as const,
 				icon: isIncrease ? TrendingUp : TrendingDown,
 				iconColor: isIncrease ? 'text-warning-500' : 'text-success-500',
-				headline: `${icon} ${name} ${isIncrease ? 'up' : 'down'} ${formatCurrency(diff)}`,
+				headline: `${name} ${isIncrease ? 'up' : 'down'} ${formatCurrency(diff)}`,
 				subtext: `Biggest category change from prior month`
 			};
 		}

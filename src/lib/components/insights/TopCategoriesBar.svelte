@@ -5,7 +5,7 @@
 	export interface TopCategory {
 		id: number | null;
 		name: string;
-		icon: string;
+		color: string;
 		amount: number;
 		percent: number;
 		count?: number; // Only for "Other"
@@ -31,7 +31,7 @@
 				categorySpending.push({
 					id: catId,
 					name: cat.name,
-					icon: cat.icon || '📁',
+					color: cat.color || '#C45D3A',
 					amount: roundCurrency(amount),
 					percent: 0
 				});
@@ -59,7 +59,7 @@
 			top.push({
 				id: null,
 				name: 'Other',
-				icon: '',
+				color: '',
 				amount: otherAmount,
 				percent: total > 0 ? Math.round((otherAmount / total) * 100) : 0,
 				count: rest.length
@@ -104,8 +104,8 @@
 
 				<!-- Icon -->
 				<span class="relative z-10 w-6 text-center shrink-0">
-					{#if cat.icon}
-						{cat.icon}
+					{#if cat.color}
+						<span class="inline-block w-2 h-2 rounded-full" style="background-color: {cat.color};" aria-hidden="true"></span>
 					{:else if cat.count}
 						<span class="text-xs text-charcoal-muted">+{cat.count}</span>
 					{/if}

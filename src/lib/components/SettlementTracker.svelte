@@ -31,7 +31,6 @@
 	// Create category helpers bound to current categories
 	let categoryHelpers = $derived(createCategoryHelpers(categories));
 	let getCategoryName = $derived(categoryHelpers.getName);
-	let getCategoryIcon = $derived(categoryHelpers.getIcon);
 	let getCategoryColor = $derived(categoryHelpers.getColor);
 
 	function formatDate(date: Date): string {
@@ -157,17 +156,12 @@
 						{/if}
 					</div>
 
-					<!-- Icon -->
-					<div
-						class="category-chip category-icon-box w-9 h-9 text-lg"
-						style="background-color: {getCategoryColor(transaction.categoryId)}1F;"
-					>{getCategoryIcon(transaction.categoryId)}</div>
 
 					<!-- Details -->
 					<div class="flex-1 min-w-0">
 						<p class="font-medium text-charcoal truncate">{transaction.merchant}</p>
 						<p class="text-sm text-charcoal-muted">
-							{formatDate(transaction.date)} · {getCategoryName(transaction.categoryId)}
+							{formatDate(transaction.date)} · <span class="inline-block w-2 h-2 rounded-full" style="background-color: {getCategoryColor(transaction.categoryId)};" aria-hidden="true"></span> {getCategoryName(transaction.categoryId)}
 						</p>
 					</div>
 

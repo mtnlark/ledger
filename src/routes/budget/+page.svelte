@@ -124,7 +124,6 @@
 			return {
 				categoryId,
 				categoryName: category?.name ?? 'Unknown',
-				categoryIcon: category?.icon ?? '📦',
 				budgetAmount: rollover?.byCategory.get(categoryId)?.effective ?? budget.budgetAmount,
 				spent: spending.get(categoryId) || 0
 			};
@@ -497,7 +496,6 @@
 						<ul class="space-y-2">
 							{#each visibleBudgetAlerts as alert}
 								<li class="flex items-center gap-3 text-sm group">
-									<span class="text-lg">{alert.categoryIcon}</span>
 									{#if alert.type === 'over'}
 										<span class="text-danger-600 flex-1">
 											You're <span class="font-mono font-medium">{formatCurrencyWhole(alert.amount)}</span> over budget for {alert.categoryName}

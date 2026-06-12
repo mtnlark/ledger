@@ -119,17 +119,11 @@
 <div class="bg-surface rounded-lg shadow-sm shadow-theme">
 	<!-- Account Header -->
 	<div class="p-4 flex items-center gap-4">
-		<!-- Icon -->
-		<div
-			class="w-12 h-12 rounded-lg flex items-center justify-center text-2xl shrink-0"
-			style="background-color: {account.color}20"
-		>
-			{account.icon || '💰'}
-		</div>
 
 		<!-- Account Info -->
 		<div class="flex-1 min-w-0">
 			<div class="flex items-center gap-2">
+				<span class="w-2.5 h-2.5 rounded-full shrink-0" style="background-color: {account.color};" aria-hidden="true"></span>
 				<span class="font-medium text-charcoal truncate">{account.name}</span>
 				<span
 					class="text-xs px-2 py-0.5 rounded-full bg-surface-alt text-charcoal-muted capitalize"

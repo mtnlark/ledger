@@ -154,7 +154,7 @@
 						{#each topCategories.essential as { category, amount }}
 							{#if category}
 								<div class="flex items-center gap-2">
-									<span class="text-lg">{category.icon}</span>
+									<span class="w-2 h-2 rounded-full shrink-0" style="background-color: {category.color || '#C45D3A'};" aria-hidden="true"></span>
 									<span class="text-sm text-charcoal truncate flex-1">{category.name}</span>
 									<span class="font-mono text-sm text-charcoal-soft">{formatCurrencyWhole(amount)}</span>
 								</div>
@@ -172,7 +172,7 @@
 						{#each topCategories.discretionary as { category, amount }}
 							{#if category}
 								<div class="flex items-center gap-2">
-									<span class="text-lg">{category.icon}</span>
+									<span class="w-2 h-2 rounded-full shrink-0" style="background-color: {category.color || '#C45D3A'};" aria-hidden="true"></span>
 									<span class="text-sm text-charcoal truncate flex-1">{category.name}</span>
 									<span class="font-mono text-sm text-charcoal-soft">{formatCurrencyWhole(amount)}</span>
 								</div>

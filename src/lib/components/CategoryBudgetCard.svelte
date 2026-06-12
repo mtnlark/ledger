@@ -82,17 +82,11 @@
 <div
 	class="bg-surface rounded-lg shadow-sm shadow-theme p-4 flex items-center gap-4 transition-colors hover:shadow-md"
 >
-	<!-- Category Icon -->
-	<div
-		class="w-10 h-10 rounded-lg flex items-center justify-center text-xl shrink-0"
-		style="background-color: {category.color}20"
-	>
-		{category.icon || '📦'}
-	</div>
 
 	<!-- Category Name & Progress -->
 	<div class="flex-1 min-w-0">
 		<div class="flex items-center gap-2 mb-1">
+			<span class="w-2.5 h-2.5 rounded-full shrink-0" style="background-color: {category.color};" aria-hidden="true"></span>
 			<span class="font-medium text-charcoal truncate">{category.name}</span>
 			{#if carryover > 0}
 				<span

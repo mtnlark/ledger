@@ -187,7 +187,7 @@
 			{#if topChange}
 				{@const diff = topChange.current - topChange.previous}
 				<div class="flex items-center gap-2">
-					<span class="text-xl">{topChange.icon}</span>
+					<span class="w-2.5 h-2.5 rounded-full shrink-0" style="background-color: {categories.find((c) => c.name === topChange.name)?.color || '#C45D3A'};" aria-hidden="true"></span>
 					<div>
 						<p class="text-sm font-medium text-charcoal">{topChange.name}</p>
 						<p class="text-xs text-charcoal-muted">
@@ -255,7 +255,7 @@
 			{#if selectedCategory && categoryTrendData.size > 0}
 				<div>
 					<h3 class="text-sm font-semibold text-charcoal-soft mb-3">
-						{selectedCategory.icon} {selectedCategory.name} Over Time
+						{selectedCategory.name} Over Time
 					</h3>
 					<CategoryTrendsChart
 						categoryName={selectedCategory.name}

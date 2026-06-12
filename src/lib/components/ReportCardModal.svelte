@@ -70,7 +70,7 @@
 				<div class="space-y-1.5">
 					{#each topCategories as cat (cat.categoryId)}
 						<div class="flex items-baseline text-sm">
-							<span class="text-charcoal">{cat.icon} {cat.name}</span>
+							<span class="text-charcoal">{cat.name}</span>
 							<span class="ledger-line"></span>
 							<span class="font-mono text-charcoal">{formatCurrency(cat.amount)}</span>
 						</div>

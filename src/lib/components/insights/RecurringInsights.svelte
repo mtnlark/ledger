@@ -55,7 +55,7 @@
 
 	// Create category helpers bound to current categories
 	let categoryHelpers = $derived(createCategoryHelpers(categories));
-	let getCategoryIcon = $derived(categoryHelpers.getIcon);
+	let getCategoryColor = $derived(categoryHelpers.getColor);
 	let getCategoryName = $derived(categoryHelpers.getName);
 
 	// Confirm dialog state for dismissing recurring bills
@@ -452,7 +452,7 @@
 								{#each monthlySubscriptions as sub}
 									{@const userAmount = sub.isShared ? sub.amount - sub.partnerShare : sub.amount}
 									<div class="flex items-center gap-3 py-2 px-3 bg-cream rounded-lg">
-										<span class="text-lg">{getCategoryIcon(sub.categoryId)}</span>
+										<span class="w-2 h-2 rounded-full shrink-0" style="background-color: {getCategoryColor(sub.categoryId)};" aria-hidden="true"></span>
 										<div class="flex-1 min-w-0">
 											<p class="text-sm font-medium text-charcoal truncate">{sub.merchant}</p>
 											<p class="text-xs text-charcoal-muted">{getCategoryName(sub.categoryId)}</p>
@@ -486,7 +486,7 @@
 									{@const userAmount = sub.isShared ? sub.amount - sub.partnerShare : sub.amount}
 									{@const monthlyEquiv = userAmount / 6}
 									<div class="flex items-center gap-3 py-2 px-3 bg-cream rounded-lg">
-										<span class="text-lg">{getCategoryIcon(sub.categoryId)}</span>
+										<span class="w-2 h-2 rounded-full shrink-0" style="background-color: {getCategoryColor(sub.categoryId)};" aria-hidden="true"></span>
 										<div class="flex-1 min-w-0">
 											<p class="text-sm font-medium text-charcoal truncate">{sub.merchant}</p>
 											<p class="text-xs text-charcoal-muted">{getCategoryName(sub.categoryId)}</p>
@@ -523,7 +523,7 @@
 									{@const userAmount = sub.isShared ? sub.amount - sub.partnerShare : sub.amount}
 									{@const monthlyEquiv = userAmount / 12}
 									<div class="flex items-center gap-3 py-2 px-3 bg-cream rounded-lg">
-										<span class="text-lg">{getCategoryIcon(sub.categoryId)}</span>
+										<span class="w-2 h-2 rounded-full shrink-0" style="background-color: {getCategoryColor(sub.categoryId)};" aria-hidden="true"></span>
 										<div class="flex-1 min-w-0">
 											<p class="text-sm font-medium text-charcoal truncate">{sub.merchant}</p>
 											<p class="text-xs text-charcoal-muted">{getCategoryName(sub.categoryId)}</p>
@@ -556,7 +556,7 @@
 					<div class="space-y-2">
 						{#each upcomingRenewals as renewal}
 							<div class="flex items-center gap-3 py-2 px-3 bg-primary-500/5 rounded-lg border border-primary-500/20">
-								<span class="text-lg">{getCategoryIcon(renewal.categoryId)}</span>
+								<span class="w-2 h-2 rounded-full shrink-0" style="background-color: {getCategoryColor(renewal.categoryId)};" aria-hidden="true"></span>
 								<div class="flex-1 min-w-0">
 									<p class="text-sm font-medium text-charcoal truncate">{renewal.merchant}</p>
 									<p class="text-xs text-charcoal-muted">
@@ -589,7 +589,7 @@
 						{#each possiblyInactiveSubscriptions as sub}
 							{@const userAmount = sub.isShared ? sub.amount - sub.partnerShare : sub.amount}
 							<div class="flex items-center gap-3 py-2 px-3 bg-warning-50 rounded-lg border border-warning-200">
-								<span class="text-lg">{getCategoryIcon(sub.categoryId)}</span>
+								<span class="w-2 h-2 rounded-full shrink-0" style="background-color: {getCategoryColor(sub.categoryId)};" aria-hidden="true"></span>
 								<div class="flex-1 min-w-0">
 									<p class="text-sm font-medium text-charcoal truncate">{sub.merchant}</p>
 									<p class="text-xs text-warning-600">
@@ -641,7 +641,7 @@
 								onclick={() => openEditModal(item)}
 								class="group flex items-center gap-3 py-2 px-3 bg-cream/50 rounded-lg w-full text-left hover:bg-cream cursor-pointer transition-colors"
 							>
-								<span class="text-lg">{getCategoryIcon(item.categoryId)}</span>
+								<span class="w-2 h-2 rounded-full shrink-0" style="background-color: {getCategoryColor(item.categoryId)};" aria-hidden="true"></span>
 								<div class="flex-1 min-w-0">
 									<p class="text-sm font-medium text-charcoal truncate">{item.merchant}</p>
 									<p class="text-xs text-charcoal-muted">

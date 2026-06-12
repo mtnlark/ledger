@@ -100,9 +100,6 @@
 				<p class="text-xs text-charcoal-muted mb-0.5">Top Category</p>
 				{#if review.topCategory}
 					<div class="flex items-center gap-1 min-w-0">
-						{#if review.topCategory.icon}
-							<span class="text-sm shrink-0">{review.topCategory.icon}</span>
-						{/if}
 						<span class="text-sm font-medium text-charcoal truncate">{review.topCategory.name}</span>
 					</div>
 					<span class="font-mono text-xs text-charcoal-muted">{formatCurrency(review.topCategory.amount)}</span>

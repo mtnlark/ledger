@@ -9,14 +9,12 @@ type BudgetAlertType = 'over' | 'at' | 'approaching';
 export interface BudgetAlert {
 	type: BudgetAlertType;
 	categoryName: string;
-	categoryIcon: string;
 	amount: number; // Over amount or remaining amount
 }
 
 export interface CategoryBudgetData {
 	categoryId: number;
 	categoryName: string;
-	categoryIcon: string;
 	budgetAmount: number;
 	spent: number;
 }
@@ -49,7 +47,6 @@ export function calculateBudgetAlerts(categoryBudgets: CategoryBudgetData[]): Bu
 			alerts.push({
 				type: 'over',
 				categoryName: data.categoryName,
-				categoryIcon: data.categoryIcon,
 				amount: Math.abs(roundedRemaining)
 			});
 		} else if (roundedRemaining === 0) {
@@ -57,7 +54,6 @@ export function calculateBudgetAlerts(categoryBudgets: CategoryBudgetData[]): Bu
 			alerts.push({
 				type: 'at',
 				categoryName: data.categoryName,
-				categoryIcon: data.categoryIcon,
 				amount: 0
 			});
 		} else if (roundedRemaining <= config.budget.approachingThreshold) {
@@ -65,7 +61,6 @@ export function calculateBudgetAlerts(categoryBudgets: CategoryBudgetData[]): Bu
 			alerts.push({
 				type: 'approaching',
 				categoryName: data.categoryName,
-				categoryIcon: data.categoryIcon,
 				amount: roundedRemaining
 			});
 		}

@@ -70,7 +70,6 @@
 				return {
 					categoryId: catId,
 					name: cat?.name ?? 'Unknown',
-					icon: cat?.icon ?? '',
 					current,
 					previous,
 					significance

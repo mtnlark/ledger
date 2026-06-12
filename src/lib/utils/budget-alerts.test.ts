@@ -14,7 +14,6 @@ describe('calculateBudgetAlerts', () => {
 	): CategoryBudgetData => ({
 		categoryId: Math.random(),
 		categoryName: name,
-		categoryIcon: '📦',
 		budgetAmount,
 		spent
 	});
@@ -234,17 +233,5 @@ describe('calculateBudgetAlerts', () => {
 			expect(alerts[0].amount).toBe(50);
 		});
 
-		it('should preserve category icon in alert', () => {
-			const data: CategoryBudgetData = {
-				categoryId: 1,
-				categoryName: 'Food',
-				categoryIcon: '🍕',
-				budgetAmount: 100,
-				spent: 120
-			};
-			const alerts = calculateBudgetAlerts([data]);
-
-			expect(alerts[0].categoryIcon).toBe('🍕');
-		});
 	});
 });

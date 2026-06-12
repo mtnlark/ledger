@@ -17,7 +17,7 @@ export interface WeekInReview {
 	/** Number of transactions last week */
 	txCount: number;
 	/** Top category by total spend */
-	topCategory: { id: number; name: string; icon?: string; amount: number } | null;
+	topCategory: { id: number; name: string; amount: number } | null;
 	/** Top merchant by frequency (min 1 visit) */
 	topMerchant: { name: string; count: number } | null;
 	/** Total user spending the week before last (for comparison) */
@@ -90,7 +90,7 @@ export function calculateWeekInReview(
 			maxCatSpend = amount;
 			const cat = categories.find((c) => c.id === catId);
 			if (cat) {
-				topCategory = { id: catId, name: cat.name, icon: cat.icon, amount: roundCurrency(amount) };
+				topCategory = { id: catId, name: cat.name, amount: roundCurrency(amount) };
 			}
 		}
 	}

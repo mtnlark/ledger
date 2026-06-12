@@ -181,12 +181,7 @@
 				<div class="space-y-3">
 					{#each byAccount as { account, total, count }}
 						<div class="flex items-center gap-3">
-							<div
-								class="w-8 h-8 rounded-lg flex items-center justify-center text-lg shrink-0"
-								style="background-color: {account.color}20"
-							>
-								{account.icon || '💰'}
-							</div>
+							<span class="w-2.5 h-2.5 rounded-full shrink-0" style="background-color: {account.color};" aria-hidden="true"></span>
 							<div class="flex-1 min-w-0">
 								<div class="flex items-baseline justify-between">
 									<span class="text-sm font-medium text-charcoal truncate">{account.name}</span>
@@ -271,12 +266,7 @@
 					{#each goalInfos as { account, status, progress }}
 						<div class="bg-surface-alt rounded-lg p-3 border border-theme">
 							<div class="flex items-center gap-3 mb-2">
-								<div
-									class="w-8 h-8 rounded-lg flex items-center justify-center text-lg shrink-0"
-									style="background-color: {account.color}20"
-								>
-									{account.icon || '💰'}
-								</div>
+								<span class="w-2.5 h-2.5 rounded-full shrink-0" style="background-color: {account.color};" aria-hidden="true"></span>
 								<div class="flex-1 min-w-0">
 									<span class="text-sm font-medium text-charcoal truncate block">{account.name}</span>
 									<span class="text-xs text-charcoal-muted">
