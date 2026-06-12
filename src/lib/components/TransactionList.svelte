@@ -154,7 +154,6 @@
 	// Create category helpers bound to current categories
 	let categoryHelpers = $derived(createCategoryHelpers(categories));
 	let getCategoryName = $derived(categoryHelpers.getName);
-	let getCategoryIcon = $derived(categoryHelpers.getIcon);
 	let getCategoryColor = $derived(categoryHelpers.getColor);
 
 	// Split-group expand/collapse state (collapsed by default), keyed by parent id
@@ -243,12 +242,6 @@
 			</div>
 		{/if}
 
-		<!-- Category Icon -->
-		<div
-			class="category-chip category-icon-box w-9 h-9 text-lg"
-			style="background-color: {getCategoryColor(transaction.categoryId)}1F;"
-		>{getCategoryIcon(transaction.categoryId)}</div>
-
 		<!-- Main Content -->
 		<div class="flex-1 min-w-0">
 			<div class="flex items-center gap-2">
@@ -281,7 +274,10 @@
 				{/if}
 			</div>
 			<div class="flex items-center gap-2 text-sm text-charcoal-muted mt-0.5">
-				<span>{getCategoryName(transaction.categoryId)}</span>
+				<span class="inline-flex items-center gap-1.5">
+					<span class="w-2 h-2 rounded-full flex-shrink-0" style="background-color: {getCategoryColor(transaction.categoryId)};" aria-hidden="true"></span>
+					{getCategoryName(transaction.categoryId)}
+				</span>
 				{#if transaction.isShared}
 					<span>·</span>
 					<span>{partnerName}: {formatCurrency(transaction.partnerShare)}</span>
@@ -413,11 +409,6 @@
 												class="transition-transform {isExpanded ? 'rotate-90' : ''}"
 											/>
 										</button>
-										<div
-											class="category-chip category-icon-box w-9 h-9 text-lg"
-											style="background-color: {getCategoryColor(row.dominantCategoryId)}1F;"
-										>{getCategoryIcon(row.dominantCategoryId)}</div>
-
 										<div class="flex-1 min-w-0">
 											<div class="flex items-center gap-2">
 												{#if onMerchantClick && !isSelectionMode}
@@ -493,12 +484,11 @@
 													class="group/child bg-surface-alt rounded-lg p-3 flex items-center gap-3"
 													role="listitem"
 												>
-													<div
-														class="category-chip category-icon-box w-8 h-8 text-base"
-														style="background-color: {getCategoryColor(child.categoryId)}1F;"
-													>{getCategoryIcon(child.categoryId)}</div>
 													<div class="flex-1 min-w-0">
-														<span class="font-medium text-charcoal text-sm truncate">{getCategoryName(child.categoryId)}</span>
+														<span class="inline-flex items-center gap-1.5 font-medium text-charcoal text-sm truncate">
+															<span class="w-2 h-2 rounded-full flex-shrink-0" style="background-color: {getCategoryColor(child.categoryId)};" aria-hidden="true"></span>
+															{getCategoryName(child.categoryId)}
+														</span>
 														{#if childNotes || childTags.length > 0}
 															<div class="mt-0.5 flex flex-wrap items-center gap-1">
 																{#if childNotes}
