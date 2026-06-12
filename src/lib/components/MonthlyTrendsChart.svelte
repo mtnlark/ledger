@@ -12,9 +12,11 @@
 
 	interface Props {
 		monthlyData: Map<string, number>;
+		/** Month key → income; when provided, income renders as a line over the spending bars. */
+		incomeByMonth?: Map<string, number>;
 	}
 
-	let { monthlyData }: Props = $props();
+	let { monthlyData, incomeByMonth }: Props = $props();
 
 	// Theme state that reacts to dark mode changes
 	let theme = $state<ChartTheme>(getChartTheme());
@@ -30,7 +32,8 @@
 	const COLORS = {
 		belowAverage: '#5B8C5A', // success-500 (sage)
 		normal: '#6B8CA6',      // warm slate blue (neutral)
-		aboveAverage: '#C44D4D' // warm red (over budget)
+		aboveAverage: '#C44D4D', // warm red (over budget)
+		income: '#C45D3A'       // primary-500 (terracotta)
 	};
 
 	// Convert map to sorted arrays for chart
@@ -52,12 +55,32 @@
 
 	let stdDev = $derived(computeStdDev(chartData.values));
 
-	// Chart configuration
+	// Income values aligned to the chart's months (null where no income recorded)
+	let incomeValues = $derived(
+		incomeByMonth ? chartData.months.map((m) => incomeByMonth.get(m) ?? null) : []
+	);
+	let hasIncome = $derived(incomeValues.some((v) => v !== null));
+
+	// Chart configuration (bar spending + optional income line overlay)
 	let chartConfig = $derived<ChartConfiguration<'bar'>>({
 		type: 'bar',
 		data: {
 			labels: chartData.labels,
 			datasets: [
+				...(hasIncome
+					? [{
+						type: 'line' as const,
+						label: 'Income',
+						data: incomeValues,
+						borderColor: COLORS.income,
+						backgroundColor: COLORS.income,
+						borderWidth: 2,
+						pointRadius: 2.5,
+						pointHoverRadius: 4,
+						spanGaps: true,
+						tension: 0.3
+					}]
+					: []),
 				{
 					label: 'Monthly Spending',
 					data: chartData.values,
@@ -68,7 +91,7 @@
 					borderSkipped: false
 				}
 			]
-		},
+		} as ChartConfiguration<'bar'>['data'],
 		options: {
 			responsive: true,
 			maintainAspectRatio: false,
@@ -104,7 +127,8 @@
 					callbacks: {
 						label: (context) => {
 							const value = context.parsed.y ?? 0;
-							return `$${value.toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
+							const prefix = hasIncome ? `${context.dataset.label}: ` : '';
+							return `${prefix}$${value.toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
 						}
 					}
 				}
@@ -179,6 +203,12 @@
 					<div class="w-3 h-3 rounded" style="background-color: {COLORS.aboveAverage};"></div>
 					<span>Above average</span>
 				</div>
+				{#if hasIncome}
+					<div class="flex items-center gap-1.5">
+						<div class="w-3 h-0.5 rounded" style="background-color: {COLORS.income};"></div>
+						<span>Income</span>
+					</div>
+				{/if}
 			</div>
 		{/if}
 	</div>

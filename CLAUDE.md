@@ -528,6 +528,8 @@ Sidebar state persists to localStorage (`ledger-sidebar-expanded`).
 - **Tab-based architecture** with 5 tabs: Overview, Spending, Savings, Recurring, Year in Review
   - Selected tab persisted to localStorage (`ledger-insights-tab`)
   - Month picker is global but hidden on the Recurring tab (current-state only); Year in Review follows the selected month's year (`computeYTDStats` clamps its window to Dec 31 for past years; `NetWorthYearCard` clamps the series to year end)
+  - Tab bar supports arrow-key navigation (roving tabindex); lazy tab loads show a skeleton pending state
+  - Monthly Trends chart renders an income line over the spending bars when `MonthlyBudget.income` is set (optional `incomeByMonth` prop; chart renders its own card — no wrapper)
 - **Overview tab**: Smart Takeaways (forward-looking current month / retrospective past month), Quick Stats Row (total spent, budget status, savings rate), "What Changed" variance card (`VarianceBreakdown`: per-category deltas vs 6-month baseline, day-clipped for partial months; statistically anomalous rows get an "Unusual" badge via `detectAnomalies` — the single home for change detection, replacing anomaly/shift takeaways; rows jump to that category's Deep Dive on the Spending tab), Wealth card (`NetWorthOverviewCard`: net worth total, monthly delta, runway = liquid balances ÷ 6-month avg spend; liquid = checking + savings + investment — brokerage counts per Lev (SGOV as cash-equivalent), retirement/other excluded)
   - Highlights: pace projection, savings wins, goal completions, velocity, needs/wants, top merchant (anomalies + category shifts live in What Changed, not here)
   - Pace projection and velocity exclude future-dated transactions via `filterUpToDate()`

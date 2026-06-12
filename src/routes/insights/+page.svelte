@@ -96,6 +96,11 @@
 	// Year in Review follows the selected month's year
 	let selectedYear = $derived(Number(selectedMonth.slice(0, 4)));
 
+	// Income per month (for the trends chart's income line)
+	let incomeByMonth = $derived(
+		new Map(allBudgets.filter((b) => b.income > 0).map((b) => [b.month, b.income]))
+	);
+
 	// Cross-links: merchant/tag report cards + deep-dive category jumps
 	let merchantReportFor = $state<string | null>(null);
 	let tagReportFor = $state<string | null>(null);
@@ -284,6 +289,13 @@
 			<!-- Tab Navigation -->
 			<InsightTabs {activeTab} onTabChange={handleTabChange} />
 
+			{#snippet tabLoading()}
+				<div class="bg-surface rounded-xl shadow-md shadow-[var(--color-shadow)] p-6">
+					<Skeleton class="h-6 mb-4" width="180px" rounded="sm" />
+					<Skeleton class="h-40 w-full" rounded="lg" />
+				</div>
+			{/snippet}
+
 			<!-- Tab Content -->
 			<div id="insights-tabpanel" role="tabpanel" class="space-y-6">
 				{#if activeTab === 'overview'}
@@ -325,7 +337,9 @@
 					/>
 
 					<!-- Lazy-loaded chart components for overview tab -->
-					{#await lazyOverviewCharts() then [TopCategoriesBarMod, MonthlyTrendsChartMod]}
+					{#await lazyOverviewCharts()}
+						{@render tabLoading()}
+					{:then [TopCategoriesBarMod, MonthlyTrendsChartMod]}
 						<div class="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
 						<!-- Where It Goes - Top Categories -->
 						{#if selectedMonthTransactions.length > 0}
@@ -343,23 +357,17 @@
 							</div>
 						{/if}
 
-						<!-- Monthly Trends -->
+						<!-- Monthly Trends (component renders its own card) -->
 						{#if monthlyTrends.size > 1}
-							<div class="bg-surface rounded-xl shadow-md shadow-[var(--color-shadow)] overflow-hidden">
-								<div class="px-6 py-4">
-									<h2 class="font-display text-xl font-medium text-charcoal">Monthly Trends</h2>
-									<p class="text-sm text-charcoal-muted mt-0.5">Spending over time</p>
-								</div>
-								<div class="px-6 pb-6">
-									<MonthlyTrendsChartMod.default monthlyData={monthlyTrends} />
-								</div>
-							</div>
+							<MonthlyTrendsChartMod.default monthlyData={monthlyTrends} {incomeByMonth} />
 						{/if}
 						</div>
 					{/await}
 
 				{:else if activeTab === 'spending'}
-					{#await lazySpending() then [SpendingThisMonthMod, CategoryDeepDivesMod, NeedsWantsInsightsMod]}
+					{#await lazySpending()}
+						{@render tabLoading()}
+					{:then [SpendingThisMonthMod, CategoryDeepDivesMod, NeedsWantsInsightsMod]}
 						<SpendingThisMonthMod.default
 							currentMonth={selectedMonth}
 							transactions={selectedMonthTransactions}
@@ -377,7 +385,9 @@
 					{/await}
 
 				{:else if activeTab === 'savings'}
-					{#await lazySavings() then SavingsInsightsMod}
+					{#await lazySavings()}
+						{@render tabLoading()}
+					{:then SavingsInsightsMod}
 						<SavingsInsightsMod.default
 							currentMonth={selectedMonth}
 							contributions={selectedMonthContributions}
@@ -389,7 +399,9 @@
 					{/await}
 
 				{:else if activeTab === 'recurring'}
-					{#await lazyRecurring() then RecurringInsightsMod}
+					{#await lazyRecurring()}
+						{@render tabLoading()}
+					{:then RecurringInsightsMod}
 						<RecurringInsightsMod.default
 							{recurring}
 							{categories}
@@ -406,7 +418,9 @@
 					{/await}
 
 				{:else if activeTab === 'year-in-review'}
-					{#await lazyYearInReview() then [YTDSummaryMod, TagsYearSummaryMod]}
+					{#await lazyYearInReview()}
+						{@render tabLoading()}
+					{:then [YTDSummaryMod, TagsYearSummaryMod]}
 						<YTDSummaryMod.default transactions={allTransactions} settings={appSettings} year={selectedYear} onMerchantClick={(m: string) => merchantReportFor = m} />
 						<NetWorthYearCard accounts={linkedAccounts} snapshots={balanceSnapshots} year={selectedYear} />
 						<TagsYearSummaryMod.default transactions={allTransactions} year={selectedYear} onTagClick={(t: string) => tagReportFor = t} />
