@@ -37,23 +37,27 @@ export function computeYTDStats(allTransactions: Transaction[], year?: number): 
 		totalSpent += getUserAmount(t);
 	}
 
-	// Days in year so far (use UTC to avoid DST-related partial-day errors)
+	// Stats window: Jan 1 of the target year through today, clamped to Dec 31
+	// for completed past years (use UTC to avoid DST-related partial-day errors)
 	const now = new Date();
-	const todayKey = format(now, 'yyyy-MM-dd');
+	const endDate = currentYear < now.getFullYear() ? new Date(currentYear, 11, 31) : now;
+	const endKey = format(endDate, 'yyyy-MM-dd');
 
-	// Spend days (only count days up to today, excluding future-dated transactions)
+	// Spend days (only count days inside the window, excluding future-dated transactions)
 	const spendDaySet = new Set<string>();
 	for (const t of ytdTransactions) {
 		const dateKey = format(new Date(t.date), 'yyyy-MM-dd');
-		if (dateKey <= todayKey) {
+		if (dateKey <= endKey) {
 			spendDaySet.add(dateKey);
 		}
 	}
 	const spendDays = spendDaySet.size;
 	const startUTC = Date.UTC(currentYear, 0, 1);
-	const todayUTC = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
-	const daysInYearSoFar =
-		Math.floor((todayUTC - startUTC) / (1000 * 60 * 60 * 24)) + 1;
+	const endUTC = Date.UTC(endDate.getFullYear(), endDate.getMonth(), endDate.getDate());
+	const daysInYearSoFar = Math.max(
+		0,
+		Math.floor((endUTC - startUTC) / (1000 * 60 * 60 * 24)) + 1
+	);
 
 	const noSpendDays = daysInYearSoFar - spendDays;
 	const dailyAvg = daysInYearSoFar > 0 ? totalSpent / daysInYearSoFar : 0;

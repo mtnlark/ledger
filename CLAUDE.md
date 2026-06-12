@@ -527,7 +527,7 @@ Sidebar state persists to localStorage (`ledger-sidebar-expanded`).
 ### Insights
 - **Tab-based architecture** with 5 tabs: Overview, Spending, Savings, Recurring, Year in Review
   - Selected tab persisted to localStorage (`ledger-insights-tab`)
-  - Month picker remains global, applies to all tabs
+  - Month picker is global but hidden on the Recurring tab (current-state only); Year in Review follows the selected month's year (`computeYTDStats` clamps its window to Dec 31 for past years; `NetWorthYearCard` clamps the series to year end)
 - **Overview tab**: Smart Takeaways (forward-looking current month / retrospective past month), Quick Stats Row (total spent, budget status, savings rate), "Versus a Typical Month" variance card, Wealth card (`NetWorthOverviewCard`: net worth total, monthly delta, runway = liquid balances ÷ 6-month avg spend; liquid = checking + savings + investment — brokerage counts per Lev (SGOV as cash-equivalent), retirement/other excluded)
   - Highlights: pace projection, anomalies (with dollar amounts), category shifts
   - Pace projection and velocity exclude future-dated transactions via `filterUpToDate()`
@@ -538,12 +538,12 @@ Sidebar state persists to localStorage (`ledger-sidebar-expanded`).
   - Budget context in spending group: over/under count for budgeted categories
   - Needs/wants only shown when skewed (>75% or <25%), with descriptive prefix
   - Positive-only savings insights (never flags low rates due to paycheck timing)
-- **Spending tab**: Total + velocity, top 5 merchants, shared vs personal breakdown, category treemap, category deep dives with trend charts, month-over-month comparison
+- **Spending tab**: Total + velocity, top 5 merchants, shared vs personal breakdown, category treemap, category deep dives with trend charts, month-over-month comparison, needs vs wants (with trend chart)
   - Variability classification (Steady/Moderate/Variable) uses only completed months
     — current calendar month excluded to prevent partial-month distortion of weighted stats
 - **Savings tab**: Contribution breakdown by account/source, goal progress, savings rate trend chart
 - **Recurring tab**: Active subscriptions, upcoming annual renewals, possibly inactive alerts, detected recurring bills
-- **Year in Review tab**: Calendar heatmap, best/worst spending months, needs vs wants with trend chart, tag spending summary, shared expense annual summary, YTD stats, Net Worth year card (`NetWorthYearCard`: delta since start of year or first record, now/then, $10k milestone crossings)
+- **Year in Review tab**: Calendar heatmap, best/worst spending months, tag spending summary, shared expense annual summary, YTD stats, Net Worth year card (`NetWorthYearCard`: delta since start of year or first record, now/then, $10k milestone crossings)
 
 ### Shared Expenses
 - Outstanding balance with partner

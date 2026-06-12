@@ -7,17 +7,17 @@
 
 	interface Props {
 		transactions: Transaction[];
+		/** Year to summarize (defaults to the current calendar year). */
+		year?: number;
 	}
 
-	let { transactions }: Props = $props();
-
-	let currentYear = new Date().getFullYear();
+	let { transactions, year = new Date().getFullYear() }: Props = $props();
 
 	// Tag spending summary for the year
 	let tagSummary = $derived.by(() => {
 		const tagTotals = new Map<string, { total: number; count: number }>();
 		const yearTransactions = transactions.filter(
-			(t) => new Date(t.date).getFullYear() === currentYear
+			(t) => new Date(t.date).getFullYear() === year
 		);
 
 		for (const t of yearTransactions) {
@@ -41,7 +41,7 @@
 
 {#if tagSummary.length > 0}
 	<InsightGroup
-		title="Tags This Year"
+		title="Tags in {year}"
 		description="{tagSummary.length} tag{tagSummary.length !== 1 ? 's' : ''} used"
 		defaultExpanded={false}
 	>

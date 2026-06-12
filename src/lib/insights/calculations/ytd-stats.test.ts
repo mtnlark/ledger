@@ -188,6 +188,28 @@ describe('computeYTDStats', () => {
 		expect(result.smallestMonth).toBeNull();
 	});
 
+	it('uses the full year window for a completed past year', () => {
+		// System time is March 20, 2025; computing stats for 2024 (a leap year)
+		const txs = [makeTx({ date: new Date(2024, 5, 15, 12), amount: 73.2 })];
+
+		const result = computeYTDStats(txs, 2024);
+		expect(result.daysInYearSoFar).toBe(366);
+		expect(result.spendDays).toBe(1);
+		expect(result.noSpendDays).toBe(365);
+		expect(result.dailyAvg).toBeCloseTo(73.2 / 366, 5);
+	});
+
+	it('does not exclude December from biggest/smallest for a past year', () => {
+		const txs = [
+			makeTx({ date: new Date(2024, 10, 10, 12), amount: 100 }), // Nov
+			makeTx({ date: new Date(2024, 11, 10, 12), amount: 500 }) // Dec
+		];
+
+		const result = computeYTDStats(txs, 2024);
+		expect(result.biggestMonth?.label).toBe('December');
+		expect(result.smallestMonth?.label).toBe('November');
+	});
+
 	it('excludes future-dated transactions from spend days count', () => {
 		// System time is March 20, 2025
 		// Transaction on March 15 (past) and March 25 (future)

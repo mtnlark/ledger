@@ -45,14 +45,14 @@
 	]);
 	const lazySpending = () => Promise.all([
 		import('$lib/components/insights/SpendingThisMonth.svelte'),
-		import('$lib/components/insights/CategoryDeepDives.svelte')
+		import('$lib/components/insights/CategoryDeepDives.svelte'),
+		import('$lib/components/insights/NeedsWantsInsights.svelte')
 	]);
 	const lazySavings = () => import('$lib/components/insights/SavingsInsights.svelte');
 	const lazyRecurring = () => import('$lib/components/insights/RecurringInsights.svelte');
 	const lazyYearInReview = () => Promise.all([
 		import('$lib/components/insights/YTDSummary.svelte'),
-		import('$lib/components/insights/TagsYearSummary.svelte'),
-		import('$lib/components/insights/NeedsWantsInsights.svelte')
+		import('$lib/components/insights/TagsYearSummary.svelte')
 	]);
 
 	// State
@@ -88,6 +88,9 @@
 		}
 		return map;
 	});
+
+	// Year in Review follows the selected month's year
+	let selectedYear = $derived(Number(selectedMonth.slice(0, 4)));
 
 	// Tab change handler
 	function handleTabChange(tab: string) {
@@ -213,7 +216,7 @@
 		<!-- Title + month picker -->
 		<div class="flex items-center justify-between">
 			<h1 class="font-display text-2xl font-medium text-charcoal">Insights</h1>
-			{#if !isLoading}
+			{#if !isLoading && activeTab !== 'recurring'}
 				<MonthPicker
 					currentMonth={selectedMonth}
 					{availableMonths}
@@ -315,7 +318,7 @@
 					{/await}
 
 				{:else if activeTab === 'spending'}
-					{#await lazySpending() then [SpendingThisMonthMod, CategoryDeepDivesMod]}
+					{#await lazySpending() then [SpendingThisMonthMod, CategoryDeepDivesMod, NeedsWantsInsightsMod]}
 						<SpendingThisMonthMod.default
 							currentMonth={selectedMonth}
 							transactions={selectedMonthTransactions}
@@ -324,6 +327,11 @@
 							{monthlyTrends}
 						/>
 						<CategoryDeepDivesMod.default currentMonth={selectedMonth} transactions={selectedMonthTransactions} {allTransactions} {categories} {availableMonths} />
+						<NeedsWantsInsightsMod.default
+							transactions={selectedMonthTransactions}
+							{categories}
+							{allTransactions}
+						/>
 					{/await}
 
 				{:else if activeTab === 'savings'}
@@ -356,15 +364,10 @@
 					{/await}
 
 				{:else if activeTab === 'year-in-review'}
-					{#await lazyYearInReview() then [YTDSummaryMod, TagsYearSummaryMod, NeedsWantsInsightsMod]}
-						<YTDSummaryMod.default transactions={allTransactions} settings={appSettings} />
-						<NetWorthYearCard accounts={linkedAccounts} snapshots={balanceSnapshots} />
-						<TagsYearSummaryMod.default transactions={allTransactions} />
-						<NeedsWantsInsightsMod.default
-							transactions={selectedMonthTransactions}
-							{categories}
-							{allTransactions}
-						/>
+					{#await lazyYearInReview() then [YTDSummaryMod, TagsYearSummaryMod]}
+						<YTDSummaryMod.default transactions={allTransactions} settings={appSettings} year={selectedYear} />
+						<NetWorthYearCard accounts={linkedAccounts} snapshots={balanceSnapshots} year={selectedYear} />
+						<TagsYearSummaryMod.default transactions={allTransactions} year={selectedYear} />
 					{/await}
 				{/if}
 			</div>

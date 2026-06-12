@@ -8,20 +8,24 @@
 	interface Props {
 		accounts: LinkedAccount[];
 		snapshots: BalanceSnapshot[];
+		/** Year to summarize (defaults to the current calendar year). */
+		year?: number;
 	}
 
-	let { accounts, snapshots }: Props = $props();
+	let { accounts, snapshots, year = new Date().getFullYear() }: Props = $props();
 
 	let series = $derived(buildNetWorthSeries(snapshots, accounts));
-	let year = new Date().getFullYear();
 
 	let yearStats = $derived.by(() => {
-		if (series.length < 2) return null;
-		const latest = series[series.length - 1];
+		// Clamp to points up to the end of the selected year so past years
+		// show that year's closing position, not today's
+		const inWindow = series.filter((p) => p.date <= `${year}-12-31`);
+		if (inWindow.length < 2) return null;
+		const latest = inWindow[inWindow.length - 1];
 		// Baseline: last point of the prior year, or the first point on record
 		// (then the delta is labeled "since <month>")
-		let baseline: NetWorthPoint = series[0];
-		for (const point of series) {
+		let baseline: NetWorthPoint = inWindow[0];
+		for (const point of inWindow) {
 			if (point.date <= `${year - 1}-12-31`) baseline = point;
 			else break;
 		}
@@ -29,7 +33,7 @@
 		if (latest.date === baseline.date) return null;
 		const delta = roundCurrency(latest.total - baseline.total);
 		const percent = baseline.total > 0 ? calculatePercent(delta, baseline.total, true) : null;
-		const milestones = netWorthMilestones(series).filter((m) => m.date >= `${year}-01-01`);
+		const milestones = netWorthMilestones(inWindow).filter((m) => m.date >= `${year}-01-01`);
 		return { latest, baseline, delta, percent, sinceStartOfYear, milestones };
 	});
 </script>

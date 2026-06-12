@@ -298,7 +298,7 @@ export class InsightsEngine {
 
 	/** Compute year-to-date statistics. */
 	getYTDStats(allTransactions: Transaction[], year?: number): YTDStatsResult {
-		return this._computeYTDStats(this.version, 'ytd', allTransactions, year);
+		return this._computeYTDStats(this.version, `ytd-${year ?? 'current'}`, allTransactions, year);
 	}
 }
 

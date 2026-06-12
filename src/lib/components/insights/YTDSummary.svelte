@@ -8,15 +8,16 @@
 	interface Props {
 		transactions: Transaction[];
 		settings?: Settings | null;
+		/** Year to summarize (defaults to the current calendar year). */
+		year?: number;
 	}
 
-	let { transactions, settings = null }: Props = $props();
+	let { transactions, settings = null, year = new Date().getFullYear() }: Props = $props();
 
 	const engine = getInsightsEngine();
-	let currentYear = new Date().getFullYear();
 
 	// Compute all YTD stats via the engine (memoized)
-	let ytdStats = $derived(engine.getYTDStats(transactions, currentYear));
+	let ytdStats = $derived(engine.getYTDStats(transactions, year));
 
 	// Destructure for template usage
 	let totalSpent = $derived(ytdStats.totalSpent);
@@ -31,14 +32,14 @@
 	// Goals completed this year
 	let goalsCompletedThisYear = $derived.by(() => {
 		if (!settings?.completedGoals) return 0;
-		const yearPrefix = String(currentYear);
+		const yearPrefix = String(year);
 		return settings.completedGoals.filter((g) => g.completedDate.startsWith(yearPrefix)).length;
 	});
 
 	// Shared expense annual summary
 	let sharedSummary = $derived.by(() => {
 		const yearTransactions = transactions.filter(
-			(t) => new Date(t.date).getFullYear() === currentYear && t.isShared
+			(t) => new Date(t.date).getFullYear() === year && t.isShared
 		);
 
 		if (yearTransactions.length === 0) return null;
@@ -68,14 +69,14 @@
 <div class="bg-surface rounded-xl shadow-md shadow-[var(--color-shadow)] overflow-hidden">
 	<div class="px-6 py-4">
 		<h2 class="font-display text-xl font-medium text-charcoal">Year in Review</h2>
-		<p class="text-sm text-charcoal-muted mt-0.5">{currentYear}</p>
+		<p class="text-sm text-charcoal-muted mt-0.5">{year}</p>
 	</div>
 	<div class="px-6 pb-6 space-y-6">
 		<!-- Quick stats preview -->
 		<div class="flex items-center justify-between">
 			<div>
 				<p class="font-mono text-2xl font-medium text-charcoal">{formatCurrencyWhole(totalSpent)}</p>
-				<p class="text-sm text-charcoal-muted">Total spent in {currentYear}</p>
+				<p class="text-sm text-charcoal-muted">Total spent in {year}</p>
 			</div>
 			<div class="text-right">
 				<p class="font-mono text-lg font-medium text-success-600">{noSpendDays}</p>
@@ -86,7 +87,7 @@
 		<!-- Full calendar heatmap -->
 		<div>
 			<h3 class="text-sm font-semibold text-charcoal-soft mb-3">Spending Calendar</h3>
-			<CalendarHeatmap {dailySpending} year={currentYear} />
+			<CalendarHeatmap {dailySpending} year={year} />
 		</div>
 
 		<!-- Quick Stats Row -->
@@ -131,7 +132,7 @@
 				<span class="text-2xl">🎯</span>
 				<div>
 					<p class="font-semibold text-success-700">{goalsCompletedThisYear} Savings Goal{goalsCompletedThisYear !== 1 ? 's' : ''} Completed</p>
-					<p class="text-sm text-success-600">This year</p>
+					<p class="text-sm text-success-600">In {year}</p>
 				</div>
 			</div>
 		{/if}
@@ -139,7 +140,7 @@
 		<!-- Shared Expense Annual Summary -->
 		{#if sharedSummary}
 			<div class="bg-cream-dark rounded-lg p-4 border border-dashed border-theme">
-				<h3 class="text-sm font-semibold text-charcoal-soft mb-3">Shared Expenses This Year</h3>
+				<h3 class="text-sm font-semibold text-charcoal-soft mb-3">Shared Expenses in {year}</h3>
 				<div class="grid grid-cols-3 gap-4">
 					<div class="text-center">
 						<p class="font-mono text-lg font-medium text-charcoal">{formatCurrencyWhole(sharedSummary.totalShared)}</p>
