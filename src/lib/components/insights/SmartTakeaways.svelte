@@ -88,17 +88,8 @@
 		return months;
 	});
 
-	// Calculate category stats (mean + stdDev) for anomaly and shift detection
-	let categoryStats = $derived.by(() => {
-		if (recentMonths.length === 0) return new Map<number, { mean: number; stdDev: number; sampleCount: number }>();
-		return engine.getCategoryStats(getTransactionsForMonth, recentMonths, selectedMonth);
-	});
-
-	// Detect anomalies (categories significantly above average using z-scores)
-	let anomalies = $derived.by(() => {
-		const currentSpending = engine.getSpendingByCategory(currentMonthTransactions, selectedMonth);
-		return engine.getAnomalies(currentSpending, categoryStats, categories, config.insights.anomaly, selectedMonth);
-	});
+	// Anomaly and category-shift detection live in the "What Changed" card
+	// (VarianceBreakdown) on the Overview tab — not duplicated here.
 
 	// Transactions up to today (excludes future-dated recurring entries) for pace calculations
 	let pastTransactions = $derived(isCurrentMonth ? filterUpToDate(currentMonthTransactions) : []);
@@ -123,24 +114,6 @@
 
 	// Get previous month for comparison
 	let previousMonthKey = $derived(navigateMonth(selectedMonth, -1));
-
-	// Calculate top category shift (biggest statistically significant change)
-	let topShift = $derived.by(() => {
-		if (!isCurrentMonth) return null;
-		const prevTransactions = getTransactionsForMonth(previousMonthKey);
-		const today = new Date();
-		const currentDay = today.getDate();
-		return engine.getTopCategoryShift(
-			currentMonthTransactions,
-			prevTransactions,
-			categories,
-			currentDay,
-			anomalies,
-			config.insights.shift,
-			selectedMonth,
-			categoryStats
-		);
-	});
 
 	// Fallback: Needs vs wants ratio (current month only)
 	let needsVsWants = $derived.by(() => {
@@ -400,12 +373,6 @@
 			items.push({ text: `${name} ${isIncrease ? 'up' : 'down'} ${formatCurrency(diff)} from prior month` });
 		}
 
-		// Anomalies (with dollar amounts)
-		for (const anomaly of anomalies) {
-			const percent = Math.round((anomaly.ratio - 1) * 100);
-			items.push({ text: `${anomaly.name} was ${percent}% higher than usual (${formatCurrency(Math.round(anomaly.current))} vs ${formatCurrency(Math.round(anomaly.avg))} avg)` });
-		}
-
 		// Budget context
 		if (budgetSummary) {
 			const { overCount, budgetedCount, overallDiff } = budgetSummary;
@@ -484,7 +451,7 @@
 
 	// Build takeaways list (for current month / Highlights mode only)
 	interface Takeaway {
-		type: 'anomaly' | 'pace' | 'shift' | 'needsWants' | 'monthComparison' | 'topMerchant' | 'savingsHighest' | 'savingsAboveAvg' | 'goalCompleted';
+		type: 'pace' | 'needsWants' | 'monthComparison' | 'topMerchant' | 'savingsHighest' | 'savingsAboveAvg' | 'goalCompleted';
 		icon: typeof AlertTriangle;
 		iconColor: string;
 		text: string;
@@ -506,17 +473,6 @@
 			});
 		}
 
-		// Add anomalies (high priority, with dollar amounts)
-		for (const anomaly of anomalies) {
-			const percent = Math.round((anomaly.ratio - 1) * 100);
-			items.push({
-				type: 'anomaly',
-				icon: AlertTriangle,
-				iconColor: 'text-warning-500',
-				text: `${anomaly.name} is ${percent}% higher than usual (${formatCurrency(Math.round(anomaly.current))} vs ${formatCurrency(Math.round(anomaly.avg))} avg)`
-			});
-		}
-
 		// Add pace projection
 		if (paceProjection) {
 			const rangeContext = monthlyTotalStats
@@ -529,18 +485,6 @@
 				text: paceProjection.isOverBudget
 					? `On pace to spend ${formatCurrency(paceProjection.projected)} (${paceProjection.percentOfBudget}% of budget)`
 					: `On pace to spend ${formatCurrency(paceProjection.projected)} this month${rangeContext}`
-			});
-		}
-
-		// Add top category shift
-		if (topShift) {
-			items.push({
-				type: 'shift',
-				icon: topShift.isIncrease ? TrendingUp : TrendingDown,
-				iconColor: topShift.isIncrease ? 'text-warning-500' : 'text-success-500',
-				text: topShift.isIncrease
-					? `${topShift.name} up ${formatCurrency(Math.abs(topShift.diff))} from last month`
-					: `${topShift.name} down ${formatCurrency(Math.abs(topShift.diff))} from last month`
 			});
 		}
 

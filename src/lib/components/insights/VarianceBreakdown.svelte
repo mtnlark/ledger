@@ -2,6 +2,9 @@
 	import type { Transaction, Category } from '$lib/db';
 	import { getMonthKey } from '$lib/db';
 	import { roundCurrency } from '$lib/utils/currency';
+	import { computeStdDev } from '$lib/insights/calculations/stats';
+	import { detectAnomalies } from '$lib/insights/calculations/anomalies';
+	import { config } from '$lib/config';
 
 	export interface VarianceItem {
 		categoryId: number;
@@ -10,6 +13,8 @@
 		current: number;
 		baseline: number;
 		delta: number;
+		/** Statistically anomalous vs the baseline months (z-score based). */
+		isUnusual: boolean;
 	}
 
 	export interface VarianceResult {
@@ -69,6 +74,8 @@
 
 		const currentByCategory = new Map<number, number>();
 		const baselineByCategory = new Map<number, number>();
+		// Per-category, per-month baseline totals (for stdDev / anomaly flagging)
+		const baselineMonthly = new Map<number, Map<string, number>>();
 		const monthsWithData = new Set<string>();
 
 		for (const t of transactions) {
@@ -86,12 +93,35 @@
 			} else {
 				monthsWithData.add(key);
 				baselineByCategory.set(t.categoryId, (baselineByCategory.get(t.categoryId) || 0) + share);
+				let perMonth = baselineMonthly.get(t.categoryId);
+				if (!perMonth) {
+					perMonth = new Map();
+					baselineMonthly.set(t.categoryId, perMonth);
+				}
+				perMonth.set(key, (perMonth.get(key) || 0) + share);
 			}
 		}
 
 		// Need a meaningful baseline: at least two prior months with activity
 		const baselineMonthCount = monthsWithData.size;
 		if (baselineMonthCount < 2) return null;
+
+		// Reuse the production anomaly detector (adaptive z-score thresholds) to
+		// flag categories whose current spending is statistically unusual.
+		// Baseline values are zero-filled across active months so a category that
+		// only appears occasionally still gets a meaningful spread.
+		const categoryStats = new Map<number, { mean: number; stdDev: number; sampleCount: number }>();
+		for (const [id, perMonth] of baselineMonthly) {
+			const values = [...monthsWithData].map((m) => perMonth.get(m) || 0);
+			const mean = values.reduce((s, v) => s + v, 0) / baselineMonthCount;
+			categoryStats.set(id, { mean, stdDev: computeStdDev(values), sampleCount: baselineMonthCount });
+		}
+		const unusualIds = new Set(
+			detectAnomalies(currentByCategory, categoryStats, categories, {
+				...config.insights.anomaly,
+				maxToShow: Number.MAX_SAFE_INTEGER
+			}).map((a) => a.catId)
+		);
 
 		const categoryIds = new Set([...currentByCategory.keys(), ...baselineByCategory.keys()]);
 		const items: VarianceItem[] = [];
@@ -110,7 +140,8 @@
 				icon: cat?.icon ?? '📁',
 				current,
 				baseline,
-				delta
+				delta,
+				isUnusual: delta > 0 && unusualIds.has(id)
 			});
 		}
 
@@ -149,7 +180,7 @@
 {#if result && result.items.length > 0}
 	<div class="bg-surface rounded-xl shadow-md shadow-[var(--color-shadow)] overflow-hidden">
 		<div class="px-6 py-4">
-			<h2 class="font-display text-xl font-medium text-charcoal">Versus a Typical Month</h2>
+			<h2 class="font-display text-xl font-medium text-charcoal">What Changed</h2>
 			<p class="text-sm text-charcoal-muted mt-0.5">
 				<span class="font-mono font-medium {result.totalDelta > 0 ? 'text-danger-600' : 'text-success-600'}">{signed(result.totalDelta)}</span>
 				vs your {result.baselineMonthCount}-month average{result.throughDay !== null ? ` (through day ${result.throughDay})` : ''}
@@ -160,7 +191,12 @@
 				{@const pct = (Math.abs(item.delta) / maxAbsDelta) * 50}
 				<div class="flex items-center gap-3">
 					<span class="w-6 text-center shrink-0">{item.icon}</span>
-					<span class="text-sm text-charcoal truncate min-w-0 flex-1">{item.name}</span>
+					<span class="text-sm text-charcoal truncate min-w-0 flex-1">
+						{item.name}
+						{#if item.isUnusual}
+							<span class="badge bg-warning-500/10 text-warning-700 ml-1.5" title="Statistically unusual vs your recent months">Unusual</span>
+						{/if}
+					</span>
 					<!-- Diverging bar: spending above baseline grows right, below grows left -->
 					<div class="relative h-1.5 w-28 shrink-0 rounded-full bg-surface-alt overflow-hidden" aria-hidden="true">
 						<span class="absolute inset-y-0 left-1/2 w-px bg-charcoal-muted/30"></span>

@@ -103,6 +103,42 @@ describe('computeCategoryVariance', () => {
 		expect(result!.totalDelta).toBe(155);
 	});
 
+	it('flags statistically unusual categories using the anomaly detector', () => {
+		const txns = [
+			// Groceries baseline: 90/110 alternating → mean 100, stdDev 10
+			tx('2026-02-10', 1, 90), tx('2026-03-10', 1, 110),
+			tx('2026-04-10', 1, 90), tx('2026-05-10', 1, 110),
+			// Restaurants baseline: identical spread
+			tx('2026-02-10', 2, 90), tx('2026-03-10', 2, 110),
+			tx('2026-04-10', 2, 90), tx('2026-05-10', 2, 110),
+			// June: Groceries z-score 10 (unusual), Restaurants z-score 2
+			// (below the adaptive threshold of 2.0 × (1 + 1/4) = 2.5)
+			tx('2026-06-05', 1, 200),
+			tx('2026-06-05', 2, 120)
+		];
+		const result = computeCategoryVariance(txns, categories, '2026-06', {
+			today: new Date('2026-08-15T12:00:00')
+		});
+		const groceries = result!.items.find((i) => i.categoryId === 1)!;
+		const restaurants = result!.items.find((i) => i.categoryId === 2)!;
+		expect(groceries.isUnusual).toBe(true);
+		expect(restaurants.isUnusual).toBe(false);
+	});
+
+	it('never flags categories that dropped below their baseline', () => {
+		const txns = [
+			tx('2026-02-10', 1, 90), tx('2026-03-10', 1, 110),
+			tx('2026-04-10', 1, 90), tx('2026-05-10', 1, 110),
+			// June: Groceries collapses to 10 → big negative delta, not "unusual"
+			tx('2026-06-05', 1, 10)
+		];
+		const result = computeCategoryVariance(txns, categories, '2026-06', {
+			today: new Date('2026-08-15T12:00:00')
+		});
+		expect(result!.items[0].delta).toBeLessThan(0);
+		expect(result!.items[0].isUnusual).toBe(false);
+	});
+
 	it('skips soft-deleted transactions and split parents', () => {
 		const txns = [
 			tx('2026-04-10', 1, 100), tx('2026-05-10', 1, 100),
