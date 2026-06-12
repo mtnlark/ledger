@@ -4,11 +4,20 @@
 //! never in app data, data.json, or backups (which can copy to iCloud). It is
 //! claimed/stored/read entirely on the Rust side; JavaScript never sees it.
 
+use std::sync::Mutex;
+
 use base64::Engine;
 use serde::{Deserialize, Serialize};
 
 const KEYRING_SERVICE: &str = "app.ledger.desktop.simplefin";
 const KEYRING_USER: &str = "access_url";
+
+/// Session cache: the Keychain is consulted at most once per app run, no
+/// matter the outcome. Locally built (ad-hoc signed) binaries change identity
+/// every deploy, so reading an item created by an earlier build triggers a
+/// user-authorization prompt — and repeated reads once produced a prompt
+/// storm that froze the app. Even a denied read is cached until relaunch.
+static ACCESS_URL_CACHE: Mutex<Option<Result<Option<String>, String>>> = Mutex::new(None);
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct SimplefinOrg {
@@ -43,12 +52,25 @@ fn keyring_entry() -> Result<keyring::Entry, String> {
   keyring::Entry::new(KEYRING_SERVICE, KEYRING_USER).map_err(|e| e.to_string())
 }
 
-fn get_access_url() -> Result<Option<String>, String> {
+fn read_access_url_uncached() -> Result<Option<String>, String> {
   match keyring_entry()?.get_password() {
     Ok(url) => Ok(Some(url)),
     Err(keyring::Error::NoEntry) => Ok(None),
     Err(e) => Err(e.to_string()),
   }
+}
+
+fn get_access_url() -> Result<Option<String>, String> {
+  if let Some(cached) = ACCESS_URL_CACHE.lock().unwrap().as_ref() {
+    return cached.clone();
+  }
+  let result = read_access_url_uncached();
+  *ACCESS_URL_CACHE.lock().unwrap() = Some(result.clone());
+  result
+}
+
+fn set_cached_access_url(value: Option<String>) {
+  *ACCESS_URL_CACHE.lock().unwrap() = Some(Ok(value));
 }
 
 /// reqwest does not translate URL userinfo (user:pass@host) into an
@@ -122,28 +144,48 @@ pub async fn simplefin_link(setup_token: String) -> Result<AccountsResponse, Str
   };
 
   let accounts = fetch_accounts_internal(&access_url).await?;
-  keyring_entry()?
-    .set_password(&access_url)
-    .map_err(|e| format!("Keychain error: {e}"))?;
+  let url_to_store = access_url.clone();
+  tauri::async_runtime::spawn_blocking(move || {
+    keyring_entry()?
+      .set_password(&url_to_store)
+      .map_err(|e| format!("Keychain error: {e}"))
+  })
+  .await
+  .map_err(|e| e.to_string())??;
+  set_cached_access_url(Some(access_url));
   Ok(accounts)
 }
 
 #[tauri::command]
-pub fn simplefin_is_linked() -> Result<bool, String> {
-  Ok(get_access_url()?.is_some())
+pub async fn simplefin_is_linked() -> Result<bool, String> {
+  let url = tauri::async_runtime::spawn_blocking(get_access_url)
+    .await
+    .map_err(|e| e.to_string())??;
+  Ok(url.is_some())
 }
 
 #[tauri::command]
-pub fn simplefin_unlink() -> Result<(), String> {
-  match keyring_entry()?.delete_credential() {
-    Ok(()) | Err(keyring::Error::NoEntry) => Ok(()),
-    Err(e) => Err(e.to_string()),
-  }
+pub async fn simplefin_unlink() -> Result<(), String> {
+  tauri::async_runtime::spawn_blocking(|| {
+    let result = match keyring_entry()?.delete_credential() {
+      Ok(()) | Err(keyring::Error::NoEntry) => Ok(()),
+      Err(e) => Err(e.to_string()),
+    };
+    if result.is_ok() {
+      set_cached_access_url(None);
+    }
+    result
+  })
+  .await
+  .map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
 pub async fn simplefin_fetch_accounts() -> Result<AccountsResponse, String> {
-  let url = get_access_url()?.ok_or_else(|| "SimpleFIN is not linked".to_string())?;
+  let url = tauri::async_runtime::spawn_blocking(get_access_url)
+    .await
+    .map_err(|e| e.to_string())??
+    .ok_or_else(|| "SimpleFIN is not linked".to_string())?;
   fetch_accounts_internal(&url).await
 }
 
