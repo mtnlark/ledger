@@ -1,3 +1,5 @@
+mod simplefin;
+
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use tauri::Manager;
@@ -71,6 +73,12 @@ pub fn run() {
   let app = tauri::Builder::default()
     .plugin(tauri_plugin_fs::init())
     .plugin(tauri_plugin_notification::init())
+    .invoke_handler(tauri::generate_handler![
+      simplefin::simplefin_link,
+      simplefin::simplefin_is_linked,
+      simplefin::simplefin_unlink,
+      simplefin::simplefin_fetch_accounts
+    ])
     .setup(|app| {
       if cfg!(debug_assertions) {
         app.handle().plugin(
