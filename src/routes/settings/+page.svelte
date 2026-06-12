@@ -373,12 +373,14 @@
 		try {
 			const choice = sfMapping[mapped.simplefinId] ?? 'new';
 			if (choice === 'new') {
+				// Negative upstream balance ⇒ almost certainly a credit card / debt
+				const isLiability = mapped.balance < 0;
 				await addLinkedAccount({
 					name: mapped.name,
 					institution: mapped.institution,
-					accountClass: 'asset',
-					accountType: 'other',
-					initialBalance: mapped.balance,
+					accountClass: isLiability ? 'liability' : 'asset',
+					accountType: isLiability ? 'credit' : 'other',
+					initialBalance: Math.abs(mapped.balance),
 					source: 'simplefin',
 					simplefinId: mapped.simplefinId
 				});
@@ -386,8 +388,11 @@
 				if (created) await setSyncStatus(created.id!, 'ok', new Date());
 			} else {
 				const id = Number(choice);
+				const target = sfAccounts.find((a) => a.id === id);
 				await updateLinkedAccount(id, { source: 'simplefin', simplefinId: mapped.simplefinId });
-				await recordBalance(id, mapped.balance, 'simplefin');
+				const balance =
+					target?.accountClass === 'liability' ? Math.abs(mapped.balance) : mapped.balance;
+				await recordBalance(id, balance, 'simplefin');
 				await setSyncStatus(id, 'ok', new Date());
 			}
 			await sfRefreshLocal();

@@ -113,7 +113,11 @@ export async function syncBalances(): Promise<SyncResult> {
 				failed++;
 				continue;
 			}
-			await recordBalance(account.id!, mapped.balance, 'simplefin');
+			// SimpleFIN reports credit/loan balances as negative; our model stores
+			// "amount owed" as positive with accountClass carrying the sign
+			const balance =
+				account.accountClass === 'liability' ? Math.abs(mapped.balance) : mapped.balance;
+			await recordBalance(account.id!, balance, 'simplefin');
 			await setSyncStatus(account.id!, 'ok', new Date());
 			synced++;
 		} catch (error) {

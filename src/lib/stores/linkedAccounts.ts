@@ -66,6 +66,19 @@ export async function updateLinkedAccount(
 	await persistData();
 }
 
+/**
+ * Swap display positions of two accounts (manual reordering).
+ * Intentionally does not bump updatedAt — the UI shows that as the
+ * balance-updated date, and reordering doesn't change balances.
+ */
+export async function swapLinkedAccountOrder(idA: number, idB: number): Promise<void> {
+	const [a, b] = await Promise.all([db.linkedAccounts.get(idA), db.linkedAccounts.get(idB)]);
+	if (!a || !b) return;
+	await db.linkedAccounts.update(idA, { sortOrder: b.sortOrder });
+	await db.linkedAccounts.update(idB, { sortOrder: a.sortOrder });
+	await persistData();
+}
+
 /** Deletes the account and its entire snapshot history. */
 export async function deleteLinkedAccount(id: number): Promise<void> {
 	await db.balanceSnapshots.where('accountId').equals(id).delete();

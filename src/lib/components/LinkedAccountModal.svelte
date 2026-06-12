@@ -1,8 +1,9 @@
 <script lang="ts">
 	import { Trash2 } from 'lucide-svelte';
 	import ModalContainer from './ModalContainer.svelte';
-	import type { LinkedAccount, LinkedAccountType } from '$lib/db';
+	import type { AccountClass, LinkedAccount, LinkedAccountType } from '$lib/db';
 	import { cleanNumberInput } from '$lib/utils/form-validation';
+	import { accountClassForType } from '$lib/utils/net-worth';
 
 	// One modal serves add (account === null) and edit; the fields are identical.
 	interface Props {
@@ -13,6 +14,7 @@
 			name: string;
 			institution: string;
 			accountType: LinkedAccountType;
+			accountClass: AccountClass;
 			balance: number;
 			isActive: boolean;
 		}) => Promise<void> | void;
@@ -22,13 +24,16 @@
 
 	let { isOpen, account, onSave, onDelete, onClose }: Props = $props();
 
-	// Assets-only v1: credit/loan stay in the schema but aren't offered here
-	const TYPE_OPTIONS: Array<{ value: LinkedAccountType; label: string }> = [
+	const ASSET_TYPES: Array<{ value: LinkedAccountType; label: string }> = [
 		{ value: 'checking', label: 'Checking' },
 		{ value: 'savings', label: 'Savings' },
 		{ value: 'investment', label: 'Investment' },
 		{ value: 'retirement', label: 'Retirement' },
 		{ value: 'other', label: 'Other' }
+	];
+	const LIABILITY_TYPES: Array<{ value: LinkedAccountType; label: string }> = [
+		{ value: 'credit', label: 'Credit card' },
+		{ value: 'loan', label: 'Loan' }
 	];
 
 	let name = $state('');
@@ -51,6 +56,8 @@
 	});
 
 	let balance = $derived(parseFloat(cleanNumberInput(balanceStr)) || 0);
+	// Class follows the type — users never pick asset/liability directly
+	let accountClass = $derived(accountClassForType(accountType));
 	let isValid = $derived(name.trim().length > 0 && balanceStr.trim() !== '' && !isNaN(parseFloat(cleanNumberInput(balanceStr))));
 
 	async function handleSubmit(e: Event) {
@@ -62,6 +69,7 @@
 				name: name.trim(),
 				institution: institution.trim(),
 				accountType,
+				accountClass,
 				balance,
 				isActive
 			});
@@ -105,14 +113,21 @@
 					bind:value={accountType}
 					class="w-full px-3 py-2.5 bg-surface-alt border border-theme rounded-lg focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-colors"
 				>
-					{#each TYPE_OPTIONS as opt (opt.value)}
-						<option value={opt.value}>{opt.label}</option>
-					{/each}
+					<optgroup label="Assets">
+						{#each ASSET_TYPES as opt (opt.value)}
+							<option value={opt.value}>{opt.label}</option>
+						{/each}
+					</optgroup>
+					<optgroup label="Liabilities">
+						{#each LIABILITY_TYPES as opt (opt.value)}
+							<option value={opt.value}>{opt.label}</option>
+						{/each}
+					</optgroup>
 				</select>
 			</div>
 			<div>
 				<label for="la-balance" class="block text-sm font-medium text-charcoal-soft mb-1.5">
-					{account ? 'Current balance' : 'Starting balance'}
+					{accountClass === 'liability' ? 'Amount owed' : account ? 'Current balance' : 'Starting balance'}
 				</label>
 				<div class="relative">
 					<span class="absolute left-3 top-1/2 -translate-y-1/2 text-charcoal-muted font-mono">$</span>

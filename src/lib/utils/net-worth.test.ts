@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { calculateNetWorth, buildNetWorthSeries, seriesDelta } from './net-worth';
+import { calculateNetWorth, buildNetWorthSeries, seriesDelta, accountClassForType } from './net-worth';
 import type { LinkedAccount, BalanceSnapshot } from '$lib/db';
 
 let nextId = 1;
@@ -110,5 +110,17 @@ describe('seriesDelta', () => {
 	it('returns null without enough history', () => {
 		expect(seriesDelta([{ date: '2026-06-10', total: 100 }], 30)).toBeNull();
 		expect(seriesDelta([], 30)).toBeNull();
+	});
+});
+
+describe('accountClassForType', () => {
+	it('classifies credit and loan as liabilities, everything else as assets', () => {
+		expect(accountClassForType('credit')).toBe('liability');
+		expect(accountClassForType('loan')).toBe('liability');
+		expect(accountClassForType('checking')).toBe('asset');
+		expect(accountClassForType('savings')).toBe('asset');
+		expect(accountClassForType('investment')).toBe('asset');
+		expect(accountClassForType('retirement')).toBe('asset');
+		expect(accountClassForType('other')).toBe('asset');
 	});
 });

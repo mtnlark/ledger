@@ -1,4 +1,4 @@
-import type { LinkedAccount, BalanceSnapshot } from '$lib/db';
+import type { LinkedAccount, BalanceSnapshot, LinkedAccountType, AccountClass } from '$lib/db';
 import { roundCurrency } from './currency';
 
 export interface NetWorthSummary {
@@ -10,6 +10,13 @@ export interface NetWorthSummary {
 export interface NetWorthPoint {
 	date: string; // 'YYYY-MM-DD' (local)
 	total: number;
+}
+
+const LIABILITY_TYPES: ReadonlySet<LinkedAccountType> = new Set(['credit', 'loan']);
+
+/** Class is derived from type so users never pick asset/liability directly. */
+export function accountClassForType(type: LinkedAccountType): AccountClass {
+	return LIABILITY_TYPES.has(type) ? 'liability' : 'asset';
 }
 
 function sign(account: LinkedAccount): number {

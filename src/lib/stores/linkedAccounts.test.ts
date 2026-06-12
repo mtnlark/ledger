@@ -7,7 +7,8 @@ import {
 	deleteLinkedAccount,
 	recordBalance,
 	setSyncStatus,
-	getAllSnapshots
+	getAllSnapshots,
+	swapLinkedAccountOrder
 } from './linkedAccounts';
 
 describe('LinkedAccounts Operations', () => {
@@ -103,6 +104,14 @@ describe('LinkedAccounts Operations', () => {
 		const after = (await getAllLinkedAccounts())[0];
 		expect(after.lastSyncStatus).toBe('error');
 		expect(after.lastSyncedAt?.getTime()).toBe(when.getTime()); // unchanged
+	});
+
+	it('swapLinkedAccountOrder exchanges positions', async () => {
+		const a = await newAccount();
+		const b = await newAccount({ name: 'Fidelity' });
+		await swapLinkedAccountOrder(a, b);
+		const accounts = await getAllLinkedAccounts();
+		expect(accounts.map((x) => x.name)).toEqual(['Fidelity', 'Chase Checking']);
 	});
 
 	it('deleteLinkedAccount cascades its snapshots', async () => {

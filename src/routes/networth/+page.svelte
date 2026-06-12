@@ -2,9 +2,9 @@
 	import { onMount } from 'svelte';
 	import { afterNavigate } from '$app/navigation';
 	import { format } from 'date-fns';
-	import { Plus, Pencil, Landmark, PiggyBank, TrendingUp, ShieldCheck, Wallet, CreditCard, Banknote } from 'lucide-svelte';
+	import { Plus, Pencil, ChevronUp, ChevronDown, Landmark, PiggyBank, TrendingUp, ShieldCheck, Wallet, CreditCard, Banknote } from 'lucide-svelte';
 	import type { ComponentType } from 'svelte';
-	import type { LinkedAccount, BalanceSnapshot, LinkedAccountType } from '$lib/db';
+	import type { AccountClass, LinkedAccount, BalanceSnapshot, LinkedAccountType } from '$lib/db';
 	import { initializeStorage } from '$lib/storage';
 	import {
 		getAllLinkedAccounts,
@@ -12,7 +12,8 @@
 		addLinkedAccount,
 		updateLinkedAccount,
 		deleteLinkedAccount,
-		recordBalance
+		recordBalance,
+		swapLinkedAccountOrder
 	} from '$lib/stores/linkedAccounts';
 	import { calculateNetWorth, buildNetWorthSeries, seriesDelta } from '$lib/utils/net-worth';
 	import { syncBalances } from '$lib/services/simplefin';
@@ -46,8 +47,9 @@
 	let summary = $derived(calculateNetWorth(accounts));
 	let series = $derived(buildNetWorthSeries(snapshots, accounts));
 	let monthDelta = $derived(seriesDelta(series, 30));
-	let activeAccounts = $derived(accounts.filter((a) => a.isActive));
-	let hiddenAccounts = $derived(accounts.filter((a) => !a.isActive));
+	// Sections keep store order (sortOrder); hidden accounts stay in place, dimmed
+	let assetAccounts = $derived(accounts.filter((a) => a.accountClass !== 'liability'));
+	let liabilityAccounts = $derived(accounts.filter((a) => a.accountClass === 'liability'));
 	let lastUpdated = $derived(
 		accounts.length > 0
 			? accounts.reduce((max, a) => (a.updatedAt > max ? a.updatedAt : max), accounts[0].updatedAt)
@@ -76,15 +78,24 @@
 		}
 	}
 
-	// Asset subtotals by type for the rail breakdown
-	let byType = $derived.by(() => {
+	// Subtotals by type for the rail breakdown (active accounts only)
+	function totalsByType(list: LinkedAccount[], cls: AccountClass) {
 		const totals = new Map<LinkedAccountType, number>();
-		for (const a of activeAccounts) {
-			if (a.accountClass === 'liability') continue;
+		for (const a of list) {
+			if (!a.isActive || a.accountClass !== cls) continue;
 			totals.set(a.accountType, (totals.get(a.accountType) || 0) + a.currentBalance);
 		}
 		return [...totals.entries()].sort((x, y) => y[1] - x[1]);
-	});
+	}
+	let assetsByType = $derived(totalsByType(accounts, 'asset'));
+	let liabilitiesByType = $derived(totalsByType(accounts, 'liability'));
+
+	async function handleMove(list: LinkedAccount[], index: number, direction: -1 | 1) {
+		const neighbor = list[index + direction];
+		if (!neighbor) return;
+		await swapLinkedAccountOrder(list[index].id!, neighbor.id!);
+		await loadData();
+	}
 
 	async function loadData() {
 		if (!hasLoadedOnce) isLoading = true;
@@ -124,6 +135,7 @@
 		name: string;
 		institution: string;
 		accountType: LinkedAccountType;
+		accountClass: AccountClass;
 		balance: number;
 		isActive: boolean;
 	}) {
@@ -133,6 +145,7 @@
 					name: data.name,
 					institution: data.institution,
 					accountType: data.accountType,
+					accountClass: data.accountClass,
 					isActive: data.isActive
 				});
 				if (data.balance !== editingAccount.currentBalance) {
@@ -144,7 +157,7 @@
 				await addLinkedAccount({
 					name: data.name,
 					institution: data.institution,
-					accountClass: 'asset',
+					accountClass: data.accountClass,
 					accountType: data.accountType,
 					initialBalance: data.balance
 				});
@@ -179,6 +192,83 @@
 <svelte:head>
 	<title>Net Worth - Ledger</title>
 </svelte:head>
+
+{#snippet accountsSection(title: string, list: LinkedAccount[])}
+	<div>
+		<h2 class="text-xs font-medium uppercase tracking-wider text-charcoal-muted mb-2 px-1">
+			{title} ({list.length})
+		</h2>
+		<div class="bg-surface rounded-xl shadow-sm shadow-theme overflow-hidden divide-y divide-dashed divide-theme-dashed">
+			{#each list as account, index (account.id)}
+				{@const meta = TYPE_META[account.accountType]}
+				{@const Icon = meta.icon}
+				<div class="group/row px-4 py-3 flex items-center gap-3 transition-colors hover:bg-surface-hover/50 {account.isActive ? '' : 'opacity-50'}">
+					<div class="category-chip w-9 h-9 bg-surface-alt text-charcoal-soft">
+						<Icon size={17} />
+					</div>
+					<div class="flex-1 min-w-0">
+						<div class="flex items-center gap-2">
+							<span class="font-medium text-charcoal truncate">{account.name}</span>
+							{#if !account.isActive}
+								<span class="badge bg-surface-alt text-charcoal-muted">Hidden</span>
+							{/if}
+							{#if account.source === 'simplefin'}
+								{#if account.lastSyncStatus === 'error'}
+									<span class="badge bg-danger-100 text-danger-600" title="Last sync failed — balance may be outdated; update it manually if needed">Sync error</span>
+								{:else if account.lastSyncStatus === 'stale'}
+									<span class="badge bg-warning-100 text-warning-600" title="Account not found upstream — balance kept from last successful sync">Stale</span>
+								{:else}
+									<span class="badge bg-primary-100 text-primary-600" title="Balance syncs from SimpleFIN">Synced</span>
+								{/if}
+							{/if}
+						</div>
+						<div class="flex items-center gap-2 text-sm text-charcoal-muted mt-0.5">
+							{#if account.institution}
+								<span>{account.institution}</span>
+								<span>·</span>
+							{/if}
+							<span>{meta.label}</span>
+						</div>
+					</div>
+					<div class="text-right flex-shrink-0">
+						<div class="font-mono font-medium text-charcoal">{formatCurrency(account.currentBalance)}</div>
+						<div class="text-xs text-charcoal-muted">
+							Updated {format(account.updatedAt, 'MMM d')}
+						</div>
+					</div>
+					<div class="flex gap-0.5 flex-shrink-0 opacity-0 group-hover/row:opacity-100 focus-within:opacity-100 transition-opacity">
+						<button
+							type="button"
+							onclick={() => handleMove(list, index, -1)}
+							disabled={index === 0}
+							class="p-1.5 text-charcoal-muted hover:text-charcoal hover:bg-surface-alt rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+							aria-label="Move {account.name} up"
+						>
+							<ChevronUp size={14} />
+						</button>
+						<button
+							type="button"
+							onclick={() => handleMove(list, index, 1)}
+							disabled={index === list.length - 1}
+							class="p-1.5 text-charcoal-muted hover:text-charcoal hover:bg-surface-alt rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+							aria-label="Move {account.name} down"
+						>
+							<ChevronDown size={14} />
+						</button>
+						<button
+							type="button"
+							onclick={() => openEdit(account)}
+							class="p-1.5 text-charcoal-muted hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors"
+							aria-label="Edit {account.name}"
+						>
+							<Pencil size={16} />
+						</button>
+					</div>
+				</div>
+			{/each}
+		</div>
+	</div>
+{/snippet}
 
 <div class="min-h-screen">
 	<main class="max-w-6xl mx-auto px-6 py-6" aria-live="polite">
@@ -238,66 +328,22 @@
 								{/if}
 							</div>
 						</div>
+						{#if summary.liabilities > 0}
+							<p class="px-6 pb-1 text-xs text-charcoal-muted">
+								Assets <span class="font-mono">{formatCurrencyWhole(summary.assets)}</span>
+								· Liabilities <span class="font-mono text-danger-600">−{formatCurrencyWhole(summary.liabilities)}</span>
+							</p>
+						{/if}
 						<div class="px-4 pb-4">
 							<NetWorthChart {series} />
 						</div>
 					</div>
 
-					<!-- Accounts -->
-					<div>
-						<h2 class="text-xs font-medium uppercase tracking-wider text-charcoal-muted mb-2 px-1">
-							Accounts ({activeAccounts.length})
-						</h2>
-						<div class="bg-surface rounded-xl shadow-sm shadow-theme overflow-hidden divide-y divide-dashed divide-theme-dashed">
-							{#each [...activeAccounts, ...hiddenAccounts] as account (account.id)}
-								{@const meta = TYPE_META[account.accountType]}
-								{@const Icon = meta.icon}
-								<div class="group/row px-4 py-3 flex items-center gap-3 transition-colors hover:bg-surface-hover/50 {account.isActive ? '' : 'opacity-50'}">
-									<div class="category-chip w-9 h-9 bg-surface-alt text-charcoal-soft">
-										<Icon size={17} />
-									</div>
-									<div class="flex-1 min-w-0">
-										<div class="flex items-center gap-2">
-											<span class="font-medium text-charcoal truncate">{account.name}</span>
-											{#if !account.isActive}
-												<span class="badge bg-surface-alt text-charcoal-muted">Hidden</span>
-											{/if}
-											{#if account.source === 'simplefin'}
-												{#if account.lastSyncStatus === 'error'}
-													<span class="badge bg-danger-100 text-danger-600" title="Last sync failed — balance may be outdated; update it manually if needed">Sync error</span>
-												{:else if account.lastSyncStatus === 'stale'}
-													<span class="badge bg-warning-100 text-warning-600" title="Account not found upstream — balance kept from last successful sync">Stale</span>
-												{:else}
-													<span class="badge bg-primary-100 text-primary-600" title="Balance syncs from SimpleFIN">Synced</span>
-												{/if}
-											{/if}
-										</div>
-										<div class="flex items-center gap-2 text-sm text-charcoal-muted mt-0.5">
-											{#if account.institution}
-												<span>{account.institution}</span>
-												<span>·</span>
-											{/if}
-											<span>{meta.label}</span>
-										</div>
-									</div>
-									<div class="text-right flex-shrink-0">
-										<div class="font-mono font-medium text-charcoal">{formatCurrency(account.currentBalance)}</div>
-										<div class="text-xs text-charcoal-muted">
-											Updated {format(account.updatedAt, 'MMM d')}
-										</div>
-									</div>
-									<button
-										type="button"
-										onclick={() => openEdit(account)}
-										class="p-2 text-charcoal-muted hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors flex-shrink-0 opacity-0 group-hover/row:opacity-100 focus-within:opacity-100"
-										aria-label="Edit {account.name}"
-									>
-										<Pencil size={16} />
-									</button>
-								</div>
-							{/each}
-						</div>
-					</div>
+					<!-- Accounts: assets and liabilities sections -->
+					{@render accountsSection('Assets', assetAccounts)}
+					{#if liabilityAccounts.length > 0}
+						{@render accountsSection('Liabilities', liabilityAccounts)}
+					{/if}
 				</div>
 
 				<!-- Right rail -->
@@ -307,11 +353,18 @@
 							<h2 class="text-xs font-medium uppercase tracking-wider text-charcoal-muted">Breakdown</h2>
 						</div>
 						<div class="px-5 pb-5 pt-4 border-t border-dashed border-theme-dashed space-y-3">
-							{#each byType as [type, total] (type)}
+							{#each assetsByType as [type, total] (type)}
 								<div class="flex items-baseline">
 									<span class="text-charcoal-soft text-sm">{TYPE_META[type].label}</span>
 									<span class="ledger-line"></span>
 									<span class="font-mono text-charcoal">{formatCurrencyWhole(total)}</span>
+								</div>
+							{/each}
+							{#each liabilitiesByType as [type, total] (type)}
+								<div class="flex items-baseline">
+									<span class="text-charcoal-soft text-sm">{TYPE_META[type].label}</span>
+									<span class="ledger-line"></span>
+									<span class="font-mono text-danger-600">−{formatCurrencyWhole(total)}</span>
 								</div>
 							{/each}
 							<div class="border-t border-theme my-2"></div>
