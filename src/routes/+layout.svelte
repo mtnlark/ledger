@@ -116,6 +116,22 @@
 		return () => unlistenQuickAdd?.();
 	});
 
+	// Daily SimpleFIN balance sync on app open (main window only; single writer)
+	onMount(() => {
+		if (isQuickWindow) return;
+		(async () => {
+			try {
+				await initializeStorage();
+				const { maybeSyncOnLaunch } = await import('$lib/services/simplefin');
+				if (await maybeSyncOnLaunch()) {
+					window.dispatchEvent(new CustomEvent('ledger:networth-changed'));
+				}
+			} catch {
+				// Non-Tauri environment, or sync failure — statuses are recorded per account
+			}
+		})();
+	});
+
 	onDestroy(() => {
 		cleanupListener?.();
 		cleanupNotifications();

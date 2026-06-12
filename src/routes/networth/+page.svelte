@@ -15,6 +15,7 @@
 		recordBalance
 	} from '$lib/stores/linkedAccounts';
 	import { calculateNetWorth, buildNetWorthSeries, seriesDelta } from '$lib/utils/net-worth';
+	import { syncBalances } from '$lib/services/simplefin';
 	import { formatCurrency, formatCurrencyWhole } from '$lib/utils/format-helpers';
 	import { toast } from '$lib/stores/toast';
 	import NetWorthChart from '$lib/components/NetWorthChart.svelte';
@@ -40,6 +41,7 @@
 	let showAccountModal = $state(false);
 	let editingAccount = $state<LinkedAccount | null>(null);
 	let confirmingDelete = $state(false);
+	let syncing = $state(false);
 
 	let summary = $derived(calculateNetWorth(accounts));
 	let series = $derived(buildNetWorthSeries(snapshots, accounts));
@@ -51,6 +53,28 @@
 			? accounts.reduce((max, a) => (a.updatedAt > max ? a.updatedAt : max), accounts[0].updatedAt)
 			: null
 	);
+
+	let simplefinAccounts = $derived(accounts.filter((a) => a.source === 'simplefin'));
+	let lastSynced = $derived.by(() => {
+		const dates = simplefinAccounts.map((a) => a.lastSyncedAt).filter((d): d is Date => !!d);
+		return dates.length > 0 ? dates.reduce((max, d) => (d > max ? d : max)) : null;
+	});
+
+	async function handleRefresh() {
+		if (syncing) return;
+		syncing = true;
+		try {
+			const result = await syncBalances();
+			await loadData();
+			if (result.failed > 0) {
+				toast.warning(`Synced ${result.synced}, ${result.failed} failed — see account badges`);
+			} else {
+				toast.success(`Synced ${result.synced} account${result.synced === 1 ? '' : 's'}`);
+			}
+		} finally {
+			syncing = false;
+		}
+	}
 
 	// Asset subtotals by type for the rail breakdown
 	let byType = $derived.by(() => {
@@ -238,6 +262,15 @@
 											{#if !account.isActive}
 												<span class="badge bg-surface-alt text-charcoal-muted">Hidden</span>
 											{/if}
+											{#if account.source === 'simplefin'}
+												{#if account.lastSyncStatus === 'error'}
+													<span class="badge bg-danger-100 text-danger-600" title="Last sync failed — balance may be outdated; update it manually if needed">Sync error</span>
+												{:else if account.lastSyncStatus === 'stale'}
+													<span class="badge bg-warning-100 text-warning-600" title="Account not found upstream — balance kept from last successful sync">Stale</span>
+												{:else}
+													<span class="badge bg-primary-100 text-primary-600" title="Balance syncs from SimpleFIN">Synced</span>
+												{/if}
+											{/if}
 										</div>
 										<div class="flex items-center gap-2 text-sm text-charcoal-muted mt-0.5">
 											{#if account.institution}
@@ -294,6 +327,29 @@
 							{/if}
 						</div>
 					</div>
+
+					{#if simplefinAccounts.length > 0}
+						<div class="bg-surface rounded-xl shadow-md shadow-[var(--color-shadow)]">
+							<div class="px-5 py-3.5 flex items-center justify-between">
+								<h2 class="text-xs font-medium uppercase tracking-wider text-charcoal-muted">SimpleFIN</h2>
+								<button
+									type="button"
+									onclick={handleRefresh}
+									disabled={syncing}
+									class="text-sm text-primary-600 hover:text-primary-700 font-medium transition-colors disabled:opacity-50"
+								>
+									{syncing ? 'Syncing…' : 'Refresh'}
+								</button>
+							</div>
+							<div class="px-5 pb-4 pt-3 border-t border-dashed border-theme-dashed text-xs text-charcoal-muted">
+								{#if lastSynced}
+									Last synced {format(lastSynced, 'MMM d, h:mm a')} · syncs daily on launch
+								{:else}
+									Never synced — press Refresh
+								{/if}
+							</div>
+						</div>
+					{/if}
 				</aside>
 			</div>
 		{/if}
