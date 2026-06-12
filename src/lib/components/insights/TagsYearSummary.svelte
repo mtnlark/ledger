@@ -9,9 +9,11 @@
 		transactions: Transaction[];
 		/** Year to summarize (defaults to the current calendar year). */
 		year?: number;
+		/** When provided, tag rows open the tag report card. */
+		onTagClick?: (tag: string) => void;
 	}
 
-	let { transactions, year = new Date().getFullYear() }: Props = $props();
+	let { transactions, year = new Date().getFullYear(), onTagClick }: Props = $props();
 
 	// Tag spending summary for the year
 	let tagSummary = $derived.by(() => {
@@ -58,15 +60,20 @@
 		{/snippet}
 
 		{#snippet children()}
-			<div class="space-y-2">
+			<div class="space-y-1">
 				{#each tagSummary as { tag, total, count }}
-					<div class="flex items-center justify-between py-1.5">
+					<button
+						type="button"
+						disabled={!onTagClick}
+						onclick={() => onTagClick?.(tag)}
+						class="flex items-center justify-between py-1.5 px-2 -mx-2 rounded-lg w-full text-left {onTagClick ? 'hover:bg-surface-alt transition-colors cursor-pointer' : 'cursor-default'}"
+					>
 						<span class="text-sm text-primary-600 font-medium">#{tag}</span>
 						<div class="text-right">
 							<span class="font-mono text-sm text-charcoal">{formatCurrencyWhole(total)}</span>
 							<span class="text-xs text-charcoal-muted ml-2">{count} txn{count !== 1 ? 's' : ''}</span>
 						</div>
-					</div>
+					</button>
 				{/each}
 			</div>
 		{/snippet}

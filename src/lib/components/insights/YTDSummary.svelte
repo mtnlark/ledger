@@ -10,9 +10,11 @@
 		settings?: Settings | null;
 		/** Year to summarize (defaults to the current calendar year). */
 		year?: number;
+		/** When provided, the top-merchant tile opens the merchant report card. */
+		onMerchantClick?: (merchant: string) => void;
 	}
 
-	let { transactions, settings = null, year = new Date().getFullYear() }: Props = $props();
+	let { transactions, settings = null, year = new Date().getFullYear(), onMerchantClick }: Props = $props();
 
 	const engine = getInsightsEngine();
 
@@ -103,10 +105,16 @@
 				</div>
 			{/if}
 			{#if topMerchant}
-				<div class="bg-cream-dark rounded-lg p-3 text-center">
+				{@const merchantName = topMerchant.merchant}
+				<button
+					type="button"
+					disabled={!onMerchantClick}
+					onclick={() => onMerchantClick?.(merchantName)}
+					class="bg-cream-dark rounded-lg p-3 text-center {onMerchantClick ? 'hover:ring-1 hover:ring-primary-300 transition-shadow cursor-pointer' : 'cursor-default'}"
+				>
 					<p class="font-mono text-lg font-medium text-charcoal truncate" title={topMerchant.merchant}>{topMerchant.merchant}</p>
 					<p class="text-xs text-charcoal-muted">{topMerchant.count}x visits</p>
-				</div>
+				</button>
 			{/if}
 		</div>
 

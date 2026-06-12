@@ -15,6 +15,8 @@
 		budget: MonthlyBudget | null;
 		allBudgets: MonthlyBudget[];
 		monthlyTrends: Map<string, number>;
+		/** When provided, top-merchant rows open the merchant report card. */
+		onMerchantClick?: (merchant: string) => void;
 	}
 
 	let {
@@ -22,7 +24,8 @@
 		transactions,
 		budget,
 		allBudgets,
-		monthlyTrends
+		monthlyTrends,
+		onMerchantClick
 	}: Props = $props();
 
 	const engine = getInsightsEngine();
@@ -196,7 +199,12 @@
 				<div class="rounded-lg overflow-hidden">
 					{#each topMerchants as { merchant, amount }, i}
 						{@const pct = (amount / maxMerchant) * 100}
-						<div class="relative flex items-center px-4 py-3 bg-surface">
+						<button
+							type="button"
+							disabled={!onMerchantClick}
+							onclick={() => onMerchantClick?.(merchant)}
+							class="relative flex items-center px-4 py-3 bg-surface w-full text-left {onMerchantClick ? 'hover:bg-surface-alt transition-colors cursor-pointer' : 'cursor-default'}"
+						>
 							<!-- Fill bar background -->
 							<div
 								class="absolute inset-y-0 left-0 bg-gradient-to-r from-primary-500/15 via-primary-500/7 to-transparent transition-all duration-500"
@@ -218,7 +226,7 @@
 							{#if topMerchants.length > 1}
 								<span class="relative z-10 text-xs text-charcoal-muted ml-1.5 shrink-0">{Math.round((amount / totalSpent) * 100)}%</span>
 							{/if}
-						</div>
+						</button>
 					{/each}
 				</div>
 			{:else}

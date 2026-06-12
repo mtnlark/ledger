@@ -37,6 +37,10 @@
 	import { getEffectiveBudgetsForMonth } from '$lib/stores/categoryBudget';
 	import type { RolloverResult } from '$lib/utils/budget-rollover';
 	import type { CategoryBudget } from '$lib/db';
+	import { format } from 'date-fns';
+	import ReportCardModal, { type ReportStat } from '$lib/components/ReportCardModal.svelte';
+	import { computeMerchantReport, computeTagReport } from '$lib/utils/report-cards';
+	import { formatCurrency } from '$lib/utils/format-helpers';
 
 	// Lazy-loaded chart-heavy components (loaded on tab switch)
 	const lazyOverviewCharts = () => Promise.all([
@@ -91,6 +95,42 @@
 
 	// Year in Review follows the selected month's year
 	let selectedYear = $derived(Number(selectedMonth.slice(0, 4)));
+
+	// Cross-links: merchant/tag report cards + deep-dive category jumps
+	let merchantReportFor = $state<string | null>(null);
+	let tagReportFor = $state<string | null>(null);
+	let deepDiveCategoryId = $state<number | null>(null);
+
+	let merchantReport = $derived(
+		merchantReportFor ? computeMerchantReport(allTransactions, categories, merchantReportFor) : null
+	);
+	let merchantReportStats = $derived.by((): ReportStat[] => {
+		if (!merchantReport) return [];
+		return [
+			{ label: 'Total spent', value: formatCurrency(merchantReport.total), sub: 'your share, all time' },
+			{ label: 'Visits', value: String(merchantReport.visits) },
+			{ label: 'Average per visit', value: formatCurrency(merchantReport.average) },
+			{ label: 'Last visit', value: format(merchantReport.lastDate, 'MMM d, yyyy') }
+		];
+	});
+	let tagReport = $derived(
+		tagReportFor ? computeTagReport(allTransactions, categories, tagReportFor) : null
+	);
+	let tagReportStats = $derived.by((): ReportStat[] => {
+		if (!tagReport) return [];
+		return [
+			{ label: 'Total spent', value: formatCurrency(tagReport.total), sub: 'your share, all time' },
+			{ label: 'Transactions', value: String(tagReport.count) },
+			{ label: 'First used', value: format(tagReport.firstDate, 'MMM d, yyyy') },
+			{ label: 'Last used', value: format(tagReport.lastDate, 'MMM d, yyyy') }
+		];
+	});
+
+	// "What Changed" row click → Spending tab with that category's deep dive open
+	function jumpToDeepDive(categoryId: number) {
+		deepDiveCategoryId = categoryId;
+		handleTabChange('spending');
+	}
 
 	// Tab change handler
 	function handleTabChange(tab: string) {
@@ -273,6 +313,7 @@
 						transactions={allTransactions}
 						{categories}
 						{selectedMonth}
+						onCategoryClick={jumpToDeepDive}
 					/>
 
 					<!-- Actual wealth: net worth, monthly delta, runway -->
@@ -325,8 +366,9 @@
 							{budget}
 							{allBudgets}
 							{monthlyTrends}
+							onMerchantClick={(m: string) => merchantReportFor = m}
 						/>
-						<CategoryDeepDivesMod.default currentMonth={selectedMonth} transactions={selectedMonthTransactions} {allTransactions} {categories} {availableMonths} />
+						<CategoryDeepDivesMod.default currentMonth={selectedMonth} transactions={selectedMonthTransactions} {allTransactions} {categories} {availableMonths} initialCategoryId={deepDiveCategoryId} />
 						<NeedsWantsInsightsMod.default
 							transactions={selectedMonthTransactions}
 							{categories}
@@ -365,12 +407,34 @@
 
 				{:else if activeTab === 'year-in-review'}
 					{#await lazyYearInReview() then [YTDSummaryMod, TagsYearSummaryMod]}
-						<YTDSummaryMod.default transactions={allTransactions} settings={appSettings} year={selectedYear} />
+						<YTDSummaryMod.default transactions={allTransactions} settings={appSettings} year={selectedYear} onMerchantClick={(m: string) => merchantReportFor = m} />
 						<NetWorthYearCard accounts={linkedAccounts} snapshots={balanceSnapshots} year={selectedYear} />
-						<TagsYearSummaryMod.default transactions={allTransactions} year={selectedYear} />
+						<TagsYearSummaryMod.default transactions={allTransactions} year={selectedYear} onTagClick={(t: string) => tagReportFor = t} />
 					{/await}
 				{/if}
 			</div>
 		{/if}
 	</main>
 </div>
+
+<!-- Merchant / Tag report cards -->
+{#if merchantReport}
+	<ReportCardModal
+		isOpen={true}
+		title={merchantReport.merchant}
+		stats={merchantReportStats}
+		monthly={merchantReport.monthly}
+		topCategories={merchantReport.topCategories}
+		onClose={() => merchantReportFor = null}
+	/>
+{/if}
+{#if tagReport}
+	<ReportCardModal
+		isOpen={true}
+		title={'#' + tagReport.tag}
+		stats={tagReportStats}
+		monthly={tagReport.monthly}
+		topCategories={tagReport.topCategories}
+		onClose={() => tagReportFor = null}
+	/>
+{/if}

@@ -163,9 +163,11 @@
 		transactions: Transaction[];
 		categories: Category[];
 		selectedMonth: string;
+		/** When provided, rows jump to that category's deep dive on the Spending tab. */
+		onCategoryClick?: (categoryId: number) => void;
 	}
 
-	let { transactions, categories, selectedMonth }: Props = $props();
+	let { transactions, categories, selectedMonth, onCategoryClick }: Props = $props();
 
 	let result = $derived(computeCategoryVariance(transactions, categories, selectedMonth));
 	let maxAbsDelta = $derived(
@@ -189,7 +191,12 @@
 		<div class="px-6 pb-5 space-y-2.5">
 			{#each result.items as item (item.categoryId)}
 				{@const pct = (Math.abs(item.delta) / maxAbsDelta) * 50}
-				<div class="flex items-center gap-3">
+				<button
+					type="button"
+					disabled={!onCategoryClick}
+					onclick={() => onCategoryClick?.(item.categoryId)}
+					title={onCategoryClick ? `Explore ${item.name} in Category Deep Dives` : undefined}
+					class="flex items-center gap-3 w-full text-left px-2 -mx-2 py-0.5 rounded-lg {onCategoryClick ? 'hover:bg-surface-alt transition-colors cursor-pointer' : 'cursor-default'}">
 					<span class="w-6 text-center shrink-0">{item.icon}</span>
 					<span class="text-sm text-charcoal truncate min-w-0 flex-1">
 						{item.name}
@@ -212,7 +219,7 @@
 					>
 						{signed(item.delta)}
 					</span>
-				</div>
+				</button>
 			{/each}
 		</div>
 	</div>

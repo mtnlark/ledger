@@ -21,9 +21,11 @@
 		allTransactions: Transaction[];
 		categories: Category[];
 		availableMonths: string[];
+		/** Externally requested category (e.g., a "What Changed" row click); overrides the default selection. */
+		initialCategoryId?: number | null;
 	}
 
-	let { currentMonth, transactions, allTransactions, categories, availableMonths }: Props = $props();
+	let { currentMonth, transactions, allTransactions, categories, availableMonths, initialCategoryId = null }: Props = $props();
 
 	const engine = getInsightsEngine();
 
@@ -116,6 +118,15 @@
 		if (currentMonth !== lastMonth) {
 			hasUserSelected = false;
 			lastMonth = currentMonth;
+		}
+	});
+
+	// Honor an externally requested category (counts as a user selection so
+	// the anomaly-default effect below doesn't override it)
+	$effect(() => {
+		if (initialCategoryId !== null) {
+			selectedCategoryId = initialCategoryId;
+			hasUserSelected = true;
 		}
 	});
 
