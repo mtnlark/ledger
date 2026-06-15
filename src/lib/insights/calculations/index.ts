@@ -14,6 +14,7 @@ export { getTopMerchant, countMerchantVisits } from './top-merchant';
 export { computeYTDStats } from './ytd-stats';
 export {
 	computeStdDev,
+	computeMedian,
 	computeZScore,
 	generateDecayWeights,
 	computeWeightedMean,

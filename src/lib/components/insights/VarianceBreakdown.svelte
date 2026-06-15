@@ -2,7 +2,7 @@
 	import type { Transaction, Category } from '$lib/db';
 	import { getMonthKey } from '$lib/db';
 	import { roundCurrency } from '$lib/utils/currency';
-	import { computeStdDev } from '$lib/insights/calculations/stats';
+	import { computeStdDev, computeMedian } from '$lib/insights/calculations/stats';
 	import { detectAnomalies } from '$lib/insights/calculations/anomalies';
 	import { config } from '$lib/config';
 
@@ -55,10 +55,14 @@
 	}
 
 	/**
-	 * "Why is this month different?" — per-category spending vs the average of
-	 * recent months. When the selected month is the current calendar month, both
-	 * sides are clipped to the same day-of-month so a half-finished month is
-	 * compared against half-finished baselines rather than full ones.
+	 * "Why is this month different?" — per-category spending vs the typical
+	 * (median) spending of recent months. The median is used instead of the
+	 * mean so a single one-off month (e.g. a big purchase or an annual tax
+	 * payment) doesn't drag the baseline up and create a phantom "decrease"
+	 * in months where nothing actually changed. When the selected month is the
+	 * current calendar month, both sides are clipped to the same day-of-month
+	 * so a half-finished month is compared against half-finished baselines
+	 * rather than full ones.
 	 */
 	export function computeCategoryVariance(
 		transactions: Transaction[],
@@ -72,8 +76,7 @@
 		const baselineKeys = previousMonthKeys(selectedMonth, monthsBack);
 
 		const currentByCategory = new Map<number, number>();
-		const baselineByCategory = new Map<number, number>();
-		// Per-category, per-month baseline totals (for stdDev / anomaly flagging)
+		// Per-category, per-month baseline totals (for median/stdDev/anomaly flagging)
 		const baselineMonthly = new Map<number, Map<string, number>>();
 		const monthsWithData = new Set<string>();
 
@@ -91,7 +94,6 @@
 				currentByCategory.set(t.categoryId, (currentByCategory.get(t.categoryId) || 0) + share);
 			} else {
 				monthsWithData.add(key);
-				baselineByCategory.set(t.categoryId, (baselineByCategory.get(t.categoryId) || 0) + share);
 				let perMonth = baselineMonthly.get(t.categoryId);
 				if (!perMonth) {
 					perMonth = new Map();
@@ -110,10 +112,14 @@
 		// Baseline values are zero-filled across active months so a category that
 		// only appears occasionally still gets a meaningful spread.
 		const categoryStats = new Map<number, { mean: number; stdDev: number; sampleCount: number }>();
+		// Median of the same zero-filled series — used as the displayed
+		// "typical month" baseline (see computeMedian for why).
+		const categoryMedians = new Map<number, number>();
 		for (const [id, perMonth] of baselineMonthly) {
 			const values = [...monthsWithData].map((m) => perMonth.get(m) || 0);
 			const mean = values.reduce((s, v) => s + v, 0) / baselineMonthCount;
 			categoryStats.set(id, { mean, stdDev: computeStdDev(values), sampleCount: baselineMonthCount });
+			categoryMedians.set(id, computeMedian(values));
 		}
 		const unusualIds = new Set(
 			detectAnomalies(currentByCategory, categoryStats, categories, {
@@ -122,13 +128,13 @@
 			}).map((a) => a.catId)
 		);
 
-		const categoryIds = new Set([...currentByCategory.keys(), ...baselineByCategory.keys()]);
+		const categoryIds = new Set([...currentByCategory.keys(), ...baselineMonthly.keys()]);
 		const items: VarianceItem[] = [];
 		let totalDelta = 0;
 
 		for (const id of categoryIds) {
 			const current = roundCurrency(currentByCategory.get(id) || 0);
-			const baseline = roundCurrency((baselineByCategory.get(id) || 0) / baselineMonthCount);
+			const baseline = roundCurrency(categoryMedians.get(id) ?? 0);
 			const delta = roundCurrency(current - baseline);
 			totalDelta += delta;
 			if (Math.abs(delta) < minDelta) continue;
@@ -183,7 +189,7 @@
 			<h2 class="font-display text-xl font-medium text-charcoal">What Changed</h2>
 			<p class="text-sm text-charcoal-muted mt-0.5">
 				<span class="font-mono font-medium {result.totalDelta > 0 ? 'text-danger-600' : 'text-success-600'}">{signed(result.totalDelta)}</span>
-				vs your {result.baselineMonthCount}-month average{result.throughDay !== null ? ` (through day ${result.throughDay})` : ''}
+				vs your typical month (last {result.baselineMonthCount}{result.throughDay !== null ? `, through day ${result.throughDay}` : ''})
 			</p>
 		</div>
 		<div class="px-6 pb-5 space-y-2.5">

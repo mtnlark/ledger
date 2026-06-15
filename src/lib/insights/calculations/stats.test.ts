@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
 	computeStdDev,
+	computeMedian,
 	computeZScore,
 	generateDecayWeights,
 	computeWeightedMean,
@@ -37,6 +38,36 @@ describe('computeStdDev', () => {
 	it('handles negative values', () => {
 		// [-10, 10], mean=0, squaredDiffs=100+100=200, variance=100, sd=10
 		expect(computeStdDev([-10, 10])).toBe(10);
+	});
+});
+
+describe('computeMedian', () => {
+	it('returns 0 for empty array', () => {
+		expect(computeMedian([])).toBe(0);
+	});
+
+	it('returns the value for a single element', () => {
+		expect(computeMedian([42])).toBe(42);
+	});
+
+	it('returns the middle value for odd-length arrays', () => {
+		expect(computeMedian([3, 1, 2])).toBe(2);
+	});
+
+	it('averages the two middle values for even-length arrays', () => {
+		expect(computeMedian([1, 2, 3, 4])).toBe(2.5);
+	});
+
+	it('is not pulled toward a single large outlier the way a mean would be', () => {
+		// Mean of [0,0,0,0,0,600] is 100; median stays at 0, reflecting
+		// what 5 of the 6 months actually looked like.
+		expect(computeMedian([0, 0, 0, 0, 0, 600])).toBe(0);
+	});
+
+	it('does not mutate the input array', () => {
+		const values = [3, 1, 2];
+		computeMedian(values);
+		expect(values).toEqual([3, 1, 2]);
 	});
 });
 

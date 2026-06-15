@@ -17,6 +17,20 @@ export function computeStdDev(values: number[]): number {
 }
 
 /**
+ * Compute the median of a set of values. Returns 0 for an empty array.
+ * Unlike the mean, a single outlier can shift the median by at most one
+ * rank position, making it a better "typical value" for skewed monthly
+ * spending data (e.g., one big one-off purchase among mostly-zero months).
+ */
+export function computeMedian(values: number[]): number {
+	if (values.length === 0) return 0;
+
+	const sorted = [...values].sort((a, b) => a - b);
+	const mid = Math.floor(sorted.length / 2);
+	return sorted.length % 2 === 0 ? (sorted[mid - 1] + sorted[mid]) / 2 : sorted[mid];
+}
+
+/**
  * Generate exponential decay weights for a sequence of values.
  * Most recent value (last in array) gets weight 1.0, earlier values decay.
  *

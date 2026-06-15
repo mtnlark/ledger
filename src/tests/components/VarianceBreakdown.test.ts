@@ -6,7 +6,8 @@ import type { Transaction, Category } from '$lib/db';
 const categories = [
 	{ id: 1, name: 'Groceries', icon: '🛒', isActive: true, sortOrder: 0, isEssential: true },
 	{ id: 2, name: 'Restaurants', icon: '🍽️', isActive: true, sortOrder: 1, isEssential: false },
-	{ id: 3, name: 'Travel', icon: '✈️', isActive: true, sortOrder: 2, isEssential: false }
+	{ id: 3, name: 'Travel', icon: '✈️', isActive: true, sortOrder: 2, isEssential: false },
+	{ id: 4, name: 'Electronics', icon: '💻', isActive: true, sortOrder: 3, isEssential: false }
 ] as Category[];
 
 function tx(
@@ -150,5 +151,44 @@ describe('computeCategoryVariance', () => {
 			today: new Date('2026-08-15T12:00:00')
 		});
 		expect(result!.items[0].current).toBe(150);
+	});
+
+	it('does not let a one-off historical spike create a phantom decrease', () => {
+		const txns = [
+			// Groceries: steady $100/month across all 6 baseline months + current
+			// (keeps monthsWithData populated; delta should be 0)
+			tx('2025-12-10', 1, 100), tx('2026-01-10', 1, 100), tx('2026-02-10', 1, 100),
+			tx('2026-03-10', 1, 100), tx('2026-04-10', 1, 100), tx('2026-05-10', 1, 100),
+			tx('2026-06-05', 1, 100),
+			// Electronics: one-off $700 purchase in February (e.g. a new laptop),
+			// $0 in every other baseline month and $0 again this month.
+			tx('2026-02-15', 4, 700)
+		];
+		const result = computeCategoryVariance(txns, categories, '2026-06', {
+			today: new Date('2026-08-15T12:00:00')
+		});
+		expect(result!.baselineMonthCount).toBe(6);
+		// A mean baseline of 700/6 ≈ $116.67 would make this month look like a
+		// -$116.67 "decrease" in Electronics even though nothing changed there.
+		// The median baseline ($0, since 5 of 6 months were $0) correctly
+		// reports no change.
+		expect(result!.items.find((i) => i.name === 'Electronics')).toBeUndefined();
+		expect(result!.totalDelta).toBe(0);
+	});
+
+	it('uses the median (not mean) as the displayed baseline for an asymmetric history', () => {
+		// Groceries: $50 in five months, $350 in one (e.g. a big holiday grocery
+		// run). Mean = 100, median = 50 — the median better reflects "typical".
+		const txns = [
+			tx('2025-12-10', 1, 50), tx('2026-01-10', 1, 50), tx('2026-02-10', 1, 350),
+			tx('2026-03-10', 1, 50), tx('2026-04-10', 1, 50), tx('2026-05-10', 1, 50),
+			// Current month: back to the typical $50 → delta should be ~0, not -50
+			tx('2026-06-05', 1, 50)
+		];
+		const result = computeCategoryVariance(txns, categories, '2026-06', {
+			today: new Date('2026-08-15T12:00:00')
+		});
+		expect(result!.items.find((i) => i.categoryId === 1)).toBeUndefined();
+		expect(result!.totalDelta).toBe(0);
 	});
 });
