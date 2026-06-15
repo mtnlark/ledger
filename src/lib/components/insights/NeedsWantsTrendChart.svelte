@@ -3,7 +3,7 @@
 	import { type ChartConfiguration } from 'chart.js/auto';
 	import ChartWrapper from '../ChartWrapper.svelte';
 	import { parseMonthKey, getMonthKey, type Transaction } from '$lib/db';
-	import { sumCurrency } from '$lib/utils/currency';
+	import { sumCurrency, getUserAmount } from '$lib/utils/currency';
 	import { getChartTheme, onThemeChange, type ChartTheme } from '$lib/utils/chart-theme';
 
 	interface Props {
@@ -36,7 +36,7 @@
 
 		for (const t of allTransactions) {
 			const month = getMonthKey(new Date(t.date));
-			const userAmount = t.isShared ? t.amount - t.partnerShare : t.amount;
+			const userAmount = getUserAmount(t);
 
 			// A transaction is "needs" if t.isEssential OR its category's isEssential
 			const isNeeds = t.isEssential || (categoryEssentialMap.get(t.categoryId) ?? false);

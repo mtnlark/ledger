@@ -5,8 +5,8 @@
 	import { TrendingUp, TrendingDown, Store } from 'lucide-svelte';
 	import { getInsightsEngine } from '$lib/insights';
 	import EmptyState from '$lib/components/EmptyState.svelte';
-	import { formatCurrency } from '$lib/utils/format-helpers';
-	import { roundCurrency } from '$lib/utils/currency';
+	import { formatCurrency, formatPercentage } from '$lib/utils/format-helpers';
+	import { roundCurrency, getUserAmount } from '$lib/utils/currency';
 	import { filterUpToDate } from '$lib/utils/date-helpers';
 
 	interface Props {
@@ -112,7 +112,7 @@
 		const merchantTotals = new Map<string, number>();
 		for (const t of displayTransactions) {
 			if (!t.merchant) continue;
-			const userAmount = t.isShared ? t.amount - t.partnerShare : t.amount;
+			const userAmount = getUserAmount(t);
 			merchantTotals.set(t.merchant, (merchantTotals.get(t.merchant) || 0) + userAmount);
 		}
 		return Array.from(merchantTotals.entries())
@@ -224,7 +224,7 @@
 							<!-- Amount + percentage -->
 							<span class="relative z-10 font-mono text-sm font-medium text-charcoal shrink-0">{formatCurrency(amount)}</span>
 							{#if topMerchants.length > 1}
-								<span class="relative z-10 text-xs text-charcoal-muted ml-1.5 shrink-0">{Math.round((amount / totalSpent) * 100)}%</span>
+								<span class="relative z-10 text-xs text-charcoal-muted ml-1.5 shrink-0">{formatPercentage(amount / totalSpent)}</span>
 							{/if}
 						</button>
 					{/each}

@@ -5,7 +5,7 @@ import { invalidateRecurringCache } from './recurring';
 import { isSubscriptionCancelled, reactivateSubscription } from './subscriptionSettings';
 import { getMonthDateRange } from '$lib/utils/date-helpers';
 import { getTransactionCache } from './transactionCache';
-import { sumCurrency, currencyEquals } from '$lib/utils/currency';
+import { sumCurrency, currencyEquals, getUserAmount } from '$lib/utils/currency';
 import { tagIndex } from './tags.svelte';
 import { replaceTag, stripTag, appendTag } from '$lib/utils/tags';
 import {
@@ -25,7 +25,6 @@ function invalidateTransactionCaches(): void {
 	invalidateRecurringCache();
 }
 
-// Get all transactions for a month using indexed date range query
 // Filters out split parent transactions and soft-deleted transactions
 export async function getTransactionsByMonth(month: string): Promise<Transaction[]> {
 	const { start, end } = getMonthDateRange(month);
@@ -38,7 +37,6 @@ export async function getTransactionsByMonth(month: string): Promise<Transaction
 	return transactions;
 }
 
-// Get transactions within a date range using indexed query
 // Filters out split parent transactions and soft-deleted transactions
 export async function getTransactionsByDateRange(
 	fromDate?: Date,
@@ -60,7 +58,6 @@ export async function getTransactionsByDateRange(
 		.sortBy('date');
 }
 
-// Add a new transaction
 // Returns the ID of the created transaction
 // Throws if validation fails
 export async function addTransaction(
@@ -130,7 +127,6 @@ export async function addTransaction(
 	return id;
 }
 
-// Update a transaction
 export async function updateTransaction(
 	id: number,
 	updates: Partial<Omit<Transaction, 'id' | 'createdAt'>>
@@ -186,7 +182,6 @@ export async function updateTransaction(
 	await persistData();
 }
 
-// Delete a transaction
 export async function deleteTransaction(id: number): Promise<void> {
 	// Get transaction for tag index removal before deleting
 	const oldTx = await db.transactions.get(id);
@@ -203,7 +198,6 @@ export async function deleteTransaction(id: number): Promise<void> {
 	await persistData();
 }
 
-// Bulk delete transactions
 export async function bulkDeleteTransactions(ids: number[]): Promise<void> {
 	if (ids.length === 0) return;
 	await db.transactions.where('id').anyOf(ids).delete();
@@ -245,7 +239,6 @@ export async function softDeleteTransaction(id: number): Promise<Transaction | n
 	return transaction;
 }
 
-// Soft delete multiple transactions
 // Returns the deleted transactions for undo capture
 export async function softDeleteTransactions(ids: number[]): Promise<Transaction[]> {
 	if (ids.length === 0) return [];
@@ -276,7 +269,6 @@ export async function softDeleteTransactions(ids: number[]): Promise<Transaction
 	return transactions;
 }
 
-// Restore multiple soft-deleted transactions
 export async function restoreTransactions(ids: number[]): Promise<void> {
 	if (ids.length === 0) return;
 
@@ -304,7 +296,6 @@ export async function restoreTransactions(ids: number[]): Promise<void> {
 	await persistData();
 }
 
-// Permanently delete all soft-deleted transactions
 // Called on app startup to clean up items that weren't undone
 // Returns the count of purged transactions
 export async function purgeDeletedTransactions(): Promise<number> {
@@ -326,7 +317,6 @@ export async function purgeDeletedTransactions(): Promise<number> {
 	return deleted.length;
 }
 
-// Bulk update category for transactions
 export async function bulkUpdateCategory(ids: number[], categoryId: number): Promise<void> {
 	if (ids.length === 0) return;
 	const updatedAt = new Date();
@@ -345,7 +335,6 @@ export async function bulkUpdateCategory(ids: number[], categoryId: number): Pro
 	await persistData();
 }
 
-// Bulk add a tag to transactions' notes
 export async function bulkAddTag(ids: number[], tag: string): Promise<void> {
 	if (ids.length === 0) return;
 
@@ -381,7 +370,6 @@ export async function bulkAddTag(ids: number[], tag: string): Promise<void> {
 	await persistData();
 }
 
-// Bulk remove a tag from transactions' notes
 export async function bulkRemoveTag(ids: number[], tag: string): Promise<void> {
 	if (ids.length === 0) return;
 
@@ -422,7 +410,6 @@ export async function bulkRemoveTag(ids: number[], tag: string): Promise<void> {
 	await persistData();
 }
 
-// Split a transaction into multiple category-based parts
 // Returns the child transaction IDs
 export async function splitTransaction(
 	id: number,
@@ -506,7 +493,6 @@ export async function splitTransaction(
 	return childIds;
 }
 
-// Get child transactions for a split parent
 export async function getSplitChildren(parentId: number): Promise<Transaction[]> {
 	return db.transactions.where('parentTransactionId').equals(parentId).toArray();
 }
@@ -635,13 +621,11 @@ export async function updateSplitGroup(
 	return childIds;
 }
 
-// Check if a transaction has been split (has children)
 export async function isSplitParent(id: number): Promise<boolean> {
 	const children = await db.transactions.where('parentTransactionId').equals(id).count();
 	return children > 0;
 }
 
-// Mark transactions as settled
 export async function markAsSettled(ids: number[]): Promise<void> {
 	const now = new Date();
 	await db.transactions.where('id').anyOf(ids).modify({
@@ -677,7 +661,6 @@ export async function calculateOutstandingBalance(): Promise<number> {
 	return sumCurrency(unsettled.map((t) => t.partnerShare));
 }
 
-// Get the earliest month that has transactions (for month picker)
 export async function getEarliestTransactionMonth(): Promise<string | null> {
 	// Use date index to get earliest transaction directly
 	const earliest = await db.transactions.orderBy('date').first();
@@ -685,7 +668,6 @@ export async function getEarliestTransactionMonth(): Promise<string | null> {
 	return getMonthKey(new Date(earliest.date));
 }
 
-// Get spending totals by month for trends chart
 export async function getMonthlySpendingTrends(months: string[]): Promise<Map<string, number>> {
 	const spending = new Map<string, number>();
 	if (months.length === 0) return spending;
@@ -718,7 +700,7 @@ export async function getMonthlySpendingTrends(months: string[]): Promise<Map<st
 
 		if (spending.has(monthKey)) {
 			// For shared transactions, only count your portion
-			const amount = t.isShared ? t.amount - t.partnerShare : t.amount;
+			const amount = getUserAmount(t);
 			spending.set(monthKey, (spending.get(monthKey) || 0) + amount);
 		}
 	}
@@ -765,7 +747,6 @@ export function getTransactionsByMonthFromCache(month: string): Transaction[] | 
 	);
 }
 
-// Get all transactions (for YTD calculations)
 // Uses cache when available, otherwise loads from DB and initializes cache
 // Uses async lock to prevent concurrent double-loading
 // Filters out split parent transactions (they've been replaced by children)
@@ -785,7 +766,6 @@ export async function getAllTransactions(): Promise<Transaction[]> {
 	return cache.getAll();
 }
 
-// Get spending by category across multiple months
 export async function getCategoryTrends(
 	categoryId: number,
 	months: string[]
@@ -822,7 +802,7 @@ export async function getCategoryTrends(
 	for (const t of transactions) {
 		const monthKey = getMonthKey(new Date(t.date));
 		if (spending.has(monthKey)) {
-			const amount = t.isShared ? t.amount - t.partnerShare : t.amount;
+			const amount = getUserAmount(t);
 			spending.set(monthKey, (spending.get(monthKey) || 0) + amount);
 		}
 	}
@@ -830,7 +810,6 @@ export async function getCategoryTrends(
 	return spending;
 }
 
-// Get daily spending for a month (for velocity chart)
 export async function getDailySpending(
 	month: string
 ): Promise<{ day: number; amount: number; cumulative: number }[]> {
@@ -850,7 +829,7 @@ export async function getDailySpending(
 	for (const t of transactions) {
 		const date = new Date(t.date);
 		const day = date.getDate();
-		const amount = t.isShared ? t.amount - t.partnerShare : t.amount;
+		const amount = getUserAmount(t);
 		dailyAmounts.set(day, (dailyAmounts.get(day) || 0) + amount);
 	}
 
@@ -867,7 +846,6 @@ export async function getDailySpending(
 	return result;
 }
 
-// Rename a tag across all transactions
 // Returns the number of transactions updated
 export async function renameTag(oldTag: string, newTag: string): Promise<number> {
 	// Normalize both tags (strip # prefix, lowercase)
@@ -916,7 +894,6 @@ export async function renameTag(oldTag: string, newTag: string): Promise<number>
 	return matching.length;
 }
 
-// Delete a tag from all transactions
 // Returns the number of transactions updated
 export async function deleteTag(tag: string): Promise<number> {
 	// Normalize tag (strip # prefix, lowercase)

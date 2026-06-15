@@ -1,6 +1,6 @@
 <script lang="ts" module>
 	import type { Transaction, Category } from '$lib/db';
-	import { roundCurrency } from '$lib/utils/currency';
+	import { roundCurrency, getUserAmount } from '$lib/utils/currency';
 
 	export interface TopCategory {
 		id: number | null;
@@ -19,7 +19,7 @@
 		// Sum spending by category (user portion)
 		const byCategory = new Map<number, number>();
 		for (const t of transactions) {
-			const userAmount = t.isShared ? t.amount - t.partnerShare : t.amount;
+			const userAmount = getUserAmount(t);
 			byCategory.set(t.categoryId, (byCategory.get(t.categoryId) || 0) + userAmount);
 		}
 

@@ -2,7 +2,7 @@
 	import type { Transaction, MonthlyBudget, SavingsContribution } from '$lib/db';
 	import { getMonthKey } from '$lib/db';
 	import type { CategoryBudget } from '$lib/db';
-	import { sumCurrency, calculatePercent, roundCurrency } from '$lib/utils/currency';
+	import { sumCurrency, calculatePercent, roundCurrency, getUserAmount } from '$lib/utils/currency';
 	import { formatCurrencyWhole } from '$lib/utils/format-helpers';
 	import { getBudgetStatus } from '$lib/utils/budget-status';
 
@@ -21,7 +21,7 @@
 	// Total Spent (user's portion)
 	let totalSpent = $derived(
 		roundCurrency(transactions.reduce((sum, t) => {
-			const userAmount = t.isShared ? t.amount - t.partnerShare : t.amount;
+			const userAmount = getUserAmount(t);
 			return sum + userAmount;
 		}, 0))
 	);
@@ -34,7 +34,7 @@
 		// Sum spending per category (user's portion) — raw float, matching getAllCategorySpending
 		const spending = new Map<number, number>();
 		for (const t of transactions) {
-			const userAmount = t.isShared ? t.amount - t.partnerShare : t.amount;
+			const userAmount = getUserAmount(t);
 			spending.set(t.categoryId, (spending.get(t.categoryId) || 0) + userAmount);
 		}
 

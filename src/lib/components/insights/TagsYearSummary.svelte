@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { Transaction } from '$lib/db';
 	import { formatCurrencyWhole } from '$lib/utils/format-helpers';
-	import { roundCurrency } from '$lib/utils/currency';
+	import { roundCurrency, getUserAmount } from '$lib/utils/currency';
 	import { extractTags } from '$lib/utils/tags';
 	import InsightGroup from './InsightGroup.svelte';
 
@@ -25,7 +25,7 @@
 		for (const t of yearTransactions) {
 			const tags = extractTags(t.notes);
 			if (tags.length === 0) continue;
-			const userAmount = t.isShared ? t.amount - t.partnerShare : t.amount;
+			const userAmount = getUserAmount(t);
 
 			for (const tag of tags) {
 				const existing = tagTotals.get(tag) || { total: 0, count: 0 };

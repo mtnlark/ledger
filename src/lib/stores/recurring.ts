@@ -8,7 +8,7 @@ import {
 	computeWeightedStdDev,
 	mode
 } from '$lib/insights/calculations/stats';
-import { roundCurrency, roundCoefficient } from '$lib/utils/currency';
+import { roundCurrency, roundCoefficient, getUserAmount } from '$lib/utils/currency';
 import { getCachedRecurring, setCachedRecurring } from './recurringCache';
 
 // Re-export cache functions for backward compatibility
@@ -222,7 +222,7 @@ export async function detectRecurringExpenses(providedTransactions?: Transaction
 
 		// Calculate user's portion (after split if shared)
 		const userAmounts = transactions.map((t) =>
-			t.isShared ? t.amount - t.partnerShare : t.amount
+			getUserAmount(t)
 		);
 		const avgUserAmount = average(userAmounts);
 

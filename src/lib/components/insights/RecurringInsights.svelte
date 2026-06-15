@@ -15,7 +15,7 @@
 		removeFixedRecurringAmount
 	} from '$lib/stores/settings';
 	import { normalizeMerchant, subscriptionKey, findSupersededSubscriptionKeys } from '$lib/utils/string-helpers';
-	import { currencyEquals } from '$lib/utils/currency';
+	import { currencyEquals, getUserAmount, sumCurrency } from '$lib/utils/currency';
 	import { config } from '$lib/config';
 
 	interface Props {
@@ -254,7 +254,7 @@
 				const lastCharge = new Date(sub.date);
 				const expectedRenewal = new Date(lastCharge);
 				expectedRenewal.setFullYear(expectedRenewal.getFullYear() + 1);
-				const userAmount = sub.isShared ? sub.amount - sub.partnerShare : sub.amount;
+				const userAmount = getUserAmount(sub);
 				return {
 					merchant: sub.merchant,
 					lastCharge,
@@ -271,32 +271,15 @@
 		allSubscriptions.filter((sub) => !isCancelled(sub.merchant, new Date(sub.date), sub.amount))
 	);
 
+	function subCost(subs: Transaction[], match: (s: Transaction) => boolean): number {
+		return sumCurrency(subs.filter(match).map(getUserAmount));
+	}
+
 	let monthlySubCost = $derived(
-		allNonCancelledSubs
-			.filter((s) => !s.subscriptionFrequency || s.subscriptionFrequency === 'monthly')
-			.reduce((sum, t) => {
-				const userAmount = t.isShared ? t.amount - t.partnerShare : t.amount;
-				return sum + userAmount;
-			}, 0)
+		subCost(allNonCancelledSubs, (s) => !s.subscriptionFrequency || s.subscriptionFrequency === 'monthly')
 	);
-
-	let semiAnnualSubCost = $derived(
-		allNonCancelledSubs
-			.filter((s) => s.subscriptionFrequency === 'semi-annual')
-			.reduce((sum, t) => {
-				const userAmount = t.isShared ? t.amount - t.partnerShare : t.amount;
-				return sum + userAmount;
-			}, 0)
-	);
-
-	let annualSubCost = $derived(
-		allNonCancelledSubs
-			.filter((s) => s.subscriptionFrequency === 'annual')
-			.reduce((sum, t) => {
-				const userAmount = t.isShared ? t.amount - t.partnerShare : t.amount;
-				return sum + userAmount;
-			}, 0)
-	);
+	let semiAnnualSubCost = $derived(subCost(allNonCancelledSubs, (s) => s.subscriptionFrequency === 'semi-annual'));
+	let annualSubCost = $derived(subCost(allNonCancelledSubs, (s) => s.subscriptionFrequency === 'annual'));
 
 	// Monthly equivalent of all non-cancelled subscriptions
 	let totalSubMonthly = $derived(monthlySubCost + semiAnnualSubCost / 6 + annualSubCost / 12);
@@ -450,7 +433,7 @@
 							</h4>
 							<div class="space-y-2">
 								{#each monthlySubscriptions as sub}
-									{@const userAmount = sub.isShared ? sub.amount - sub.partnerShare : sub.amount}
+									{@const userAmount = getUserAmount(sub)}
 									<div class="flex items-center gap-3 py-2 px-3 bg-cream rounded-lg">
 										<span class="w-2 h-2 rounded-full shrink-0" style="background-color: {getCategoryColor(sub.categoryId)};" aria-hidden="true"></span>
 										<div class="flex-1 min-w-0">
@@ -483,7 +466,7 @@
 							</h4>
 							<div class="space-y-2">
 								{#each semiAnnualSubscriptions as sub}
-									{@const userAmount = sub.isShared ? sub.amount - sub.partnerShare : sub.amount}
+									{@const userAmount = getUserAmount(sub)}
 									{@const monthlyEquiv = userAmount / 6}
 									<div class="flex items-center gap-3 py-2 px-3 bg-cream rounded-lg">
 										<span class="w-2 h-2 rounded-full shrink-0" style="background-color: {getCategoryColor(sub.categoryId)};" aria-hidden="true"></span>
@@ -520,7 +503,7 @@
 							</h4>
 							<div class="space-y-2">
 								{#each annualSubscriptions as sub}
-									{@const userAmount = sub.isShared ? sub.amount - sub.partnerShare : sub.amount}
+									{@const userAmount = getUserAmount(sub)}
 									{@const monthlyEquiv = userAmount / 12}
 									<div class="flex items-center gap-3 py-2 px-3 bg-cream rounded-lg">
 										<span class="w-2 h-2 rounded-full shrink-0" style="background-color: {getCategoryColor(sub.categoryId)};" aria-hidden="true"></span>
@@ -587,7 +570,7 @@
 
 					<div class="space-y-2">
 						{#each possiblyInactiveSubscriptions as sub}
-							{@const userAmount = sub.isShared ? sub.amount - sub.partnerShare : sub.amount}
+							{@const userAmount = getUserAmount(sub)}
 							<div class="flex items-center gap-3 py-2 px-3 bg-warning-50 rounded-lg border border-warning-200">
 								<span class="w-2 h-2 rounded-full shrink-0" style="background-color: {getCategoryColor(sub.categoryId)};" aria-hidden="true"></span>
 								<div class="flex-1 min-w-0">

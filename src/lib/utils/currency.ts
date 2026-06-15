@@ -88,6 +88,14 @@ export function isSplitBalanced(remaining: number): boolean {
 // ============================================================================
 
 /**
+ * A transaction's user-facing amount: the full amount, or the amount minus the
+ * partner's share for shared expenses. The basis for every spending sum.
+ */
+export function getUserAmount(t: { amount: number; isShared: boolean; partnerShare: number }): number {
+	return t.isShared ? t.amount - t.partnerShare : t.amount;
+}
+
+/**
  * Calculate total spent from transactions, accounting for shared expenses.
  * For shared transactions, only the user's portion (amount - partnerShare) is counted.
  *
@@ -103,9 +111,7 @@ export function isSplitBalanced(remaining: number): boolean {
 export function calculateTotalSpent(
 	transactions: { amount: number; isShared: boolean; partnerShare: number }[]
 ): number {
-	return sumCurrency(
-		transactions.map((t) => (t.isShared ? t.amount - t.partnerShare : t.amount))
-	);
+	return sumCurrency(transactions.map(getUserAmount));
 }
 
 // ============================================================================

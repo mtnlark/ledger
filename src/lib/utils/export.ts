@@ -1,4 +1,5 @@
 import { db, type Transaction, type Category } from '$lib/db';
+import { getUserAmount } from '$lib/utils/currency';
 import { persistData } from '$lib/storage';
 import { parseStoredDate } from '$lib/utils/date-helpers';
 import { format } from 'date-fns';
@@ -26,7 +27,7 @@ export async function exportTransactionsToCSV(
 
 	const rows = transactions.map((t) => {
 		const category = categoryMap.get(t.categoryId);
-		const yourShare = t.isShared ? t.amount - t.partnerShare : t.amount;
+		const yourShare = getUserAmount(t);
 
 		return [
 			format(new Date(t.date), 'yyyy-MM-dd'),

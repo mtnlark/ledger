@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { Transaction, Category } from '$lib/db';
+	import { getUserAmount } from '$lib/utils/currency';
 	import { goto } from '$app/navigation';
 	import { formatCurrencyWhole } from '$lib/utils/format-helpers';
 	import { getInsightsEngine } from '$lib/insights';
@@ -32,7 +33,7 @@
 		const discretionaryTotals = new Map<number, number>();
 
 		for (const tx of transactions) {
-			const userAmount = tx.isShared ? tx.amount - tx.partnerShare : tx.amount;
+			const userAmount = getUserAmount(tx);
 			const isNeeds = tx.isEssential || (categoryEssentialMap.get(tx.categoryId) ?? false);
 			const targetMap = isNeeds ? essentialTotals : discretionaryTotals;
 			targetMap.set(tx.categoryId, (targetMap.get(tx.categoryId) ?? 0) + userAmount);

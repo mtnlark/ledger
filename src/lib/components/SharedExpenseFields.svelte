@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { formatCurrency } from '$lib/utils/format-helpers';
+	import { formatCurrency, formatPercentage } from '$lib/utils/format-helpers';
 	import { roundCurrency } from '$lib/utils/currency';
 
 	interface Props {
@@ -91,7 +91,7 @@
 			{#if splitType === 'percentage'}
 				<div>
 					<label for="{idPrefix}splitPercent" class="block text-sm text-charcoal-soft mb-1">
-						{partnerName}'s share: <span class="font-mono font-medium">{Math.round(splitValue * 100)}%</span>
+						{partnerName}'s share: <span class="font-mono font-medium">{formatPercentage(splitValue)}</span>
 					</label>
 					<input
 						type="range"

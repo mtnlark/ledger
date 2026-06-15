@@ -44,7 +44,6 @@
 		onSearchInputRef?.(searchInput);
 	});
 
-	// Local UI state
 	let showAdvanced = $state(false);
 	let showManageTags = $state(false);
 	let editingTag = $state<string | null>(null);
