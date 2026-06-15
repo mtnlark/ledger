@@ -1,339 +1,84 @@
-# Ledger - Personal Budget Tracking App
+# Ledger — Personal Budget Tracking App
 
-## Overview
-A Tauri desktop application for personal budget tracking with expense splitting, category insights, and Venmo settlement tracking. Local-first architecture with all data stored on-device.
+Tauri + SvelteKit desktop app (macOS-only) for personal budget tracking: expense splitting, category insights, savings goals, net worth, and Venmo settlement tracking. Local-first — all data lives on-device.
 
-Use test-driven development (TDD) best practices when adding new code. Update CLAUDE.md whenever you make relevant changes to any of the areas listed below.
-
----
-
-## Standard Workflow
-
-Standard workflow after implementation: 1) Run all tests 2) Update relevant documentation 3) Commit with descriptive message 4) Build production app 5) Deploy. Do not skip steps unless explicitly told to.
+Use TDD for new code. **Update this file whenever you change a documented area.** Plans live in `PRODUCT_ROADMAP.md` and `NET_WORTH_PLAN.md`; git history is the full changelog.
 
 ---
 
-## Code Editing
+## Working Agreements
 
-When editing files with tab indentation (especially Svelte/TSX files), prefer using Bash sed commands over the Edit tool to avoid indentation mismatches and repeated failures.
-
----
-
-## Build & Deploy
-
-After implementing changes, always clear BOTH frontend build artifacts AND the Rust binary cache before building the Tauri app. Run: `rm -rf src-tauri/target/release/bundle && cargo clean -p ledger && npm run build`
-
----
-
-## Debugging Philosophy
-
-When debugging, do NOT guess at root causes or explain away user observations. Systematically verify each hypothesis with actual data/logs before proposing a fix. If the first fix doesn't work, step back and re-examine assumptions from scratch.
+- **Standard workflow** after implementing: 1) run all tests 2) update docs 3) commit (descriptive message) 4) build production app 5) deploy. Don't skip unless told.
+- **Build & deploy**: clear BOTH frontend and Rust caches before building: `rm -rf src-tauri/target/release/bundle && cargo clean -p ledger && npm run build`.
+- **Editing tab-indented files** (Svelte/TSX): the codebase uses real tab characters. Prefer `sed`/Python over the Edit tool to avoid indentation mismatches.
+- **Debugging**: never guess at root causes or explain away user observations. Verify each hypothesis with real data/logs before proposing a fix; if the first fix fails, re-examine assumptions from scratch.
+- **Python**: always use a venv (`python3 -m venv .venv && source .venv/bin/activate`); never install globally.
+- **Tailwind v4**: verify directories are in the content config and that classes apply at expected specificity; prefer inline styles / explicit overrides when utilities don't take effect.
 
 ---
 
-## Python / Environment Rules
+## Status
 
-Always use Python virtual environments (venv) for any Python package installations. Never install packages globally. Create/activate venv first: `python3 -m venv .venv && source .venv/bin/activate`
-
----
-
-## Styling / Tailwind
-
-When making CSS/styling changes with Tailwind, verify that the relevant directories are included in the Tailwind content config and that utility classes actually apply at the expected specificity. For Tailwind v4, prefer inline styles or explicit class overrides when utility classes don't take effect.
+Roadmap groups 1–9 complete: data-integrity hardening, savings goals, tags, notifications, insights redesign, undo system, design polish, performance/tech-debt, startup perf & search. Shipped since: Net Worth page + SimpleFIN sync, budget rollover, trust/insight features (stale-ledger nudge, report cards, variance card), menu-bar quick add, and an app-wide design-language refresh. See the feature sections below for current behavior.
 
 ---
 
-## Active Development
+## Stack
 
-See `PRODUCT_ROADMAP.md` for the full development plan. Groups 1–9 are complete:
-
-1. ~~Data Integrity Hardening~~ — Backup recovery, atomic writes, checksums ✅
-2. ~~Savings Goals~~ — Goal tracking with projections ✅
-3. ~~Tags System~~ — Hashtag-based tagging via notes field ✅
-4. ~~Notifications~~ — Daily reminders, weekly review, monthly budget setup ✅
-5. ~~Insights Page Redesign~~ — Tab-based navigation (5 tabs) ✅
-6. ~~Undo System~~ — Recoverable deletions with soft delete ✅
-7. ~~Design Polish~~ — Accessibility, dark mode, loading states ✅
-8. ~~Performance & Tech Debt~~ — N+1 fix, stats dedup, lazy-load, chunk splitting, import/export tests ✅
-9. ~~Startup Perf & Search~~ — Redundant DB scan elimination, query parallelization, search/filter enhancements, pagination, lazy emoji picker, migration version stamp ✅
-
-**Recent**: Net Worth page + SimpleFIN sync — see the Net Worth feature section. New tables `linkedAccounts`/`balanceSnapshots` (Dexie v5, all six storage touchpoints), `utils/net-worth.ts`, `services/simplefin.ts`, `src-tauri/src/simplefin.rs` (first `invoke_handler` commands). Lev links real accounts post-ship via Settings → Connected Accounts.
-
-**Earlier**: Budget rollover — see Budget section for semantics (surpluses chain per category; deficits pool one month). `CategoryBudget.rollsOver` field (no migration needed; undefined = off).
-
-**Earlier**: Trust & insight features — Stale-ledger nudge (dashboard banner when nothing entered for 7+ days, dismissal re-arms after a week, `ledger-stale-nudge-dismissed`). Shared-status filter (shared/pending/settled/personal) in advanced filters — with All Time this doubles as settlement history. Insights Overview gains a "Versus a Typical Month" variance card (`VarianceBreakdown.svelte`, per-category deltas vs 6-month baseline, day-clipped for partial months). Merchant + tag report cards (`ReportCardModal` + `utils/report-cards.ts`): click a merchant name on a row, or the chart icon on an active tag filter chip — stats, trailing-12-month bars, top categories. svelte-check is now fully clean (0 errors, 0 warnings). Menu-bar quick add is live: tray icon toggles a small capture window (`/quick-add` route) that reads shared Dexie and hands submits to the main window via Tauri event (single-writer). Split-group merchant names now open the merchant report card (header restructured: row click toggles, chevron is the accessible control).
-
-**Earlier**: Design language rolled out app-wide — All pages now use in-content Fraunces titles (HeaderNav deleted); KeyboardShortcuts moved to the root layout with a handler registry (`stores/shortcuts.ts`) so ⌘1–5/⌘N/⌘K work on every page. Budget and Savings are two-column (main list + sticky 330px rail with vertically stacked summary cards). Insights: title row with month picker, underline-style tabs (InsightTabs), two-up chart grid on the Overview tab. Shared: plain-language hero balance ("{partner} owes you"), gradient removed, list rows use category chips + dashed dividers, static Tips card deleted. Dashboard additions: sticky Transactions heading + search toolbar (measured via bind:clientHeight, offsets sticky date headers), and future-dated transactions hidden behind a "Show N upcoming" toggle (`ledger-show-upcoming`).
-
-**Earlier**: Monarch-style dashboard restructure — Two-column dashboard: ledger in the main column, sticky right rail (Cash Flow, Week in Review, Top Categories). The month name is now the page title (`MonthPicker variant="title"`). One add-transaction entry point: `AddTransactionModal` (full `TransactionForm` refactored to a pure form, no card chrome) via "Add" button or ⌘N; QuickAddFAB and the inline form card deleted. Ledger refinements: sticky date headers with day totals (your share), your-share-first amounts on shared rows ("of $full" beneath), muted partner line (green reserved for positive states), ↻ icon for monthly subs. TransactionFilters is a slim toolbar (search + All Time + Filters buttons) with the advanced panel as a card. Also: `prefers-reduced-motion` support, and divider color utilities now cover Tailwind v4's `:not(:last-child)` divide selector (first-divider dark bug).
-
-**Earlier**: Look-and-feel refresh — Transaction list rows are grouped into one card per date with dashed hairline dividers (no more shadow-per-row or `border-l-4` color stripes); category emoji render in soft color-tinted chips (`.category-chip` utility, `{hex}1F` 12% alpha tint); status badges use the new quiet `.badge` utility (sentence-case pills; a shared transaction shows *either* "Pending" or "Shared", not both); row edit/delete actions reveal on hover (`group/row` + `focus-within` for keyboard). Shadow token warmed: `--color-shadow` is now charcoal-tinted `rgba(45,42,38,0.12)` instead of cool gray. Sidebar got a terracotta logo chip + active-item accent bar.
-
-**Earlier**: Split transactions are now visually linked on the dashboard — children collapse into a single expandable summary row (`buildListRows`/`groupRowsByDate` in `transaction-grouping.ts`) instead of appearing as separate same-merchant rows. The summary row also has group-level Edit (`EditSplitModal` + `updateSplitGroup()`) and Delete actions, aligning splits with normal transactions.
-
-**Earlier**: Codebase cleanup — Removed 9 unused functions and ~20 unused exports (dead-code sweep), and cleared all `svelte-check` type errors (24 → 0). Notable: fixed a latent mobile-only bug in `registerNotificationClickHandler` (`onAction` returns a `PluginListener`, so cleanup must call `unlisten.unregister()`). `npm run check` is now a clean tripwire (13 a11y/reactivity warnings remain).
-
-**Earlier**: Tag toggle + bulk tag management — Clicking a filtered tag pill now un-filters it (toggle behavior). Bulk select toolbar adds "Tag" button with dropdown for adding/removing tags across selected transactions. New `appendTag()` utility, `bulkAddTag`/`bulkRemoveTag` store operations and dashboard actions.
-
----
-
-## Technology Stack
-
-### Framework: **SvelteKit + Tauri**
-- **SvelteKit**: File-based routing, Svelte 5 with runes (`$state`, `$derived`, `$props`)
-- **Tauri v2**: Native desktop app with Rust backend
-- **Target Platform**: macOS (desktop-only, no mobile/PWA)
-
-### Storage: **Dexie.js + JSON File Persistence**
-- **Dexie**: In-memory database for queries (IndexedDB cleared on startup)
-- **JSON Files**: Source of truth in `~/Library/Application Support/app.ledger.desktop/`
-  - `data.json`: All app data
-  - `backups/`: Timestamped backups (max 10 retained)
-
-### UI: **Tailwind CSS v4**
-- Tailwind v4 with `@tailwindcss/vite` plugin
-- CSS-first configuration via `@theme` blocks in `app.css`
-- Custom "Warm Ledger" design system with terracotta/cream palette
-
-### Charts: **Chart.js**
-- Top-categories bars, category treemap, category/savings/needs-wants trend lines
-- Monthly spending trends
+- **SvelteKit** (Svelte 5 runes: `$state`/`$derived`/`$props`, file-based routing) + **Tauri v2** (Rust backend). macOS desktop only.
+- **Storage**: Dexie (in-memory IndexedDB, cleared on startup) for queries; JSON files are the source of truth in `~/Library/Application Support/app.ledger.desktop/` (`data.json` + `backups/`, max 10).
+- **UI**: Tailwind v4 (`@tailwindcss/vite`, CSS-first config via `@theme` in `app.css`); "Warm Ledger" terracotta/cream design system.
+- **Charts**: Chart.js (+ `chartjs-plugin-annotation` for σ bands / mean lines).
+- **Other runtime deps**: `date-fns`, `lucide-svelte`, `xlsx`. Full list in `package.json`.
 
 ---
 
 ## Design System
 
-### Colors
 ```css
-/* Primary - Terracotta */
---color-primary-500: #C45D3A;
---color-primary-600: #B5522F;
-
-/* Semantic */
---color-cream: #FAF8F5;
---color-charcoal: #2D2A26;
-
-/* Success - Sage Green */
---color-success-500: #5B8C5A;
-
-/* Warning - Amber */
---color-warning-500: #D4915D;
-
-/* Danger - Muted Rose */
---color-danger-500: #C17B7B;
+--color-primary-500: #C45D3A;  --color-primary-600: #B5522F;  /* Terracotta */
+--color-cream: #FAF8F5;         --color-charcoal: #2D2A26;
+--color-success-500: #5B8C5A;   /* Sage */   --color-warning-500: #D4915D;  /* Amber */
+--color-danger-500: #C17B7B;    /* Muted rose */
+--color-shadow: rgba(45,42,38,0.12);          /* charcoal-tinted, not cool gray */
 ```
 
-### Typography
-- **Display**: Fraunces (serif, for headings)
-- **Body**: Instrument Sans (sans-serif)
-- **Mono**: DM Mono (for amounts)
+- **Type**: Fraunces (display/headings), Instrument Sans (body), DM Mono (amounts).
+- **Tokens over hardcoded values**: use `bg-surface-alt`, `border-theme`, `text-charcoal-muted`, `bg-cream` (theme-aware) instead of raw Tailwind grays / `rgba()`.
+- **Emoji policy**: category/account emoji appear ONLY in selection contexts (pickers, form dropdowns, CategoryChipPicker), the treemap, and CategoryManager. Every display row (dashboard, Shared, Budget, Savings, insights) uses a small full-color dot + name instead.
+- **Cards**: one card per date with dashed hairline dividers; 12%-alpha tinted category chips (`.category-chip`); quiet sentence-case `.badge` pills; hover/`focus-within`-revealed row actions.
 
 ---
 
-## Application Structure
+## Structure
 
 ```
-ledger/
-├── src/
-│   ├── app.html              # HTML template
-│   ├── app.css               # Tailwind + design system
-│   ├── app.d.ts              # TypeScript definitions
-│   ├── lib/
-│   │   ├── db/
-│   │   │   ├── index.ts      # Dexie schema & defaults
-│   │   │   ├── constants.ts  # Type definitions & default data
-│   │   │   └── migrations.ts # Database migration logic
-│   │   ├── storage/
-│   │   │   ├── index.ts      # Storage abstraction layer (UI-agnostic, uses registered callbacks)
-│   │   │   ├── types.ts      # StoredData interface
-│   │   │   └── tauri-adapter.ts  # File persistence
-│   │   ├── config/
-│   │   │   └── index.ts          # Centralized configuration constants
-│   │   ├── stores/           # Data operations
-│   │   │   ├── transactions.ts
-│   │   │   ├── transactionCache.ts    # In-memory transaction cache with versioning
-│   │   │   ├── categories.ts
-│   │   │   ├── settings.ts
-│   │   │   ├── budget.ts
-│   │   │   ├── categoryBudget.ts   # Per-category budget tracking
-│   │   │   ├── savingsAccounts.ts  # Savings account CRUD
-│   │   │   ├── savingsContributions.ts  # Contribution tracking + goal projections
-│   │   │   ├── linkedAccounts.ts   # Net-worth accounts + balance snapshots (recordBalance = one snapshot/account/day)
-│   │   │   ├── merchants.ts
-│   │   │   ├── recurring.ts
-│   │   │   ├── recurringCache.ts       # Recurring detection cache management
-│   │   │   ├── recurringSuggestions.ts  # Monthly recurring transaction suggestions
-│   │   │   ├── subscriptionSettings.ts # Cancel/confirm/reactivate subscription state
-│   │   │   ├── dashboardActions.ts     # Dashboard transaction CRUD operations
-│   │   │   ├── tags.ts              # TagIndex class for tag lookups (incremental + bulk)
-│   │   │   ├── tags.svelte.ts       # Reactive TagIndex wrapper ($state version)
-│   │   │   ├── selectedMonth.ts    # UI state for month selection
-│   │   │   ├── shortcuts.ts        # Registry for page-specific keyboard shortcut handlers
-│   │   │   ├── theme.ts            # Light/dark/system theme
-│   │   │   ├── toast.ts            # Toast notification system
-│   │   │   └── undo.ts             # Undo store for recoverable deletions
-│   │   ├── notifications/        # Native macOS notification system
-│   │   │   ├── index.ts          # Public API (init, cleanup)
-│   │   │   ├── tauri-notifications.ts  # Tauri plugin wrapper
-│   │   │   ├── scheduler.ts      # setInterval-based scheduler
-│   │   │   └── app-open-checks.ts # One-shot app-open fallback
-│   │   ├── insights/             # Memoized insight calculations
-│   │   │   ├── index.ts          # Public API (getInsightsEngine)
-│   │   │   ├── types.ts          # Type definitions
-│   │   │   ├── memo.ts           # Version-based memoization utilities
-│   │   │   ├── insights-engine.ts # InsightsEngine singleton
-│   │   │   └── calculations/     # Pure calculation functions
-│   │   │       ├── index.ts
-│   │   │       ├── spending.ts
-│   │   │       ├── needs-wants.ts
-│   │   │       ├── category-shift.ts
-│   │   │       ├── category-averages.ts
-│   │   │       ├── anomalies.ts
-│   │   │       ├── pace-projection.ts
-│   │   │       ├── velocity.ts
-│   │   │       ├── top-merchant.ts
-│   │   │       ├── ytd-stats.ts
-│   │   │       ├── month-review.ts   # End-of-month spending review calculations
-│   │   │       └── stats.ts          # Shared statistical helpers (stdDev, zScore)
-│   │   ├── components/
-│   │   │   ├── SideNav.svelte         # Collapsible sidebar
-│   │   │   ├── TransactionForm.svelte
-│   │   │   ├── TransactionList.svelte
-│   │   │   ├── TransactionListSkeleton.svelte
-│   │   │   ├── TransactionFilters.svelte
-│   │   │   ├── EditTransactionModal.svelte
-│   │   │   ├── SplitTransactionModal.svelte
-│   │   │   ├── EditSplitModal.svelte     # Edit an entire split (group fields + category lines)
-│   │   │   ├── CashFlowCard.svelte
-│   │   │   ├── CashFlowCardSkeleton.svelte
-│   │   │   ├── SettlementTracker.svelte
-│   │   │   ├── AddTransactionModal.svelte # Add-transaction modal (wraps TransactionForm)
-│   │   │   ├── BulkActionBar.svelte
-│   │   │   ├── BudgetModal.svelte
-│   │   │   ├── BudgetProgressBar.svelte
-│   │   │   ├── CategoryBudgetCard.svelte
-│   │   │   ├── CategoryBudgetList.svelte
-│   │   │   ├── CategoryManager.svelte
-│   │   │   ├── CategoryCombobox.svelte
-│   │   │   ├── CategoryEditModal.svelte
-│   │   │   ├── MonthlyTrendsChart.svelte
-│   │   │   ├── MonthPicker.svelte
-│   │   │   ├── MerchantAutocomplete.svelte
-│   │   │   ├── ConfirmDialog.svelte
-│   │   │   ├── ModalContainer.svelte     # Reusable modal wrapper (focus trap, backdrop)
-│   │   │   ├── ToastContainer.svelte
-│   │   │   ├── EmptyState.svelte
-│   │   │   ├── Skeleton.svelte
-│   │   │   ├── ChartWrapper.svelte
-│   │   │   ├── SharedExpenseFields.svelte  # Shared expense toggle + split options
-│   │   │   ├── EssentialToggle.svelte      # Needs vs wants toggle
-│   │   │   ├── SubscriptionFields.svelte   # Subscription toggle + frequency
-│   │   │   ├── SavingsAccountCard.svelte   # Individual savings account display
-│   │   │   ├── AddContributionModal.svelte # Add savings contribution
-│   │   │   ├── EditContributionModal.svelte # Edit/delete contribution
-│   │   │   ├── AddAccountModal.svelte      # Add savings account
-│   │   │   ├── EditAccountModal.svelte     # Edit savings account/balance
-│   │   │   ├── RecurringSuggestionsBanner.svelte  # Banner for recurring suggestions
-│   │   │   ├── RecurringSuggestionsModal.svelte   # Modal to review/add recurring
-│   │   │   ├── TagPill.svelte             # Tag pill display with hover popover
-│   │   │   ├── TagPopover.svelte          # Tag hover popover (total + count)
-│   │   │   ├── TagAutocomplete.svelte     # Tag autocomplete for notes input
-│   │   │   ├── WeekInReviewCard.svelte    # Week in Review dashboard card
-│   │   │   ├── KeyboardShortcuts.svelte  # App-wide shortcuts (mounted in layout; pages register handlers via stores/shortcuts.ts)
-│   │   │   ├── __tests__/             # Component test utilities
-│   │   │   │   ├── setup.ts
-│   │   │   │   └── test-utils.test.ts
-│   │   │   └── insights/              # Insight components
-│   │   │       ├── InsightGroup.svelte
-│   │   │       ├── SmartTakeaways.svelte
-│   │   │       ├── SpendingThisMonth.svelte
-│   │   │       ├── YTDSummary.svelte
-│   │   │       ├── NeedsWantsInsights.svelte
-│   │   │       ├── RecurringInsights.svelte
-│   │   │       ├── CategoryDeepDives.svelte
-│   │   │       ├── CategoryComparison.svelte
-│   │   │       ├── CategoryTrendsChart.svelte
-│   │   │       ├── SavingsInsights.svelte      # Savings breakdown and trends
-│   │   │       ├── SavingsRateTrendChart.svelte # Savings rate over time
-│   │   │       ├── CalendarHeatmap.svelte
-│   │   │       ├── InsightTabs.svelte         # Pill tab bar for insights navigation
-│   │   │       ├── QuickStatsRow.svelte       # Overview tab quick stats (total, budget, savings rate)
-│   │   │       └── NeedsWantsTrendChart.svelte # Needs/wants % trend line chart
-│   │   ├── utils/
-│   │   │   ├── currency.ts            # Currency/percentage utilities (rounding, comparison)
-│   │   │   ├── budget-status.ts       # Budget status calculation (under/approaching/at/over)
-│   │   │   ├── budget-alerts.ts       # Budget alert message generation
-│   │   │   ├── format-helpers.ts      # Currency/percentage display formatting
-│   │   │   ├── import.ts              # Excel import
-│   │   │   ├── export.ts              # CSV/JSON export
-│   │   │   ├── category-helpers.ts
-│   │   │   ├── chart-theme.ts         # Chart.js theme configuration
-│   │   │   ├── date-helpers.ts        # Date parsing, filterUpToDate
-│   │   │   ├── string-helpers.ts      # Merchant normalization, subscription keys, supersession
-│   │   │   ├── focus-trap.ts          # Modal focus trapping utility
-│   │   │   ├── modal-helpers.ts       # Modal event handlers (backdrop click, escape key)
-│   │   │   ├── form-validation.ts     # Shared form validation helpers
-│   │   │   ├── transaction-validation.ts  # Transaction data validation
-│   │   │   ├── transaction-grouping.ts    # Group txns by date; collapse split children into list rows (buildListRows/groupRowsByDate)
-│   │   │   ├── trie.ts                # Trie for merchant autocomplete
-│   │   │   ├── pagination.ts          # List pagination utilities
-│   │   │   ├── retry.ts               # Async retry with backoff
-│   │   │   ├── tags.ts                # Tag parsing, replace, strip, append, total calculation
-│   │   │   ├── errors.ts              # Error class definitions & type guards
-│   │   │   ├── error-handler.ts       # Centralized error handler (logging + toast)
-│   │   │   ├── week-in-review.ts      # Week in Review calculations + dismiss logic
-│   │   │   └── debug.ts               # Debugging utilities
-│   │   └── assets/
-│   │       └── favicon.svg
-│   ├── routes/
-│   │   ├── +layout.svelte    # App shell with SideNav (bare shell + submit listener for quick-add window)
-│   │   ├── +layout.ts
-│   │   ├── +page.svelte      # Dashboard
-│   │   ├── budget/+page.svelte
-│   │   ├── savings/+page.svelte  # Savings tracking
-│   │   ├── insights/+page.svelte
-│   │   ├── networth/+page.svelte # Net worth: hero+chart, accounts, rail breakdown + SimpleFIN sync card
-│   │   ├── quick-add/+page.svelte # Menu-bar quick-add window (reads shared Dexie, submits via Tauri event)
-│   │   ├── shared/+page.svelte
-│   │   └── settings/+page.svelte
-│   └── tests/
-│       ├── setup.ts          # Vitest test setup
-│       ├── stores/           # Store integration tests
-│       │   ├── dashboardActions.test.ts
-│       │   ├── recurringCache.test.ts
-│       │   ├── recurringSuggestions.test.ts
-│       │   ├── splitTransaction.test.ts   # Split transaction edge cases
-│       │   ├── subscriptionSettings.test.ts
-│       │   ├── tagIndex.test.ts           # TagIndex incremental add/remove/update
-│       │   └── tagOperations.test.ts      # Tag rename/delete batch operations
-│       └── utils/            # Utility tests
-│           ├── cash-flow.test.ts          # Cash flow + total spent calculations
-│           ├── error-handler.test.ts
-│           ├── export.test.ts
-│           ├── import.test.ts
-│           ├── stats.test.ts
-│           ├── string-helpers.test.ts
-│           ├── tags.test.ts               # appendTag utility tests
-│           └── week-in-review.test.ts     # Week in Review calculations + dismiss
-├── src-tauri/
-│   ├── src/
-│   │   ├── main.rs
-│   │   ├── lib.rs            # Tauri plugins setup + tray icon / quick-add window toggle + invoke_handler
-│   │   └── simplefin.rs      # SimpleFIN client: claim/fetch/unlink; access URL lives in macOS Keychain only
-│   ├── capabilities/
-│   │   └── default.json      # Capability configuration
-│   ├── icons/                # App icons (all sizes)
-│   ├── tauri.conf.json       # Tauri configuration
-│   └── Cargo.toml
-├── static/
-│   └── robots.txt
-├── vite.config.ts
-└── vitest.config.ts
+src/lib/
+  db/            # Dexie schema (index.ts), type defs + defaults (constants.ts), migrations.ts
+  storage/       # UI-agnostic abstraction (index.ts) + tauri-adapter.ts (file persistence); types.ts = StoredData
+  config/        # Centralized constants (insights pace, subscription staleness thresholds, …)
+  stores/        # Data ops: transactions(+Cache), categories, settings, budget, categoryBudget,
+                 #   savings{Accounts,Contributions}, linkedAccounts (net worth; recordBalance = 1 snapshot/account/day),
+                 #   merchants, recurring(+Cache,Suggestions), subscriptionSettings, dashboardActions,
+                 #   tags(+.svelte reactive), selectedMonth, shortcuts (kbd handler registry), theme, toast, undo
+  notifications/ # Tauri-plugin scheduler (setInterval 60s tick) + one-shot app-open fallback checks
+  insights/      # Memoized engine (getInsightsEngine) + pure calculations/ (spending, needs-wants,
+                 #   anomalies, category-shift, pace-projection, velocity, top-merchant, ytd-stats, month-review, stats)
+  components/    # ~60 Svelte components incl. an insights/ subfolder; key behaviors documented below
+  utils/         # currency, budget-{status,alerts,rollover}, date-helpers (filterUpToDate),
+                 #   string-helpers (merchant norm, subscriptionKey, supersession), tags, net-worth,
+                 #   transaction-grouping (buildListRows/groupRowsByDate), import/export, errors, report-cards
+src/routes/      # +layout (app shell + quick-add submit listener) + pages: dashboard (+page),
+                 #   budget, savings, insights, networth, shared, settings, quick-add
+src/tests/       # Vitest specs under stores/ and utils/
+src-tauri/src/   # main.rs; lib.rs (plugins, tray/quick-add window toggle, invoke_handler); simplefin.rs
 ```
 
 ---
 
 ## Data Schema
+
+Source of truth: `src/lib/db/constants.ts`. Core shapes:
 
 ```typescript
 interface Transaction {
@@ -348,419 +93,193 @@ interface Transaction {
   partnerShare: number;
   isSettled: boolean;
   settledDate?: Date;
-  isEssential: boolean;           // Needs vs wants
-  isSubscription: boolean;        // Recurring subscription payment
+  isEssential: boolean;            // needs vs wants
+  isSubscription: boolean;
   subscriptionFrequency?: 'monthly' | 'semi-annual' | 'annual';
-  parentTransactionId?: number;   // Links split children to parent
-  isSplitParent?: boolean;        // True if split into children
-  notes?: string;
-  isDeleted?: boolean;            // Soft delete flag (for undo support)
-  deletedAt?: Date;               // When transaction was soft-deleted
+  parentTransactionId?: number;    // links split children to parent
+  isSplitParent?: boolean;
+  notes?: string;                  // also holds #hashtags
+  isDeleted?: boolean;             // soft delete (undo support)
+  deletedAt?: Date;
   createdAt: Date;
   updatedAt: Date;
 }
 
 interface Category {
-  id?: number;
-  name: string;
-  icon?: string;           // Emoji
-  color?: string;          // Hex color for charts
-  isActive: boolean;
-  sortOrder: number;
-  isEssential: boolean;    // Default needs/wants
+  id?: number; name: string; icon?: string; color?: string;
+  isActive: boolean; sortOrder: number; isEssential: boolean;
 }
 
 interface MonthlyBudget {
-  id?: number;
-  month: string;           // "YYYY-MM" format
+  id?: number; month: string;  // "YYYY-MM"
   income: number;
-  savedAmount: number;     // DEPRECATED: Use SavingsContribution instead
+  savedAmount: number;         // DEPRECATED → use SavingsContribution
   notes?: string;
 }
 
 type SavingsAccountType = 'savings' | 'retirement' | 'investment';
-
 type ContributionSource =
-  | 'payroll_deduction'    // Pre-tax (doesn't affect available)
-  | 'bank_transfer'        // From checking (affects available)
-  | 'interest'             // Interest earned (doesn't affect available)
-  | 'employer_match'       // 401k match (doesn't affect available)
-  | 'other';               // Other source (affects available)
-
-// CONTRIBUTION_SOURCES constant provides labels, descriptions, and affectsAvailable flags
-// Use: import { CONTRIBUTION_SOURCES } from '$lib/db';
+  | 'payroll_deduction' | 'interest' | 'employer_match'  // don't affect available
+  | 'bank_transfer' | 'other';                           // affect available
+// CONTRIBUTION_SOURCES (from '$lib/db') has labels, descriptions, affectsAvailable flags.
 
 interface SavingsAccount {
-  id?: number;
-  name: string;
-  accountType: SavingsAccountType;
-  icon?: string;           // Emoji
-  color?: string;          // Hex color
-  sortOrder: number;
-  currentBalance?: number; // Only tracked for 'savings' type
-  targetAmount?: number;   // Goal target (e.g., $10,000)
-  targetDate?: Date;       // Goal deadline (e.g., Dec 31, 2026)
-  createdAt: Date;
-  updatedAt: Date;
+  id?: number; name: string; accountType: SavingsAccountType;
+  icon?: string; color?: string; sortOrder: number;
+  currentBalance?: number;   // 'savings' type only
+  targetAmount?: number; targetDate?: Date;   // goal
+  createdAt: Date; updatedAt: Date;
 }
 
 interface SavingsContribution {
-  id?: number;
-  date: Date;
-  accountId: number;       // References SavingsAccount.id
-  amount: number;
-  source: ContributionSource;
-  notes?: string;
-  createdAt: Date;
-  updatedAt: Date;
+  id?: number; date: Date; accountId: number; amount: number;
+  source: ContributionSource; notes?: string; createdAt: Date; updatedAt: Date;
 }
 
 interface CategoryBudget {
-  id?: number;
-  month: string;           // "YYYY-MM" format
-  categoryId: number;      // References Category.id
-  budgetAmount: number;    // Target spending limit
-  rollsOver?: boolean;     // Unused budget rolls into next month's effective budget
-  createdAt: Date;
-  updatedAt: Date;
+  id?: number; month: string; categoryId: number; budgetAmount: number;
+  rollsOver?: boolean;       // undefined = off (no migration needed)
+  createdAt: Date; updatedAt: Date;
 }
 
-interface CancelledSubscription {
-  merchant: string;        // Normalized merchant name
-  cancelledDate: string;   // ISO date string
-  amount?: number;         // When set, cancellation targets this specific subscription amount
-}
-
-interface CompletedGoal {
-  accountName: string;     // Name of the savings account
-  targetAmount: number;    // Goal target that was reached
-  completedDate: string;   // ISO date string
-  icon?: string;           // Preserved for display
-  color?: string;
-}
+interface CancelledSubscription { merchant: string; cancelledDate: string; amount?: number; }
+interface CompletedGoal { accountName: string; targetAmount: number; completedDate: string; icon?: string; color?: string; }
 
 interface Settings {
-  id: 1;                   // Singleton
+  id: 1;                     // singleton
   partnerName: string;
   defaultSplitType: 'percentage' | 'fixed';
   defaultSplitValue: number;
   currency: string;
   theme: 'light' | 'dark' | 'system';
-  dismissedRecurring: string[];           // Hidden from recurring detection
+  dismissedRecurring: string[];
   cancelledSubscriptions: CancelledSubscription[];
-  confirmedActiveSubscriptions: string[]; // Override staleness detection
-  iCloudBackupEnabled: boolean;           // Copy backups to iCloud Drive
-  lastAutoSuggestedMonth?: string;        // "YYYY-MM" - tracks recurring suggestion dismissal
-  completedGoals: CompletedGoal[];        // Archived savings goals that have been completed
-  notificationsEnabled: boolean;          // Master toggle (opt-in, default false)
-  dailyReminderEnabled: boolean;          // Daily expense reminder (default true)
-  dailyReminderTime: string;             // "HH:MM" 24h format (default "20:00")
-  weeklyReviewEnabled: boolean;           // Monday 9am review prompt (default true)
-  monthlyBudgetSetupEnabled: boolean;     // 1st-of-month budget prompt (default true)
-  migrationVersion?: number;              // Tracks applied migrations (skip all if current); currently v11
+  confirmedActiveSubscriptions: string[];
+  iCloudBackupEnabled: boolean;
+  lastAutoSuggestedMonth?: string;       // "YYYY-MM"
+  completedGoals: CompletedGoal[];
+  notificationsEnabled: boolean;         // master toggle, opt-in (default false)
+  dailyReminderEnabled: boolean;         // default true
+  dailyReminderTime: string;             // "HH:MM" 24h (default "20:00")
+  weeklyReviewEnabled: boolean;          // Mon 9am (default true)
+  monthlyBudgetSetupEnabled: boolean;    // 1st of month (default true)
+  migrationVersion?: number;             // currently v11; skip all if current
 }
 ```
 
----
+Net worth uses separate tables `linkedAccounts` / `balanceSnapshots` (`LinkedAccount` / `BalanceSnapshot`, Dexie v5) — see Net Worth feature.
 
-## Navigation
-
-**Collapsible Sidebar:**
-- Dashboard (home)
-- Budget (category budgets)
-- Savings (contribution tracking)
-- Insights (charts & trends)
-- Shared (settlement tracking)
-- Settings (categories, import/export)
-
-Sidebar state persists to localStorage (`ledger-sidebar-expanded`).
+**Migration persistence**: migrations that create/modify records MUST `saveToFile()` after running (Dexie is cleared every startup).
 
 ---
 
-## Key Features
+## Features
+
+**Navigation** — collapsible sidebar (state in `ledger-sidebar-expanded`): Dashboard, Budget, Savings, Insights, Net Worth (⌘6), Shared, Settings. ⌘1–5/⌘N/⌘K work app-wide via the layout-mounted `KeyboardShortcuts` + `stores/shortcuts.ts` handler registry. Pages use in-content Fraunces titles (no HeaderNav).
 
 ### Dashboard
-- **Two-column layout** (`max-w-6xl`): ledger in the main column; sticky right rail with Cash Flow card (always expanded), Week in Review, and Top Categories (reuses `insights/TopCategoriesBar`)
-- Month title in Fraunces doubles as the month picker (`MonthPicker variant="title"`); the dashboard has no HeaderNav
-- **Single add-transaction entry point**: toolbar "Add" button / ⌘N opens `AddTransactionModal` (wraps the full `TransactionForm`: split mode, shared, subscription, tags). The inline form card and QuickAddFAB are retired.
-- Transaction list with search/filters (searches merchant names and notes), amount range filter, progressive pagination (50 rows at a time); search/filters render as a slim toolbar, advanced filters in a card below
-- Day-grouped cards with dashed hairline dividers; sticky date headers show day totals (your share); shared rows show your share as the primary amount with "of $full" beneath; monthly/semi-annual subscriptions show a ↻ icon (annual keeps its badge)
-- Transaction rows are emoji-free: category is shown as a small full-color dot + name in the row subtext. Category/account emoji are display-free app-wide — they appear ONLY in selection contexts (pickers, form dropdowns, CategoryChipPicker), the treemap, and CategoryManager in Settings. All display rows (Shared page, Budget cards/alerts, Savings cards, insight cards) use the color-dot pattern instead
-- **Sticky list header**: the Transactions heading + search toolbar stick to the viewport top (`bind:clientHeight` → `toolbarHeight`); date headers stick below it via the `stickyOffset` prop on `TransactionList`
-- **Upcoming transactions hidden by default**: future-dated transactions are filtered out with a dashed "Show N upcoming" toggle row (persisted to `ledger-show-upcoming`); the filter is skipped when viewing a future month, where everything would be upcoming
-- **Split transaction nesting**: Children of a split (sharing `parentTransactionId`) collapse into one summary row (merchant + "Split" badge + total + your-share) with a chevron to expand the indented per-category breakdown. Grouping/pagination happen at the row level so a split is never cut at the page boundary; groups left with <2 visible children (e.g. after a category filter) fall back to a plain row. Selection mode renders splits flat so each child stays individually selectable.
-  - **Group edit/delete**: The summary row has Edit/Delete controls mirroring normal rows. Edit opens `EditSplitModal` (group-level merchant/date/shared + editable category lines incl. per-line notes/tags); save calls `updateSplitGroup()` which keeps the hidden parent, recreates children from the new lines, and lets the total change to the sum of lines (`isEssential`/`isSubscription` inherited from the parent). Delete uses `onDeleteSplit(childIds)` → split-specific confirm ("Delete this split?") → soft-delete with undo (children only; total restores together). Individual lines keep their own per-row edit/delete in the expanded view.
-- Edit/split transaction modals
-- Bulk action toolbar for multi-select operations
-- Month picker for navigating between months
-- **Recurring suggestions banner**: Prompts to add expected recurring transactions at start of month
-  - Two-step flow: selection → confirmation with editable dates/amounts
-  - Merges detected recurring with user-tagged subscriptions
-  - Filters by frequency (monthly/semi-annual/annual)
-  - Persists until all added or user defers to next month
+- Two-column (`max-w-6xl`): ledger main column + sticky right rail (Cash Flow, Week in Review, Top Categories). Month name is the title and the picker (`MonthPicker variant="title"`).
+- **One add entry point**: "Add" button / ⌘N → `AddTransactionModal` (wraps the full `TransactionForm`: split, shared, subscription, tags).
+- Transaction list: search (merchant + notes) + amount-range + advanced filters, 50-row progressive pagination. Sticky Transactions heading + toolbar (`bind:clientHeight` → `toolbarHeight`); date headers stick below via `stickyOffset`.
+- Day-grouped cards: sticky date headers with day totals (your share); shared rows show your share primary with "of $full" beneath; monthly/semi-annual subs show a ↻ icon.
+- **Upcoming hidden by default**: future-dated rows behind a "Show N upcoming" toggle (`ledger-show-upcoming`); skipped when viewing a future month.
+- **Split nesting**: children (same `parentTransactionId`) collapse into one summary row (merchant + Split badge + total + your-share) with a chevron to expand. Grouping/pagination at the row level so a split never splits across a page; groups with <2 visible children fall back to a plain row; selection mode renders flat. Summary row has group Edit (`EditSplitModal` → `updateSplitGroup()`: keeps hidden parent, recreates children, total = sum of lines) and Delete (`onDeleteSplit(childIds)` → soft-delete with undo).
+- **Recurring suggestions banner** (start of month): two-step selection → confirmation with editable dates/amounts; merges detected recurring with user-tagged subs; persists until added or deferred.
 
 ### Budget
-- Per-category budget tracking
-- **Budget rollover** (opt-in per category-month, ↻ toggle in the card's edit state): surpluses on `rollsOver` rows carry into the same category's next month and chain across consecutive rollover months (gap or flag-off breaks the chain; 24-month cap). **Deficits never reduce a category** — last month's overspend on rollover rows is pooled into `deficitCarried`, shown as a summary note and deducted from the effective total (one-month memory). Math in `utils/budget-rollover.ts` (`computeEffectiveBudgets`), orchestrated by `getEffectiveBudgetsForMonth()`; flag set via `setCategoryBudgetRollover()`, propagated by Copy from Last Month. Effective budgets flow to cards, summary metrics, alerts, and Insights budget stats; the income-allocation bar intentionally keeps BASE totals (carryover is prior months' income).
-- Visual progress bars showing spending vs budget
-- Summary card scoped to budgeted categories: total budgeted, spent (with % of budget), remaining
-  - Inline progress bar fills remaining horizontal space in the metrics row
-  - Unbudgeted spending callout (count + amount of categories without budgets)
-  - Income allocation stacked bar (savings, budgeted, unallocated) — shown when income is set
-  - Uses `sumCurrency()`/`roundCurrency()` for all aggregations
-- Alerts for categories approaching or over budget
-- Month picker for viewing different months
+- Per-category tracking with progress bars; summary card (total budgeted, spent + % of budget, remaining, unbudgeted callout, income-allocation stacked bar when income set). Alerts for approaching/over budget. Month picker.
+- **Rollover** (opt-in per category-month, ↻ toggle): surpluses on `rollsOver` rows chain into the same category's later months (gap or flag-off breaks the chain; 24-month cap). **Deficits never reduce a category** — last month's overspend is pooled into `deficitCarried` (one-month memory), shown as a note and deducted from the effective total. Math in `utils/budget-rollover.ts` (`computeEffectiveBudgets`), via `getEffectiveBudgetsForMonth()`; flag set by `setCategoryBudgetRollover()`, propagated by Copy from Last Month. Effective budgets flow to cards/metrics/alerts/insights; the income-allocation bar intentionally keeps BASE totals.
 
 ### Savings
-- Track contributions to savings, retirement, and investment accounts
-- Multiple account types: savings (balance tracked), retirement, investment
-- Contribution sources: bank transfer, payroll deduction, interest, employer match
-- Only bank transfers and "other" reduce available to spend
-- Account cards with contribution history
-- **Goal tracking**: Set target amount and target date for savings accounts
-  - Progress bar visualization with percentage complete
-  - Projected completion date based on average monthly contribution (6-month rolling)
-  - On-track/behind-pace status with recommended monthly contribution
-  - Goal insights integration showing X of Y goals on track
-- Savings rate calculation based on contributions
-- Integration with Dashboard (available = income - savings contributions)
+- Track contributions to savings/retirement/investment accounts; only `bank_transfer` and `other` reduce available-to-spend. Account cards with contribution history; savings-rate calc; Dashboard integration (available = income − savings contributions).
+- **Goals**: target amount + date → progress bar, projected completion (6-month rolling avg), on-track/behind status with recommended monthly contribution.
 
-### Insights
-- **Tab-based architecture** with 5 tabs: Overview, Spending, Savings, Recurring, Year in Review
-  - Selected tab persisted to localStorage (`ledger-insights-tab`)
-  - Month picker is global but hidden on the Recurring tab (current-state only); Year in Review follows the selected month's year (`computeYTDStats` clamps its window to Dec 31 for past years; `NetWorthYearCard` clamps the series to year end)
-  - Tab bar supports arrow-key navigation (roving tabindex); lazy tab loads show a skeleton pending state
-  - Monthly Trends chart renders an income line over the spending bars when `MonthlyBudget.income` is set (optional `incomeByMonth` prop; chart renders its own card — no wrapper)
-- **Overview tab**: Smart Takeaways (forward-looking current month / retrospective past month), Quick Stats Row (total spent, budget status, savings rate), "What Changed" variance card (`VarianceBreakdown`: per-category deltas vs each category's 6-month **median** ("typical month"), day-clipped for partial months — median rather than mean keeps one-off historical spikes (e.g. a big purchase, annual taxes) from inflating the baseline and showing up as a phantom decrease in normal months; statistically anomalous rows get an "Unusual" badge via `detectAnomalies` (mean/stdDev-based, separate from the median baseline) — the single home for change detection, replacing anomaly/shift takeaways; rows jump to that category's Deep Dive on the Spending tab), Wealth card (`NetWorthOverviewCard`: net worth total, monthly delta, runway = liquid balances ÷ 6-month avg spend; liquid = checking + savings + investment — brokerage counts per Lev (SGOV as cash-equivalent), retirement/other excluded)
-  - Highlights: pace projection, savings wins, goal completions, velocity, needs/wants, top merchant (anomalies + category shifts live in What Changed, not here)
-  - Pace projection and velocity exclude future-dated transactions via `filterUpToDate()`
-  - Pace projection is suppressed early in the month (until `ceil(daysInMonth × config.insights.pace.minMonthFraction)`, default 0.25 ≈ day 8) so a single large early charge doesn't extrapolate to a wildly inflated month-end number; other Highlights fill the slot meanwhile
-  - Month in Review (past months): hero stat + grouped insights with 12-month rolling window
-  - Hero priority chain: rank superlative → goal completion → savings highest → vs-average → rank quartile → savings above avg → category standout → total
-  - Anomalies show dollar context ($current vs $avg avg), vs-average shows typical month amount + sample size
-  - Budget context in spending group: over/under count for budgeted categories
-  - Needs/wants only shown when skewed (>75% or <25%), with descriptive prefix
-  - Positive-only savings insights (never flags low rates due to paycheck timing)
-- **Spending tab**: Total + velocity, top 5 merchants, shared vs personal breakdown, category treemap, category deep dives with trend charts, month-over-month comparison, needs vs wants (with trend chart). Top-merchant rows open the merchant report card (`ReportCardModal` hosted by the insights page; same pattern as the dashboard)
-  - Variability classification (Steady/Moderate/Variable) uses only completed months
-    — current calendar month excluded to prevent partial-month distortion of weighted stats
-- **Savings tab**: Contribution breakdown by account/source, goal progress, savings rate trend chart
-- **Recurring tab**: Active subscriptions, upcoming annual renewals, possibly inactive alerts, detected recurring bills
-- **Year in Review tab**: Calendar heatmap, best/worst spending months, tag spending summary (rows open tag report cards), shared expense annual summary, YTD stats (top-merchant tile opens the merchant report card), Net Worth year card (`NetWorthYearCard`: delta since start of year or first record, now/then, $10k milestone crossings)
+### Insights — 5 tabs (Overview, Spending, Savings, Recurring, Year in Review)
+- Tab persisted (`ledger-insights-tab`); arrow-key roving tabindex; lazy tabs show skeletons. Global month picker (hidden on Recurring; Year in Review follows the selected year, clamped to Dec 31 for past years).
+- **Overview**: Smart Takeaways (forward-looking current / retrospective past month), Quick Stats Row (total, budget, savings rate), **What Changed** (`VarianceBreakdown`: per-category deltas vs each category's 6-month **median** "typical month", day-clipped — median avoids one-off spikes inflating the baseline; anomalous rows get an "Unusual" badge via `detectAnomalies`; rows jump to the category's Deep Dive — the single home for change detection), **Wealth card** (`NetWorthOverviewCard`: net worth, monthly delta, runway = liquid ÷ 6-month avg spend; liquid = checking + savings + investment, retirement/other excluded). Highlights: pace projection, savings wins, goal completions, velocity, needs/wants, top merchant. Pace projection + velocity exclude future-dated rows (`filterUpToDate`); pace suppressed early in the month (config `pace.minMonthFraction`, default 0.25 ≈ day 8).
+- **Spending**: total + velocity, top 5 merchants (open `ReportCardModal`), shared-vs-personal, treemap, category deep dives + trend charts, MoM comparison, needs-vs-wants. Variability classification uses completed months only.
+- **Savings**: contribution breakdown by account/source, goal progress, savings-rate trend chart.
+- **Recurring**: active subscriptions, upcoming annual renewals, possibly-inactive alerts, detected recurring bills.
+- **Year in Review**: calendar heatmap, best/worst months, tag summary (open tag report cards), shared annual summary, YTD stats, `NetWorthYearCard` (delta since year start / first record, $10k milestone crossings).
+- Monthly Trends chart overlays an income line when `MonthlyBudget.income` is set (`incomeByMonth` prop).
 
 ### Shared Expenses
-- Outstanding balance with partner
-- Unsettled transaction list
-- Batch settlement marking
+Outstanding balance with partner ("{partner} owes you" hero), unsettled list with category chips, batch settlement marking.
 
 ### Settings
-- **Section nav layout**: sticky left nav (Expense Sharing / Appearance / Notifications / Keyboard Shortcuts / Categories / Data & Backup / About) shows one section at a time; selection persists to `ledger-settings-section`
-- Partner name configuration
-- Default split settings
-- Category management (add/edit/reorder)
-- Excel import / JSON export
-- iCloud backup toggle (copies backups to iCloud Drive when enabled)
+Sticky section nav (Expense Sharing / Appearance / Notifications / Keyboard Shortcuts / Categories / Data & Backup / About; persists to `ledger-settings-section`): partner name, default split, category management, Excel import / JSON export, iCloud backup toggle, Connected Accounts (SimpleFIN).
 
 ### Tags
-- Hashtag-based tagging in transaction notes field (e.g. `#vacation`, `#italy-trip`)
-- Tag format: letters, numbers, hyphens; must start with letter or number
-- Tag pills displayed on transactions with click-to-filter toggle behavior (click to filter, click again to un-filter)
-- **Tag popover**: Hover a tag pill to see total spent (user's share) and transaction count
-- **Tag filtering**: Filter transactions by one or more tags in the advanced filters panel
-- **Manage tags**: Inline section in filters panel to rename or delete tags across all transactions
-  - Rename: batch-updates all transaction notes replacing `#oldtag` with `#newtag`
-  - Delete: strips `#tag` from all matching transaction notes
-- **Tag autocomplete**: Suggests existing tags when typing `#` in notes input
-- Helper text below notes input clarifies tag format rules
-- **Bulk tag management**: Add or remove tags from multiple selected transactions via BulkActionBar
-  - Tag button in bulk action bar with dropdown: text input for new tags + existing tag list
-  - Each existing tag has + (add) and − (remove) action buttons
-  - Uses `appendTag()` (idempotent add) and `stripTag()` (remove) utilities
-- Tag index (`TagIndex` class) provides fast lookups, rebuilt from transaction cache
+Hashtags in the notes field (`#vacation`; letters/numbers/hyphens, must start alphanumeric). Pills with click-to-filter toggle + hover popover (total your-share + count). Filter by multiple tags; inline rename/delete across all transactions; autocomplete on `#`. Bulk add/remove via BulkActionBar (`appendTag()` idempotent add, `stripTag()` remove). `TagIndex` (rebuilt from the transaction cache) provides fast lookups.
 
-### Net Worth
-- `/networth` (⌘6): hero total + 30-day delta over an area chart (with assets/liabilities sub-line when debt exists), accounts split into Assets and Liabilities sections with collapsible per-type subgroups (header = count + subtotal, state in `ledger-networth-collapsed`); health-colored badges (Manual/Synced = green, Stale = amber, Sync error = red), hover-reveal ↑/↓ reorder within a type group + edit, rail breakdown by account type (liabilities shown negative) + SimpleFIN sync card
-- Account class is derived from type (`accountClassForType` in `utils/net-worth.ts`): credit/loan → liability, else asset; the modal offers grouped Asset/Liability type options and labels liability balances "Amount owed". Sync normalizes liability balances with `Math.abs` (SimpleFIN reports debt as negative; the model stores amount owed as positive, class carries the sign)
-- **Intent vs actual (critical rule)**: `LinkedAccount` (actual balances) is deliberately separate from `SavingsAccount` (intent: contributions, goals). Synced balances must NEVER write to `SavingsAccount.currentBalance` — it would erase the "planned as spent" signal and corrupt goal math. See NET_WORTH_PLAN.md §7.
-- Snapshots: `recordBalance()` updates `currentBalance` AND upserts that day's `BalanceSnapshot` (max one per account per day, same-day overwrites). Manual balance edits in `LinkedAccountModal` flow through it so history accrues. Series math in `utils/net-worth.ts` (forward-fill per account).
-- **SimpleFIN (read-only)**: Rust commands in `simplefin.rs`; the access URL is a credential held ONLY in the macOS Keychain (service `app.ledger.desktop.simplefin`) — JS never sees it, so it can never reach data.json or iCloud backups. Linking in Settings → Connected Accounts (setup token, or a raw access URL for the public demo). Sync: app-open max once/day (`ledger-simplefin-last-sync`) + manual Refresh; per-account failures mark error/stale and never block others. Dexie `version(5)`.
+### Net Worth (`/networth`, ⌘6)
+- Hero total + 30-day delta over an area chart (assets/liabilities sub-line when debt exists); accounts split into Assets/Liabilities with collapsible per-type subgroups (`ledger-networth-collapsed`); health badges (Manual/Synced green, Stale amber, Sync error red); hover reorder/edit; rail breakdown by type (liabilities negative) + SimpleFIN card.
+- Account class derived from type (`accountClassForType`): credit/loan → liability, else asset. Sync normalizes liability balances with `Math.abs` (SimpleFIN reports debt negative; model stores amount owed positive, class carries the sign).
+- **Intent vs actual (critical)**: `LinkedAccount` (actual balances) is deliberately separate from `SavingsAccount` (intent: contributions, goals). Synced balances must NEVER write to `SavingsAccount.currentBalance` — it would corrupt the "planned as spent" signal and goal math. See `NET_WORTH_PLAN.md` §7.
+- **Snapshots**: `recordBalance()` updates `currentBalance` AND upserts that day's `BalanceSnapshot` (max one/account/day; same-day overwrites). Manual edits flow through it. Series math in `utils/net-worth.ts` (forward-fill per account).
+- **SimpleFIN (read-only)**: Rust commands in `simplefin.rs`; the access URL lives ONLY in the macOS Keychain (`app.ledger.desktop.simplefin`) — JS never sees it, so it can't reach `data.json` or backups. Link in Settings → Connected Accounts. Sync: app-open max once/day (`ledger-simplefin-last-sync`) + manual Refresh; per-account failures mark error/stale without blocking others.
 
 ### Menu-bar Quick Add
-- Tray icon (left-click) toggles a small always-on-top `quick-add` window rendering the full `TransactionForm`. The icon is a monochrome template glyph (`icons/tray.png`, generated 44px "L in rounded card") with `icon_as_template(true)` so macOS recolors it for light/dark menu bars (needs `image-png` cargo feature)
-- **Single-writer rule**: both windows share one IndexedDB origin. The quick window reads categories/settings (and merchant autocomplete) directly from shared Dexie but NEVER calls `initializeStorage()` (it clears+reloads shared tables) and never writes. Submits are emitted as `ledger://quick-add-submit` (date as ISO string); the main window's layout listener performs the add, toasts, and dispatches `ledger:transactions-changed` (DOM event) so the dashboard refreshes.
-- Layout renders a bare shell for `/quick-add` (no SideNav/KeyboardShortcuts) and skips the purge + notification effects there
-- Rust: `SUPPRESS_NEXT_ACTIVATE` atomic stops the macOS activation observer from popping the main window when the tray opens the quick window; the existing CloseRequested handler hides (not closes) the quick window
+- Tray icon (left-click) toggles a small always-on-top `quick-add` window rendering the full `TransactionForm`. Icon is a monochrome template glyph (`icons/tray.png`, `icon_as_template(true)`; needs the `image-png` cargo feature).
+- **Single-writer rule**: both windows share one IndexedDB origin. The quick window READS categories/settings/merchants from shared Dexie but NEVER calls `initializeStorage()` and never writes. Submits emit `ledger://quick-add-submit` (date as ISO string); the main window's layout listener performs the add, toasts, and dispatches the `ledger:transactions-changed` DOM event so the dashboard refreshes.
+- Layout renders a bare shell for `/quick-add` (no SideNav/KeyboardShortcuts) and skips purge + notification effects. Rust `SUPPRESS_NEXT_ACTIVATE` atomic stops the activation observer from popping the main window; CloseRequested hides (not closes) the quick window.
 
-### Notifications
-- Native macOS notifications via Tauri plugin (opt-in)
-- **Daily expense reminder**: Fires at configured time if no transactions logged today (schedule-only)
-- **Weekly review prompt**: Monday mornings (schedule + app-open fallback)
-- **Monthly budget setup prompt**: 1st of month (schedule + app-open fallback, catches up on 2nd+)
-- Scheduler uses `setInterval` (60s tick) with localStorage for last-fired tracking
-- App stays alive in dock when window is closed (Cmd+W hides, Cmd+Q quits)
-- Permission requested on first enable; silently disables if OS permission revoked
+### Notifications (opt-in, native macOS via Tauri plugin)
+Daily expense reminder (configured time, if nothing logged today — schedule-only), weekly review (Mon AM, schedule + app-open fallback), monthly budget setup (1st, fallback catches up on 2nd+). `setInterval` 60s tick with localStorage last-fired tracking. App stays in dock when window closed (⌘W hides, ⌘Q quits); silently disables if OS permission revoked.
 
 ### Subscriptions
-- Mark transactions as subscriptions (monthly/semi-annual/annual)
-- Track cancelled subscriptions
-- Confirm active subscriptions to override staleness detection
-- **Multiple subscriptions per merchant**: Same merchant with different amounts (e.g., Apple iCloud $2.99 + Apple Music $2.16) tracked independently using composite key `merchant|amount` via `subscriptionKey()` from `string-helpers.ts`
-- **Supersession detection**: `findSupersededSubscriptionKeys()` identifies price changes (old amount stops before new amount starts) vs concurrent subscriptions (charges overlap). Old prices are automatically filtered from the active subscription list.
-- Cancellations with `amount` target a specific subscription; without `amount` they cancel all subscriptions from that merchant (backward compatible)
-- Staleness thresholds configurable in `config.subscription` (60 days monthly, 8 months semi-annual, 13 months annual)
+Mark monthly/semi-annual/annual; track cancellations and confirmed-active overrides. **Multiple per merchant** via composite key `merchant|amount` (`subscriptionKey()`). **Supersession** (`findSupersededSubscriptionKeys()`) distinguishes price changes (old stops before new starts) from concurrent subs; old prices auto-filtered. Cancellation with `amount` targets one sub, without cancels all from that merchant. Staleness thresholds in `config.subscription` (60d monthly, 8mo semi-annual, 13mo annual).
 
-### Undo System
-- Recoverable deletions with 5-second undo window
-- **Soft delete pattern**: Deleted transactions marked with `isDeleted: true` rather than hard delete
-- Toast notification with "Undo" action button and countdown progress bar
-- Singleton behavior: new deletes replace previous undo toast
-- **Startup cleanup**: Soft-deleted transactions permanently purged on app launch
-- Survives app crashes during undo window (transactions can be recovered until next app launch)
-- Integrated with both single and bulk delete operations
+### Undo
+Recoverable deletions with a 5-second window via soft delete (`isDeleted: true`). Toast with Undo + countdown; singleton (new deletes replace the prior toast). Soft-deleted rows are permanently purged on next app launch (so deletes survive crashes during the window). Covers single + bulk deletes.
 
 ---
 
 ## localStorage Keys
 
-UI state persisted across sessions:
-- `ledger-sidebar-expanded` - Sidebar collapse state
-- `ledger-show-upcoming` - Whether future-dated transactions are visible on the dashboard
-- `ledger-stale-nudge-dismissed` - ISO date the stale-ledger nudge was last dismissed
-- `ledger-simplefin-last-sync` - "YYYY-MM-DD" of the last app-open SimpleFIN sync (max once/day)
-- `ledger-insight-{title}` - Each insight group state
-- `ledger-insights-tab` - Selected insights tab
-- `ledger-settings-section` - Selected settings section
-- `ledger-notif-daily-last-fired` - Daily notification last-fired date ("YYYY-MM-DD")
-- `ledger-notif-weekly-last-fired` - Weekly notification last-fired date ("YYYY-MM-DD")
-- `ledger-notif-monthly-last-fired` - Monthly notification last-fired month ("YYYY-MM")
-- `ledger-week-review-dismissed` - Week in Review dismiss date (this Monday's "YYYY-MM-DD")
+- `ledger-sidebar-expanded`, `ledger-show-upcoming`, `ledger-networth-collapsed`
+- `ledger-stale-nudge-dismissed` (ISO date), `ledger-week-review-dismissed` (this Monday)
+- `ledger-simplefin-last-sync` ("YYYY-MM-DD")
+- `ledger-insight-{title}`, `ledger-insights-tab`, `ledger-settings-section`
+- `ledger-notif-{daily,weekly}-last-fired` ("YYYY-MM-DD"), `ledger-notif-monthly-last-fired` ("YYYY-MM")
 
 ---
 
 ## Currency & Percentage Handling
 
-To avoid floating-point precision issues, use the utilities in `src/lib/utils/currency.ts`:
+Always use `src/lib/utils/currency.ts` to avoid float drift:
 
-### Currency Functions
-```typescript
-import { roundCurrency, currencyEquals, isZeroCurrency, sumCurrency, isSplitBalanced, roundCoefficient } from '$lib/utils/currency';
+- `roundCurrency(v)` — round to 2dp (use instead of `Math.round(v*100)/100`).
+- `currencyEquals(a,b)` / `isZeroCurrency(v)` — tolerance `CURRENCY_EPSILON` (0.005).
+- `sumCurrency([…])` — sum with final rounding. `isSplitBalanced(remaining)` — split validation.
+- `roundCoefficient(v, dp=4)` — for ratios/coefficients, NOT `roundCurrency`.
+- `calculatePercent(part, whole, round?)`; `percentExceeds` / `percentMeetsOrExceeds` — compare raw values, round only for display.
 
-// Round to 2 decimal places
-roundCurrency(33.333)     // 33.33
-
-// Compare with tolerance (0.005)
-currencyEquals(10.0, 10.001)  // true
-
-// Check if effectively zero
-isZeroCurrency(0.001)     // true
-
-// Sum with final rounding
-sumCurrency([0.1, 0.2])   // 0.30
-
-// Validate split transactions
-isSplitBalanced(remaining) // true if ~0
-
-// Round coefficients/ratios (default 4 decimals)
-roundCoefficient(0.12345678)     // 0.1235
-roundCoefficient(0.12345678, 2)  // 0.12
-```
-
-### Percentage Functions
-```typescript
-import { calculatePercent, percentExceeds, percentMeetsOrExceeds } from '$lib/utils/currency';
-
-// Calculate percentage (optionally rounded)
-calculatePercent(85, 100)       // 85
-calculatePercent(1, 3, true)    // 33 (rounded)
-
-// Compare percentages (use raw values)
-percentExceeds(81, 100, 80)     // true (81% > 80%)
-percentMeetsOrExceeds(80, 100, 80)  // true (80% >= 80%)
-```
-
-### Key Conventions
-1. **Round at calculation time**, not display time
-2. Use `roundCurrency()` instead of `Math.round(value * 100) / 100`
-3. For threshold comparisons, compare raw values first, then round for display
-4. Use `CURRENCY_EPSILON` (0.005) for tolerance-based comparisons
-5. When displayed values don't match internal calculations, round both to the same precision
-6. Use `roundCoefficient()` for ratios/coefficients (variance, percentages as decimals) - NOT `roundCurrency()`
+Conventions: round at calculation time (not display); for thresholds compare raw then round to display; when displayed and internal values disagree, round both to the same precision.
 
 ---
 
 ## Development
 
 ```bash
-# Install dependencies
 npm install
-
-# Run in development (web only)
-npm run dev
-
-# Run Tauri development
-npm run tauri:dev
-
-# Build production app
-npm run tauri:build
-
-# Run tests
+npm run dev          # web only
+npm run tauri:dev    # Tauri dev
+npm run tauri:build  # production app
 npm run test
+npm run check        # svelte-check (clean tripwire: 0 errors/warnings)
 ```
 
-### Build Output
-- **App**: `src-tauri/target/release/bundle/macos/Ledger.app`
-- **DMG**: `src-tauri/target/release/bundle/dmg/Ledger_0.1.0_aarch64.dmg`
-
----
+Build output: `src-tauri/target/release/bundle/macos/Ledger.app` and `.../dmg/Ledger_0.1.0_aarch64.dmg`.
 
 ## Tools
 
-Standalone reporting utilities (not part of the app):
-
-- **`tools/sankey/`** — Monarch-style money-flow Sankey generator. Produces a self-contained
-  `ledger-sankey.html` (D3 inlined) from live `data.json`. Regenerate with
-  `python3 tools/sankey/gen_sankey.py && open ledger-sankey.html`. Currently scoped to YTD;
-  see `tools/sankey/README.md` for the accounting rules and layout rationale.
-
----
+`tools/sankey/` — Monarch-style money-flow Sankey generator (self-contained `ledger-sankey.html`, D3 inlined) from live `data.json`. Regenerate: `python3 tools/sankey/gen_sankey.py && open ledger-sankey.html`. Scoped to YTD; see its README.
 
 ## Categories (22 default)
 
-Car, Cash withdrawals, Clothes & accessories, Coffee & snacks, Donations, Electronics, Fitness & wellness, Fun & hobbies, Gas, Gifts, Groceries, Grooming, Health, Home, Household supplies, Insurance, Parking & tolls, Pet, Rent, Restaurants, Travel, Utilities
+Car, Cash withdrawals, Clothes & accessories, Coffee & snacks, Donations, Electronics, Fitness & wellness, Fun & hobbies, Gas, Gifts, Groceries, Grooming, Health, Home, Household supplies, Insurance, Parking & tolls, Pet, Rent, Restaurants, Travel, Utilities.
 
----
+## File Storage
 
-## File Storage Location
-
-macOS: `~/Library/Application Support/app.ledger.desktop/`
-- `data.json` - Main data file
-- `backups/` - Auto-timestamped backups before each save (max 10, debounced 1 min)
-
-### iCloud Backup (Optional)
-When enabled in Settings, backups are also copied to iCloud Drive:
-- `~/Library/Mobile Documents/com~apple~CloudDocs/Ledger/ledger-backup.json`
-- Single file overwritten on each backup (not versioned in iCloud)
-- Requires iCloud Drive to be enabled on the Mac
-
----
-
-## Dependencies
-
-### Runtime
-- `@tauri-apps/plugin-fs` - File system access
-- `@tauri-apps/api` - Tauri API
-- `dexie` - IndexedDB wrapper
-- `chart.js` - Charts
-- `chartjs-plugin-annotation` - Chart.js annotation overlays (σ bands, mean lines)
-- `date-fns` - Date utilities
-- `lucide-svelte` - Icons
-- `xlsx` - Excel parsing
-
-### Development
-- `@sveltejs/kit` - Framework
-- `@sveltejs/adapter-static` - Static build for Tauri
-- `@tailwindcss/vite` - Tailwind v4
-- `@tauri-apps/cli` - Tauri CLI
-- `svelte` v5 - UI framework
-- `typescript` - Type checking
-- `vitest` - Testing
+macOS: `~/Library/Application Support/app.ledger.desktop/` — `data.json` (main) + `backups/` (auto-timestamped before each save, max 10, debounced 1 min). With iCloud backup enabled, a single `~/Library/Mobile Documents/com~apple~CloudDocs/Ledger/ledger-backup.json` is overwritten each backup (requires iCloud Drive).
