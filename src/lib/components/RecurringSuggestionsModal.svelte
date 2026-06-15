@@ -38,7 +38,6 @@
 	// Confirmation state: editable date and amount for each selected item
 	let confirmationData = $state(new Map<string, { date: string; amount: string }>());
 
-	// Loading state
 	let isSubmitting = $state(false);
 
 	// Parse current month for date defaults
@@ -56,10 +55,8 @@
 		}
 	});
 
-	// Get selected count
 	let selectedCount = $derived(selectedIds.size);
 
-	// Get selected suggestions
 	let selectedSuggestions = $derived(
 		suggestions.filter((s) => selectedIds.has(s.id))
 	);
@@ -75,12 +72,10 @@
 		return total;
 	});
 
-	// Get category by ID
 	function getCategory(categoryId: number): Category | undefined {
 		return categories.find((c) => c.id === categoryId);
 	}
 
-	// Toggle selection
 	function toggleSelection(id: string) {
 		const newSelected = new Set(selectedIds);
 		if (newSelected.has(id)) {
@@ -91,17 +86,14 @@
 		selectedIds = newSelected;
 	}
 
-	// Select all
 	function selectAll() {
 		selectedIds = new Set(suggestions.map((s) => s.id));
 	}
 
-	// Deselect all
 	function deselectAll() {
 		selectedIds = new Set();
 	}
 
-	// Move to confirmation step
 	function goToConfirm() {
 		// Initialize confirmation data for selected items
 		const { year, month } = getMonthYear();
@@ -123,12 +115,10 @@
 		step = 'confirm';
 	}
 
-	// Go back to selection
 	function goBackToSelect() {
 		step = 'select';
 	}
 
-	// Update confirmation data
 	function updateConfirmationDate(id: string, date: string) {
 		const newData = new Map(confirmationData);
 		const existing = newData.get(id);
@@ -147,7 +137,6 @@
 		}
 	}
 
-	// Handle final submission
 	async function handleSubmit() {
 		const itemsToAdd = selectedSuggestions.map((s) => {
 			const data = confirmationData.get(s.id)!;
@@ -168,7 +157,6 @@
 		}
 	}
 
-	// Format frequency display
 	function formatFrequency(frequency: string): string {
 		switch (frequency) {
 			case 'monthly':
@@ -182,14 +170,12 @@
 		}
 	}
 
-	// Get ordinal suffix for day
 	function getOrdinal(n: number): string {
 		const s = ['th', 'st', 'nd', 'rd'];
 		const v = n % 100;
 		return n + (s[(v - 20) % 10] || s[v] || s[0]);
 	}
 
-	// Modal title based on step
 	let modalTitle = $derived(
 		step === 'select' ? 'Expected Recurring Transactions' : 'Confirm Transactions'
 	);

@@ -1,7 +1,7 @@
 <script lang="ts" module>
 	import type { Transaction, Category } from '$lib/db';
 	import { getMonthKey } from '$lib/db';
-	import { roundCurrency } from '$lib/utils/currency';
+	import { roundCurrency, getUserAmount } from '$lib/utils/currency';
 	import { computeStdDev, computeMedian } from '$lib/insights/calculations/stats';
 	import { detectAnomalies } from '$lib/insights/calculations/anomalies';
 	import { config } from '$lib/config';
@@ -35,7 +35,7 @@
 	}
 
 	function userShare(t: Transaction): number {
-		return t.isShared ? t.amount - t.partnerShare : t.amount;
+		return getUserAmount(t);
 	}
 
 	function previousMonthKeys(monthKey: string, count: number): string[] {

@@ -15,6 +15,7 @@ import {
 	computeWeightedStdDev
 } from './stats';
 import { calculatePercent } from '$lib/utils/currency';
+import { normalizeMerchant } from '$lib/utils/string-helpers';
 
 interface SavingsReviewResult {
 	/** Total saved this month */
@@ -209,7 +210,7 @@ export function computeMostVisitedMerchant(
 ): MonthReviewResult['mostVisitedMerchant'] {
 	if (transactions.length === 0) return null;
 
-	const counts = countMerchantVisits(transactions, (m) => m.trim().toLowerCase());
+	const counts = countMerchantVisits(transactions, normalizeMerchant);
 
 	let topMerchant = '';
 	let topCount = 0;
@@ -224,13 +225,13 @@ export function computeMostVisitedMerchant(
 
 	// Find original casing from first occurrence
 	const originalName = transactions.find(
-		(t) => t.merchant.trim().toLowerCase() === topMerchant
+		(t) => normalizeMerchant(t.merchant) === topMerchant
 	)?.merchant ?? topMerchant;
 
 	// Sum user amounts for the top merchant's transactions
 	let totalSpent = 0;
 	for (const t of transactions) {
-		if (t.merchant.trim().toLowerCase() === topMerchant) {
+		if (normalizeMerchant(t.merchant) === topMerchant) {
 			totalSpent += getUserAmount(t);
 		}
 	}

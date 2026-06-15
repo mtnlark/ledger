@@ -3,14 +3,9 @@
  */
 
 import type { Transaction } from '$lib/db';
-import { sumCurrency } from '$lib/utils/currency';
+import { sumCurrency, getUserAmount, calculateTotalSpent } from '$lib/utils/currency';
 
-/**
- * Get user's portion of a transaction amount (accounting for splits).
- */
-export function getUserAmount(transaction: Transaction): number {
-	return transaction.isShared ? transaction.amount - transaction.partnerShare : transaction.amount;
-}
+export { getUserAmount };
 
 /**
  * Calculate total spending by category for a list of transactions.
@@ -41,5 +36,5 @@ export function getSpendingByCategory(transactions: Transaction[]): Map<number, 
  * Uses sumCurrency() to avoid floating-point accumulation errors.
  */
 export function getTotalSpent(transactions: Transaction[]): number {
-	return sumCurrency(transactions.map(t => getUserAmount(t)));
+	return calculateTotalSpent(transactions);
 }

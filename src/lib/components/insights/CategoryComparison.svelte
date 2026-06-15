@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { format } from 'date-fns';
+	import { getUserAmount } from '$lib/utils/currency';
 	import type { ComponentType } from 'svelte';
 	import { type ChartConfiguration } from 'chart.js/auto';
 	import { BarChart3 } from 'lucide-svelte';
@@ -35,7 +36,7 @@
 	function getSpendingByCategory(transactions: Transaction[]): Map<number, number> {
 		const spending = new Map<number, number>();
 		for (const t of transactions) {
-			const amount = t.isShared ? t.amount - t.partnerShare : t.amount;
+			const amount = getUserAmount(t);
 			spending.set(t.categoryId, (spending.get(t.categoryId) || 0) + amount);
 		}
 		return spending;

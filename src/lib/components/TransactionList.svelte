@@ -12,7 +12,7 @@
 		type ListRow
 	} from '$lib/utils/transaction-grouping';
 	import { extractTags, removeTags } from '$lib/utils/tags';
-	import { sumCurrency } from '$lib/utils/currency';
+	import { sumCurrency, getUserAmount } from '$lib/utils/currency';
 	import { DEFAULT_PAGE_SIZE } from '$lib/utils/pagination';
 	import EmptyState from './EmptyState.svelte';
 	import BulkActionBar from './BulkActionBar.svelte';
@@ -203,7 +203,7 @@
 
 	// Day totals reflect what hits your budget: your share for shared rows
 	function userShare(t: Transaction): number {
-		return t.isShared ? t.amount - t.partnerShare : t.amount;
+		return getUserAmount(t);
 	}
 
 	function groupTotal(rows: ListRow[]): number {

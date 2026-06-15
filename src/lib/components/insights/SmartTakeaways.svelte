@@ -6,7 +6,7 @@
 	import { getInsightsEngine } from '$lib/insights';
 	import { computeStdDev } from '$lib/insights/calculations/stats';
 	import { computeSavingsReview } from '$lib/insights/calculations/month-review';
-	import { formatCurrency } from '$lib/utils/format-helpers';
+	import { formatCurrency, formatPercentage } from '$lib/utils/format-helpers';
 	import { filterUpToDate } from '$lib/utils/date-helpers';
 	import { getBudgetStatus } from '$lib/utils/budget-status';
 	import { sumCurrency, roundCurrency } from '$lib/utils/currency';
@@ -283,7 +283,7 @@
 				icon: Trophy,
 				iconColor: 'text-success-500',
 				headline: 'Your highest savings month!',
-				subtext: `${formatCurrency(savingsReview.totalSaved)} saved${savingsReview.savingsRate !== null ? ` · ${Math.round(savingsReview.savingsRate * 100)}% savings rate` : ''}`
+				subtext: `${formatCurrency(savingsReview.totalSaved)} saved${savingsReview.savingsRate !== null ? ` · ${formatPercentage(savingsReview.savingsRate)} savings rate` : ''}`
 			};
 		}
 

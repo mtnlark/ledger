@@ -1,4 +1,5 @@
 import type { Transaction, Category } from '$lib/db';
+import { getUserAmount } from '$lib/utils/currency';
 import { getMonthKey } from '$lib/db';
 import { roundCurrency } from './currency';
 import { matchesTag } from './tags';
@@ -36,7 +37,7 @@ export interface TagReport {
 }
 
 function userShare(t: Transaction): number {
-	return t.isShared ? t.amount - t.partnerShare : t.amount;
+	return getUserAmount(t);
 }
 
 function trailingMonthKeys(count: number, today: Date): string[] {

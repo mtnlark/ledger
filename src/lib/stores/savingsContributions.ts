@@ -8,7 +8,6 @@ import { sumCurrency } from '$lib/utils/currency';
 // Payroll deductions, interest, and employer matches are "free money" or pre-tax
 const SOURCES_AFFECTING_AVAILABLE: ContributionSource[] = ['bank_transfer', 'other'];
 
-// Add a new contribution
 export async function addContribution(
 	contribution: Omit<SavingsContribution, 'id' | 'createdAt' | 'updatedAt'>
 ): Promise<number> {
@@ -32,7 +31,6 @@ export async function addContribution(
 	return id;
 }
 
-// Get contributions for a specific month, optionally filtered by account
 export async function getContributionsForMonth(
 	month: string,
 	accountId: number
@@ -46,14 +44,12 @@ export async function getContributionsForMonth(
 		.toArray();
 }
 
-// Get all contributions for a month (all accounts)
 export async function getAllContributionsForMonth(month: string): Promise<SavingsContribution[]> {
 	const { start, end } = getMonthDateRange(month);
 
 	return db.savingsContributions.where('date').between(start, end, true, true).toArray();
 }
 
-// Get all contributions (for insights/trends)
 export async function getAllContributions(): Promise<SavingsContribution[]> {
 	return db.savingsContributions.toArray();
 }
@@ -72,13 +68,11 @@ export async function getContributionsAffectingAvailable(
 		.toArray();
 }
 
-// Get total saved for a month (all contributions, all sources)
 export async function getTotalSavedForMonth(month: string): Promise<number> {
 	const contributions = await getAllContributionsForMonth(month);
 	return sumCurrency(contributions.map((c) => c.amount));
 }
 
-// Get year-to-date contributions for a specific account
 export async function getYTDContributions(accountId: number): Promise<SavingsContribution[]> {
 	const currentYear = new Date().getFullYear();
 	const startOfYear = new Date(currentYear, 0, 1);
@@ -91,7 +85,6 @@ export async function getYTDContributions(accountId: number): Promise<SavingsCon
 		.toArray();
 }
 
-// Update a contribution
 export async function updateContribution(
 	id: number,
 	updates: Partial<Omit<SavingsContribution, 'id' | 'createdAt'>>
@@ -115,7 +108,6 @@ export async function updateContribution(
 	await persistData();
 }
 
-// Delete a contribution
 export async function deleteContribution(id: number): Promise<void> {
 	const contribution = await db.savingsContributions.get(id);
 	if (!contribution) return;

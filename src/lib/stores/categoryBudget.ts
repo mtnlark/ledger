@@ -1,4 +1,5 @@
 import { db, type CategoryBudget, navigateMonth } from '$lib/db';
+import { getUserAmount } from '$lib/utils/currency';
 import { persistData } from '$lib/storage';
 import { getMonthDateRange } from '$lib/utils/date-helpers';
 import {
@@ -149,7 +150,7 @@ async function getCategorySpendingForMonth(categoryId: number, month: string): P
 
 	// Sum user's portion
 	return transactions.reduce((sum, t) => {
-		const userAmount = t.isShared ? t.amount - t.partnerShare : t.amount;
+		const userAmount = getUserAmount(t);
 		return sum + userAmount;
 	}, 0);
 }
@@ -215,7 +216,7 @@ export async function calculateSuggestedBudget(
 		const monthKey = getMonthKeyFromDate(t.date);
 		if (!months.includes(monthKey)) continue;
 
-		const userAmount = t.isShared ? t.amount - t.partnerShare : t.amount;
+		const userAmount = getUserAmount(t);
 		monthlySpending.set(monthKey, (monthlySpending.get(monthKey) || 0) + userAmount);
 	}
 
@@ -291,7 +292,7 @@ export async function generateAllSuggestions(month: string): Promise<Map<number,
 			categoryMonthSpending.set(t.categoryId, new Map());
 		}
 
-		const userAmount = t.isShared ? t.amount - t.partnerShare : t.amount;
+		const userAmount = getUserAmount(t);
 		const monthSpending = categoryMonthSpending.get(t.categoryId)!;
 		monthSpending.set(monthKey, (monthSpending.get(monthKey) || 0) + userAmount);
 	}
@@ -381,7 +382,7 @@ export async function getAllCategorySpending(month: string): Promise<Map<number,
 
 	for (const t of transactions) {
 		// Calculate user's portion
-		const userAmount = t.isShared ? t.amount - t.partnerShare : t.amount;
+		const userAmount = getUserAmount(t);
 		const current = spending.get(t.categoryId) || 0;
 		spending.set(t.categoryId, current + userAmount);
 	}

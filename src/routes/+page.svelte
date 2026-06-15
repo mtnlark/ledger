@@ -39,7 +39,6 @@
 	import TopCategoriesBar from '$lib/components/insights/TopCategoriesBar.svelte';
 	import { Plus, Square, CalendarClock } from 'lucide-svelte';
 
-	// State
 	const SHOW_UPCOMING_KEY = 'ledger-show-upcoming';
 	const STALE_NUDGE_KEY = 'ledger-stale-nudge-dismissed';
 	const STALE_THRESHOLD_DAYS = 7;
@@ -302,7 +301,6 @@
 		filters = newFilters;
 	}
 
-	// Computed
 	let monthDisplay = $derived(format(parseMonthKey(currentMonth), 'MMMM yyyy'));
 	let totalSpent = $derived(calculateTotalSpent(transactions));
 
@@ -313,7 +311,6 @@
 		return () => {};
 	});
 
-	// Load data
 	async function loadData() {
 		isLoading = true;
 		try {
@@ -396,7 +393,6 @@
 		}
 	}
 
-	// Handle edit - open modal
 	function handleEdit(transaction: Transaction) {
 		editingTransaction = transaction;
 	}

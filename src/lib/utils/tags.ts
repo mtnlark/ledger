@@ -1,4 +1,5 @@
 import type { Transaction } from '$lib/db/constants.js';
+import { getUserAmount } from '$lib/utils/currency';
 import { sumCurrency } from '$lib/utils/currency.js';
 
 /**
@@ -67,7 +68,7 @@ export function calculateTagTotal(transactions: Transaction[], tag: string): num
   const normalizedTag = tag.replace(/^#/, '').toLowerCase();
   const amounts = transactions
     .filter(tx => extractTags(tx.notes).includes(normalizedTag))
-    .map(tx => tx.isShared ? tx.amount - tx.partnerShare : tx.amount);
+    .map(tx => getUserAmount(tx));
   return sumCurrency(amounts);
 }
 

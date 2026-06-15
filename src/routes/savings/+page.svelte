@@ -13,7 +13,7 @@
 	import { getSelectedMonth, setSelectedMonth } from '$lib/stores/selectedMonth';
 	import { getAvailableMonths } from '$lib/stores/transactions';
 	import { toast } from '$lib/stores/toast';
-	import { formatCurrency, formatCurrencyWhole } from '$lib/utils/format-helpers';
+	import { formatCurrency, formatCurrencyWhole, formatPercentage } from '$lib/utils/format-helpers';
 	import { sumCurrency } from '$lib/utils/currency';
 	import { Plus } from 'lucide-svelte';
 	import MonthPicker from '$lib/components/MonthPicker.svelte';
@@ -294,7 +294,7 @@
 							<div>
 								<span class="text-sm text-charcoal-muted">Savings Rate</span>
 								<p class="font-mono text-xl font-medium text-charcoal">
-									{Math.round(savingsRate * 100)}%
+									{formatPercentage(savingsRate)}
 								</p>
 								<p class="text-xs text-charcoal-muted mt-0.5">
 									of {formatCurrencyWhole(monthlyIncome)} income

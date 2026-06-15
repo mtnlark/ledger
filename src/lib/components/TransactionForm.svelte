@@ -58,7 +58,6 @@
 
 	let { categories, settings, onSubmit, onSplitSubmit, onCancel }: Props = $props();
 
-	// Form state
 	let dateStr = $state(format(new Date(), 'yyyy-MM-dd'));
 	let merchant = $state('');
 	let amountStr = $state('');
@@ -77,7 +76,6 @@
 	let futureDateConfirmed = $state(false);
 	let isSubmitting = $state(false);
 
-	// Validation state
 	let touched = $state(new Set<string>());
 	let errors = $state<Record<string, string>>({});
 
@@ -135,7 +133,6 @@
 	// Get selected category for essential default
 	let selectedCategory = $derived(categories.find((c) => c.id === categoryId));
 
-	// Computed values
 	let amount = $derived(parseFloat(amountStr) || 0);
 
 	// Validate and clamp split value based on type and amount

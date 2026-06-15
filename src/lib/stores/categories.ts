@@ -2,31 +2,25 @@ import { db, type Category } from '$lib/db';
 import { liveQuery } from 'dexie';
 import { persistData } from '$lib/storage';
 
-// Reactive categories list
 export const categories = liveQuery(() => db.categories.orderBy('sortOrder').toArray());
 
-// Get all categories
 export async function getAllCategories(): Promise<Category[]> {
 	return db.categories.orderBy('sortOrder').toArray();
 }
 
-// Get active categories only
 export async function getActiveCategories(): Promise<Category[]> {
 	const all = await db.categories.orderBy('sortOrder').toArray();
 	return all.filter((c) => c.isActive);
 }
 
-// Get category by ID
 export async function getCategoryById(id: number): Promise<Category | undefined> {
 	return db.categories.get(id);
 }
 
-// Get category by name
 export async function getCategoryByName(name: string): Promise<Category | undefined> {
 	return db.categories.where('name').equalsIgnoreCase(name).first();
 }
 
-// Add a new category
 export async function addCategory(
 	category: Omit<Category, 'id' | 'sortOrder'>
 ): Promise<number> {
@@ -42,7 +36,6 @@ export async function addCategory(
 	return id;
 }
 
-// Update a category
 export async function updateCategory(
 	id: number,
 	updates: Partial<Omit<Category, 'id'>>
@@ -51,7 +44,6 @@ export async function updateCategory(
 	await persistData();
 }
 
-// Toggle category active status
 export async function toggleCategoryActive(id: number): Promise<void> {
 	const category = await db.categories.get(id);
 	if (category) {
@@ -60,7 +52,6 @@ export async function toggleCategoryActive(id: number): Promise<void> {
 	}
 }
 
-// Reorder categories based on an array of IDs
 export async function reorderCategories(orderedIds: number[]): Promise<void> {
 	// Update sortOrder for each category based on its position in the array
 	await db.transaction('rw', db.categories, async () => {
@@ -71,7 +62,6 @@ export async function reorderCategories(orderedIds: number[]): Promise<void> {
 	await persistData();
 }
 
-// Move a category up one position
 export async function moveCategoryUp(id: number): Promise<void> {
 	const categories = await db.categories.orderBy('sortOrder').toArray();
 	const index = categories.findIndex((c) => c.id === id);
@@ -90,7 +80,6 @@ export async function moveCategoryUp(id: number): Promise<void> {
 	await persistData();
 }
 
-// Move a category down one position
 export async function moveCategoryDown(id: number): Promise<void> {
 	const categories = await db.categories.orderBy('sortOrder').toArray();
 	const index = categories.findIndex((c) => c.id === id);
@@ -109,13 +98,11 @@ export async function moveCategoryDown(id: number): Promise<void> {
 	await persistData();
 }
 
-// Delete a category
 export async function deleteCategory(id: number): Promise<void> {
 	await db.categories.delete(id);
 	await persistData();
 }
 
-// Get count of transactions using a category
 export async function getCategoryUsageCount(id: number): Promise<number> {
 	return db.transactions.where('categoryId').equals(id).count();
 }
