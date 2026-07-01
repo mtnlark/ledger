@@ -41,6 +41,15 @@ export interface RolloverOptions {
 	maxChainMonths?: number;
 }
 
+/**
+ * Convert a desired month total (base + carryover) back to the base amount to
+ * store. Clamped at 0 so a cap below the carryover keeps the budget row (and
+ * with it the rollover chain) instead of going negative.
+ */
+export function baseFromEffective(effectiveTotal: number, carryover: number): number {
+	return Math.max(0, roundCurrency(effectiveTotal - carryover));
+}
+
 export function previousMonthKey(month: string): string {
 	const [y, m] = month.split('-').map(Number);
 	return m === 1 ? `${y - 1}-12` : `${y}-${String(m - 1).padStart(2, '0')}`;

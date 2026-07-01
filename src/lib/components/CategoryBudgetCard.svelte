@@ -4,6 +4,7 @@
 	import type { Category } from '$lib/db';
 	import { formatCurrencyWhole } from '$lib/utils/format-helpers';
 	import { roundCurrency } from '$lib/utils/currency';
+	import { baseFromEffective } from '$lib/utils/budget-rollover';
 
 	interface Props {
 		category: Category;
@@ -40,7 +41,8 @@
 	let inputRef = $state<HTMLInputElement | null>(null);
 
 	function startEditing() {
-		editValue = budgetAmount ? String(budgetAmount) : '';
+		// With a carryover, the user edits the month total (base + rollover) directly
+		editValue = hasBudget ? String(roundCurrency(budgetAmount! + carryover)) : '';
 		editRollsOver = rollsOver;
 		isEditing = true;
 		// Use queueMicrotask for better screen reader UX vs autofocus attribute
@@ -57,7 +59,7 @@
 		isEditing = false;
 		if (!isNaN(amount) && amount > 0) {
 			// Await so the row exists before the rollover flag is written to it
-			await onSaveBudget(amount);
+			await onSaveBudget(baseFromEffective(amount, carryover));
 			if (editRollsOver !== rollsOver) {
 				await onToggleRollover?.(editRollsOver);
 			}
@@ -74,9 +76,15 @@
 		}
 	}
 
-	let hasBudget = $derived(budgetAmount !== null && budgetAmount > 0);
+	let hasBudget = $derived(budgetAmount !== null && (budgetAmount > 0 || carryover > 0));
 	let effectiveBudget = $derived(hasBudget ? roundCurrency(budgetAmount! + carryover) : null);
 	let showSuggestion = $derived(!hasBudget && suggestedAmount > 0);
+	// Live preview of the base amount that saving the typed month total would store
+	let editBasePreview = $derived.by(() => {
+		if (carryover <= 0) return null;
+		const parsed = parseFloat(editValue);
+		return !isNaN(parsed) && parsed > 0 ? baseFromEffective(parsed, carryover) : null;
+	});
 </script>
 
 <div
@@ -116,45 +124,54 @@
 	<!-- Amount Display / Edit -->
 	<div class="flex items-center gap-3 shrink-0 justify-end {isEditing ? '' : 'w-40'}">
 		{#if isEditing}
-			<div class="flex items-center gap-2">
-				{#if onToggleRollover}
+			<div class="flex flex-col items-end gap-1">
+				<div class="flex items-center gap-2">
+					{#if onToggleRollover}
+						<button
+							type="button"
+							onclick={() => (editRollsOver = !editRollsOver)}
+							aria-pressed={editRollsOver}
+							class="p-1.5 rounded-md transition-colors {editRollsOver
+								? 'text-primary-600 bg-primary-50'
+								: 'text-charcoal-muted hover:bg-surface-alt'}"
+							title="Roll over unused budget to next month"
+						>
+							<Repeat size={16} />
+						</button>
+					{/if}
+					<span class="text-charcoal-muted font-mono">$</span>
+					<input
+						type="text"
+						inputmode="numeric"
+						pattern="[0-9]*"
+						bind:value={editValue}
+						bind:this={inputRef}
+						onkeydown={handleKeydown}
+						class="w-20 px-3 py-1.5 text-right font-mono text-sm border border-theme rounded-lg
+							focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500
+							bg-surface text-charcoal"
+						placeholder="0"
+						title={carryover > 0 ? 'Total for this month, including rollover' : undefined}
+					/>
 					<button
-						type="button"
-						onclick={() => (editRollsOver = !editRollsOver)}
-						aria-pressed={editRollsOver}
-						class="p-1.5 rounded-md transition-colors {editRollsOver
-							? 'text-primary-600 bg-primary-50'
-							: 'text-charcoal-muted hover:bg-surface-alt'}"
-						title="Roll over unused budget to next month"
+						onclick={saveEdit}
+						class="p-1.5 text-success-600 hover:bg-success-50 rounded-md transition-colors"
 					>
-						<Repeat size={16} />
+						<Check size={16} />
 					</button>
+					<button
+						onclick={cancelEditing}
+						class="p-1.5 text-charcoal-muted hover:bg-surface-alt rounded-md transition-colors"
+					>
+						<X size={16} />
+					</button>
+				</div>
+				{#if editBasePreview !== null}
+					<p class="text-xs text-charcoal-muted pr-1">
+						incl. <span class="font-mono text-success-600">{formatCurrencyWhole(carryover)}</span> rollover
+						→ <span class="font-mono">{formatCurrencyWhole(editBasePreview)}</span> budget
+					</p>
 				{/if}
-				<span class="text-charcoal-muted font-mono">$</span>
-				<input
-					type="text"
-					inputmode="numeric"
-					pattern="[0-9]*"
-					bind:value={editValue}
-					bind:this={inputRef}
-					onkeydown={handleKeydown}
-					class="w-20 px-3 py-1.5 text-right font-mono text-sm border border-theme rounded-lg
-						focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500
-						bg-surface text-charcoal"
-					placeholder="0"
-				/>
-				<button
-					onclick={saveEdit}
-					class="p-1.5 text-success-600 hover:bg-success-50 rounded-md transition-colors"
-				>
-					<Check size={16} />
-				</button>
-				<button
-					onclick={cancelEditing}
-					class="p-1.5 text-charcoal-muted hover:bg-surface-alt rounded-md transition-colors"
-				>
-					<X size={16} />
-				</button>
 			</div>
 		{:else}
 			<div class="text-right min-w-24">

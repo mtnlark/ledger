@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { computeEffectiveBudgets } from './budget-rollover';
+import { baseFromEffective, computeEffectiveBudgets } from './budget-rollover';
 import type { CategoryBudget } from '$lib/db';
 
 function row(month: string, categoryId: number, budgetAmount: number, rollsOver?: boolean): CategoryBudget {
@@ -122,5 +122,24 @@ describe('computeEffectiveBudgets', () => {
 		const result = computeEffectiveBudgets(budgets, spending, '2026-01');
 		expect(result.prevMonth).toBe('2025-12');
 		expect(result.byCategory.get(1)).toMatchObject({ carryover: 66.77, effective: 166.77 });
+	});
+});
+
+describe('baseFromEffective', () => {
+	it('subtracts the carryover from the desired month total', () => {
+		expect(baseFromEffective(500, 150)).toBe(350);
+	});
+
+	it('clamps to zero when the total is at or below the carryover', () => {
+		expect(baseFromEffective(100, 150)).toBe(0);
+		expect(baseFromEffective(150, 150)).toBe(0);
+	});
+
+	it('is a passthrough with no carryover', () => {
+		expect(baseFromEffective(500, 0)).toBe(500);
+	});
+
+	it('rounds currency', () => {
+		expect(baseFromEffective(500.005, 100)).toBe(400.01);
 	});
 });
