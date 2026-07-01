@@ -88,12 +88,7 @@
 		<div class="flex items-center gap-2 mb-1">
 			<span class="w-2.5 h-2.5 rounded-full shrink-0" style="background-color: {category.color};" aria-hidden="true"></span>
 			<span class="font-medium text-charcoal truncate">{category.name}</span>
-			{#if carryover > 0}
-				<span
-					class="font-mono text-xs text-success-600 shrink-0"
-					title="Includes {formatCurrencyWhole(carryover)} rolled over from last month"
-				>+{formatCurrencyWhole(carryover)}</span>
-			{:else if rollsOver}
+			{#if rollsOver}
 				<span class="text-charcoal-muted/70 shrink-0" title="Unused budget rolls over to next month">
 					<Repeat size={12} />
 				</span>
@@ -163,14 +158,19 @@
 			</div>
 		{:else}
 			<div class="text-right min-w-24">
-				<span class="font-mono text-sm text-charcoal">{formatCurrencyWhole(spent)}</span>
-				{#if hasBudget}
-					<span
-						class="font-mono text-sm text-charcoal-muted"
-						title={carryover > 0
-							? `${formatCurrencyWhole(budgetAmount!)} budget + ${formatCurrencyWhole(carryover)} rolled over`
-							: undefined}
-					> / {formatCurrencyWhole(effectiveBudget!)}</span>
+				<div>
+					<span class="font-mono text-sm text-charcoal">{formatCurrencyWhole(spent)}</span>
+					{#if hasBudget}
+						<span class="font-mono text-sm text-charcoal-muted"> / {formatCurrencyWhole(effectiveBudget!)}</span>
+					{/if}
+				</div>
+				{#if hasBudget && carryover > 0}
+					<p
+						class="text-xs text-success-600"
+						title="{formatCurrencyWhole(budgetAmount!)} budget + {formatCurrencyWhole(carryover)} rolled over"
+					>
+						incl. <span class="font-mono">{formatCurrencyWhole(carryover)}</span> rollover
+					</p>
 				{/if}
 			</div>
 			<button

@@ -28,6 +28,8 @@ export interface RolloverResult {
 	byCategory: Map<number, EffectiveBudget>;
 	/** Overspend across last month's rollover rows (≥ 0); reduces the pool, not categories. */
 	deficitCarried: number;
+	/** Σ carryover across categories (≥ 0); the surplus portion of effectiveTotal. */
+	carryoverTotal: number;
 	/** The month the deficit came from, for display ("carried from May"). */
 	prevMonth: string;
 	/** Σ effective − deficitCarried. */
@@ -76,6 +78,7 @@ export function computeEffectiveBudgets(
 
 	const byCategory = new Map<number, EffectiveBudget>();
 	let deficitCarried = 0;
+	let carryoverSum = 0;
 	let effectiveSum = 0;
 
 	for (const [categoryId, rows] of rowsByCategory) {
@@ -102,6 +105,7 @@ export function computeEffectiveBudgets(
 					effective,
 					rollsOver: budgetRow.rollsOver === true
 				});
+				carryoverSum += carryover;
 				effectiveSum += effective;
 			} else if (budgetRow.rollsOver === true) {
 				surplusCarry = Math.max(0, roundCurrency(effective - monthSpent));
@@ -119,6 +123,7 @@ export function computeEffectiveBudgets(
 	return {
 		byCategory,
 		deficitCarried,
+		carryoverTotal: roundCurrency(carryoverSum),
 		prevMonth,
 		effectiveTotal: roundCurrency(effectiveSum - deficitCarried)
 	};

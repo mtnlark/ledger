@@ -20,6 +20,7 @@ describe('computeEffectiveBudgets', () => {
 		const result = computeEffectiveBudgets([row('2026-06', 1, 200)], spendMap([]), '2026-06');
 		expect(result.byCategory.get(1)).toMatchObject({ base: 200, carryover: 0, effective: 200, rollsOver: false });
 		expect(result.deficitCarried).toBe(0);
+		expect(result.carryoverTotal).toBe(0);
 		expect(result.effectiveTotal).toBe(200);
 		expect(result.prevMonth).toBe('2026-05');
 	});
@@ -29,6 +30,7 @@ describe('computeEffectiveBudgets', () => {
 		const spending = spendMap([['2026-05', 1, 150]]);
 		const result = computeEffectiveBudgets(budgets, spending, '2026-06');
 		expect(result.byCategory.get(1)).toMatchObject({ base: 200, carryover: 50, effective: 250 });
+		expect(result.carryoverTotal).toBe(50);
 		expect(result.effectiveTotal).toBe(250);
 	});
 
@@ -101,6 +103,7 @@ describe('computeEffectiveBudgets', () => {
 		expect(result.byCategory.get(1)).toMatchObject({ carryover: 50, effective: 250 });
 		expect(result.byCategory.get(2)).toMatchObject({ carryover: 0, effective: 100 });
 		expect(result.deficitCarried).toBe(30);
+		expect(result.carryoverTotal).toBe(50);
 		expect(result.effectiveTotal).toBe(320); // 250 + 100 - 30
 	});
 

@@ -54,6 +54,9 @@
 	// The income-allocation bar intentionally keeps the BASE total: carryovers are
 	// funded by prior months' income, not this month's.
 	let effectiveTotalBudgeted = $derived(rollover ? rollover.effectiveTotal : totalBudgeted);
+	let carryoverTotal = $derived(rollover?.carryoverTotal ?? 0);
+	let deficitCarried = $derived(rollover?.deficitCarried ?? 0);
+	let hasRolloverAdjustments = $derived(carryoverTotal > 0 || deficitCarried > 0);
 	let budgetRemaining = $derived(roundCurrency(effectiveTotalBudgeted - budgetedSpent));
 	let deficitMonthLabel = $derived(
 		rollover ? format(parseMonthKey(rollover.prevMonth), 'MMMM') : ''
@@ -360,8 +363,31 @@
 							<div>
 								<span class="text-sm text-charcoal-muted">Total Budgeted</span>
 								<p class="font-mono text-xl font-medium text-charcoal">
-									{formatCurrencyWhole(effectiveTotalBudgeted)}
+									{formatCurrencyWhole(totalBudgeted)}
 								</p>
+								{#if hasRolloverAdjustments}
+									<div class="mt-2 space-y-1 text-xs">
+										{#if carryoverTotal > 0}
+											<div class="flex items-center justify-between gap-2 text-charcoal-muted">
+												<span>Rolled over from earlier months</span>
+												<span class="font-mono text-success-600">+{formatCurrencyWhole(carryoverTotal)}</span>
+											</div>
+										{/if}
+										{#if deficitCarried > 0}
+											<div
+												class="flex items-center justify-between gap-2 text-charcoal-muted"
+												title="Overspend on {deficitMonthLabel}'s rollover categories reduces this month's overall budget rather than any single category"
+											>
+												<span>{deficitMonthLabel} overspend</span>
+												<span class="font-mono text-warning-600">−{formatCurrencyWhole(deficitCarried)}</span>
+											</div>
+										{/if}
+										<div class="flex items-center justify-between gap-2 pt-1 border-t border-dashed border-theme-dashed font-medium text-charcoal">
+											<span>This month's budget</span>
+											<span class="font-mono">{formatCurrencyWhole(effectiveTotalBudgeted)}</span>
+										</div>
+									</div>
+								{/if}
 							</div>
 							<div>
 								<span class="text-sm text-charcoal-muted">Spent</span>
@@ -403,7 +429,7 @@
 							<div>
 								<span class="text-sm text-charcoal-muted">Total Budgeted</span>
 								<p class="font-mono text-xl font-medium text-charcoal">
-									{formatCurrencyWhole(effectiveTotalBudgeted)}
+									{formatCurrencyWhole(totalBudgeted)}
 								</p>
 							</div>
 							<div>
@@ -422,12 +448,6 @@
 					{:else if totalBudgeted > 0}
 						<p class="text-xs text-charcoal-muted mt-3">
 							All categories with spending have budgets set
-						</p>
-					{/if}
-
-					{#if rollover && rollover.deficitCarried > 0}
-						<p class="text-xs text-warning-600 mt-2" title="Overspend on rollover categories reduces this month's overall budget rather than any single category">
-							−{formatCurrencyWhole(rollover.deficitCarried)} overspend carried from {deficitMonthLabel} (already deducted)
 						</p>
 					{/if}
 
