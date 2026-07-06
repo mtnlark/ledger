@@ -439,41 +439,44 @@ export async function splitTransaction(
 	const childIds: number[] = [];
 	const childTransactions: Transaction[] = [];
 
-	// Create child transactions
-	for (const split of splits) {
-		const partnerShare = parent.isShared
-			? calculatePartnerShare(split.amount, parent.splitType, parent.splitValue)
-			: 0;
+	// Atomic: create all children and mark the parent, or roll back entirely
+	// (a partial split would leave orphaned children or a childless parent)
+	await db.transaction('rw', db.transactions, async () => {
+		for (const split of splits) {
+			const partnerShare = parent.isShared
+				? calculatePartnerShare(split.amount, parent.splitType, parent.splitValue)
+				: 0;
 
-		const childData: Omit<Transaction, 'id'> = {
-			date: parent.date,
-			merchant: parent.merchant,
-			amount: split.amount,
-			categoryId: split.categoryId,
-			isShared: parent.isShared,
-			splitType: parent.splitType,
-			splitValue: parent.splitValue,
-			partnerShare,
-			isSettled: parent.isSettled,
-			settledDate: parent.settledDate,
-			notes: split.notes,
-			isEssential: parent.isEssential,
-			isSubscription: parent.isSubscription,
-			subscriptionFrequency: parent.subscriptionFrequency,
-			parentTransactionId: id,
-			createdAt: now,
+			const childData: Omit<Transaction, 'id'> = {
+				date: parent.date,
+				merchant: parent.merchant,
+				amount: split.amount,
+				categoryId: split.categoryId,
+				isShared: parent.isShared,
+				splitType: parent.splitType,
+				splitValue: parent.splitValue,
+				partnerShare,
+				isSettled: parent.isSettled,
+				settledDate: parent.settledDate,
+				notes: split.notes,
+				isEssential: parent.isEssential,
+				isSubscription: parent.isSubscription,
+				subscriptionFrequency: parent.subscriptionFrequency,
+				parentTransactionId: id,
+				createdAt: now,
+				updatedAt: now
+			};
+
+			const childId = (await db.transactions.add(childData)) as number;
+			childIds.push(childId);
+			childTransactions.push({ ...childData, id: childId } as Transaction);
+		}
+
+		// Mark the parent as split so it's hidden from normal queries
+		await db.transactions.update(id, {
+			isSplitParent: true,
 			updatedAt: now
-		};
-
-		const childId = (await db.transactions.add(childData)) as number;
-		childIds.push(childId);
-		childTransactions.push({ ...childData, id: childId } as Transaction);
-	}
-
-	// Mark the parent as split so it's hidden from normal queries
-	await db.transactions.update(id, {
-		isSplitParent: true,
-		updatedAt: now
+		});
 	});
 
 	// Update the cache incrementally
@@ -534,64 +537,70 @@ export async function updateSplitGroup(
 	const total = sumCurrency(lines.map((l) => l.amount));
 	const settledDate = shared.isSettled ? (parent.settledDate ?? now) : undefined;
 
-	// Remove the existing children before recreating from the new lines.
-	const oldChildren = await db.transactions
-		.where('parentTransactionId')
-		.equals(parentId)
-		.toArray();
-	const oldChildIds = oldChildren.map((c) => c.id!).filter((id) => id != null);
-	if (oldChildIds.length > 0) {
-		await db.transactions.bulkDelete(oldChildIds);
-	}
-
-	// Update the parent in place (remains isSplitParent, so still hidden).
-	await db.transactions.update(parentId, {
-		merchant: shared.merchant,
-		date: shared.date,
-		amount: total,
-		isShared: shared.isShared,
-		splitType: shared.splitType,
-		splitValue: shared.splitValue,
-		isSettled: shared.isSettled,
-		settledDate,
-		partnerShare: shared.isShared
-			? calculatePartnerShare(total, shared.splitType, shared.splitValue)
-			: 0,
-		updatedAt: now
-	});
-
-	// Recreate children from the new lines.
 	const childIds: number[] = [];
 	const childTransactions: Transaction[] = [];
-	for (const line of lines) {
-		const partnerShare = shared.isShared
-			? calculatePartnerShare(line.amount, shared.splitType, shared.splitValue)
-			: 0;
+	let oldChildIds: number[] = [];
 
-		const childData: Omit<Transaction, 'id'> = {
-			date: shared.date,
+	// Atomic: replace children and update the parent as one unit, or roll back
+	// (a partial edit would delete the old lines without recreating them)
+	await db.transaction('rw', db.transactions, async () => {
+		// Remove the existing children before recreating from the new lines.
+		const oldChildren = await db.transactions
+			.where('parentTransactionId')
+			.equals(parentId)
+			.toArray();
+		oldChildIds = oldChildren.map((c) => c.id!).filter((id) => id != null);
+		if (oldChildIds.length > 0) {
+			await db.transactions.bulkDelete(oldChildIds);
+		}
+
+		// Update the parent in place (remains isSplitParent, so still hidden).
+		await db.transactions.update(parentId, {
 			merchant: shared.merchant,
-			amount: line.amount,
-			categoryId: line.categoryId,
+			date: shared.date,
+			amount: total,
 			isShared: shared.isShared,
 			splitType: shared.splitType,
 			splitValue: shared.splitValue,
-			partnerShare,
 			isSettled: shared.isSettled,
 			settledDate,
-			notes: line.notes,
-			isEssential: parent.isEssential,
-			isSubscription: parent.isSubscription,
-			subscriptionFrequency: parent.subscriptionFrequency,
-			parentTransactionId: parentId,
-			createdAt: now,
+			partnerShare: shared.isShared
+				? calculatePartnerShare(total, shared.splitType, shared.splitValue)
+				: 0,
 			updatedAt: now
-		};
+		});
 
-		const childId = (await db.transactions.add(childData)) as number;
-		childIds.push(childId);
-		childTransactions.push({ ...childData, id: childId } as Transaction);
-	}
+		// Recreate children from the new lines.
+		for (const line of lines) {
+			const partnerShare = shared.isShared
+				? calculatePartnerShare(line.amount, shared.splitType, shared.splitValue)
+				: 0;
+
+			const childData: Omit<Transaction, 'id'> = {
+				date: shared.date,
+				merchant: shared.merchant,
+				amount: line.amount,
+				categoryId: line.categoryId,
+				isShared: shared.isShared,
+				splitType: shared.splitType,
+				splitValue: shared.splitValue,
+				partnerShare,
+				isSettled: shared.isSettled,
+				settledDate,
+				notes: line.notes,
+				isEssential: parent.isEssential,
+				isSubscription: parent.isSubscription,
+				subscriptionFrequency: parent.subscriptionFrequency,
+				parentTransactionId: parentId,
+				createdAt: now,
+				updatedAt: now
+			};
+
+			const childId = (await db.transactions.add(childData)) as number;
+			childIds.push(childId);
+			childTransactions.push({ ...childData, id: childId } as Transaction);
+		}
+	});
 
 	// Reconcile the cache incrementally.
 	const cache = getTransactionCache();

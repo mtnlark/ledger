@@ -163,14 +163,42 @@ async function readDataFile(): Promise<ReadDataResult> {
 }
 
 /**
- * Attempt to recover data from backups
+ * Attempt to recover from the .bak file left by the previous atomic write.
+ * This is the most recent good state (fresher than the debounced timestamped
+ * backups), so it is tried first.
+ */
+async function recoverFromBakFile(): Promise<RecoveryResult> {
+	ensureInitialized();
+
+	const bakPath = cachedDataPath + '.bak';
+	if (!(await fs.exists(bakPath))) {
+		return { status: 'no_valid_backup', hadCandidates: false };
+	}
+
+	try {
+		const content = await fs.readTextFile(bakPath);
+		const data = JSON.parse(content) as StoredData;
+		if (data.checksum && !(await verifyChecksum(data))) {
+			console.warn('data.json.bak has invalid checksum');
+			return { status: 'no_valid_backup', hadCandidates: true };
+		}
+		console.log('Successfully recovered from data.json.bak');
+		return { status: 'recovered', data, backupName: 'data.json.bak' };
+	} catch (error) {
+		console.warn('data.json.bak is invalid', error);
+		return { status: 'no_valid_backup', hadCandidates: true };
+	}
+}
+
+/**
+ * Attempt to recover data from timestamped backups
  * Tries each backup from newest to oldest until one parses successfully
  */
 async function recoverFromBackups(): Promise<RecoveryResult> {
 	ensureInitialized();
 
 	if (!(await fs.exists(cachedBackupsDir))) {
-		return { status: 'no_valid_backup' };
+		return { status: 'no_valid_backup', hadCandidates: false };
 	}
 
 	const entries = await fs.readDir(cachedBackupsDir);
@@ -203,7 +231,23 @@ async function recoverFromBackups(): Promise<RecoveryResult> {
 		}
 	}
 
-	return { status: 'no_valid_backup' };
+	return { status: 'no_valid_backup', hadCandidates: backupFiles.length > 0 };
+}
+
+/**
+ * Try every recovery source, freshest first: .bak, then timestamped backups.
+ */
+async function recoverFromAnySource(): Promise<RecoveryResult> {
+	const bakResult = await recoverFromBakFile();
+	if (bakResult.status === 'recovered') return bakResult;
+
+	const backupsResult = await recoverFromBackups();
+	if (backupsResult.status === 'recovered') return backupsResult;
+
+	return {
+		status: 'no_valid_backup',
+		hadCandidates: bakResult.hadCandidates || backupsResult.hadCandidates
+	};
 }
 
 /**
@@ -405,8 +449,30 @@ export async function initializeTauriStorage(): Promise<InitializationResult> {
 		return { status: 'loaded' };
 	}
 
-	// Handle first run (no data file)
+	// Handle a missing data file. This is usually a true first run, but it can
+	// also mean a crash landed between the rename-to-.bak and rename-from-tmp
+	// steps of an atomic write — so check recovery sources before starting fresh.
 	if (readResult.status === 'not_found') {
+		const recoveryResult = await recoverFromAnySource();
+
+		if (recoveryResult.status === 'recovered') {
+			console.warn(`data.json missing; recovered from ${recoveryResult.backupName}`);
+			await loadDataIntoDexie(recoveryResult.data);
+			await saveToFile();
+			await runMigrationsIfNeeded();
+			return { status: 'recovered', backupName: recoveryResult.backupName };
+		}
+
+		if (recoveryResult.hadCandidates) {
+			// Backups exist but none were readable: data existed and was lost
+			console.error('data.json missing and no backup was readable. DATA HAS BEEN LOST.');
+			await initializeDefaults();
+			await saveToFile();
+			await runMigrationsIfNeeded();
+			return { status: 'initialized_after_unrecoverable_corruption' };
+		}
+
+		// No data file and no backups anywhere: genuine first run
 		await initializeDefaults();
 		await saveToFile();
 		await runMigrationsIfNeeded();
@@ -419,7 +485,7 @@ export async function initializeTauriStorage(): Promise<InitializationResult> {
 		console.error(`Corruption details: ${readResult.error}`);
 	}
 
-	const recoveryResult = await recoverFromBackups();
+	const recoveryResult = await recoverFromAnySource();
 
 	if (recoveryResult.status === 'recovered') {
 		console.log(`Recovered from backup: ${recoveryResult.backupName}`);
@@ -585,14 +651,43 @@ export class PersistenceError extends Error {
 	}
 }
 
+// Save serialization: all saves funnel through a single promise chain so two
+// saves never race on the shared temp file. A save requested while another is
+// already queued (but not started) piggybacks on it — the queued save reads
+// Dexie when it runs, so it captures both mutations in one write.
+let saveChain: Promise<void> = Promise.resolve();
+let saveQueued = false;
+
 /**
  * Save current Dexie state to JSON file
- * Called after every data modification
+ * Called after every data modification. Concurrent calls are serialized;
+ * calls arriving while a save is queued coalesce into that save.
  * @throws PersistenceError if saving fails
  */
-export async function saveToFile(): Promise<void> {
+export function saveToFile(): Promise<void> {
 	ensureInitialized();
 
+	if (saveQueued) {
+		return saveChain;
+	}
+	saveQueued = true;
+	saveChain = saveChain
+		// A failed save must not poison the chain for subsequent saves
+		.catch(() => {})
+		.then(() => {
+			// Clear the flag before reading Dexie so mutations made after this
+			// point queue a fresh save rather than assuming this one saw them
+			saveQueued = false;
+			return performSave();
+		});
+	return saveChain;
+}
+
+/**
+ * Serialize the full Dexie state and write it to disk (single writer;
+ * only ever invoked through the saveToFile queue).
+ */
+async function performSave(): Promise<void> {
 	// Create backup before saving (debounced)
 	try {
 		await createBackup();

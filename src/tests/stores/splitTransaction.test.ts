@@ -8,11 +8,12 @@
  * This file adds: N-way splits, rounding edge cases, settled status inheritance,
  * and isSplitBalanced integration.
  */
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { db, initializeDatabase } from '$lib/db';
 import {
 	addTransaction,
 	splitTransaction,
+	updateSplitGroup,
 	getSplitChildren,
 	getTransactionsByMonth
 } from '$lib/stores/transactions';
@@ -178,5 +179,76 @@ describe('splitTransaction – additional edge cases', () => {
 				{ categoryId: 2, amount: 40 }
 			])
 		).rejects.toThrow('Transaction not found');
+	});
+});
+
+describe('splitTransaction – atomicity', () => {
+	beforeEach(async () => {
+		await db.delete();
+		await db.open();
+		await initializeDatabase();
+	});
+
+	afterEach(async () => {
+		vi.restoreAllMocks();
+		await db.delete();
+	});
+
+	it('rolls back created children when marking the parent fails', async () => {
+		const parentId = await createParent({ amount: 100 });
+
+		// Fail the final step (marking the parent as split)
+		vi.spyOn(db.transactions, 'update').mockRejectedValueOnce(new Error('disk full'));
+
+		await expect(
+			splitTransaction(parentId, [
+				{ categoryId: 1, amount: 60 },
+				{ categoryId: 2, amount: 40 }
+			])
+		).rejects.toThrow();
+
+		// No orphaned children, and the parent is still a normal transaction
+		const children = await getSplitChildren(parentId);
+		expect(children).toHaveLength(0);
+
+		const parent = await db.transactions.get(parentId);
+		expect(parent?.isSplitParent).toBeFalsy();
+
+		const visible = await getTransactionsByMonth('2026-01');
+		expect(visible).toHaveLength(1);
+	});
+
+	it('rolls back deleted children when recreating fails in updateSplitGroup', async () => {
+		const parentId = await createParent({ amount: 100 });
+		const originalChildIds = await splitTransaction(parentId, [
+			{ categoryId: 1, amount: 60 },
+			{ categoryId: 2, amount: 40 }
+		]);
+
+		// Fail the child re-creation step
+		vi.spyOn(db.transactions, 'add').mockRejectedValueOnce(new Error('disk full'));
+
+		await expect(
+			updateSplitGroup(
+				parentId,
+				{
+					merchant: 'Target',
+					date: new Date(2026, 0, 15),
+					isShared: false,
+					splitType: 'percentage',
+					splitValue: 0.5,
+					isSettled: false
+				},
+				[
+					{ categoryId: 1, amount: 30 },
+					{ categoryId: 2, amount: 70 }
+				]
+			)
+		).rejects.toThrow();
+
+		// Original children survive untouched
+		const children = await getSplitChildren(parentId);
+		expect(children.map((c) => c.id).sort()).toEqual([...originalChildIds].sort());
+		expect(sumCurrency(children.map((c) => c.amount))).toBe(100);
 	});
 });
