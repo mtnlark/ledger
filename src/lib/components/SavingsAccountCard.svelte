@@ -5,7 +5,7 @@
 	import { formatCurrency, formatCurrencyWhole } from '$lib/utils/format-helpers';
 	import { sumCurrency, calculatePercent } from '$lib/utils/currency';
 	import { deleteSavingsAccount, completeGoal } from '$lib/stores/savingsAccounts';
-	import { getGoalStatus, type GoalStatus, type GoalSeverity } from '$lib/stores/savingsContributions';
+	import { getGoalStatus, type GoalStatus } from '$lib/stores/savingsContributions';
 	import { toast } from '$lib/stores/toast';
 
 	interface Props {

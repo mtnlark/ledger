@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { getBudgetStatus, getBudgetColorClass, getBudgetTextColorClass, type BudgetStatus } from './budget-status';
+import { getBudgetStatus, getBudgetColorClass, getBudgetTextColorClass } from './budget-status';
 
 describe('getBudgetStatus', () => {
 	describe('status classification at boundaries', () => {

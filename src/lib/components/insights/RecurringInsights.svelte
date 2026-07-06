@@ -4,7 +4,6 @@
 	import type { Category, Transaction, CancelledSubscription } from '$lib/db';
 	import { createCategoryHelpers } from '$lib/utils/category-helpers';
 	import { formatCurrencyWhole, formatCurrency } from '$lib/utils/format-helpers';
-	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
 	import EditDetectedBillModal from '$lib/components/EditDetectedBillModal.svelte';
 	import type { DetectedRecurring } from '$lib/stores/recurring';
 	import {
@@ -57,33 +56,6 @@
 	let categoryHelpers = $derived(createCategoryHelpers(categories));
 	let getCategoryColor = $derived(categoryHelpers.getColor);
 	let getCategoryName = $derived(categoryHelpers.getName);
-
-	// Confirm dialog state for dismissing recurring bills
-	let confirmDialog = $state({
-		isOpen: false,
-		merchantName: '',
-		onConfirm: () => {}
-	});
-
-	function showDismissConfirmDialog(merchant: string) {
-		confirmDialog = {
-			isOpen: true,
-			merchantName: merchant,
-			onConfirm: async () => {
-				await dismissRecurring(merchant);
-				onDismiss?.();
-			}
-		};
-	}
-
-	function closeConfirmDialog() {
-		confirmDialog = { ...confirmDialog, isOpen: false };
-	}
-
-	function handleConfirm() {
-		confirmDialog.onConfirm();
-		closeConfirmDialog();
-	}
 
 	// Edit modal state for detected bills
 	let editModal = $state({
@@ -320,11 +292,6 @@
 		allSubscriptions.length > 0 || activeRecurring.length > 0
 	);
 
-	// Action handlers - handleDismiss now shows confirmation dialog
-	function handleDismiss(merchant: string) {
-		showDismissConfirmDialog(merchant);
-	}
-
 	async function handleCancelSubscription(merchant: string, amount?: number) {
 		await cancelSubscription(merchant, amount);
 		onSubscriptionChange?.();
@@ -333,18 +300,6 @@
 	async function handleConfirmActive(merchant: string) {
 		await confirmSubscriptionActive(merchant);
 		onSubscriptionChange?.();
-	}
-
-	function formatDayOfMonth(day: number): string {
-		const suffix =
-			day === 1 || day === 21 || day === 31
-				? 'st'
-				: day === 2 || day === 22
-					? 'nd'
-					: day === 3 || day === 23
-						? 'rd'
-						: 'th';
-		return `${day}${suffix}`;
 	}
 
 	function formatRelativeDate(date: Date): string {
@@ -662,15 +617,6 @@
 </div>
 
 <!-- Confirm Dialog for dismissing recurring bills -->
-<ConfirmDialog
-	isOpen={confirmDialog.isOpen}
-	title="Remove Recurring Bill"
-	message={`Are you sure you want to remove "${confirmDialog.merchantName}" from recurring expenses? This bill will no longer appear in your recurring list.`}
-	confirmText="Remove"
-	variant="warning"
-	onConfirm={handleConfirm}
-	onCancel={closeConfirmDialog}
-/>
 
 <!-- Edit modal for detected bills -->
 <EditDetectedBillModal

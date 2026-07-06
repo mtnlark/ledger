@@ -4,8 +4,7 @@ import { addTransaction } from './transactions';
 import {
 	getMerchantSuggestions,
 	getMostCommonCategory,
-	buildMerchantIndex,
-	type MerchantEntry
+	buildMerchantIndex
 } from './merchants';
 
 describe('Merchant Suggestions', () => {

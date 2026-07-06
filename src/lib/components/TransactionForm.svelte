@@ -144,21 +144,6 @@
 		}
 	});
 
-	// Check if current input is invalid (for showing warning)
-	let splitValueInvalid = $derived.by(() => {
-		if (!isShared) return false;
-		if (splitType === 'percentage') {
-			return splitValue < 0 || splitValue > 1;
-		} else {
-			return splitValue < 0 || splitValue > amount;
-		}
-	});
-
-	let partnerShare = $derived(
-		isShared ? (splitType === 'percentage' ? amount * validatedSplitValue : validatedSplitValue) : 0
-	);
-	let yourShare = $derived(amount - partnerShare);
-
 	// Split mode computed values
 	let splitTotal = $derived(splitLines.reduce((sum, l) => sum + (l.amount || 0), 0));
 	let splitRemaining = $derived(amount - splitTotal);

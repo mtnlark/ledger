@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { ComponentType } from 'svelte';
 	import { slide } from 'svelte/transition';
-	import { Pencil, Trash2, Receipt, CheckSquare, Square, Check, ChevronRight, Repeat } from 'lucide-svelte';
+	import { Pencil, Trash2, Receipt, CheckSquare, Check, ChevronRight, Repeat } from 'lucide-svelte';
 	import type { Transaction, Category, Settings } from '$lib/db';
 	import { createCategoryHelpers } from '$lib/utils/category-helpers';
 	import { formatCurrency } from '$lib/utils/format-helpers';

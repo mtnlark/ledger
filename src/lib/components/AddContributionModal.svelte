@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { format } from 'date-fns';
 	import { CONTRIBUTION_SOURCES, type SavingsAccount, type ContributionSource } from '$lib/db';
 	import { parseLocalDate, formatDateForInput } from '$lib/utils/date-helpers';
 	import { cleanNumberInput } from '$lib/utils/form-validation';
@@ -16,7 +15,7 @@
 		onClose: () => void;
 	}
 
-	let { isOpen, accounts, currentMonth, preselectedAccountId, onSave, onClose }: Props = $props();
+	let { isOpen, accounts, preselectedAccountId, onSave, onClose }: Props = $props();
 
 	// Form state
 	let dateStr = $state('');

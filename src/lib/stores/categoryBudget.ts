@@ -134,28 +134,6 @@ export async function getEffectiveBudgetsForMonth(
 }
 
 /**
- * Calculate spending for a category in a specific month
- * Uses indexed date range query for efficiency
- * Returns user's portion (amount - partnerShare for shared transactions)
- */
-async function getCategorySpendingForMonth(categoryId: number, month: string): Promise<number> {
-	const { start, end } = getMonthDateRange(month);
-
-	// Use indexed date range query and filter by category
-	const transactions = await db.transactions
-		.where('date')
-		.between(start, end, true, true)
-		.filter((t) => t.categoryId === categoryId && !t.isSplitParent && !t.isDeleted)
-		.toArray();
-
-	// Sum user's portion
-	return transactions.reduce((sum, t) => {
-		const userAmount = getUserAmount(t);
-		return sum + userAmount;
-	}, 0);
-}
-
-/**
  * Get the date range spanning multiple months for batch queries
  */
 function getMultiMonthDateRange(months: string[]): { start: Date; end: Date } {

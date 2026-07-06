@@ -6,8 +6,7 @@ import {
 	validateSplitValue,
 	validateSplitLines,
 	validateFutureDate,
-	type SplitLine,
-	type ValidationResult
+	type SplitLine
 } from './transaction-validation';
 
 describe('transaction-validation', () => {

@@ -99,7 +99,7 @@
 		}
 	}
 
-	function handleBlur(e: FocusEvent) {
+	function handleBlur() {
 		// Delay hiding to allow click on suggestion
 		setTimeout(() => {
 			showSuggestions = false;

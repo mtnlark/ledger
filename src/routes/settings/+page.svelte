@@ -5,13 +5,13 @@
 	import { type Settings, type Category, type Transaction, DEFAULT_SETTINGS } from '$lib/db';
 	import { initializeStorage } from '$lib/storage';
 	import { getSettings, updateSettings, updateTheme, updateICloudBackup, updateNotifications } from '$lib/stores/settings';
-	import { requestNotificationPermission, isNotificationPermissionGranted } from '$lib/notifications';
+	import { requestNotificationPermission } from '$lib/notifications';
 	import { isICloudAvailable, getICloudBackupDir } from '$lib/storage/tauri-adapter';
 	import { getTransactionsByMonth, getAvailableMonths } from '$lib/stores/transactions';
 	import { getAllCategories } from '$lib/stores/categories';
 	import CategoryManager from '$lib/components/CategoryManager.svelte';
 	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
-	import { readExcelFile, parseExpensesSheet, importTransactions, type ImportResult } from '$lib/utils/import';
+	import { readExcelFile, parseExpensesSheet, importTransactions } from '$lib/utils/import';
 	import { exportTransactionsToCSV, exportAllDataToJSON, importFromJSON, downloadFile } from '$lib/utils/export';
 	import { toast } from '$lib/stores/toast';
 	import type { LinkedAccount } from '$lib/db';

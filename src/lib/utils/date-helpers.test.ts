@@ -268,13 +268,13 @@ describe('Date Helpers', () => {
 		});
 
 		it('handles February in leap year', () => {
-			const { start, end } = getMonthDateRange('2024-02');
+			const { end } = getMonthDateRange('2024-02');
 
 			expect(end.getDate()).toBe(29); // 2024 is a leap year
 		});
 
 		it('handles month with 30 days', () => {
-			const { start, end } = getMonthDateRange('2025-11'); // November
+			const { end } = getMonthDateRange('2025-11'); // November
 
 			expect(end.getDate()).toBe(30);
 		});

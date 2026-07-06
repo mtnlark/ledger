@@ -50,7 +50,7 @@ export function parseDateString(dateStr: string): Date | null {
 	// Try US format (M/D/YYYY or MM/DD/YYYY)
 	const usMatch = trimmed.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);
 	if (usMatch) {
-		let [, month, day, year] = usMatch;
+		const [, month, day, year] = usMatch;
 		// Handle 2-digit years
 		let yearNum = parseInt(year);
 		if (yearNum < 100) {

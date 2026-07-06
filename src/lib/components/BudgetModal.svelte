@@ -15,7 +15,7 @@
 		onClose: () => void;
 	}
 
-	let { isOpen, budget, savedFromContributions, month, monthDisplay, onSave, onClose }: Props = $props();
+	let { isOpen, budget, savedFromContributions, monthDisplay, onSave, onClose }: Props = $props();
 
 	// Form state - initialize from existing budget or defaults
 	let incomeStr = $state('');

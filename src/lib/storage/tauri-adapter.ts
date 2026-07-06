@@ -9,9 +9,7 @@ import {
 	db,
 	DEFAULT_SETTINGS,
 	DEFAULT_CATEGORIES,
-	DEFAULT_SAVINGS_ACCOUNTS,
-	type Category,
-	type SavingsAccount
+	type Category
 } from '$lib/db';
 import { parseStoredDate } from '$lib/utils/date-helpers';
 import type { StoredData, ReadDataResult, RecoveryResult } from './types';
@@ -324,7 +322,7 @@ export async function createBackup(): Promise<void> {
 	try {
 		const settings = await db.settings.get(1);
 		if (settings?.iCloudBackupEnabled) {
-			await copyBackupToICloud(content, backupName);
+			await copyBackupToICloud(content);
 		}
 	} catch (error) {
 		// Don't block on iCloud backup errors
@@ -382,7 +380,7 @@ export function getICloudBackupDir(): string {
 /**
  * Copy a backup file to iCloud Drive
  */
-async function copyBackupToICloud(backupContent: string, backupName: string): Promise<void> {
+async function copyBackupToICloud(backupContent: string): Promise<void> {
 	ensureInitialized();
 
 	try {
@@ -437,7 +435,7 @@ export async function initializeTauriStorage(): Promise<InitializationResult> {
 		await db.open();
 	} catch (error) {
 		console.error('Failed to reset IndexedDB:', error);
-		throw new Error(`Failed to initialize database: ${error}`);
+		throw new Error(`Failed to initialize database: ${error}`, { cause: error });
 	}
 
 	const readResult = await readDataFile();

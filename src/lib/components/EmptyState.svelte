@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { ComponentType } from 'svelte';
-	import { Receipt, Users, BarChart3, FileText } from 'lucide-svelte';
+	import { Receipt } from 'lucide-svelte';
 
 	interface Props {
 		icon?: ComponentType;

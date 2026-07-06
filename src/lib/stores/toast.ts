@@ -20,7 +20,7 @@ interface ToastState {
 }
 
 function createToastStore() {
-	const { subscribe, update, set } = writable<ToastState>({ toasts: [] });
+	const { subscribe, update } = writable<ToastState>({ toasts: [] });
 
 	// Track timeouts so we can clear them when needed
 	const timeouts = new Map<string, ReturnType<typeof setTimeout>>();

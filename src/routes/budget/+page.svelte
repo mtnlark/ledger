@@ -28,7 +28,7 @@
 	import MonthPicker from '$lib/components/MonthPicker.svelte';
 	import CategoryBudgetList from '$lib/components/CategoryBudgetList.svelte';
 	import Skeleton from '$lib/components/Skeleton.svelte';
-	import { calculateBudgetAlerts, type BudgetAlert } from '$lib/utils/budget-alerts';
+	import { calculateBudgetAlerts } from '$lib/utils/budget-alerts';
 
 	// State
 	let isLoading = $state(true);
@@ -296,7 +296,7 @@
 
 				<!-- List skeleton -->
 				<div class="space-y-2">
-					{#each { length: 5 } as _, i}
+					{#each { length: 5 } as _}
 						<div class="bg-surface rounded-lg shadow-sm shadow-theme p-4 flex items-center gap-4">
 							<Skeleton width="40px" height="40px" class="rounded-lg" />
 							<div class="flex-1">

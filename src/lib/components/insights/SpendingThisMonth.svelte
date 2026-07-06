@@ -22,8 +22,6 @@
 	let {
 		currentMonth,
 		transactions,
-		budget,
-		allBudgets,
 		monthlyTrends,
 		onMerchantClick
 	}: Props = $props();

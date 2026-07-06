@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { db, initializeDatabase } from '$lib/db';
 import { addTransaction } from './transactions';
-import { detectRecurringExpenses, type DetectedRecurring } from './recurring';
+import { detectRecurringExpenses } from './recurring';
 
 describe('Recurring Expense Detection', () => {
 	beforeEach(async () => {

@@ -22,8 +22,6 @@ function makeSettings(overrides: Partial<Settings> = {}): Settings {
 
 // localStorage key constants (must match scheduler.ts)
 const DAILY_KEY = 'ledger-notif-daily-last-fired';
-const WEEKLY_KEY = 'ledger-notif-weekly-last-fired';
-const MONTHLY_KEY = 'ledger-notif-monthly-last-fired';
 
 describe('Notification Scheduler', () => {
 	beforeEach(() => {

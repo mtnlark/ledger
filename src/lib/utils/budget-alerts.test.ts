@@ -2,8 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
 	calculateBudgetAlerts,
 	APPROACHING_THRESHOLD,
-	type CategoryBudgetData,
-	type BudgetAlert
+	type CategoryBudgetData
 } from './budget-alerts';
 
 describe('calculateBudgetAlerts', () => {

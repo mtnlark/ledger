@@ -3,8 +3,7 @@ import { db, initializeDatabase } from '$lib/db';
 import { addTransaction } from './transactions';
 import {
 	getRecurringSuggestions,
-	shouldShowRecurringBanner,
-	type RecurringSuggestion
+	shouldShowRecurringBanner
 } from './recurringSuggestions';
 
 describe('Recurring Suggestions', () => {

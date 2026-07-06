@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { format } from 'date-fns';
 	import { ChevronLeft, ChevronRight, ChevronDown, RotateCcw } from 'lucide-svelte';
-	import { parseMonthKey, navigateMonth, getMonthKey } from '$lib/db';
+	import { parseMonthKey, getMonthKey } from '$lib/db';
 
 	interface Props {
 		currentMonth: string;

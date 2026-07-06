@@ -4,8 +4,7 @@
 	import {
 		moveCategoryUp,
 		moveCategoryDown,
-		toggleCategoryActive,
-		addCategory
+		toggleCategoryActive
 	} from '$lib/stores/categories';
 	import { toast } from '$lib/stores/toast';
 	import CategoryEditModal from './CategoryEditModal.svelte';

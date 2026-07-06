@@ -126,15 +126,12 @@ pub fn run() {
     .expect("error while building tauri application");
 
   app.run(|app_handle, event| {
-    match event {
-      tauri::RunEvent::Reopen { .. } => {
-        // Re-show and focus the window when dock icon is clicked
-        if let Some(window) = app_handle.get_webview_window("main") {
-          window.show().unwrap_or_default();
-          window.set_focus().unwrap_or_default();
-        }
+    if let tauri::RunEvent::Reopen { .. } = event {
+      // Re-show and focus the window when dock icon is clicked
+      if let Some(window) = app_handle.get_webview_window("main") {
+        window.show().unwrap_or_default();
+        window.set_focus().unwrap_or_default();
       }
-      _ => {}
     }
   });
 }
