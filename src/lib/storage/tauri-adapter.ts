@@ -11,7 +11,7 @@ import {
 	DEFAULT_CATEGORIES,
 	type Category
 } from '$lib/db';
-import { parseStoredDate } from '$lib/utils/date-helpers';
+import { dehydrateAll, hydrateAll } from './serialization';
 import type { StoredData, ReadDataResult, RecoveryResult } from './types';
 
 // Tauri API modules - loaded once during initialization
@@ -519,106 +519,7 @@ async function runMigrationsIfNeeded(): Promise<void> {
  * Load stored data into Dexie database
  */
 async function loadDataIntoDexie(data: StoredData): Promise<void> {
-	await db.transaction(
-		'rw',
-		[db.transactions, db.categories, db.monthlyBudgets, db.categoryBudgets, db.settings, db.savingsAccounts, db.savingsContributions, db.linkedAccounts, db.balanceSnapshots],
-		async () => {
-			// Clear existing data
-			await db.transactions.clear();
-			await db.categories.clear();
-			await db.monthlyBudgets.clear();
-			await db.categoryBudgets.clear();
-			await db.savingsAccounts.clear();
-			await db.savingsContributions.clear();
-			await db.linkedAccounts.clear();
-			await db.balanceSnapshots.clear();
-
-			// Load categories
-			if (data.categories && data.categories.length > 0) {
-				await db.categories.bulkPut(data.categories);
-			} else {
-				// Seed with defaults
-				await db.categories.bulkAdd(DEFAULT_CATEGORIES as Category[]);
-			}
-
-			// Load monthly budgets
-			if (data.monthlyBudgets && data.monthlyBudgets.length > 0) {
-				await db.monthlyBudgets.bulkPut(data.monthlyBudgets);
-			}
-
-			// Load category budgets (convert date strings to Date objects)
-			if (data.categoryBudgets && data.categoryBudgets.length > 0) {
-				const categoryBudgets = data.categoryBudgets.map((cb) => ({
-					...cb,
-					createdAt: new Date(cb.createdAt),
-					updatedAt: new Date(cb.updatedAt)
-				}));
-				await db.categoryBudgets.bulkPut(categoryBudgets);
-			}
-
-			// Load transactions (convert date strings to Date objects)
-			// Use parseStoredDate for transaction date to avoid timezone shift
-			if (data.transactions && data.transactions.length > 0) {
-				const transactions = data.transactions.map((t) => ({
-					...t,
-					date: parseStoredDate(t.date),
-					createdAt: new Date(t.createdAt),
-					updatedAt: new Date(t.updatedAt),
-					settledDate: t.settledDate ? new Date(t.settledDate) : undefined
-				}));
-				await db.transactions.bulkPut(transactions);
-			}
-
-			// Load savings accounts (convert date strings to Date objects)
-			if (data.savingsAccounts && data.savingsAccounts.length > 0) {
-				const savingsAccounts = data.savingsAccounts.map((sa) => ({
-					...sa,
-					targetDate: sa.targetDate ? new Date(sa.targetDate) : undefined,
-					createdAt: new Date(sa.createdAt),
-					updatedAt: new Date(sa.updatedAt)
-				}));
-				await db.savingsAccounts.bulkPut(savingsAccounts);
-			}
-			// Note: Default savings accounts are seeded by migration, not here
-
-			// Load savings contributions (convert date strings to Date objects)
-			if (data.savingsContributions && data.savingsContributions.length > 0) {
-				const savingsContributions = data.savingsContributions.map((sc) => ({
-					...sc,
-					date: parseStoredDate(sc.date),
-					createdAt: new Date(sc.createdAt),
-					updatedAt: new Date(sc.updatedAt)
-				}));
-				await db.savingsContributions.bulkPut(savingsContributions);
-			}
-
-			// Load linked accounts + balance snapshots (convert date strings)
-			if (data.linkedAccounts && data.linkedAccounts.length > 0) {
-				const linkedAccounts = data.linkedAccounts.map((la) => ({
-					...la,
-					lastSyncedAt: la.lastSyncedAt ? new Date(la.lastSyncedAt) : undefined,
-					createdAt: new Date(la.createdAt),
-					updatedAt: new Date(la.updatedAt)
-				}));
-				await db.linkedAccounts.bulkPut(linkedAccounts);
-			}
-
-			if (data.balanceSnapshots && data.balanceSnapshots.length > 0) {
-				const balanceSnapshots = data.balanceSnapshots.map((bs) => ({
-					...bs,
-					capturedAt: new Date(bs.capturedAt)
-				}));
-				await db.balanceSnapshots.bulkPut(balanceSnapshots);
-			}
-
-			// Load settings
-			if (data.settings) {
-				await db.settings.put({ ...data.settings, id: 1 });
-			} else {
-				await db.settings.put(DEFAULT_SETTINGS);
-			}
-		}
-	);
+	await hydrateAll(data, { useDefaultsWhenMissing: true });
 }
 
 /**
@@ -694,32 +595,7 @@ async function performSave(): Promise<void> {
 		console.error('Backup creation failed:', error);
 	}
 
-	// Get all data from Dexie
-	const [transactions, categories, monthlyBudgets, categoryBudgets, settings, savingsAccounts, savingsContributions, linkedAccounts, balanceSnapshots] = await Promise.all([
-		db.transactions.toArray(),
-		db.categories.toArray(),
-		db.monthlyBudgets.toArray(),
-		db.categoryBudgets.toArray(),
-		db.settings.get(1),
-		db.savingsAccounts.toArray(),
-		db.savingsContributions.toArray(),
-		db.linkedAccounts.toArray(),
-		db.balanceSnapshots.toArray()
-	]);
-
-	const data: StoredData = {
-		version: '1.0',
-		exportedAt: new Date().toISOString(),
-		transactions,
-		categories,
-		monthlyBudgets,
-		categoryBudgets,
-		settings: settings ?? DEFAULT_SETTINGS,
-		savingsAccounts,
-		savingsContributions,
-		linkedAccounts,
-		balanceSnapshots
-	};
+	const data = await dehydrateAll();
 
 	try {
 		await writeDataFile(data);

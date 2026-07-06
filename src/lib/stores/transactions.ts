@@ -25,6 +25,51 @@ function invalidateTransactionCaches(): void {
 	invalidateRecurringCache();
 }
 
+// Apply the same field update to many rows: one DB modify, mirrored into the
+// cache, then cache invalidation + persist. `afterCacheUpdate` runs only when
+// the cache is loaded, for callers that also need to adjust the tag index.
+async function bulkModifyTransactions(
+	ids: number[],
+	fields: Partial<Transaction>,
+	afterCacheUpdate?: () => void
+): Promise<void> {
+	await db.transactions.where('id').anyOf(ids).modify(fields);
+
+	const cache = getTransactionCache();
+	if (cache.isLoaded) {
+		cache.bulkUpdate(ids, fields);
+		afterCacheUpdate?.();
+	}
+
+	invalidateTransactionCaches();
+	await persistData();
+}
+
+// Write per-transaction notes changes (computed once by the caller) to the DB
+// in one rw transaction, mirror them into the cache, rebuild the tag index,
+// and persist. Shared by all tag operations.
+async function applyNotesUpdates(changes: { id: number; notes: string | undefined }[]): Promise<void> {
+	if (changes.length === 0) return;
+	const now = new Date();
+
+	await db.transaction('rw', db.transactions, async () => {
+		for (const change of changes) {
+			await db.transactions.update(change.id, { notes: change.notes, updatedAt: now });
+		}
+	});
+
+	const cache = getTransactionCache();
+	if (cache.isLoaded) {
+		for (const change of changes) {
+			cache.update(change.id, { notes: change.notes, updatedAt: now });
+		}
+		tagIndex.rebuild(cache.getAll());
+	}
+
+	invalidateTransactionCaches();
+	await persistData();
+}
+
 // Filters out split parent transactions and soft-deleted transactions
 export async function getTransactionsByMonth(month: string): Promise<Transaction[]> {
 	const { start, end } = getMonthDateRange(month);
@@ -248,24 +293,12 @@ export async function softDeleteTransactions(ids: number[]): Promise<Transaction
 	if (transactions.length === 0) return [];
 
 	const now = new Date();
-	await db.transactions.where('id').anyOf(ids).modify({
-		isDeleted: true,
-		deletedAt: now,
-		updatedAt: now
-	});
-
-	// Update the cache incrementally
-	const cache = getTransactionCache();
-	if (cache.isLoaded) {
-		cache.bulkUpdate(ids, { isDeleted: true, deletedAt: now, updatedAt: now });
+	await bulkModifyTransactions(ids, { isDeleted: true, deletedAt: now, updatedAt: now }, () => {
 		// Remove from tag index since transactions are now hidden
 		for (const tx of transactions) {
 			tagIndex.removeTransaction({ id: tx.id!, notes: tx.notes });
 		}
-	}
-
-	invalidateTransactionCaches();
-	await persistData();
+	});
 	return transactions;
 }
 
@@ -276,24 +309,12 @@ export async function restoreTransactions(ids: number[]): Promise<void> {
 	const transactions = await db.transactions.where('id').anyOf(ids).toArray();
 
 	const now = new Date();
-	await db.transactions.where('id').anyOf(ids).modify({
-		isDeleted: false,
-		deletedAt: undefined,
-		updatedAt: now
-	});
-
-	// Update the cache incrementally
-	const cache = getTransactionCache();
-	if (cache.isLoaded) {
-		cache.bulkUpdate(ids, { isDeleted: false, deletedAt: undefined, updatedAt: now });
+	await bulkModifyTransactions(ids, { isDeleted: false, deletedAt: undefined, updatedAt: now }, () => {
 		// Re-add to tag index since transactions are visible again
 		for (const tx of transactions) {
 			tagIndex.addTransaction({ id: tx.id!, notes: tx.notes });
 		}
-	}
-
-	invalidateTransactionCaches();
-	await persistData();
+	});
 }
 
 // Called on app startup to clean up items that weren't undone
@@ -319,20 +340,7 @@ export async function purgeDeletedTransactions(): Promise<number> {
 
 export async function bulkUpdateCategory(ids: number[], categoryId: number): Promise<void> {
 	if (ids.length === 0) return;
-	const updatedAt = new Date();
-	await db.transactions.where('id').anyOf(ids).modify({
-		categoryId,
-		updatedAt
-	});
-
-	// Update the cache incrementally
-	const cache = getTransactionCache();
-	if (cache.isLoaded) {
-		cache.bulkUpdate(ids, { categoryId, updatedAt });
-	}
-
-	invalidateTransactionCaches();
-	await persistData();
+	await bulkModifyTransactions(ids, { categoryId, updatedAt: new Date() });
 }
 
 export async function bulkAddTag(ids: number[], tag: string): Promise<void> {
@@ -342,32 +350,14 @@ export async function bulkAddTag(ids: number[], tag: string): Promise<void> {
 	const transactions = await db.transactions.where('id').anyOf(ids).toArray();
 	if (transactions.length === 0) return;
 
-	const now = new Date();
-
-	// Update each transaction individually since notes differ
-	await db.transaction('rw', db.transactions, async () => {
-		for (const tx of transactions) {
-			const newNotes = appendTag(tx.notes, normalizedTag);
-			if (newNotes !== (tx.notes || '')) {
-				await db.transactions.update(tx.id!, { notes: newNotes, updatedAt: now });
-			}
+	const changes: { id: number; notes: string | undefined }[] = [];
+	for (const tx of transactions) {
+		const newNotes = appendTag(tx.notes, normalizedTag);
+		if (newNotes !== (tx.notes || '')) {
+			changes.push({ id: tx.id!, notes: newNotes });
 		}
-	});
-
-	// Update cache if loaded
-	const cache = getTransactionCache();
-	if (cache.isLoaded) {
-		for (const tx of transactions) {
-			const newNotes = appendTag(tx.notes, normalizedTag);
-			if (newNotes !== (tx.notes || '')) {
-				cache.update(tx.id!, { notes: newNotes, updatedAt: now });
-			}
-		}
-		tagIndex.rebuild(cache.getAll());
 	}
-
-	invalidateTransactionCaches();
-	await persistData();
+	await applyNotesUpdates(changes);
 }
 
 export async function bulkRemoveTag(ids: number[], tag: string): Promise<void> {
@@ -377,37 +367,15 @@ export async function bulkRemoveTag(ids: number[], tag: string): Promise<void> {
 	const transactions = await db.transactions.where('id').anyOf(ids).toArray();
 	if (transactions.length === 0) return;
 
-	const now = new Date();
-
-	// Update each transaction individually since notes differ
-	await db.transaction('rw', db.transactions, async () => {
-		for (const tx of transactions) {
-			if (!tx.notes) continue;
-			const newNotes = stripTag(tx.notes, normalizedTag);
-			if (newNotes !== tx.notes) {
-				await db.transactions.update(tx.id!, {
-					notes: newNotes || undefined,
-					updatedAt: now
-				});
-			}
+	const changes: { id: number; notes: string | undefined }[] = [];
+	for (const tx of transactions) {
+		if (!tx.notes) continue;
+		const newNotes = stripTag(tx.notes, normalizedTag);
+		if (newNotes !== tx.notes) {
+			changes.push({ id: tx.id!, notes: newNotes || undefined });
 		}
-	});
-
-	// Update cache if loaded
-	const cache = getTransactionCache();
-	if (cache.isLoaded) {
-		for (const tx of transactions) {
-			if (!tx.notes) continue;
-			const newNotes = stripTag(tx.notes, normalizedTag);
-			if (newNotes !== tx.notes) {
-				cache.update(tx.id!, { notes: newNotes || undefined, updatedAt: now });
-			}
-		}
-		tagIndex.rebuild(cache.getAll());
 	}
-
-	invalidateTransactionCaches();
-	await persistData();
+	await applyNotesUpdates(changes);
 }
 
 // Returns the child transaction IDs
@@ -637,20 +605,7 @@ export async function isSplitParent(id: number): Promise<boolean> {
 
 export async function markAsSettled(ids: number[]): Promise<void> {
 	const now = new Date();
-	await db.transactions.where('id').anyOf(ids).modify({
-		isSettled: true,
-		settledDate: now,
-		updatedAt: now
-	});
-
-	// Update the cache incrementally
-	const cache = getTransactionCache();
-	if (cache.isLoaded) {
-		cache.bulkUpdate(ids, { isSettled: true, settledDate: now, updatedAt: now });
-	}
-
-	invalidateTransactionCaches();
-	await persistData();
+	await bulkModifyTransactions(ids, { isSettled: true, settledDate: now, updatedAt: now });
 }
 
 // Get unsettled transactions (sorted by date, most recent first)
@@ -878,28 +833,12 @@ export async function renameTag(oldTag: string, newTag: string): Promise<number>
 
 	if (matching.length === 0) return 0;
 
-	const now = new Date();
-
-	// Update in a Dexie transaction
-	await db.transaction('rw', db.transactions, async () => {
-		for (const tx of matching) {
-			const newNotes = replaceTag(tx.notes!, normalizedOld, normalizedNew);
-			await db.transactions.update(tx.id!, { notes: newNotes, updatedAt: now });
-		}
-	});
-
-	// Update cache if loaded
-	const cache = getTransactionCache();
-	if (cache.isLoaded) {
-		for (const tx of matching) {
-			const newNotes = replaceTag(tx.notes!, normalizedOld, normalizedNew);
-			cache.update(tx.id!, { notes: newNotes, updatedAt: now });
-		}
-		tagIndex.rebuild(cache.getAll());
-	}
-
-	invalidateTransactionCaches();
-	await persistData();
+	await applyNotesUpdates(
+		matching.map((tx) => ({
+			id: tx.id!,
+			notes: replaceTag(tx.notes!, normalizedOld, normalizedNew)
+		}))
+	);
 	return matching.length;
 }
 
@@ -917,30 +856,11 @@ export async function deleteTag(tag: string): Promise<number> {
 
 	if (matching.length === 0) return 0;
 
-	const now = new Date();
-
-	// Update in a Dexie transaction
-	await db.transaction('rw', db.transactions, async () => {
-		for (const tx of matching) {
-			const newNotes = stripTag(tx.notes!, normalizedTag);
-			await db.transactions.update(tx.id!, {
-				notes: newNotes || undefined,
-				updatedAt: now
-			});
-		}
-	});
-
-	// Update cache if loaded
-	const cache = getTransactionCache();
-	if (cache.isLoaded) {
-		for (const tx of matching) {
-			const newNotes = stripTag(tx.notes!, normalizedTag);
-			cache.update(tx.id!, { notes: newNotes || undefined, updatedAt: now });
-		}
-		tagIndex.rebuild(cache.getAll());
-	}
-
-	invalidateTransactionCaches();
-	await persistData();
+	await applyNotesUpdates(
+		matching.map((tx) => ({
+			id: tx.id!,
+			notes: stripTag(tx.notes!, normalizedTag) || undefined
+		}))
+	);
 	return matching.length;
 }
