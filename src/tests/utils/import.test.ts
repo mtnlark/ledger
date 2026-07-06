@@ -1,29 +1,34 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-// Mock xlsx dynamic import - must be before importing module under test
-vi.mock('xlsx', () => ({
-	utils: {
-		sheet_to_json: vi.fn()
-	}
-}));
-
 vi.mock('$lib/storage', () => ({
 	persistData: vi.fn().mockResolvedValue(undefined)
 }));
 
 import { db, DEFAULT_CATEGORIES, type Category } from '$lib/db';
-import { parseExpensesSheet, importTransactions, type ImportedTransaction } from '$lib/utils/import';
+import {
+	parseExpensesSheet,
+	readExcelFile,
+	importTransactions,
+	type ImportedTransaction,
+	type CellValue
+} from '$lib/utils/import';
 import { persistData } from '$lib/storage';
-import { utils as xlsxUtils } from 'xlsx';
 
-const sheet_to_json = xlsxUtils.sheet_to_json as ReturnType<typeof vi.fn>;
-
-// Helper: create a workbook object with an Expenses sheet
-function makeWorkbook(sheetData?: unknown) {
-	return {
-		Sheets: sheetData !== undefined ? { Expenses: sheetData } : {},
-		SheetNames: sheetData !== undefined ? ['Expenses'] : []
-	};
+// Helper: build an in-memory .xlsx File with the given sheets (real ExcelJS round-trip)
+async function makeExcelFile(sheets: Record<string, unknown[][]>): Promise<File> {
+	const { Workbook } = await import('exceljs');
+	const workbook = new Workbook();
+	for (const [name, rows] of Object.entries(sheets)) {
+		const sheet = workbook.addWorksheet(name);
+		sheet.addRows(rows);
+	}
+	const buffer = await workbook.xlsx.writeBuffer();
+	const file = new File([buffer], 'test.xlsx');
+	if (typeof file.arrayBuffer !== 'function') {
+		// jsdom's File lacks arrayBuffer(); real WebKit provides it
+		Object.defineProperty(file, 'arrayBuffer', { value: async () => buffer });
+	}
+	return file;
 }
 
 // Helper: create rows with standard headers + data rows
@@ -73,9 +78,7 @@ describe('parseExpensesSheet', () => {
 				['2026-01-15', 'Trader Joes', 52.30, 'Groceries', 'N', 0, 'N'],
 				['2026-01-16', 'Netflix', 15.99, 'Fun & hobbies', 'Y', 7.99, 'Y']
 			]);
-			sheet_to_json.mockReturnValue(rows);
-
-			const result = await parseExpensesSheet(makeWorkbook('sheet'));
+			const result = await parseExpensesSheet(rows as CellValue[][]);
 
 			expect(result).toHaveLength(2);
 
@@ -100,9 +103,7 @@ describe('parseExpensesSheet', () => {
 			const rows = makeRows([
 				['2026-01-15', '  Whole Foods  ', 75.00, 'Groceries', '', 0, '']
 			]);
-			sheet_to_json.mockReturnValue(rows);
-
-			const result = await parseExpensesSheet(makeWorkbook('sheet'));
+			const result = await parseExpensesSheet(rows as CellValue[][]);
 
 			expect(result[0].merchant).toBe('Whole Foods');
 		});
@@ -111,9 +112,7 @@ describe('parseExpensesSheet', () => {
 			const rows = makeRows([
 				['2026-01-15', 'Store', 33.333, 'Groceries', '', 0, '']
 			]);
-			sheet_to_json.mockReturnValue(rows);
-
-			const result = await parseExpensesSheet(makeWorkbook('sheet'));
+			const result = await parseExpensesSheet(rows as CellValue[][]);
 
 			expect(result[0].amount).toBe(33.33);
 		});
@@ -122,9 +121,7 @@ describe('parseExpensesSheet', () => {
 			const rows = makeRows([
 				['2026-01-15', 'Restaurant', 100, 'Restaurants', 'Y', 33.333, 'N']
 			]);
-			sheet_to_json.mockReturnValue(rows);
-
-			const result = await parseExpensesSheet(makeWorkbook('sheet'));
+			const result = await parseExpensesSheet(rows as CellValue[][]);
 
 			expect(result[0].partnerShare).toBe(33.33);
 		});
@@ -133,59 +130,63 @@ describe('parseExpensesSheet', () => {
 			const rows = makeRows([
 				['2026-01-15', 'Store', '25.50', 'Groceries', '', 0, '']
 			]);
-			sheet_to_json.mockReturnValue(rows);
-
-			const result = await parseExpensesSheet(makeWorkbook('sheet'));
+			const result = await parseExpensesSheet(rows as CellValue[][]);
 
 			expect(result[0].amount).toBe(25.50);
 		});
 	});
 
-	describe('missing Expenses sheet', () => {
-		it('throws when no Expenses sheet exists', async () => {
-			const workbook = { Sheets: {}, SheetNames: [] };
+	describe('readExcelFile', () => {
+		it('throws when sheet has a different name', async () => {
+			const file = await makeExcelFile({ Sheet1: [['Date', 'Merchant', 'Amount']] });
 
-			await expect(parseExpensesSheet(workbook)).rejects.toThrow(
+			await expect(readExcelFile(file)).rejects.toThrow(
 				'No "Expenses" sheet found in workbook'
 			);
 		});
 
-		it('throws when sheet has a different name', async () => {
-			const workbook = {
-				Sheets: { Sheet1: {} },
-				SheetNames: ['Sheet1']
-			};
+		it('round-trips a real workbook through readExcelFile + parseExpensesSheet', async () => {
+			const file = await makeExcelFile({
+				Expenses: [
+					['Date', 'Merchant', 'Amount', 'Category', 'Shared', 'Partner Share', 'Settled'],
+					[new Date(Date.UTC(2026, 0, 15)), 'Trader Joes', 52.3, 'Groceries', 'N', 0, 'N'],
+					[new Date(Date.UTC(2026, 0, 16)), 'Netflix', 15.99, 'Fun & hobbies', 'Y', 7.99, 'Y']
+				]
+			});
 
-			await expect(parseExpensesSheet(workbook)).rejects.toThrow(
-				'No "Expenses" sheet found in workbook'
-			);
+			const rows = await readExcelFile(file);
+			const result = await parseExpensesSheet(rows);
+
+			expect(result).toHaveLength(2);
+			expect(result[0].merchant).toBe('Trader Joes');
+			expect(result[0].amount).toBe(52.3);
+			expect(result[0].date.getFullYear()).toBe(2026);
+			expect(result[0].date.getMonth()).toBe(0);
+			expect(result[0].date.getDate()).toBe(15);
+			expect(result[1].isShared).toBe(true);
+			expect(result[1].partnerShare).toBe(7.99);
+			expect(result[1].isSettled).toBe(true);
 		});
 	});
 
 	describe('missing required columns', () => {
 		it('throws when Date column is missing', async () => {
 			const rows = [['Merchant', 'Amount'], ['Store', 10]];
-			sheet_to_json.mockReturnValue(rows);
-
-			await expect(parseExpensesSheet(makeWorkbook('sheet'))).rejects.toThrow(
+			await expect(parseExpensesSheet(rows as CellValue[][])).rejects.toThrow(
 				'Required columns (Date, Merchant, Amount) not found'
 			);
 		});
 
 		it('throws when Merchant column is missing', async () => {
 			const rows = [['Date', 'Amount'], ['2026-01-15', 10]];
-			sheet_to_json.mockReturnValue(rows);
-
-			await expect(parseExpensesSheet(makeWorkbook('sheet'))).rejects.toThrow(
+			await expect(parseExpensesSheet(rows as CellValue[][])).rejects.toThrow(
 				'Required columns (Date, Merchant, Amount) not found'
 			);
 		});
 
 		it('throws when Amount column is missing', async () => {
 			const rows = [['Date', 'Merchant'], ['2026-01-15', 'Store']];
-			sheet_to_json.mockReturnValue(rows);
-
-			await expect(parseExpensesSheet(makeWorkbook('sheet'))).rejects.toThrow(
+			await expect(parseExpensesSheet(rows as CellValue[][])).rejects.toThrow(
 				'Required columns (Date, Merchant, Amount) not found'
 			);
 		});
@@ -195,9 +196,7 @@ describe('parseExpensesSheet', () => {
 				['Date', 'Merchant', 'Amount'],
 				['2026-01-15', 'Store', 10]
 			];
-			sheet_to_json.mockReturnValue(rows);
-
-			const result = await parseExpensesSheet(makeWorkbook('sheet'));
+			const result = await parseExpensesSheet(rows as CellValue[][]);
 
 			expect(result).toHaveLength(1);
 			expect(result[0].category).toBe('Unknown');
@@ -213,9 +212,7 @@ describe('parseExpensesSheet', () => {
 				['DATE', 'MERCHANT', 'AMOUNT', 'CATEGORY'],
 				['2026-01-15', 'Store', 10, 'Groceries']
 			];
-			sheet_to_json.mockReturnValue(rows);
-
-			const result = await parseExpensesSheet(makeWorkbook('sheet'));
+			const result = await parseExpensesSheet(rows as CellValue[][]);
 
 			expect(result).toHaveLength(1);
 			expect(result[0].category).toBe('Groceries');
@@ -226,9 +223,7 @@ describe('parseExpensesSheet', () => {
 				['Transaction Date', 'Merchant Name', 'Total Amount'],
 				['2026-01-15', 'Store', 10]
 			];
-			sheet_to_json.mockReturnValue(rows);
-
-			const result = await parseExpensesSheet(makeWorkbook('sheet'));
+			const result = await parseExpensesSheet(rows as CellValue[][]);
 
 			expect(result).toHaveLength(1);
 		});
@@ -238,9 +233,7 @@ describe('parseExpensesSheet', () => {
 				['Date', 'Merchant', 'Amount', 'Venmo'],
 				['2026-01-15', 'Store', 10, 'Y']
 			];
-			sheet_to_json.mockReturnValue(rows);
-
-			const result = await parseExpensesSheet(makeWorkbook('sheet'));
+			const result = await parseExpensesSheet(rows as CellValue[][]);
 
 			expect(result[0].isSettled).toBe(true);
 		});
@@ -250,9 +243,7 @@ describe('parseExpensesSheet', () => {
 				['Date', 'Merchant', 'Amount', 'Shared', 'Partner Share'],
 				['2026-01-15', 'Restaurant', 100, 'Y', 50]
 			];
-			sheet_to_json.mockReturnValue(rows);
-
-			const result = await parseExpensesSheet(makeWorkbook('sheet'));
+			const result = await parseExpensesSheet(rows as CellValue[][]);
 
 			expect(result[0].isShared).toBe(true);
 			expect(result[0].partnerShare).toBe(50);
@@ -265,9 +256,7 @@ describe('parseExpensesSheet', () => {
 			// Calculate: new Date(1899, 11, 30 + 46037) = Jan 15, 2026
 			const excelSerial = 46037;
 			const rows = makeRows([[excelSerial, 'Store', 10, 'Groceries', '', 0, '']]);
-			sheet_to_json.mockReturnValue(rows);
-
-			const result = await parseExpensesSheet(makeWorkbook('sheet'));
+			const result = await parseExpensesSheet(rows as CellValue[][]);
 
 			expect(result).toHaveLength(1);
 			// Verify the date is valid
@@ -277,9 +266,7 @@ describe('parseExpensesSheet', () => {
 
 		it('handles ISO format string dates (YYYY-MM-DD)', async () => {
 			const rows = makeRows([['2026-03-20', 'Store', 10, 'Groceries', '', 0, '']]);
-			sheet_to_json.mockReturnValue(rows);
-
-			const result = await parseExpensesSheet(makeWorkbook('sheet'));
+			const result = await parseExpensesSheet(rows as CellValue[][]);
 
 			expect(result[0].date.getFullYear()).toBe(2026);
 			expect(result[0].date.getMonth()).toBe(2); // March
@@ -288,9 +275,7 @@ describe('parseExpensesSheet', () => {
 
 		it('handles US format string dates (M/D/YYYY)', async () => {
 			const rows = makeRows([['1/5/2026', 'Store', 10, 'Groceries', '', 0, '']]);
-			sheet_to_json.mockReturnValue(rows);
-
-			const result = await parseExpensesSheet(makeWorkbook('sheet'));
+			const result = await parseExpensesSheet(rows as CellValue[][]);
 
 			expect(result[0].date.getFullYear()).toBe(2026);
 			expect(result[0].date.getMonth()).toBe(0); // January
@@ -299,9 +284,7 @@ describe('parseExpensesSheet', () => {
 
 		it('handles US format string dates (MM/DD/YYYY)', async () => {
 			const rows = makeRows([['12/25/2026', 'Store', 10, 'Groceries', '', 0, '']]);
-			sheet_to_json.mockReturnValue(rows);
-
-			const result = await parseExpensesSheet(makeWorkbook('sheet'));
+			const result = await parseExpensesSheet(rows as CellValue[][]);
 
 			expect(result[0].date.getFullYear()).toBe(2026);
 			expect(result[0].date.getMonth()).toBe(11); // December
@@ -311,9 +294,7 @@ describe('parseExpensesSheet', () => {
 		it('handles Date objects from XLSX', async () => {
 			const dateObj = new Date(2026, 5, 10); // June 10, 2026
 			const rows = makeRows([[dateObj, 'Store', 10, 'Groceries', '', 0, '']]);
-			sheet_to_json.mockReturnValue(rows);
-
-			const result = await parseExpensesSheet(makeWorkbook('sheet'));
+			const result = await parseExpensesSheet(rows as CellValue[][]);
 
 			expect(result[0].date.getFullYear()).toBe(2026);
 			expect(result[0].date.getMonth()).toBe(5); // June
@@ -325,9 +306,7 @@ describe('parseExpensesSheet', () => {
 				['not-a-date', 'Store', 10, 'Groceries', '', 0, ''],
 				['2026-01-15', 'Valid Store', 20, 'Groceries', '', 0, '']
 			]);
-			sheet_to_json.mockReturnValue(rows);
-
-			const result = await parseExpensesSheet(makeWorkbook('sheet'));
+			const result = await parseExpensesSheet(rows as CellValue[][]);
 
 			expect(result).toHaveLength(1);
 			expect(result[0].merchant).toBe('Valid Store');
@@ -338,9 +317,7 @@ describe('parseExpensesSheet', () => {
 				[null, 'Store', 10, 'Groceries', '', 0, ''],
 				['2026-01-15', 'Valid Store', 20, 'Groceries', '', 0, '']
 			]);
-			sheet_to_json.mockReturnValue(rows);
-
-			const result = await parseExpensesSheet(makeWorkbook('sheet'));
+			const result = await parseExpensesSheet(rows as CellValue[][]);
 
 			expect(result).toHaveLength(1);
 			expect(result[0].merchant).toBe('Valid Store');
@@ -353,9 +330,7 @@ describe('parseExpensesSheet', () => {
 				['2026-01-15', 'Refund Store', -25.00, 'Groceries', '', 0, ''],
 				['2026-01-15', 'Valid Store', 10, 'Groceries', '', 0, '']
 			]);
-			sheet_to_json.mockReturnValue(rows);
-
-			const result = await parseExpensesSheet(makeWorkbook('sheet'));
+			const result = await parseExpensesSheet(rows as CellValue[][]);
 
 			expect(result).toHaveLength(1);
 			expect(result[0].merchant).toBe('Valid Store');
@@ -366,9 +341,7 @@ describe('parseExpensesSheet', () => {
 				['2026-01-15', 'Free Item', 0, 'Groceries', '', 0, ''],
 				['2026-01-15', 'Valid Store', 10, 'Groceries', '', 0, '']
 			]);
-			sheet_to_json.mockReturnValue(rows);
-
-			const result = await parseExpensesSheet(makeWorkbook('sheet'));
+			const result = await parseExpensesSheet(rows as CellValue[][]);
 
 			expect(result).toHaveLength(1);
 			expect(result[0].merchant).toBe('Valid Store');
@@ -379,9 +352,7 @@ describe('parseExpensesSheet', () => {
 				['2026-01-15', 'Store', 'abc', 'Groceries', '', 0, ''],
 				['2026-01-15', 'Valid Store', 10, 'Groceries', '', 0, '']
 			]);
-			sheet_to_json.mockReturnValue(rows);
-
-			const result = await parseExpensesSheet(makeWorkbook('sheet'));
+			const result = await parseExpensesSheet(rows as CellValue[][]);
 
 			expect(result).toHaveLength(1);
 			expect(result[0].merchant).toBe('Valid Store');
@@ -392,9 +363,7 @@ describe('parseExpensesSheet', () => {
 				['2026-01-15', 'Store', null, 'Groceries', '', 0, ''],
 				['2026-01-15', 'Valid Store', 10, 'Groceries', '', 0, '']
 			]);
-			sheet_to_json.mockReturnValue(rows);
-
-			const result = await parseExpensesSheet(makeWorkbook('sheet'));
+			const result = await parseExpensesSheet(rows as CellValue[][]);
 
 			expect(result).toHaveLength(1);
 		});
@@ -405,9 +374,7 @@ describe('parseExpensesSheet', () => {
 			const rows = makeRows([
 				['2026-01-15', 'Store', 10, 'Restaurants', '', 0, '']
 			]);
-			sheet_to_json.mockReturnValue(rows);
-
-			const result = await parseExpensesSheet(makeWorkbook('sheet'));
+			const result = await parseExpensesSheet(rows as CellValue[][]);
 
 			expect(result[0].category).toBe('Restaurants');
 		});
@@ -417,9 +384,7 @@ describe('parseExpensesSheet', () => {
 				['Date', 'Merchant', 'Amount'],
 				['2026-01-15', 'Store', 10]
 			];
-			sheet_to_json.mockReturnValue(rows);
-
-			const result = await parseExpensesSheet(makeWorkbook('sheet'));
+			const result = await parseExpensesSheet(rows as CellValue[][]);
 
 			expect(result[0].category).toBe('Unknown');
 		});
@@ -428,9 +393,7 @@ describe('parseExpensesSheet', () => {
 			const rows = makeRows([
 				['2026-01-15', 'Store', 10, '', '', 0, '']
 			]);
-			sheet_to_json.mockReturnValue(rows);
-
-			const result = await parseExpensesSheet(makeWorkbook('sheet'));
+			const result = await parseExpensesSheet(rows as CellValue[][]);
 
 			expect(result[0].category).toBe('Unknown');
 		});
@@ -439,9 +402,7 @@ describe('parseExpensesSheet', () => {
 			const rows = makeRows([
 				['2026-01-15', 'Store', 10, null, '', 0, '']
 			]);
-			sheet_to_json.mockReturnValue(rows);
-
-			const result = await parseExpensesSheet(makeWorkbook('sheet'));
+			const result = await parseExpensesSheet(rows as CellValue[][]);
 
 			expect(result[0].category).toBe('Unknown');
 		});
@@ -450,9 +411,7 @@ describe('parseExpensesSheet', () => {
 	describe('shared expense parsing', () => {
 		it('recognizes "Y" as shared', async () => {
 			const rows = makeRows([['2026-01-15', 'Store', 100, 'Groceries', 'Y', 50, 'N']]);
-			sheet_to_json.mockReturnValue(rows);
-
-			const result = await parseExpensesSheet(makeWorkbook('sheet'));
+			const result = await parseExpensesSheet(rows as CellValue[][]);
 
 			expect(result[0].isShared).toBe(true);
 			expect(result[0].partnerShare).toBe(50);
@@ -460,36 +419,28 @@ describe('parseExpensesSheet', () => {
 
 		it('recognizes "YES" as shared (case-insensitive)', async () => {
 			const rows = makeRows([['2026-01-15', 'Store', 100, 'Groceries', 'yes', 50, 'N']]);
-			sheet_to_json.mockReturnValue(rows);
-
-			const result = await parseExpensesSheet(makeWorkbook('sheet'));
+			const result = await parseExpensesSheet(rows as CellValue[][]);
 
 			expect(result[0].isShared).toBe(true);
 		});
 
 		it('recognizes "TRUE" as shared', async () => {
 			const rows = makeRows([['2026-01-15', 'Store', 100, 'Groceries', 'TRUE', 50, 'N']]);
-			sheet_to_json.mockReturnValue(rows);
-
-			const result = await parseExpensesSheet(makeWorkbook('sheet'));
+			const result = await parseExpensesSheet(rows as CellValue[][]);
 
 			expect(result[0].isShared).toBe(true);
 		});
 
 		it('treats other values as not shared', async () => {
 			const rows = makeRows([['2026-01-15', 'Store', 100, 'Groceries', 'N', 50, 'N']]);
-			sheet_to_json.mockReturnValue(rows);
-
-			const result = await parseExpensesSheet(makeWorkbook('sheet'));
+			const result = await parseExpensesSheet(rows as CellValue[][]);
 
 			expect(result[0].isShared).toBe(false);
 		});
 
 		it('partner share is 0 when not shared', async () => {
 			const rows = makeRows([['2026-01-15', 'Store', 100, 'Groceries', 'N', 50, 'N']]);
-			sheet_to_json.mockReturnValue(rows);
-
-			const result = await parseExpensesSheet(makeWorkbook('sheet'));
+			const result = await parseExpensesSheet(rows as CellValue[][]);
 
 			// partnerShare is only set when isShared is true
 			expect(result[0].partnerShare).toBe(0);
@@ -497,36 +448,28 @@ describe('parseExpensesSheet', () => {
 
 		it('handles string partner share values', async () => {
 			const rows = makeRows([['2026-01-15', 'Store', 100, 'Groceries', 'Y', '25.50', 'N']]);
-			sheet_to_json.mockReturnValue(rows);
-
-			const result = await parseExpensesSheet(makeWorkbook('sheet'));
+			const result = await parseExpensesSheet(rows as CellValue[][]);
 
 			expect(result[0].partnerShare).toBe(25.50);
 		});
 
 		it('ignores partner share value "X"', async () => {
 			const rows = makeRows([['2026-01-15', 'Store', 100, 'Groceries', 'Y', 'X', 'N']]);
-			sheet_to_json.mockReturnValue(rows);
-
-			const result = await parseExpensesSheet(makeWorkbook('sheet'));
+			const result = await parseExpensesSheet(rows as CellValue[][]);
 
 			expect(result[0].partnerShare).toBe(0);
 		});
 
 		it('handles empty partner share as 0', async () => {
 			const rows = makeRows([['2026-01-15', 'Store', 100, 'Groceries', 'Y', '', 'N']]);
-			sheet_to_json.mockReturnValue(rows);
-
-			const result = await parseExpensesSheet(makeWorkbook('sheet'));
+			const result = await parseExpensesSheet(rows as CellValue[][]);
 
 			expect(result[0].partnerShare).toBe(0);
 		});
 
 		it('handles non-numeric partner share string as 0', async () => {
 			const rows = makeRows([['2026-01-15', 'Store', 100, 'Groceries', 'Y', 'abc', 'N']]);
-			sheet_to_json.mockReturnValue(rows);
-
-			const result = await parseExpensesSheet(makeWorkbook('sheet'));
+			const result = await parseExpensesSheet(rows as CellValue[][]);
 
 			expect(result[0].partnerShare).toBe(0);
 		});
@@ -535,36 +478,28 @@ describe('parseExpensesSheet', () => {
 	describe('settled flag parsing', () => {
 		it('recognizes "Y" as settled', async () => {
 			const rows = makeRows([['2026-01-15', 'Store', 10, 'Groceries', '', 0, 'Y']]);
-			sheet_to_json.mockReturnValue(rows);
-
-			const result = await parseExpensesSheet(makeWorkbook('sheet'));
+			const result = await parseExpensesSheet(rows as CellValue[][]);
 
 			expect(result[0].isSettled).toBe(true);
 		});
 
 		it('recognizes "YES" as settled (case-insensitive)', async () => {
 			const rows = makeRows([['2026-01-15', 'Store', 10, 'Groceries', '', 0, 'yes']]);
-			sheet_to_json.mockReturnValue(rows);
-
-			const result = await parseExpensesSheet(makeWorkbook('sheet'));
+			const result = await parseExpensesSheet(rows as CellValue[][]);
 
 			expect(result[0].isSettled).toBe(true);
 		});
 
 		it('recognizes "TRUE" as settled', async () => {
 			const rows = makeRows([['2026-01-15', 'Store', 10, 'Groceries', '', 0, 'TRUE']]);
-			sheet_to_json.mockReturnValue(rows);
-
-			const result = await parseExpensesSheet(makeWorkbook('sheet'));
+			const result = await parseExpensesSheet(rows as CellValue[][]);
 
 			expect(result[0].isSettled).toBe(true);
 		});
 
 		it('treats empty or other values as not settled', async () => {
 			const rows = makeRows([['2026-01-15', 'Store', 10, 'Groceries', '', 0, 'N']]);
-			sheet_to_json.mockReturnValue(rows);
-
-			const result = await parseExpensesSheet(makeWorkbook('sheet'));
+			const result = await parseExpensesSheet(rows as CellValue[][]);
 
 			expect(result[0].isSettled).toBe(false);
 		});
@@ -577,9 +512,7 @@ describe('parseExpensesSheet', () => {
 				[],
 				['2026-01-16', 'Other Store', 20, 'Groceries', '', 0, '']
 			]);
-			sheet_to_json.mockReturnValue(rows);
-
-			const result = await parseExpensesSheet(makeWorkbook('sheet'));
+			const result = await parseExpensesSheet(rows as CellValue[][]);
 
 			expect(result).toHaveLength(2);
 		});
@@ -589,9 +522,7 @@ describe('parseExpensesSheet', () => {
 				['2026-01-15', null, 10, 'Groceries', '', 0, ''],
 				['2026-01-16', 'Valid Store', 20, 'Groceries', '', 0, '']
 			]);
-			sheet_to_json.mockReturnValue(rows);
-
-			const result = await parseExpensesSheet(makeWorkbook('sheet'));
+			const result = await parseExpensesSheet(rows as CellValue[][]);
 
 			expect(result).toHaveLength(1);
 			expect(result[0].merchant).toBe('Valid Store');
@@ -599,9 +530,7 @@ describe('parseExpensesSheet', () => {
 
 		it('returns empty array when all data rows are empty', async () => {
 			const rows = makeRows([]);
-			sheet_to_json.mockReturnValue(rows);
-
-			const result = await parseExpensesSheet(makeWorkbook('sheet'));
+			const result = await parseExpensesSheet(rows as CellValue[][]);
 
 			expect(result).toHaveLength(0);
 		});
@@ -612,9 +541,7 @@ describe('parseExpensesSheet', () => {
 				undefined,
 				['2026-01-15', 'Store', 10]
 			];
-			sheet_to_json.mockReturnValue(rows);
-
-			const result = await parseExpensesSheet(makeWorkbook('sheet'));
+			const result = await parseExpensesSheet(rows as CellValue[][]);
 
 			expect(result).toHaveLength(1);
 		});
@@ -632,9 +559,7 @@ describe('parseExpensesSheet', () => {
 				''
 			]);
 			const rows = makeRows(dataRows);
-			sheet_to_json.mockReturnValue(rows);
-
-			const result = await parseExpensesSheet(makeWorkbook('sheet'));
+			const result = await parseExpensesSheet(rows as CellValue[][]);
 
 			expect(result).toHaveLength(50);
 		});

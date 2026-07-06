@@ -205,8 +205,8 @@
 		isImporting = true;
 
 		try {
-			const workbook = await readExcelFile(file);
-			const parsed = await parseExpensesSheet(workbook);
+			const rows = await readExcelFile(file);
+			const parsed = await parseExpensesSheet(rows);
 			const result = await importTransactions(parsed, { skipDuplicates: true });
 
 			if (result.success) {
