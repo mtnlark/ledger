@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { db, initializeDatabase, type SavingsContribution } from '$lib/db';
+import { db, initializeDatabase } from '$lib/db';
 import {
 	addContribution,
 	getContributionsForMonth,

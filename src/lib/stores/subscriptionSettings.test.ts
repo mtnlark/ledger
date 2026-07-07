@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { db, DEFAULT_SETTINGS, type CancelledSubscription } from '$lib/db';
+import { db, DEFAULT_SETTINGS } from '$lib/db';
 import {
 	cancelSubscription,
 	reactivateSubscription,

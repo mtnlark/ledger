@@ -2,7 +2,7 @@
 	import { format } from 'date-fns';
 	import type { ComponentType } from 'svelte';
 	import { goto } from '$app/navigation';
-	import { ArrowRight, Target, TrendingUp, AlertTriangle, PartyPopper, PiggyBank } from 'lucide-svelte';
+	import { Target, TrendingUp, AlertTriangle, PartyPopper, PiggyBank } from 'lucide-svelte';
 	import EmptyState from '../EmptyState.svelte';
 	import type { SavingsAccount, SavingsContribution, MonthlyBudget } from '$lib/db';
 	import { parseMonthKey, getMonthKey } from '$lib/db';

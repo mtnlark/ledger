@@ -3,7 +3,6 @@
 	import { Scissors } from 'lucide-svelte';
 	import type { Category, Settings, Transaction } from '$lib/db';
 	import { parseLocalDate } from '$lib/utils/date-helpers';
-	import { formatCurrency, calculateSplitShares } from '$lib/utils/format-helpers';
 	import { validateTransactionForm } from '$lib/utils/transaction-validation';
 	import ModalContainer from './ModalContainer.svelte';
 	import CategoryCombobox from './CategoryCombobox.svelte';
@@ -40,7 +39,6 @@
 	let { isOpen, transaction, categories, settings, onSave, onSplit, onCancelSubscription, onClose }: Props = $props();
 
 	// Confirmation state for subscription cancellation
-	let showCancelConfirm = $state(false);
 	let futureDateConfirmed = $state(false);
 	let isSubmitting = $state(false);
 
@@ -123,7 +121,6 @@
 			isEssential = transaction.isEssential ?? false;
 			isSubscription = transaction.isSubscription ?? false;
 			subscriptionFrequency = transaction.subscriptionFrequency ?? 'monthly';
-			showCancelConfirm = false;
 			futureDateConfirmed = false;
 			isSubmitting = false;
 			touched = new Set();
@@ -148,21 +145,6 @@
 			return Math.min(amount, Math.max(0, splitValue));
 		}
 	});
-
-	// Check if current input is invalid (for showing warning)
-	let splitValueInvalid = $derived.by(() => {
-		if (!isShared) return false;
-		if (splitType === 'percentage') {
-			return splitValue < 0 || splitValue > 1;
-		} else {
-			return splitValue < 0 || splitValue > amount;
-		}
-	});
-
-	let partnerShare = $derived(
-		isShared ? (splitType === 'percentage' ? amount * validatedSplitValue : validatedSplitValue) : 0
-	);
-	let yourShare = $derived(amount - partnerShare);
 
 	// Auto-correct invalid split values when switching types or when amount changes
 	$effect(() => {

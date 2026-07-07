@@ -23,23 +23,16 @@ export interface ImportResult {
 	errors: string[];
 }
 
+/** Plain cell value after flattening ExcelJS rich values (formulas, rich text, hyperlinks). */
+export type CellValue = string | number | boolean | Date | null;
+
 /**
- * Parse the Expenses sheet from an Excel file.
- * Dynamically imports XLSX to avoid loading ~500KB at app startup.
+ * Parse the Expenses sheet rows (array-of-arrays, header row first) into
+ * transactions. Rows come from readExcelFile.
  */
-export async function parseExpensesSheet(workbook: { Sheets: Record<string, unknown>; SheetNames: string[] }): Promise<ImportedTransaction[]> {
-	const XLSX = await import('xlsx');
-
-	const sheet = workbook.Sheets['Expenses'];
-	if (!sheet) {
-		throw new Error('No "Expenses" sheet found in workbook');
-	}
-
-	// Get all rows as array of arrays
-	const rows = XLSX.utils.sheet_to_json<(string | number)[]>(sheet, { header: 1 });
-
+export async function parseExpensesSheet(rows: CellValue[][]): Promise<ImportedTransaction[]> {
 	// First row should be headers
-	const headers = rows[0] as string[];
+	const headers = (rows[0] ?? []) as string[];
 	const dateCol = headers.findIndex((h) => h?.toLowerCase().includes('date'));
 	const merchantCol = headers.findIndex((h) => h?.toLowerCase().includes('merchant'));
 	const amountCol = headers.findIndex((h) => h?.toLowerCase().includes('amount'));
@@ -237,24 +230,52 @@ export async function importTransactions(
 }
 
 /**
- * Read and parse an Excel file from a File object.
- * Dynamically imports XLSX to avoid loading ~500KB at app startup.
+ * Flatten an ExcelJS cell value to a plain value. ExcelJS represents formulas,
+ * rich text, and hyperlinks as objects; imports only need the display value.
  */
-export async function readExcelFile(file: File): Promise<{ Sheets: Record<string, unknown>; SheetNames: string[] }> {
-	const XLSX = await import('xlsx');
+function plainCellValue(value: unknown): CellValue {
+	if (value == null) return null;
+	if (value instanceof Date) {
+		// ExcelJS parses date cells as UTC; extract the UTC components into a
+		// local date so western timezones don't shift to the previous day
+		return new Date(value.getUTCFullYear(), value.getUTCMonth(), value.getUTCDate());
+	}
+	if (typeof value === 'object') {
+		const obj = value as Record<string, unknown>;
+		if ('result' in obj) return plainCellValue(obj.result); // formula cell
+		if ('richText' in obj) {
+			return (obj.richText as { text: string }[]).map((r) => r.text).join('');
+		}
+		if ('text' in obj) return plainCellValue(obj.text); // hyperlink cell
+		return null; // error cells and anything else unrecognized
+	}
+	if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+		return value;
+	}
+	return null;
+}
 
-	return new Promise((resolve, reject) => {
-		const reader = new FileReader();
-		reader.onload = (e) => {
-			try {
-				const data = new Uint8Array(e.target?.result as ArrayBuffer);
-				const workbook = XLSX.read(data, { type: 'array' });
-				resolve(workbook);
-			} catch (error) {
-				reject(error);
-			}
-		};
-		reader.onerror = () => reject(reader.error);
-		reader.readAsArrayBuffer(file);
+/**
+ * Read the "Expenses" sheet of an Excel file into plain rows (header row first).
+ * Dynamically imports ExcelJS to avoid loading it at app startup.
+ */
+export async function readExcelFile(file: File): Promise<CellValue[][]> {
+	const { Workbook } = await import('exceljs');
+
+	const buffer = await file.arrayBuffer();
+	const workbook = new Workbook();
+	await workbook.xlsx.load(buffer);
+
+	const sheet = workbook.getWorksheet('Expenses');
+	if (!sheet) {
+		throw new Error('No "Expenses" sheet found in workbook');
+	}
+
+	const rows: CellValue[][] = [];
+	sheet.eachRow({ includeEmpty: true }, (row) => {
+		// row.values is 1-indexed with a padded first slot
+		const values = (row.values as unknown[]).slice(1);
+		rows.push(values.map(plainCellValue));
 	});
+	return rows;
 }

@@ -55,8 +55,6 @@ import { setupDashboardActions, type DashboardContext } from '$lib/stores/dashbo
 import {
 	addTransaction,
 	updateTransaction,
-	deleteTransaction,
-	bulkDeleteTransactions,
 	bulkUpdateCategory,
 	splitTransaction,
 	getTransactionsByMonth,

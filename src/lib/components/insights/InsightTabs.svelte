@@ -19,7 +19,7 @@
 
 	function handleKeydown(event: KeyboardEvent) {
 		const current = tabs.findIndex((t) => t.id === activeTab);
-		let next = current;
+		let next: number;
 		if (event.key === 'ArrowRight') next = (current + 1) % tabs.length;
 		else if (event.key === 'ArrowLeft') next = (current - 1 + tabs.length) % tabs.length;
 		else if (event.key === 'Home') next = 0;

@@ -29,7 +29,7 @@ Roadmap groups 1–9 complete: data-integrity hardening, savings goals, tags, no
 - **Storage**: Dexie (in-memory IndexedDB, cleared on startup) for queries; JSON files are the source of truth in `~/Library/Application Support/app.ledger.desktop/` (`data.json` + `backups/`, max 10).
 - **UI**: Tailwind v4 (`@tailwindcss/vite`, CSS-first config via `@theme` in `app.css`); "Warm Ledger" terracotta/cream design system.
 - **Charts**: Chart.js (+ `chartjs-plugin-annotation` for σ bands / mean lines).
-- **Other runtime deps**: `date-fns`, `lucide-svelte`, `xlsx`. Full list in `package.json`.
+- **Other runtime deps**: `date-fns`, `lucide-svelte`, `exceljs` (Excel import). Full list in `package.json`.
 
 ---
 
@@ -55,7 +55,8 @@ Roadmap groups 1–9 complete: data-integrity hardening, savings goals, tags, no
 ```
 src/lib/
   db/            # Dexie schema (index.ts), type defs + defaults (constants.ts), migrations.ts
-  storage/       # UI-agnostic abstraction (index.ts) + tauri-adapter.ts (file persistence); types.ts = StoredData
+  storage/       # UI-agnostic abstraction (index.ts) + tauri-adapter.ts (file persistence; queued/coalesced
+                 #   saves) + serialization.ts (single hydrate/dehydrate for all tables); types.ts = StoredData
   config/        # Centralized constants (insights pace, subscription staleness thresholds, …)
   stores/        # Data ops: transactions(+Cache), categories, settings, budget, categoryBudget,
                  #   savings{Accounts,Contributions}, linkedAccounts (net worth; recordBalance = 1 snapshot/account/day),
@@ -64,7 +65,7 @@ src/lib/
   notifications/ # Tauri-plugin scheduler (setInterval 60s tick) + one-shot app-open fallback checks
   insights/      # Memoized engine (getInsightsEngine) + pure calculations/ (spending, needs-wants,
                  #   anomalies, category-shift, pace-projection, velocity, top-merchant, ytd-stats, month-review, stats)
-  components/    # ~60 Svelte components incl. an insights/ subfolder; key behaviors documented below
+  components/    # ~60 Svelte components incl. insights/ and settings/ subfolders; key behaviors documented below
   utils/         # currency, budget-{status,alerts,rollover}, date-helpers (filterUpToDate),
                  #   string-helpers (merchant norm, subscriptionKey, supersession), tags, net-worth,
                  #   transaction-grouping (buildListRows/groupRowsByDate), import/export, errors, report-cards
@@ -268,7 +269,10 @@ npm run tauri:dev    # Tauri dev
 npm run tauri:build  # production app
 npm run test
 npm run check        # svelte-check (clean tripwire: 0 errors/warnings)
+npm run lint         # eslint (0 errors; each-key/svelte-reactivity surfaced as warnings)
 ```
+
+CI (GitHub Actions) runs lint + check + tests on ubuntu and clippy `-D warnings` + cargo test on macos. Dependabot watches npm/cargo/actions. Component tests render via `@testing-library/svelte` (vitest resolves the `browser` condition). Tauri ships with a strict CSP (`tauri.conf.json`; dev variant allows Vite HMR).
 
 Build output: `src-tauri/target/release/bundle/macos/Ledger.app` and `.../dmg/Ledger_0.1.0_aarch64.dmg`.
 
@@ -282,4 +286,4 @@ Car, Cash withdrawals, Clothes & accessories, Coffee & snacks, Donations, Electr
 
 ## File Storage
 
-macOS: `~/Library/Application Support/app.ledger.desktop/` — `data.json` (main) + `backups/` (auto-timestamped before each save, max 10, debounced 1 min). With iCloud backup enabled, a single `~/Library/Mobile Documents/com~apple~CloudDocs/Ledger/ledger-backup.json` is overwritten each backup (requires iCloud Drive).
+macOS: `~/Library/Application Support/app.ledger.desktop/` — `data.json` (main) + `data.json.bak` (previous atomic write) + `backups/` (auto-timestamped before each save, max 10, debounced 1 min). Saves are serialized through a coalescing queue (`saveToFile`). Startup recovery order when `data.json` is missing or corrupted: `.bak` first (freshest), then timestamped backups; only a truly empty slate initializes fresh. With iCloud backup enabled, a single `~/Library/Mobile Documents/com~apple~CloudDocs/Ledger/ledger-backup.json` is overwritten each backup (requires iCloud Drive).

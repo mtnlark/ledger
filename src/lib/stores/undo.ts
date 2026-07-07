@@ -22,7 +22,7 @@ const initialState: UndoState = {
 };
 
 function createUndoStore() {
-	const { subscribe, set, update } = writable<UndoState>(initialState);
+	const { subscribe, set } = writable<UndoState>(initialState);
 
 	return {
 		subscribe,

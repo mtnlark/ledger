@@ -1,19 +1,16 @@
 <script lang="ts">
 	import { afterNavigate } from '$app/navigation';
-	import { format } from 'date-fns';
 	import { getMonthKey, type SavingsAccount, type SavingsContribution } from '$lib/db';
 	import { initializeStorage } from '$lib/storage';
 	import { getAllSavingsAccounts, moveSavingsAccountUp, moveSavingsAccountDown } from '$lib/stores/savingsAccounts';
 	import {
-		getAllContributionsForMonth,
-		getTotalSavedForMonth,
-		getContributionsAffectingAvailable
+		getAllContributionsForMonth
 	} from '$lib/stores/savingsContributions';
 	import { getBudgetForMonth } from '$lib/stores/budget';
 	import { getSelectedMonth, setSelectedMonth } from '$lib/stores/selectedMonth';
 	import { getAvailableMonths } from '$lib/stores/transactions';
 	import { toast } from '$lib/stores/toast';
-	import { formatCurrency, formatCurrencyWhole, formatPercentage } from '$lib/utils/format-helpers';
+	import { formatCurrencyWhole, formatPercentage } from '$lib/utils/format-helpers';
 	import { sumCurrency } from '$lib/utils/currency';
 	import { Plus } from 'lucide-svelte';
 	import MonthPicker from '$lib/components/MonthPicker.svelte';

@@ -5,8 +5,7 @@
  * JSON file persistence in the app data directory.
  */
 
-import { db, DEFAULT_SETTINGS } from '$lib/db';
-import { parseStoredDate } from '$lib/utils/date-helpers';
+import { dehydrateAll, hydrateAll } from './serialization';
 import type { StoredData } from './types';
 
 export type { StoredData } from './types';
@@ -183,126 +182,13 @@ export async function withPersistence<T>(operation: () => Promise<T>): Promise<T
  * Get all current data (useful for export/backup)
  */
 export async function getAllData(): Promise<StoredData> {
-	const [transactions, categories, monthlyBudgets, categoryBudgets, settings, savingsAccounts, savingsContributions, linkedAccounts, balanceSnapshots] = await Promise.all([
-		db.transactions.toArray(),
-		db.categories.toArray(),
-		db.monthlyBudgets.toArray(),
-		db.categoryBudgets.toArray(),
-		db.settings.get(1),
-		db.savingsAccounts.toArray(),
-		db.savingsContributions.toArray(),
-		db.linkedAccounts.toArray(),
-		db.balanceSnapshots.toArray()
-	]);
-
-	return {
-		version: '1.0',
-		exportedAt: new Date().toISOString(),
-		transactions,
-		categories,
-		monthlyBudgets,
-		categoryBudgets,
-		settings: settings ?? DEFAULT_SETTINGS,
-		savingsAccounts,
-		savingsContributions,
-		linkedAccounts,
-		balanceSnapshots
-	};
+	return dehydrateAll();
 }
 
 /**
  * Replace all data (useful for import/restore)
  */
 export async function replaceAllData(data: StoredData): Promise<void> {
-	await db.transaction(
-		'rw',
-		[db.transactions, db.categories, db.monthlyBudgets, db.categoryBudgets, db.settings, db.savingsAccounts, db.savingsContributions, db.linkedAccounts, db.balanceSnapshots],
-		async () => {
-			await db.transactions.clear();
-			await db.categories.clear();
-			await db.monthlyBudgets.clear();
-			await db.categoryBudgets.clear();
-			await db.savingsAccounts.clear();
-			await db.savingsContributions.clear();
-			await db.linkedAccounts.clear();
-			await db.balanceSnapshots.clear();
-
-			if (data.categories.length > 0) {
-				await db.categories.bulkPut(data.categories);
-			}
-
-			if (data.monthlyBudgets.length > 0) {
-				await db.monthlyBudgets.bulkPut(data.monthlyBudgets);
-			}
-
-			if (data.categoryBudgets && data.categoryBudgets.length > 0) {
-				// Convert date strings back to Date objects
-				const categoryBudgets = data.categoryBudgets.map((cb) => ({
-					...cb,
-					createdAt: new Date(cb.createdAt),
-					updatedAt: new Date(cb.updatedAt)
-				}));
-				await db.categoryBudgets.bulkPut(categoryBudgets);
-			}
-
-			if (data.transactions.length > 0) {
-				// Convert date strings back to Date objects
-				// Use parseStoredDate for transaction date to avoid timezone shift
-				const transactions = data.transactions.map((t) => ({
-					...t,
-					date: parseStoredDate(t.date),
-					createdAt: new Date(t.createdAt),
-					updatedAt: new Date(t.updatedAt),
-					settledDate: t.settledDate ? new Date(t.settledDate) : undefined
-				}));
-				await db.transactions.bulkPut(transactions);
-			}
-
-			if (data.savingsAccounts && data.savingsAccounts.length > 0) {
-				// Convert date strings back to Date objects
-				const savingsAccounts = data.savingsAccounts.map((sa) => ({
-					...sa,
-					targetDate: sa.targetDate ? new Date(sa.targetDate) : undefined,
-					createdAt: new Date(sa.createdAt),
-					updatedAt: new Date(sa.updatedAt)
-				}));
-				await db.savingsAccounts.bulkPut(savingsAccounts);
-			}
-
-			if (data.savingsContributions && data.savingsContributions.length > 0) {
-				// Convert date strings back to Date objects
-				const savingsContributions = data.savingsContributions.map((sc) => ({
-					...sc,
-					date: parseStoredDate(sc.date),
-					createdAt: new Date(sc.createdAt),
-					updatedAt: new Date(sc.updatedAt)
-				}));
-				await db.savingsContributions.bulkPut(savingsContributions);
-			}
-
-			if (data.linkedAccounts && data.linkedAccounts.length > 0) {
-				const linkedAccounts = data.linkedAccounts.map((la) => ({
-					...la,
-					lastSyncedAt: la.lastSyncedAt ? new Date(la.lastSyncedAt) : undefined,
-					createdAt: new Date(la.createdAt),
-					updatedAt: new Date(la.updatedAt)
-				}));
-				await db.linkedAccounts.bulkPut(linkedAccounts);
-			}
-
-			if (data.balanceSnapshots && data.balanceSnapshots.length > 0) {
-				const balanceSnapshots = data.balanceSnapshots.map((bs) => ({
-					...bs,
-					capturedAt: new Date(bs.capturedAt)
-				}));
-				await db.balanceSnapshots.bulkPut(balanceSnapshots);
-			}
-
-			if (data.settings) {
-				await db.settings.put({ ...data.settings, id: 1 });
-			}
-		}
-	);
-
+	await hydrateAll(data);
 	await persistData();
 }

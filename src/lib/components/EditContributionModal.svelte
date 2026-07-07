@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { format } from 'date-fns';
 	import { Trash2 } from 'lucide-svelte';
 	import { CONTRIBUTION_SOURCES, type SavingsAccount, type SavingsContribution, type ContributionSource } from '$lib/db';
 	import { parseLocalDate, formatDateForInput } from '$lib/utils/date-helpers';

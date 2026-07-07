@@ -59,23 +59,21 @@
 			</p>
 		{/snippet}
 
-		{#snippet children()}
-			<div class="space-y-1">
-				{#each tagSummary as { tag, total, count }}
-					<button
-						type="button"
-						disabled={!onTagClick}
-						onclick={() => onTagClick?.(tag)}
-						class="flex items-center justify-between py-1.5 px-2 -mx-2 rounded-lg w-full text-left {onTagClick ? 'hover:bg-surface-alt transition-colors cursor-pointer' : 'cursor-default'}"
-					>
-						<span class="text-sm text-primary-600 font-medium">#{tag}</span>
-						<div class="text-right">
-							<span class="font-mono text-sm text-charcoal">{formatCurrencyWhole(total)}</span>
-							<span class="text-xs text-charcoal-muted ml-2">{count} txn{count !== 1 ? 's' : ''}</span>
-						</div>
-					</button>
-				{/each}
-			</div>
-		{/snippet}
+		<div class="space-y-1">
+			{#each tagSummary as { tag, total, count }}
+				<button
+					type="button"
+					disabled={!onTagClick}
+					onclick={() => onTagClick?.(tag)}
+					class="flex items-center justify-between py-1.5 px-2 -mx-2 rounded-lg w-full text-left {onTagClick ? 'hover:bg-surface-alt transition-colors cursor-pointer' : 'cursor-default'}"
+				>
+					<span class="text-sm text-primary-600 font-medium">#{tag}</span>
+					<div class="text-right">
+						<span class="font-mono text-sm text-charcoal">{formatCurrencyWhole(total)}</span>
+						<span class="text-xs text-charcoal-muted ml-2">{count} txn{count !== 1 ? 's' : ''}</span>
+					</div>
+				</button>
+			{/each}
+		</div>
 	</InsightGroup>
 {/if}

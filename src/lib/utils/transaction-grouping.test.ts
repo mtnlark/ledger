@@ -6,7 +6,6 @@ import {
 	formatDateGroupLabel,
 	buildListRows,
 	groupRowsByDate,
-	type DateGroup,
 	type SplitGroupRow
 } from './transaction-grouping';
 

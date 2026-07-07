@@ -36,8 +36,10 @@ export type ReadDataResult =
 	| { status: 'checksum_mismatch'; data: StoredData };
 
 /**
- * Result of attempting to recover from backups
+ * Result of attempting to recover from backups.
+ * `hadCandidates` distinguishes "no backups exist" (true first run) from
+ * "backups exist but none were readable" (data existed and was lost).
  */
 export type RecoveryResult =
 	| { status: 'recovered'; data: StoredData; backupName: string }
-	| { status: 'no_valid_backup' };
+	| { status: 'no_valid_backup'; hadCandidates: boolean };

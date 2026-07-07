@@ -2,8 +2,6 @@ import type { Transaction, Category } from '$lib/db';
 import {
 	addTransaction as storeAddTransaction,
 	updateTransaction,
-	deleteTransaction as storeDeleteTransaction,
-	bulkDeleteTransactions,
 	bulkUpdateCategory,
 	bulkAddTag as storeBulkAddTag,
 	bulkRemoveTag as storeBulkRemoveTag,

@@ -25,7 +25,6 @@
 
 	// Create category helpers
 	let categoryHelpers = $derived(createCategoryHelpers(categories));
-	let getCategoryName = $derived(categoryHelpers.getName);
 	let getCategoryIcon = $derived(categoryHelpers.getIcon);
 
 	// Get active categories for dropdown

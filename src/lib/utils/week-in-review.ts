@@ -6,7 +6,7 @@
 
 import { startOfWeek, endOfWeek, startOfDay, format } from 'date-fns';
 import type { Transaction, Category } from '$lib/db';
-import { getUserAmount, getSpendingByCategory, getTotalSpent } from '$lib/insights/calculations/spending';
+import { getSpendingByCategory, getTotalSpent } from '$lib/insights/calculations/spending';
 import { roundCurrency } from '$lib/utils/currency';
 
 const DISMISS_KEY = 'ledger-week-review-dismissed';

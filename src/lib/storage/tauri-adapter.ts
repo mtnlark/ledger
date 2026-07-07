@@ -9,11 +9,9 @@ import {
 	db,
 	DEFAULT_SETTINGS,
 	DEFAULT_CATEGORIES,
-	DEFAULT_SAVINGS_ACCOUNTS,
-	type Category,
-	type SavingsAccount
+	type Category
 } from '$lib/db';
-import { parseStoredDate } from '$lib/utils/date-helpers';
+import { dehydrateAll, hydrateAll } from './serialization';
 import type { StoredData, ReadDataResult, RecoveryResult } from './types';
 
 // Tauri API modules - loaded once during initialization
@@ -163,14 +161,42 @@ async function readDataFile(): Promise<ReadDataResult> {
 }
 
 /**
- * Attempt to recover data from backups
+ * Attempt to recover from the .bak file left by the previous atomic write.
+ * This is the most recent good state (fresher than the debounced timestamped
+ * backups), so it is tried first.
+ */
+async function recoverFromBakFile(): Promise<RecoveryResult> {
+	ensureInitialized();
+
+	const bakPath = cachedDataPath + '.bak';
+	if (!(await fs.exists(bakPath))) {
+		return { status: 'no_valid_backup', hadCandidates: false };
+	}
+
+	try {
+		const content = await fs.readTextFile(bakPath);
+		const data = JSON.parse(content) as StoredData;
+		if (data.checksum && !(await verifyChecksum(data))) {
+			console.warn('data.json.bak has invalid checksum');
+			return { status: 'no_valid_backup', hadCandidates: true };
+		}
+		console.log('Successfully recovered from data.json.bak');
+		return { status: 'recovered', data, backupName: 'data.json.bak' };
+	} catch (error) {
+		console.warn('data.json.bak is invalid', error);
+		return { status: 'no_valid_backup', hadCandidates: true };
+	}
+}
+
+/**
+ * Attempt to recover data from timestamped backups
  * Tries each backup from newest to oldest until one parses successfully
  */
 async function recoverFromBackups(): Promise<RecoveryResult> {
 	ensureInitialized();
 
 	if (!(await fs.exists(cachedBackupsDir))) {
-		return { status: 'no_valid_backup' };
+		return { status: 'no_valid_backup', hadCandidates: false };
 	}
 
 	const entries = await fs.readDir(cachedBackupsDir);
@@ -203,7 +229,23 @@ async function recoverFromBackups(): Promise<RecoveryResult> {
 		}
 	}
 
-	return { status: 'no_valid_backup' };
+	return { status: 'no_valid_backup', hadCandidates: backupFiles.length > 0 };
+}
+
+/**
+ * Try every recovery source, freshest first: .bak, then timestamped backups.
+ */
+async function recoverFromAnySource(): Promise<RecoveryResult> {
+	const bakResult = await recoverFromBakFile();
+	if (bakResult.status === 'recovered') return bakResult;
+
+	const backupsResult = await recoverFromBackups();
+	if (backupsResult.status === 'recovered') return backupsResult;
+
+	return {
+		status: 'no_valid_backup',
+		hadCandidates: bakResult.hadCandidates || backupsResult.hadCandidates
+	};
 }
 
 /**
@@ -280,7 +322,7 @@ export async function createBackup(): Promise<void> {
 	try {
 		const settings = await db.settings.get(1);
 		if (settings?.iCloudBackupEnabled) {
-			await copyBackupToICloud(content, backupName);
+			await copyBackupToICloud(content);
 		}
 	} catch (error) {
 		// Don't block on iCloud backup errors
@@ -338,7 +380,7 @@ export function getICloudBackupDir(): string {
 /**
  * Copy a backup file to iCloud Drive
  */
-async function copyBackupToICloud(backupContent: string, backupName: string): Promise<void> {
+async function copyBackupToICloud(backupContent: string): Promise<void> {
 	ensureInitialized();
 
 	try {
@@ -393,7 +435,7 @@ export async function initializeTauriStorage(): Promise<InitializationResult> {
 		await db.open();
 	} catch (error) {
 		console.error('Failed to reset IndexedDB:', error);
-		throw new Error(`Failed to initialize database: ${error}`);
+		throw new Error(`Failed to initialize database: ${error}`, { cause: error });
 	}
 
 	const readResult = await readDataFile();
@@ -405,8 +447,30 @@ export async function initializeTauriStorage(): Promise<InitializationResult> {
 		return { status: 'loaded' };
 	}
 
-	// Handle first run (no data file)
+	// Handle a missing data file. This is usually a true first run, but it can
+	// also mean a crash landed between the rename-to-.bak and rename-from-tmp
+	// steps of an atomic write — so check recovery sources before starting fresh.
 	if (readResult.status === 'not_found') {
+		const recoveryResult = await recoverFromAnySource();
+
+		if (recoveryResult.status === 'recovered') {
+			console.warn(`data.json missing; recovered from ${recoveryResult.backupName}`);
+			await loadDataIntoDexie(recoveryResult.data);
+			await saveToFile();
+			await runMigrationsIfNeeded();
+			return { status: 'recovered', backupName: recoveryResult.backupName };
+		}
+
+		if (recoveryResult.hadCandidates) {
+			// Backups exist but none were readable: data existed and was lost
+			console.error('data.json missing and no backup was readable. DATA HAS BEEN LOST.');
+			await initializeDefaults();
+			await saveToFile();
+			await runMigrationsIfNeeded();
+			return { status: 'initialized_after_unrecoverable_corruption' };
+		}
+
+		// No data file and no backups anywhere: genuine first run
 		await initializeDefaults();
 		await saveToFile();
 		await runMigrationsIfNeeded();
@@ -419,7 +483,7 @@ export async function initializeTauriStorage(): Promise<InitializationResult> {
 		console.error(`Corruption details: ${readResult.error}`);
 	}
 
-	const recoveryResult = await recoverFromBackups();
+	const recoveryResult = await recoverFromAnySource();
 
 	if (recoveryResult.status === 'recovered') {
 		console.log(`Recovered from backup: ${recoveryResult.backupName}`);
@@ -455,106 +519,7 @@ async function runMigrationsIfNeeded(): Promise<void> {
  * Load stored data into Dexie database
  */
 async function loadDataIntoDexie(data: StoredData): Promise<void> {
-	await db.transaction(
-		'rw',
-		[db.transactions, db.categories, db.monthlyBudgets, db.categoryBudgets, db.settings, db.savingsAccounts, db.savingsContributions, db.linkedAccounts, db.balanceSnapshots],
-		async () => {
-			// Clear existing data
-			await db.transactions.clear();
-			await db.categories.clear();
-			await db.monthlyBudgets.clear();
-			await db.categoryBudgets.clear();
-			await db.savingsAccounts.clear();
-			await db.savingsContributions.clear();
-			await db.linkedAccounts.clear();
-			await db.balanceSnapshots.clear();
-
-			// Load categories
-			if (data.categories && data.categories.length > 0) {
-				await db.categories.bulkPut(data.categories);
-			} else {
-				// Seed with defaults
-				await db.categories.bulkAdd(DEFAULT_CATEGORIES as Category[]);
-			}
-
-			// Load monthly budgets
-			if (data.monthlyBudgets && data.monthlyBudgets.length > 0) {
-				await db.monthlyBudgets.bulkPut(data.monthlyBudgets);
-			}
-
-			// Load category budgets (convert date strings to Date objects)
-			if (data.categoryBudgets && data.categoryBudgets.length > 0) {
-				const categoryBudgets = data.categoryBudgets.map((cb) => ({
-					...cb,
-					createdAt: new Date(cb.createdAt),
-					updatedAt: new Date(cb.updatedAt)
-				}));
-				await db.categoryBudgets.bulkPut(categoryBudgets);
-			}
-
-			// Load transactions (convert date strings to Date objects)
-			// Use parseStoredDate for transaction date to avoid timezone shift
-			if (data.transactions && data.transactions.length > 0) {
-				const transactions = data.transactions.map((t) => ({
-					...t,
-					date: parseStoredDate(t.date),
-					createdAt: new Date(t.createdAt),
-					updatedAt: new Date(t.updatedAt),
-					settledDate: t.settledDate ? new Date(t.settledDate) : undefined
-				}));
-				await db.transactions.bulkPut(transactions);
-			}
-
-			// Load savings accounts (convert date strings to Date objects)
-			if (data.savingsAccounts && data.savingsAccounts.length > 0) {
-				const savingsAccounts = data.savingsAccounts.map((sa) => ({
-					...sa,
-					targetDate: sa.targetDate ? new Date(sa.targetDate) : undefined,
-					createdAt: new Date(sa.createdAt),
-					updatedAt: new Date(sa.updatedAt)
-				}));
-				await db.savingsAccounts.bulkPut(savingsAccounts);
-			}
-			// Note: Default savings accounts are seeded by migration, not here
-
-			// Load savings contributions (convert date strings to Date objects)
-			if (data.savingsContributions && data.savingsContributions.length > 0) {
-				const savingsContributions = data.savingsContributions.map((sc) => ({
-					...sc,
-					date: parseStoredDate(sc.date),
-					createdAt: new Date(sc.createdAt),
-					updatedAt: new Date(sc.updatedAt)
-				}));
-				await db.savingsContributions.bulkPut(savingsContributions);
-			}
-
-			// Load linked accounts + balance snapshots (convert date strings)
-			if (data.linkedAccounts && data.linkedAccounts.length > 0) {
-				const linkedAccounts = data.linkedAccounts.map((la) => ({
-					...la,
-					lastSyncedAt: la.lastSyncedAt ? new Date(la.lastSyncedAt) : undefined,
-					createdAt: new Date(la.createdAt),
-					updatedAt: new Date(la.updatedAt)
-				}));
-				await db.linkedAccounts.bulkPut(linkedAccounts);
-			}
-
-			if (data.balanceSnapshots && data.balanceSnapshots.length > 0) {
-				const balanceSnapshots = data.balanceSnapshots.map((bs) => ({
-					...bs,
-					capturedAt: new Date(bs.capturedAt)
-				}));
-				await db.balanceSnapshots.bulkPut(balanceSnapshots);
-			}
-
-			// Load settings
-			if (data.settings) {
-				await db.settings.put({ ...data.settings, id: 1 });
-			} else {
-				await db.settings.put(DEFAULT_SETTINGS);
-			}
-		}
-	);
+	await hydrateAll(data, { useDefaultsWhenMissing: true });
 }
 
 /**
@@ -585,14 +550,43 @@ export class PersistenceError extends Error {
 	}
 }
 
+// Save serialization: all saves funnel through a single promise chain so two
+// saves never race on the shared temp file. A save requested while another is
+// already queued (but not started) piggybacks on it — the queued save reads
+// Dexie when it runs, so it captures both mutations in one write.
+let saveChain: Promise<void> = Promise.resolve();
+let saveQueued = false;
+
 /**
  * Save current Dexie state to JSON file
- * Called after every data modification
+ * Called after every data modification. Concurrent calls are serialized;
+ * calls arriving while a save is queued coalesce into that save.
  * @throws PersistenceError if saving fails
  */
-export async function saveToFile(): Promise<void> {
+export function saveToFile(): Promise<void> {
 	ensureInitialized();
 
+	if (saveQueued) {
+		return saveChain;
+	}
+	saveQueued = true;
+	saveChain = saveChain
+		// A failed save must not poison the chain for subsequent saves
+		.catch(() => {})
+		.then(() => {
+			// Clear the flag before reading Dexie so mutations made after this
+			// point queue a fresh save rather than assuming this one saw them
+			saveQueued = false;
+			return performSave();
+		});
+	return saveChain;
+}
+
+/**
+ * Serialize the full Dexie state and write it to disk (single writer;
+ * only ever invoked through the saveToFile queue).
+ */
+async function performSave(): Promise<void> {
 	// Create backup before saving (debounced)
 	try {
 		await createBackup();
@@ -601,32 +595,7 @@ export async function saveToFile(): Promise<void> {
 		console.error('Backup creation failed:', error);
 	}
 
-	// Get all data from Dexie
-	const [transactions, categories, monthlyBudgets, categoryBudgets, settings, savingsAccounts, savingsContributions, linkedAccounts, balanceSnapshots] = await Promise.all([
-		db.transactions.toArray(),
-		db.categories.toArray(),
-		db.monthlyBudgets.toArray(),
-		db.categoryBudgets.toArray(),
-		db.settings.get(1),
-		db.savingsAccounts.toArray(),
-		db.savingsContributions.toArray(),
-		db.linkedAccounts.toArray(),
-		db.balanceSnapshots.toArray()
-	]);
-
-	const data: StoredData = {
-		version: '1.0',
-		exportedAt: new Date().toISOString(),
-		transactions,
-		categories,
-		monthlyBudgets,
-		categoryBudgets,
-		settings: settings ?? DEFAULT_SETTINGS,
-		savingsAccounts,
-		savingsContributions,
-		linkedAccounts,
-		balanceSnapshots
-	};
+	const data = await dehydrateAll();
 
 	try {
 		await writeDataFile(data);

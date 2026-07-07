@@ -22,7 +22,6 @@
 		isOpen,
 		suggestions,
 		categories,
-		settings,
 		currentMonth,
 		onAddSelected,
 		onDismiss,

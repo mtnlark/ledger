@@ -3,8 +3,7 @@ import {
 	formatCurrency,
 	formatCurrencyWhole,
 	formatPercentage,
-	calculateSplitShares,
-	type SplitSharesResult
+	calculateSplitShares
 } from './format-helpers';
 
 describe('format-helpers', () => {

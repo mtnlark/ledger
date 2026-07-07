@@ -50,7 +50,7 @@
 		highlightedIndex = 0;
 	}
 
-	function handleBlur(e: FocusEvent) {
+	function handleBlur() {
 		// Delay to allow click events on dropdown items
 		setTimeout(() => {
 			isOpen = false;

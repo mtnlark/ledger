@@ -218,7 +218,7 @@ describe('Storage Types', () => {
 		});
 
 		it('no_valid_backup result has no data', () => {
-			const result: RecoveryResult = { status: 'no_valid_backup' };
+			const result: RecoveryResult = { status: 'no_valid_backup', hadCandidates: false };
 
 			expect(result.status).toBe('no_valid_backup');
 			expect('data' in result).toBe(false);

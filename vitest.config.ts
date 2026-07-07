@@ -30,6 +30,8 @@ export default defineConfig({
 		}
 	},
 	resolve: {
+		// Resolve Svelte's client build so rendered component tests can mount
+		conditions: ['browser'],
 		alias: {
 			$lib: '/src/lib',
 			'$app/navigation': '/src/tests/__mocks__/$app/navigation.ts',

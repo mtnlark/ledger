@@ -17,7 +17,6 @@ export interface MerchantSuggestion {
 let cachedMerchantIndex: Map<string, MerchantEntry> | null = null;
 // Secondary index for O(1) case-insensitive lookup
 let normalizedIndex: Map<string, MerchantEntry> | null = null;
-let cacheVersion = 0;
 
 /**
  * Invalidate the merchant index cache
@@ -26,7 +25,6 @@ let cacheVersion = 0;
 export function invalidateMerchantCache(): void {
 	cachedMerchantIndex = null;
 	normalizedIndex = null;
-	cacheVersion++;
 }
 
 /**

@@ -213,75 +213,73 @@
 		</div>
 	{/snippet}
 
-	{#snippet children()}
-		{#if transactions.length === 0}
-			<EmptyState
-				icon={BarChart3}
-				title="No transactions"
-				description="Add transactions to see category insights"
-				compact={true}
+	{#if transactions.length === 0}
+		<EmptyState
+			icon={BarChart3}
+			title="No transactions"
+			description="Add transactions to see category insights"
+			compact={true}
+		/>
+	{:else}
+		<div class="space-y-6">
+			<!-- Category Treemap -->
+		<div>
+			<h3 class="text-sm font-semibold text-charcoal-soft mb-3">Category Breakdown</h3>
+			<CategoryTreemap {transactions} {categories} />
+		</div>
+
+		<!-- Category Selector for Trends -->
+		<div>
+			<p class="block text-sm font-semibold text-charcoal-soft mb-2">
+				Explore Category Trends
+			</p>
+			<CategoryChipPicker
+				categories={sortedCategories}
+				selectedId={selectedCategoryId}
+				spending={categorySpending}
+				onSelect={(id) => { selectedCategoryId = id; hasUserSelected = true; }}
 			/>
-		{:else}
-			<div class="space-y-6">
-				<!-- Category Treemap -->
-			<div>
-				<h3 class="text-sm font-semibold text-charcoal-soft mb-3">Category Breakdown</h3>
-				<CategoryTreemap {transactions} {categories} />
-			</div>
 
-			<!-- Category Selector for Trends -->
-			<div>
-				<p class="block text-sm font-semibold text-charcoal-soft mb-2">
-					Explore Category Trends
-				</p>
-				<CategoryChipPicker
-					categories={sortedCategories}
-					selectedId={selectedCategoryId}
-					spending={categorySpending}
-					onSelect={(id) => { selectedCategoryId = id; hasUserSelected = true; }}
-				/>
-
-				{#if selectedStats && selectedStats.mean > 0 && selectedCV !== null}
-					<div class="flex items-center gap-2 mt-3 text-sm text-charcoal-muted">
-						<span class="inline-block w-2.5 h-2.5 rounded-full {cvColor}"></span>
-						<span class="font-medium text-charcoal-soft">{cvLabel}</span>
-						<span>·</span>
-						<span class="font-mono">{formatCurrencyWhole(selectedStats.mean)}/mo ± {formatCurrencyWhole(selectedStats.stdDev)}</span>
-					</div>
-				{/if}
-			</div>
-
-			<!-- Category Trends Chart -->
-			{#if selectedCategory && categoryTrendData.size > 0}
-				<div>
-					<h3 class="text-sm font-semibold text-charcoal-soft mb-3">
-						{selectedCategory.name} Over Time
-					</h3>
-					<CategoryTrendsChart
-						categoryName={selectedCategory.name}
-						categoryColor={selectedCategory.color || '#C45D3A'}
-						trendData={categoryTrendData}
-						mean={selectedStats?.mean}
-						stdDev={selectedStats?.stdDev}
-					/>
+			{#if selectedStats && selectedStats.mean > 0 && selectedCV !== null}
+				<div class="flex items-center gap-2 mt-3 text-sm text-charcoal-muted">
+					<span class="inline-block w-2.5 h-2.5 rounded-full {cvColor}"></span>
+					<span class="font-medium text-charcoal-soft">{cvLabel}</span>
+					<span>·</span>
+					<span class="font-mono">{formatCurrencyWhole(selectedStats.mean)}/mo ± {formatCurrencyWhole(selectedStats.stdDev)}</span>
 				</div>
 			{/if}
+		</div>
 
-			<!-- Category Comparison -->
+		<!-- Category Trends Chart -->
+		{#if selectedCategory && categoryTrendData.size > 0}
 			<div>
 				<h3 class="text-sm font-semibold text-charcoal-soft mb-3">
-					{format(parseMonthKey(currentMonth), 'MMMM')} vs {format(parseMonthKey(previousMonth), 'MMMM')}
+					{selectedCategory.name} Over Time
 				</h3>
-				<CategoryComparison
-					{currentMonth}
-					previousMonth={previousMonth}
-					currentTransactions={transactions}
-					{previousTransactions}
-					{categories}
-					{categoryStats}
+				<CategoryTrendsChart
+					categoryName={selectedCategory.name}
+					categoryColor={selectedCategory.color || '#C45D3A'}
+					trendData={categoryTrendData}
+					mean={selectedStats?.mean}
+					stdDev={selectedStats?.stdDev}
 				/>
 			</div>
-			</div>
 		{/if}
-	{/snippet}
+
+		<!-- Category Comparison -->
+		<div>
+			<h3 class="text-sm font-semibold text-charcoal-soft mb-3">
+				{format(parseMonthKey(currentMonth), 'MMMM')} vs {format(parseMonthKey(previousMonth), 'MMMM')}
+			</h3>
+			<CategoryComparison
+				{currentMonth}
+				previousMonth={previousMonth}
+				currentTransactions={transactions}
+				{previousTransactions}
+				{categories}
+				{categoryStats}
+			/>
+		</div>
+		</div>
+	{/if}
 </InsightGroup>
