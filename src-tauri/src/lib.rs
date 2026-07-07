@@ -18,7 +18,7 @@ fn observe_app_activation(app_handle: tauri::AppHandle) {
   use std::ptr::NonNull;
 
   let name: &NSNotificationName =
-    &*NSString::from_str("NSApplicationDidBecomeActiveNotification");
+    &NSString::from_str("NSApplicationDidBecomeActiveNotification");
 
   let block = RcBlock::new(move |_notif: NonNull<NSNotification>| {
     if SUPPRESS_NEXT_ACTIVATE.swap(false, Ordering::SeqCst) {
