@@ -8,6 +8,7 @@
 	import { getAllCategories } from '$lib/stores/categories';
 	import { getSettings, dismissRecurringSuggestionsForMonth } from '$lib/stores/settings';
 	import { getBudgetForMonth, saveBudget } from '$lib/stores/budget';
+	import { getEffectiveBudgetsForMonth } from '$lib/stores/categoryBudget';
 	import { getContributionsAffectingAvailable } from '$lib/stores/savingsContributions';
 	import { getRecurringSuggestions, shouldShowRecurringBanner, type RecurringSuggestion } from '$lib/stores/recurringSuggestions';
 	import { sumCurrency, calculateTotalSpent } from '$lib/utils/currency';
@@ -62,6 +63,7 @@
 	let settings = $state<Settings>(DEFAULT_SETTINGS);
 	let budget = $state<MonthlyBudget | null>(null);
 	let savedFromContributions = $state(0);
+	let rolloverAdjustment = $state(0);
 	let showBudgetModal = $state(false);
 	let editingTransaction = $state<Transaction | null>(null);
 	let splittingTransaction = $state<Transaction | null>(null);
@@ -334,14 +336,16 @@
 			transactions = getTransactionsByMonthFromCache(currentMonth) ?? await getTransactionsByMonth(currentMonth);
 
 			// Parallelize remaining independent queries
-			const [monthBudget, months, contributions] = await Promise.all([
+			const [monthBudget, months, contributions, rollover] = await Promise.all([
 				getBudgetForMonth(currentMonth),
 				getAvailableMonths(),
-				getContributionsAffectingAvailable(currentMonth)
+				getContributionsAffectingAvailable(currentMonth),
+				getEffectiveBudgetsForMonth(currentMonth)
 			]);
 			budget = monthBudget;
 			availableMonths = months;
 			savedFromContributions = sumCurrency(contributions.map(c => c.amount));
+			rolloverAdjustment = rollover.carryoverTotal - rollover.deficitCarried;
 		} catch (error) {
 			handleError(error, { context: 'loadData', showToast: false });
 		} finally {
@@ -366,15 +370,17 @@
 	async function handleMonthChange(month: string) {
 		setSelectedMonth(month);
 		try {
-			const [txns, monthBudget, contributions] = await Promise.all([
+			const [txns, monthBudget, contributions, rollover] = await Promise.all([
 				getTransactionsByMonth(month),
 				getBudgetForMonth(month),
-				getContributionsAffectingAvailable(month)
+				getContributionsAffectingAvailable(month),
+				getEffectiveBudgetsForMonth(month)
 			]);
 			currentMonth = month;
 			transactions = txns;
 			budget = monthBudget;
 			savedFromContributions = sumCurrency(contributions.map(c => c.amount));
+			rolloverAdjustment = rollover.carryoverTotal - rollover.deficitCarried;
 		} catch (error) {
 			handleError(error, { context: 'handleMonthChange', showToast: false });
 		}
@@ -764,6 +770,7 @@
 						{budget}
 						{totalSpent}
 						{savedFromContributions}
+						{rolloverAdjustment}
 						onEditBudget={() => showBudgetModal = true}
 					/>
 					<WeekInReviewCard {allTransactions} {categories} />

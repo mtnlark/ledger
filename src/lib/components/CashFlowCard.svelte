@@ -8,15 +8,16 @@
 		budget: MonthlyBudget | null;
 		totalSpent: number;
 		savedFromContributions: number;
+		rolloverAdjustment?: number;
 		onEditBudget?: () => void;
 	}
 
-	let { budget, totalSpent, savedFromContributions, onEditBudget }: Props = $props();
+	let { budget, totalSpent, savedFromContributions, rolloverAdjustment = 0, onEditBudget }: Props = $props();
 
 	// Computed values
 	let income = $derived(budget?.income ?? 0);
 	let saved = $derived(savedFromContributions);
-	let available = $derived(income - saved);
+	let available = $derived(income - saved + rolloverAdjustment);
 	let surplus = $derived(available - totalSpent);
 
 	// Use getBudgetStatus for consistent color determination across the app
@@ -68,6 +69,14 @@
 					<span class="ledger-line"></span>
 					<span class="font-mono text-charcoal-soft">{formatCurrency(saved)}</span>
 				</div>
+
+				{#if rolloverAdjustment !== 0}
+					<div class="flex items-baseline">
+						<span class="text-charcoal-soft text-sm">{rolloverAdjustment > 0 ? '+' : '−'} Budget rollover</span>
+						<span class="ledger-line"></span>
+						<span class="font-mono text-charcoal-soft">{formatCurrency(Math.abs(rolloverAdjustment))}</span>
+					</div>
+				{/if}
 
 				<!-- Divider -->
 				<div class="border-t border-theme my-2"></div>
