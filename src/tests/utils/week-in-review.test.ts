@@ -231,14 +231,67 @@ describe('calculateWeekInReview', () => {
 
 	it('identifies top merchant by frequency', () => {
 		const txns = [
-			makeTx({ id: 1, date: new Date('2026-02-03'), merchant: 'Starbucks', categoryId: 3 }),
-			makeTx({ id: 2, date: new Date('2026-02-04'), merchant: 'Starbucks', categoryId: 3 }),
-			makeTx({ id: 3, date: new Date('2026-02-05'), merchant: 'Target', categoryId: 1 })
+			makeTx({ id: 1, date: new Date('2026-02-03'), merchant: 'Starbucks', amount: 5, categoryId: 3 }),
+			makeTx({ id: 2, date: new Date('2026-02-04'), merchant: 'Starbucks', amount: 5, categoryId: 3 }),
+			makeTx({ id: 3, date: new Date('2026-02-05'), merchant: 'Target', amount: 500, categoryId: 1 })
 		];
 		const result = calculateWeekInReview(txns, categories)!;
 		expect(result.topMerchant).not.toBeNull();
 		expect(result.topMerchant!.name).toBe('Starbucks');
 		expect(result.topMerchant!.count).toBe(2);
+		expect(result.topMerchant!.basis).toBe('visits');
+	});
+
+	it('falls back to the highest-spend merchant when no merchant repeats', () => {
+		const txns = [
+			makeTx({ id: 1, date: new Date('2026-02-03'), merchant: 'Coffee Shop', amount: 8, categoryId: 3 }),
+			makeTx({ id: 2, date: new Date('2026-02-04'), merchant: 'Target', amount: 80, categoryId: 1 }),
+			makeTx({ id: 3, date: new Date('2026-02-05'), merchant: 'Bookshop', amount: 25, categoryId: 2 })
+		];
+
+		const result = calculateWeekInReview(txns, categories)!;
+
+		expect(result.topMerchant).toEqual({
+			name: 'Target',
+			count: 1,
+			amount: 80,
+			basis: 'spend'
+		});
+	});
+
+	it('uses the combined user share of a split purchase for the spend fallback', () => {
+		const txns = [
+			makeTx({
+				id: 1,
+				date: new Date('2026-02-03'),
+				merchant: 'Hardware Store',
+				amount: 70,
+				isShared: true,
+				partnerShare: 20,
+				categoryId: 1,
+				parentTransactionId: 100
+			}),
+			makeTx({
+				id: 2,
+				date: new Date('2026-02-03'),
+				merchant: 'Hardware Store',
+				amount: 50,
+				isShared: true,
+				partnerShare: 10,
+				categoryId: 2,
+				parentTransactionId: 100
+			}),
+			makeTx({ id: 3, date: new Date('2026-02-05'), merchant: 'Target', amount: 85, categoryId: 1 })
+		];
+
+		const result = calculateWeekInReview(txns, categories)!;
+
+		expect(result.topMerchant).toEqual({
+			name: 'Hardware Store',
+			count: 1,
+			amount: 90,
+			basis: 'spend'
+		});
 	});
 
 	it('counts children from the same split transaction as one merchant visit', () => {
@@ -270,7 +323,12 @@ describe('calculateWeekInReview', () => {
 
 		const result = calculateWeekInReview(txns, categories)!;
 
-		expect(result.topMerchant).toEqual({ name: 'Costco', count: 2 });
+		expect(result.topMerchant).toEqual({
+			name: 'Costco',
+			count: 2,
+			amount: 100,
+			basis: 'visits'
+		});
 		expect(result.txCount).toBe(3);
 	});
 

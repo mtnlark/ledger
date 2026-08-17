@@ -68,21 +68,21 @@
 			<!-- Total Spent -->
 			<div class="bg-surface/60 rounded-lg px-3 py-2">
 				<p class="text-xs text-charcoal-muted mb-0.5">Total Spent</p>
-				<div class="flex items-center gap-1.5">
-					<span class="font-mono text-base font-semibold text-charcoal">{formatCurrency(review.totalSpent)}</span>
+				<div class="flex flex-wrap items-center gap-x-1.5 gap-y-1">
+					<span class="shrink-0 font-mono text-base font-semibold text-charcoal">{formatCurrency(review.totalSpent)}</span>
 					{#if review.change > 0}
-						<span class="inline-flex items-center gap-0.5 text-xs text-danger-600 font-medium" title="Up from {formatCurrency(review.priorWeekTotal)} prior week">
-							<TrendingUp size={12} />
+						<span class="inline-flex shrink-0 items-center gap-0.5 whitespace-nowrap text-xs leading-none text-danger-600 font-medium" title="Up from {formatCurrency(review.priorWeekTotal)} prior week">
+							<TrendingUp class="shrink-0" size={12} />
 							+{formatCurrency(review.change)}
 						</span>
 					{:else if review.change < 0}
-						<span class="inline-flex items-center gap-0.5 text-xs text-success-600 font-medium" title="Down from {formatCurrency(review.priorWeekTotal)} prior week">
-							<TrendingDown size={12} />
+						<span class="inline-flex shrink-0 items-center gap-0.5 whitespace-nowrap text-xs leading-none text-success-600 font-medium" title="Down from {formatCurrency(review.priorWeekTotal)} prior week">
+							<TrendingDown class="shrink-0" size={12} />
 							{formatCurrency(review.change)}
 						</span>
 					{:else}
-						<span class="inline-flex items-center gap-0.5 text-xs text-charcoal-muted" title="Same as prior week">
-							<Minus size={12} />
+						<span class="inline-flex shrink-0 items-center gap-0.5 whitespace-nowrap text-xs leading-none text-charcoal-muted" title="Same as prior week">
+							<Minus class="shrink-0" size={12} />
 							flat
 						</span>
 					{/if}
@@ -113,7 +113,11 @@
 				<p class="text-xs text-charcoal-muted mb-0.5">Top Merchant</p>
 				{#if review.topMerchant}
 					<span class="text-sm font-medium text-charcoal truncate block">{review.topMerchant.name}</span>
-					<span class="text-xs text-charcoal-muted">{review.topMerchant.count} {review.topMerchant.count === 1 ? 'visit' : 'visits'}</span>
+					{#if review.topMerchant.basis === 'spend'}
+						<span class="font-mono text-xs text-charcoal-muted">{formatCurrency(review.topMerchant.amount)} spent</span>
+					{:else}
+						<span class="text-xs text-charcoal-muted">{review.topMerchant.count} {review.topMerchant.count === 1 ? 'visit' : 'visits'}</span>
+					{/if}
 				{:else}
 					<span class="text-sm text-charcoal-muted">—</span>
 				{/if}

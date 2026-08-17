@@ -7,7 +7,6 @@
 import { startOfWeek, endOfWeek, startOfDay, format } from 'date-fns';
 import type { Transaction, Category } from '$lib/db';
 import { getSpendingByCategory, getTotalSpent } from '$lib/insights/calculations/spending';
-import { countMerchantVisits } from '$lib/insights/calculations/top-merchant';
 import { roundCurrency } from '$lib/utils/currency';
 import { groupTransactionsIntoPurchases } from '$lib/utils/transaction-grouping';
 
@@ -20,8 +19,13 @@ export interface WeekInReview {
 	txCount: number;
 	/** Top category by total spend */
 	topCategory: { id: number; name: string; amount: number } | null;
-	/** Top merchant by frequency (min 1 visit) */
-	topMerchant: { name: string; count: number } | null;
+	/** Repeat-visit leader, or highest-spend merchant when no merchant repeats */
+	topMerchant: {
+		name: string;
+		count: number;
+		amount: number;
+		basis: 'visits' | 'spend';
+	} | null;
 	/** Total user spending the week before last (for comparison) */
 	priorWeekTotal: number;
 	/** Dollar change (lastWeek - priorWeek) */
@@ -82,6 +86,7 @@ export function calculateWeekInReview(
 	const totalSpent = roundCurrency(getTotalSpent(lastWeekTxns));
 	const priorWeekTotal = roundCurrency(getTotalSpent(priorWeekTxns));
 	const change = roundCurrency(totalSpent - priorWeekTotal);
+	const lastWeekPurchases = groupTransactionsIntoPurchases(lastWeekTxns);
 
 	// Top category by total spend
 	const categorySpending = getSpendingByCategory(lastWeekTxns);
@@ -97,20 +102,39 @@ export function calculateWeekInReview(
 		}
 	}
 
-	// Top merchant by frequency (min 1 visit)
-	const merchantFreq = countMerchantVisits(lastWeekTxns);
+	// Prefer a repeat-visit leader. If every merchant was visited once, the
+	// highest-spend merchant is more meaningful than whichever appeared first.
+	const merchantStats = new Map<string, { count: number; amount: number }>();
+	for (const purchase of lastWeekPurchases) {
+		const existing = merchantStats.get(purchase.merchant) ?? { count: 0, amount: 0 };
+		merchantStats.set(purchase.merchant, {
+			count: existing.count + 1,
+			amount: roundCurrency(existing.amount + purchase.userAmount)
+		});
+	}
+
 	let topMerchant: WeekInReview['topMerchant'] = null;
 	let maxCount = 0;
-	for (const [name, count] of merchantFreq) {
-		if (count > maxCount) {
-			maxCount = count;
-			topMerchant = { name, count };
+	for (const [name, stats] of merchantStats) {
+		if (stats.count > maxCount) {
+			maxCount = stats.count;
+			topMerchant = { name, ...stats, basis: 'visits' };
+		}
+	}
+
+	if (maxCount < 2) {
+		let maxSpend = Number.NEGATIVE_INFINITY;
+		for (const [name, stats] of merchantStats) {
+			if (stats.amount > maxSpend) {
+				maxSpend = stats.amount;
+				topMerchant = { name, ...stats, basis: 'spend' };
+			}
 		}
 	}
 
 	return {
 		totalSpent,
-		txCount: groupTransactionsIntoPurchases(lastWeekTxns).length,
+		txCount: lastWeekPurchases.length,
 		topCategory,
 		topMerchant,
 		priorWeekTotal,
