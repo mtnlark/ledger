@@ -86,4 +86,18 @@ describe('computeTagReport', () => {
 		expect(report!.firstDate.getDate()).toBe(1);
 		expect(report!.lastDate.getDate()).toBe(3);
 	});
+
+	it('counts a tag once per split purchase while summing only tagged allocations', () => {
+		const txns = [
+			tx('2026-06-01', 'Target', 60, { parentTransactionId: 7, categoryId: 2, notes: '#trip supplies' }),
+			tx('2026-06-01', 'Target', 40, { parentTransactionId: 7, notes: '#trip snacks' }),
+			tx('2026-06-03', 'Hotel', 200, { notes: '#trip' }),
+			tx('2026-06-04', 'Target', 20, { parentTransactionId: 8, notes: 'not tagged' })
+		];
+
+		const report = computeTagReport(txns, categories, 'trip', TODAY);
+
+		expect(report!.total).toBe(300);
+		expect(report!.count).toBe(2);
+	});
 });

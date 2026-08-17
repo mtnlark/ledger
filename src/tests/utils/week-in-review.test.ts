@@ -241,6 +241,39 @@ describe('calculateWeekInReview', () => {
 		expect(result.topMerchant!.count).toBe(2);
 	});
 
+	it('counts children from the same split transaction as one merchant visit', () => {
+		const txns = [
+			makeTx({
+				id: 1,
+				date: new Date('2026-02-03'),
+				merchant: 'JetPens',
+				categoryId: 1,
+				parentTransactionId: 100
+			}),
+			makeTx({
+				id: 2,
+				date: new Date('2026-02-03'),
+				merchant: 'JetPens',
+				categoryId: 2,
+				parentTransactionId: 100
+			}),
+			makeTx({
+				id: 3,
+				date: new Date('2026-02-03'),
+				merchant: 'JetPens',
+				categoryId: 3,
+				parentTransactionId: 100
+			}),
+			makeTx({ id: 4, date: new Date('2026-02-04'), merchant: 'Costco', categoryId: 1 }),
+			makeTx({ id: 5, date: new Date('2026-02-06'), merchant: 'Costco', categoryId: 1 })
+		];
+
+		const result = calculateWeekInReview(txns, categories)!;
+
+		expect(result.topMerchant).toEqual({ name: 'Costco', count: 2 });
+		expect(result.txCount).toBe(3);
+	});
+
 	it('computes positive week-over-week change (spent more)', () => {
 		const txns = [
 			// Prior week: $30

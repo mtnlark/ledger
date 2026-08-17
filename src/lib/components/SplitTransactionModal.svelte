@@ -208,7 +208,7 @@
 						{#if isSubmitting}
 							<div class="animate-spin rounded-full h-4 w-4 border-2 border-white/30 border-t-white"></div>
 						{/if}
-						Split into {lines.length} Transactions
+						Split across {lines.length} categories
 					</button>
 					<button
 						type="button"

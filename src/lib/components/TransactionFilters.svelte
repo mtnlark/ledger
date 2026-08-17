@@ -4,7 +4,7 @@
 	import type { Category, Transaction } from '$lib/db';
 	import { tagIndex } from '$lib/stores/tags.svelte';
 	import { renameTag, deleteTag } from '$lib/stores/transactions';
-	import { calculateTagTotal } from '$lib/utils/tags';
+	import { calculateTagTotal, countPurchasesWithTag } from '$lib/utils/tags';
 	import { formatCurrency } from '$lib/utils/format-helpers';
 
 	export type SharedStatusFilter = '' | 'shared' | 'pending' | 'settled' | 'personal';
@@ -323,7 +323,7 @@
 									/>
 								{:else if confirmingDelete === tag}
 									<span class="flex-1 text-sm text-charcoal">
-										Remove from {tagIndex.getTransactionCountForTag(tag)} transactions?
+										Remove from {countPurchasesWithTag(allTransactions, tag)} transactions?
 									</span>
 									<button
 										type="button"
@@ -350,7 +350,7 @@
 										{tag}
 									</button>
 									<span class="text-xs text-charcoal-muted font-mono">
-										{tagIndex.getTransactionCountForTag(tag)} txns · {formatCurrency(calculateTagTotal(allTransactions, tag))}
+										{countPurchasesWithTag(allTransactions, tag)} txns · {formatCurrency(calculateTagTotal(allTransactions, tag))}
 									</span>
 									<button
 										type="button"
@@ -383,7 +383,7 @@
 						{#each availableTags as tag (tag)}
 							{#if !filters.tags.includes(tag)}
 								<option value={tag}>
-									{tag} ({tagIndex.getTransactionCountForTag(tag)})
+									{tag} ({countPurchasesWithTag(allTransactions, tag)})
 								</option>
 							{/if}
 						{/each}

@@ -1,8 +1,7 @@
 <script lang="ts">
 	import type { Transaction } from '$lib/db';
-	import { calculateTagTotal } from '$lib/utils/tags';
+	import { calculateTagTotal, countPurchasesWithTag } from '$lib/utils/tags';
 	import { formatCurrency } from '$lib/utils/format-helpers';
-	import { tagIndex } from '$lib/stores/tags.svelte';
 
 	interface Props {
 		tag: string;
@@ -13,7 +12,7 @@
 	let { tag, transactions, visible }: Props = $props();
 
 	let total = $derived(calculateTagTotal(transactions, tag));
-	let count = $derived(tagIndex.getTransactionCountForTag(tag));
+	let count = $derived(countPurchasesWithTag(transactions, tag));
 </script>
 
 {#if visible}

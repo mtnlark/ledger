@@ -12,7 +12,12 @@ vi.mock('$lib/stores/recurringCache', () => ({
 }));
 
 import { db, DEFAULT_SETTINGS, type Transaction } from '$lib/db';
-import { isExpectedThisMonth, getUserSubscriptions } from '$lib/stores/recurringSuggestions';
+import {
+	isExpectedThisMonth,
+	addRecurringSuggestionTransaction,
+	getRecurringSuggestions,
+	getUserSubscriptions
+} from '$lib/stores/recurringSuggestions';
 
 function makeTransaction(overrides: Partial<Transaction>): Transaction {
 	return {
@@ -141,17 +146,69 @@ describe('getUserSubscriptions', () => {
 		expect(subs.has('spotify|9.99')).toBe(true);
 	});
 
-	it('excludes split parent subscription transactions', async () => {
+	it('reconstructs a split subscription from its children', async () => {
 		await db.transactions.bulkAdd([
 			makeTransaction({ merchant: 'Netflix', amount: 15.99, isSubscription: true, isSplitParent: true }),
 			makeTransaction({ merchant: 'Netflix', amount: 10.00, isSubscription: true, parentTransactionId: 1 }),
-			makeTransaction({ merchant: 'Netflix', amount: 5.99, isSubscription: true, parentTransactionId: 1 })
+			makeTransaction({ merchant: 'Netflix', amount: 5.99, categoryId: 2, isSubscription: true, parentTransactionId: 1 })
 		]);
 
 		const subs = await getUserSubscriptions();
-		// Split parent excluded, children grouped by their amounts
-		expect(subs.has('netflix|15.99')).toBe(false);
-		expect(subs.size).toBe(2);
+		expect(subs.size).toBe(1);
+		expect(subs.get('netflix|15.99')).toMatchObject({
+			expectedAmount: 15.99,
+			categoryId: 1,
+			allocationTemplate: [
+				{ categoryId: 1, amount: 10 },
+				{ categoryId: 2, amount: 5.99 }
+			]
+		});
+	});
+
+	it('uses the most recent split purchase as the allocation template', async () => {
+		const transactions = [
+			makeTransaction({ id: 10, date: new Date('2025-12-15'), merchant: 'Netflix', amount: 8, categoryId: 1, isSubscription: true, parentTransactionId: 100 }),
+			makeTransaction({ id: 11, date: new Date('2025-12-15'), merchant: 'Netflix', amount: 7.99, categoryId: 2, isSubscription: true, parentTransactionId: 100 }),
+			makeTransaction({ id: 20, date: new Date('2026-01-15'), merchant: 'Netflix', amount: 10, categoryId: 3, isSubscription: true, parentTransactionId: 200 }),
+			makeTransaction({ id: 21, date: new Date('2026-01-15'), merchant: 'Netflix', amount: 5.99, categoryId: 2, isSubscription: true, parentTransactionId: 200 })
+		];
+
+		const subs = await getUserSubscriptions(transactions);
+
+		expect(subs.get('netflix|15.99')?.allocationTemplate).toEqual([
+			{ categoryId: 3, amount: 10 },
+			{ categoryId: 2, amount: 5.99 }
+		]);
+		expect(subs.get('netflix|15.99')?.categoryId).toBe(3);
+	});
+
+	it('keeps the most recent split template when the latest occurrence is unsplit', async () => {
+		const transactions = [
+			makeTransaction({ id: 10, date: new Date('2025-12-15'), amount: 10, categoryId: 3, isSubscription: true, parentTransactionId: 100 }),
+			makeTransaction({ id: 11, date: new Date('2025-12-15'), amount: 5.99, categoryId: 2, isSubscription: true, parentTransactionId: 100 }),
+			makeTransaction({ id: 20, date: new Date('2026-01-15'), amount: 15.99, categoryId: 4, isSubscription: true })
+		];
+
+		const subs = await getUserSubscriptions(transactions);
+
+		expect(subs.get('netflix|15.99')?.categoryId).toBe(4);
+		expect(subs.get('netflix|15.99')?.allocationTemplate).toEqual([
+			{ categoryId: 3, amount: 10 },
+			{ categoryId: 2, amount: 5.99 }
+		]);
+	});
+
+	it('suppresses a subscription suggestion when this month already contains the split purchase', async () => {
+		const transactions = [
+			makeTransaction({ id: 10, date: new Date('2026-01-15'), amount: 10, isSubscription: true, parentTransactionId: 100 }),
+			makeTransaction({ id: 11, date: new Date('2026-01-15'), amount: 5.99, categoryId: 2, isSubscription: true, parentTransactionId: 100 }),
+			makeTransaction({ id: 20, date: new Date('2026-02-15'), amount: 9, isSubscription: true, parentTransactionId: 200 }),
+			makeTransaction({ id: 21, date: new Date('2026-02-15'), amount: 6.99, categoryId: 2, isSubscription: true, parentTransactionId: 200 })
+		];
+
+		const suggestions = await getRecurringSuggestions('2026-02', transactions);
+
+		expect(suggestions).toEqual([]);
 	});
 
 	it('does not return non-subscription transactions', async () => {
@@ -202,5 +259,46 @@ describe('getUserSubscriptions', () => {
 		expect(subs.size).toBe(2);
 		expect(subs.has('apple|2.99')).toBe(true);
 		expect(subs.has('apple|2.16')).toBe(true);
+	});
+});
+
+describe('addRecurringSuggestionTransaction', () => {
+	beforeEach(async () => {
+		await db.transactions.clear();
+		await db.settings.clear();
+		await db.settings.add({ ...DEFAULT_SETTINGS });
+	});
+
+	it('creates linked split children and scales the template to an edited total', async () => {
+		const childIds = await addRecurringSuggestionTransaction({
+			id: 'split-service|100',
+			merchant: 'Split Service',
+			categoryId: 1,
+			expectedAmount: 99.99,
+			expectedDate: 15,
+			date: new Date('2026-03-15'),
+			frequency: 'monthly',
+			isShared: false,
+			splitType: 'percentage',
+			splitValue: 0.5,
+			isSubscription: true,
+			isEssential: false,
+			amountType: 'fixed',
+			allocationTemplate: [
+				{ categoryId: 1, amount: 60 },
+				{ categoryId: 2, amount: 40 }
+			]
+		});
+
+		const all = await db.transactions.toArray();
+		const parent = all.find((transaction) => transaction.isSplitParent);
+		const children = all.filter((transaction) => transaction.parentTransactionId === parent?.id);
+
+		expect(parent).toMatchObject({ amount: 99.99, isSplitParent: true });
+		expect(childIds).toEqual(children.map((transaction) => transaction.id));
+		expect(children.map(({ categoryId, amount, notes }) => ({ categoryId, amount, notes }))).toEqual([
+			{ categoryId: 1, amount: 59.99, notes: undefined },
+			{ categoryId: 2, amount: 40, notes: undefined }
+		]);
 	});
 });

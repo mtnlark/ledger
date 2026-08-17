@@ -166,7 +166,7 @@ export function setupDashboardActions(ctx: DashboardContext) {
 				await storeSplitTransaction(parentId, data.splits);
 
 				await reloadAfterMutation();
-				toast.success(`Transaction split into ${data.splits.length} parts`);
+				toast.success(`Transaction split across ${data.splits.length} categories`);
 			} catch (error) {
 				handleError(error, {
 					context: 'addSplitTransactions',
@@ -283,7 +283,7 @@ export function setupDashboardActions(ctx: DashboardContext) {
 			try {
 				await storeSplitTransaction(id, splits);
 				await reloadAfterMutation();
-				toast.success(`Transaction split into ${splits.length} parts`);
+				toast.success(`Transaction split across ${splits.length} categories`);
 				return true;
 			} catch (error) {
 				handleError(error, {

@@ -3,15 +3,16 @@
 	import { format, startOfDay, parseISO } from 'date-fns';
 	import { getMonthKey, parseMonthKey, type Transaction, type Category, type Settings, type MonthlyBudget, DEFAULT_SETTINGS } from '$lib/db';
 	import { initializeStorage } from '$lib/storage';
-	import { addTransaction, getTransactionsByMonth, getTransactionsByMonthFromCache, getAllTransactions, getAvailableMonths } from '$lib/stores/transactions';
+	import { getTransactionsByMonth, getTransactionsByMonthFromCache, getAllTransactions, getAvailableMonths } from '$lib/stores/transactions';
 	import { setupDashboardActions } from '$lib/stores/dashboardActions';
 	import { getAllCategories } from '$lib/stores/categories';
 	import { getSettings, dismissRecurringSuggestionsForMonth } from '$lib/stores/settings';
 	import { getBudgetForMonth, saveBudget } from '$lib/stores/budget';
 	import { getEffectiveBudgetsForMonth } from '$lib/stores/categoryBudget';
 	import { getContributionsAffectingAvailable } from '$lib/stores/savingsContributions';
-	import { getRecurringSuggestions, shouldShowRecurringBanner, type RecurringSuggestion } from '$lib/stores/recurringSuggestions';
+	import { addRecurringSuggestionTransaction, getRecurringSuggestions, shouldShowRecurringBanner, type RecurringSuggestion } from '$lib/stores/recurringSuggestions';
 	import { sumCurrency, calculateTotalSpent } from '$lib/utils/currency';
+	import { groupTransactionsIntoPurchases } from '$lib/utils/transaction-grouping';
 	import { matchesTag } from '$lib/utils/tags';
 	import { tagIndex } from '$lib/stores/tags.svelte';
 	import { registerShortcutHandlers } from '$lib/stores/shortcuts';
@@ -227,7 +228,10 @@
 	let upcomingCount = $derived.by(() => {
 		if (isFutureMonthView) return 0;
 		const today = startOfDay(new Date());
-		return searchFilteredTransactions.filter((t) => startOfDay(new Date(t.date)) > today).length;
+		const upcoming = searchFilteredTransactions.filter(
+			(t) => startOfDay(new Date(t.date)) > today
+		);
+		return groupTransactionsIntoPurchases(upcoming).length;
 	});
 
 	let filteredTransactions = $derived.by(() => {
@@ -235,6 +239,12 @@
 		const today = startOfDay(new Date());
 		return searchFilteredTransactions.filter((t) => startOfDay(new Date(t.date)) <= today);
 	});
+
+	let filteredTransactionCount = $derived(
+		groupTransactionsIntoPurchases(filteredTransactions).length
+	);
+	let monthTransactionCount = $derived(groupTransactionsIntoPurchases(transactions).length);
+	let allTransactionCount = $derived(groupTransactionsIntoPurchases(allTransactions).length);
 
 	// Days since the most recent entry (createdAt = entry activity, not transaction date)
 	let daysSinceEntry = $derived.by(() => {
@@ -505,21 +515,7 @@
 	async function handleAddSelectedSuggestions(items: Array<RecurringSuggestion & { date: Date }>) {
 		try {
 			const results = await Promise.allSettled(
-				items.map((item) =>
-					addTransaction({
-						date: item.date,
-						merchant: item.merchant,
-						amount: item.expectedAmount,
-						categoryId: item.categoryId,
-						isShared: item.isShared,
-						isSettled: false,
-						splitType: item.splitType,
-						splitValue: item.splitValue,
-						isEssential: item.isEssential,
-						isSubscription: item.isSubscription,
-						subscriptionFrequency: item.frequency
-					})
-				)
+				items.map((item) => addRecurringSuggestionTransaction(item))
 			);
 
 			const succeeded = results.filter((r) => r.status === 'fulfilled').length;
@@ -709,9 +705,9 @@
 								{categories}
 								{filters}
 								onFilterChange={handleFilterChange}
-								resultCount={filteredTransactions.length}
-								totalCount={transactions.length}
-								allTimeCount={allTransactions.length}
+								resultCount={filteredTransactionCount}
+								totalCount={monthTransactionCount}
+								allTimeCount={allTransactionCount}
 								onSearchInputRef={setSearchInputRef}
 								{allTransactions}
 								onTagsChanged={async () => {

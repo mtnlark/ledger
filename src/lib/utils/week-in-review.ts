@@ -7,7 +7,9 @@
 import { startOfWeek, endOfWeek, startOfDay, format } from 'date-fns';
 import type { Transaction, Category } from '$lib/db';
 import { getSpendingByCategory, getTotalSpent } from '$lib/insights/calculations/spending';
+import { countMerchantVisits } from '$lib/insights/calculations/top-merchant';
 import { roundCurrency } from '$lib/utils/currency';
+import { groupTransactionsIntoPurchases } from '$lib/utils/transaction-grouping';
 
 const DISMISS_KEY = 'ledger-week-review-dismissed';
 
@@ -96,10 +98,7 @@ export function calculateWeekInReview(
 	}
 
 	// Top merchant by frequency (min 1 visit)
-	const merchantFreq = new Map<string, number>();
-	for (const t of lastWeekTxns) {
-		merchantFreq.set(t.merchant, (merchantFreq.get(t.merchant) || 0) + 1);
-	}
+	const merchantFreq = countMerchantVisits(lastWeekTxns);
 	let topMerchant: WeekInReview['topMerchant'] = null;
 	let maxCount = 0;
 	for (const [name, count] of merchantFreq) {
@@ -111,7 +110,7 @@ export function calculateWeekInReview(
 
 	return {
 		totalSpent,
-		txCount: lastWeekTxns.length,
+		txCount: groupTransactionsIntoPurchases(lastWeekTxns).length,
 		topCategory,
 		topMerchant,
 		priorWeekTotal,

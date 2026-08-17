@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { db, initializeDatabase } from '$lib/db';
-import { addTransaction } from './transactions';
+import { addTransaction, splitTransaction } from './transactions';
 import {
 	getMerchantSuggestions,
 	getMostCommonCategory,
@@ -107,6 +107,31 @@ describe('Merchant Suggestions', () => {
 			expect(index.has('Shell')).toBe(true);
 			expect(index.has('Chipotle')).toBe(true);
 		});
+
+		it('counts a split once and gives it one dominant-category vote', async () => {
+			const parentId = await addTransaction({
+				date: new Date(2025, 11, 1),
+				merchant: 'Target',
+				amount: 100,
+				categoryId: 4,
+				isShared: false,
+				splitType: 'percentage',
+				splitValue: 0.5,
+				isSettled: false,
+				isEssential: false,
+				isSubscription: false
+			});
+			await splitTransaction(parentId, [
+				{ categoryId: 4, amount: 30 },
+				{ categoryId: 11, amount: 70 }
+			]);
+
+			const index = await buildMerchantIndex();
+			const entry = index.get('Target')!;
+
+			expect(entry.count).toBe(1);
+			expect(entry.categoryCounts).toEqual(new Map([[11, 1]]));
+		});
 	});
 
 	describe('getMerchantSuggestions', () => {
@@ -195,6 +220,48 @@ describe('Merchant Suggestions', () => {
 
 			expect(suggestions[0].merchant).toBe('Walmart'); // 4 total transactions
 			expect(suggestions[1].merchant).toBe('Walgreens'); // 1 transaction
+		});
+
+		it('ranks autocomplete frequency by purchases rather than split allocations', async () => {
+			for (let i = 0; i < 2; i++) {
+				await addTransaction({
+					date: new Date(2025, 11, i + 2),
+					merchant: 'Walgreens',
+					amount: 10,
+					categoryId: 13,
+					isShared: false,
+					splitType: 'percentage',
+					splitValue: 0.5,
+					isSettled: false,
+					isEssential: false,
+					isSubscription: false
+				});
+			}
+			const parentId = await addTransaction({
+				date: new Date(2025, 11, 5),
+				merchant: 'Walmart',
+				amount: 100,
+				categoryId: 11,
+				isShared: false,
+				splitType: 'percentage',
+				splitValue: 0.5,
+				isSettled: false,
+				isEssential: false,
+				isSubscription: false
+			});
+			await splitTransaction(parentId, [
+				{ categoryId: 11, amount: 25 },
+				{ categoryId: 4, amount: 25 },
+				{ categoryId: 13, amount: 25 },
+				{ categoryId: 20, amount: 25 }
+			]);
+
+			const suggestions = await getMerchantSuggestions('wa');
+
+			expect(suggestions.map(({ merchant, count }) => ({ merchant, count }))).toEqual([
+				{ merchant: 'Walgreens', count: 3 },
+				{ merchant: 'Walmart', count: 2 }
+			]);
 		});
 
 		it('includes most common category in suggestion', async () => {

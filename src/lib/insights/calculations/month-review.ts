@@ -16,6 +16,7 @@ import {
 } from './stats';
 import { calculatePercent } from '$lib/utils/currency';
 import { normalizeMerchant } from '$lib/utils/string-helpers';
+import { groupTransactionsIntoPurchases } from '$lib/utils/transaction-grouping';
 
 interface SavingsReviewResult {
 	/** Total saved this month */
@@ -184,20 +185,22 @@ export function computeBiggestPurchase(
 		}
 	}
 
-	let biggest: Transaction | null = null;
+	let biggestMerchant = '';
 	let biggestAmount = 0;
 
-	for (const t of transactions) {
-		if (excludedIds.has(t.categoryId)) continue;
-		const amount = getUserAmount(t);
+	for (const purchase of groupTransactionsIntoPurchases(transactions)) {
+		if (purchase.allocations.every((allocation) => excludedIds.has(allocation.categoryId))) {
+			continue;
+		}
+		const amount = purchase.userAmount;
 		if (amount > biggestAmount) {
 			biggestAmount = amount;
-			biggest = t;
+			biggestMerchant = purchase.merchant;
 		}
 	}
 
-	if (!biggest || biggestAmount === 0) return null;
-	return { merchant: biggest.merchant, amount: biggestAmount };
+	if (!biggestMerchant || biggestAmount === 0) return null;
+	return { merchant: biggestMerchant, amount: biggestAmount };
 }
 
 /**

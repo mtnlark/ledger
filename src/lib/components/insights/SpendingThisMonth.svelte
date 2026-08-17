@@ -8,6 +8,7 @@
 	import { formatCurrency, formatPercentage } from '$lib/utils/format-helpers';
 	import { roundCurrency, getUserAmount } from '$lib/utils/currency';
 	import { filterUpToDate } from '$lib/utils/date-helpers';
+	import { groupTransactionsIntoPurchases } from '$lib/utils/transaction-grouping';
 
 	interface Props {
 		currentMonth: string;
@@ -42,8 +43,10 @@
 	let totalSpent = $derived(engine.getTotalSpent(displayTransactions, isCurrentMonth ? `${currentMonth}-past` : currentMonth));
 
 	// Quick stats
-	let sharedCount = $derived(displayTransactions.filter((t) => t.isShared).length);
-	let avgTransaction = $derived(displayTransactions.length > 0 ? totalSpent / displayTransactions.length : 0);
+	let displayPurchases = $derived(groupTransactionsIntoPurchases(displayTransactions));
+	let transactionCount = $derived(displayPurchases.length);
+	let sharedCount = $derived(displayPurchases.filter((purchase) => purchase.isShared).length);
+	let avgTransaction = $derived(transactionCount > 0 ? totalSpent / transactionCount : 0);
 
 	// Basic pace stats (always computed when we have previous month data)
 	let paceStats = $derived.by(() => {
@@ -151,7 +154,7 @@
 					{formatCurrency(totalSpent)}
 				</p>
 				<p class="text-sm text-charcoal-muted">
-					{displayTransactions.length} transaction{displayTransactions.length !== 1 ? 's' : ''}
+					{transactionCount} transaction{transactionCount !== 1 ? 's' : ''}
 				</p>
 			</div>
 			{#if paceStats && paceStats.percentChange !== 0}

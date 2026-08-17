@@ -19,6 +19,13 @@ import { normalizeMerchant, subscriptionKey, findSupersededSubscriptionKeys } fr
 import { roundCurrency, currencyEquals } from '$lib/utils/currency';
 import { mode } from '$lib/insights/calculations/stats';
 import { config } from '$lib/config';
+import {
+	groupTransactionsIntoPurchases,
+	scalePurchaseAllocations,
+	type PurchaseAllocation,
+	type TransactionPurchase
+} from '$lib/utils/transaction-grouping';
+import { addTransaction, splitTransaction } from './transactions';
 
 export interface RecurringSuggestion {
 	/** Unique ID - composite key (merchant|amount) for subscriptions, normalized merchant for detected */
@@ -38,6 +45,36 @@ export interface RecurringSuggestion {
 	isEssential: boolean;
 	/** 'fixed' = low variance (subscriptions), 'variable' = higher variance (utilities) */
 	amountType: 'fixed' | 'variable';
+	/** Category amounts from the most recent split purchase. Notes and tags are intentionally omitted. */
+	allocationTemplate?: PurchaseAllocation[];
+}
+
+/** Add one accepted recurring suggestion, preserving its category allocations when split. */
+export async function addRecurringSuggestionTransaction(
+	suggestion: RecurringSuggestion & { date: Date }
+): Promise<number[]> {
+	const parentId = await addTransaction({
+		date: suggestion.date,
+		merchant: suggestion.merchant,
+		amount: suggestion.expectedAmount,
+		categoryId: suggestion.categoryId,
+		isShared: suggestion.isShared,
+		isSettled: false,
+		splitType: suggestion.splitType,
+		splitValue: suggestion.splitValue,
+		isEssential: suggestion.isEssential,
+		isSubscription: suggestion.isSubscription,
+		subscriptionFrequency: suggestion.frequency
+	});
+
+	if (!suggestion.allocationTemplate || suggestion.allocationTemplate.length < 2) {
+		return [parentId];
+	}
+
+	return splitTransaction(
+		parentId,
+		scalePurchaseAllocations(suggestion.allocationTemplate, suggestion.expectedAmount)
+	);
 }
 
 /**
@@ -61,16 +98,14 @@ function isAlreadyAdded(suggestion: RecurringSuggestion, monthTxns: Transaction[
 	const normalizedMerchant = normalizeMerchant(suggestion.merchant);
 	const tolerance = config.recurringSuggestions.amountTolerance;
 
-	return monthTxns.some((tx) => {
-		// Skip split parent and soft-deleted transactions
-		if (tx.isSplitParent || tx.isDeleted) return false;
-		if (normalizeMerchant(tx.merchant) !== normalizedMerchant) return false;
+	return groupTransactionsIntoPurchases(monthTxns).some((purchase) => {
+		if (normalizeMerchant(purchase.merchant) !== normalizedMerchant) return false;
 
 		// For subscription suggestions, also match by amount (within tolerance)
 		if (suggestion.isSubscription) {
 			const expected = suggestion.expectedAmount;
 			if (expected === 0) return true; // Edge case: free subscriptions
-			const diff = Math.abs(tx.amount - expected) / expected;
+			const diff = Math.abs(purchase.totalAmount - expected) / expected;
 			return diff <= tolerance;
 		}
 
@@ -124,44 +159,49 @@ export function isExpectedThisMonth(
 export async function getUserSubscriptions(providedTransactions?: Transaction[]): Promise<Map<string, RecurringSuggestion>> {
 	// Filter in-memory since isSubscription isn't indexed
 	const allTransactions = providedTransactions ?? await db.transactions.toArray();
-	const allTxns = allTransactions.filter((tx) => tx.isSubscription && !tx.isDeleted && !tx.isSplitParent);
+	const subscriptionPurchases = groupTransactionsIntoPurchases(allTransactions).filter((purchase) =>
+		purchase.sourceTransactions.some((transaction) => transaction.isSubscription)
+	);
 
 	// Group by composite key (merchant|amount)
-	const grouped = new Map<string, Transaction[]>();
-	for (const tx of allTxns) {
-		const key = subscriptionKey(tx.merchant, tx.amount);
+	const grouped = new Map<string, TransactionPurchase[]>();
+	for (const purchase of subscriptionPurchases) {
+		const key = subscriptionKey(purchase.merchant, purchase.totalAmount);
 		const existing = grouped.get(key) || [];
-		grouped.set(key, [...existing, tx]);
+		grouped.set(key, [...existing, purchase]);
 	}
 
 	const subscriptions = new Map<string, RecurringSuggestion>();
 
-	for (const [key, txns] of grouped) {
+	for (const [key, purchases] of grouped) {
 		// Sort by date descending to get most recent
-		const sorted = [...txns].sort(
+		const sorted = [...purchases].sort(
 			(a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
 		);
 		const mostRecent = sorted[0];
+		const mostRecentSplit = sorted.find((purchase) => purchase.isSplit);
+		const mostRecentTransaction = mostRecent.sourceTransactions[0];
 
 		// Use most recent amount (not average) since subscription prices change over time
-		const expectedAmount = mostRecent.amount;
+		const expectedAmount = mostRecent.totalAmount;
 
 		// Determine day of month (most common)
-		const days = txns.map((t) => new Date(t.date).getDate());
+		const days = purchases.map((purchase) => new Date(purchase.date).getDate());
 		const dayOfMonth = mode(days);
 
 		// Map subscription frequency to RecurringFrequency (types now align)
-		const frequency: RecurringFrequency = mostRecent.subscriptionFrequency ?? 'monthly';
+		const frequency: RecurringFrequency = mostRecentTransaction.subscriptionFrequency ?? 'monthly';
 
 		// Determine if typically shared
-		const sharedCount = txns.filter((t) => t.isShared).length;
-		const isShared = sharedCount > txns.length / 2;
+		const sharedCount = purchases.filter((purchase) => purchase.isShared).length;
+		const isShared = sharedCount > purchases.length / 2;
 
 		// Get split settings from most recent shared transaction, or defaults
 		let splitType: 'percentage' | 'fixed' = 'percentage';
 		let splitValue = 0.5;
 		if (isShared) {
-			const sharedTx = sorted.find((t) => t.isShared);
+			const sharedPurchase = sorted.find((purchase) => purchase.isShared);
+			const sharedTx = sharedPurchase?.sourceTransactions[0];
 			if (sharedTx) {
 				splitType = sharedTx.splitType;
 				splitValue = sharedTx.splitValue;
@@ -171,7 +211,7 @@ export async function getUserSubscriptions(providedTransactions?: Transaction[])
 		subscriptions.set(key, {
 			id: key,
 			merchant: mostRecent.merchant,
-			categoryId: mostRecent.categoryId,
+			categoryId: mostRecent.dominantCategoryId,
 			expectedAmount,
 			expectedDate: dayOfMonth,
 			frequency,
@@ -179,8 +219,11 @@ export async function getUserSubscriptions(providedTransactions?: Transaction[])
 			splitType,
 			splitValue,
 			isSubscription: true,
-			isEssential: mostRecent.isEssential,
-			amountType: 'fixed' // Subscriptions are typically fixed
+			isEssential: mostRecentTransaction.isEssential,
+			amountType: 'fixed', // Subscriptions are typically fixed
+			allocationTemplate: mostRecentSplit
+				? mostRecentSplit.allocations.map((allocation) => ({ ...allocation }))
+				: undefined
 		});
 	}
 
@@ -190,10 +233,17 @@ export async function getUserSubscriptions(providedTransactions?: Transaction[])
 		merchant: s.merchant,
 		amount: s.expectedAmount,
 		latestDate: new Date(
-			Math.max(...(grouped.get(key) || []).map((tx) => new Date(tx.date).getTime()))
+			Math.max(...(grouped.get(key) || []).map((purchase) => purchase.date.getTime()))
 		)
 	}));
-	const superseded = findSupersededSubscriptionKeys(entries, allTxns);
+	const superseded = findSupersededSubscriptionKeys(
+		entries,
+		subscriptionPurchases.map((purchase) => ({
+			merchant: purchase.merchant,
+			amount: purchase.totalAmount,
+			date: purchase.date
+		}))
+	);
 	for (const key of superseded) {
 		subscriptions.delete(key);
 	}
@@ -218,9 +268,9 @@ function buildLastOccurrenceMaps(allTxns: Transaction[]): LastOccurrenceMaps {
 	const merchantLastDate = new Map<string, Date>();
 	const merchantAmountLastDate = new Map<string, Date>();
 
-	for (const tx of allTxns) {
-		const merchant = normalizeMerchant(tx.merchant);
-		const txDate = new Date(tx.date);
+	for (const purchase of groupTransactionsIntoPurchases(allTxns)) {
+		const merchant = normalizeMerchant(purchase.merchant);
+		const txDate = purchase.date;
 
 		// Merchant-level: latest date for this merchant (any amount)
 		const existing = merchantLastDate.get(merchant);
@@ -229,7 +279,7 @@ function buildLastOccurrenceMaps(allTxns: Transaction[]): LastOccurrenceMaps {
 		}
 
 		// Merchant+amount-level: latest date for this specific amount
-		const amountKey = `${merchant}|${roundCurrency(tx.amount)}`;
+		const amountKey = `${merchant}|${roundCurrency(purchase.totalAmount)}`;
 		const existingAmount = merchantAmountLastDate.get(amountKey);
 		if (!existingAmount || txDate.getTime() > existingAmount.getTime()) {
 			merchantAmountLastDate.set(amountKey, txDate);
@@ -332,15 +382,16 @@ export async function getRecurringSuggestions(month: string, providedTransaction
 
 		if (detected.isShared) {
 			// Find the most recent transaction for this merchant to get split settings
-			const merchantTxns = monthTxns.filter(
-				(tx) => normalizeMerchant(tx.merchant) === key && tx.isShared
+			const merchantPurchases = groupTransactionsIntoPurchases(allTxns).filter(
+				(purchase) => normalizeMerchant(purchase.merchant) === key && purchase.isShared
 			);
-			if (merchantTxns.length > 0) {
-				const recent = merchantTxns.sort(
+			if (merchantPurchases.length > 0) {
+				const recent = merchantPurchases.sort(
 					(a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
 				)[0];
-				splitType = recent.splitType;
-				splitValue = recent.splitValue;
+				const recentTransaction = recent.sourceTransactions[0];
+				splitType = recentTransaction.splitType;
+				splitValue = recentTransaction.splitValue;
 			}
 		}
 
@@ -356,7 +407,8 @@ export async function getRecurringSuggestions(month: string, providedTransaction
 			splitValue,
 			isSubscription: false,
 			isEssential: false, // Will be set from category default
-			amountType: detected.amountType
+			amountType: detected.amountType,
+			allocationTemplate: detected.allocationTemplate?.map((allocation) => ({ ...allocation }))
 		});
 	}
 

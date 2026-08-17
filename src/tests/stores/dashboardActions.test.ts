@@ -222,7 +222,7 @@ describe('dashboardActions', () => {
 			expect(getTransactionsByMonth).toHaveBeenCalledWith('2026-01');
 			expect(getAvailableMonths).toHaveBeenCalled();
 			expect(reloadFn).toHaveBeenCalled();
-			expect(toast.success).toHaveBeenCalledWith('Transaction split into 2 parts');
+			expect(toast.success).toHaveBeenCalledWith('Transaction split across 2 categories');
 		});
 
 		it('calls handleError when parent creation fails', async () => {
@@ -500,7 +500,7 @@ describe('dashboardActions', () => {
 		it('toasts with split count', async () => {
 			await actions.splitTransaction(42, splits);
 
-			expect(toast.success).toHaveBeenCalledWith('Transaction split into 2 parts');
+			expect(toast.success).toHaveBeenCalledWith('Transaction split across 2 categories');
 		});
 
 		it('returns true on success', async () => {

@@ -1,4 +1,5 @@
 import { db } from '$lib/db';
+import { groupTransactionsIntoPurchases } from '$lib/utils/transaction-grouping';
 
 export interface MerchantEntry {
 	merchant: string;
@@ -37,31 +38,30 @@ export async function buildMerchantIndex(): Promise<Map<string, MerchantEntry>> 
 		return cachedMerchantIndex;
 	}
 
-	const transactions = await db.transactions
-		.filter((t) => !t.isSplitParent && !t.isDeleted)
-		.toArray();
+	const transactions = await db.transactions.toArray();
+	const purchases = groupTransactionsIntoPurchases(transactions);
 	const index = new Map<string, MerchantEntry>();
 
-	for (const tx of transactions) {
-		const existing = index.get(tx.merchant);
+	for (const purchase of purchases) {
+		const existing = index.get(purchase.merchant);
 
 		if (existing) {
 			existing.count++;
 			existing.categoryCounts.set(
-				tx.categoryId,
-				(existing.categoryCounts.get(tx.categoryId) || 0) + 1
+				purchase.dominantCategoryId,
+				(existing.categoryCounts.get(purchase.dominantCategoryId) || 0) + 1
 			);
-			if (new Date(tx.date) > existing.lastUsed) {
-				existing.lastUsed = new Date(tx.date);
+			if (purchase.date > existing.lastUsed) {
+				existing.lastUsed = purchase.date;
 			}
 		} else {
 			const categoryCounts = new Map<number, number>();
-			categoryCounts.set(tx.categoryId, 1);
-			index.set(tx.merchant, {
-				merchant: tx.merchant,
+			categoryCounts.set(purchase.dominantCategoryId, 1);
+			index.set(purchase.merchant, {
+				merchant: purchase.merchant,
 				count: 1,
 				categoryCounts,
-				lastUsed: new Date(tx.date)
+				lastUsed: purchase.date
 			});
 		}
 	}

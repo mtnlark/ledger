@@ -519,7 +519,7 @@
 					{#if isSubmitting}
 						<div class="animate-spin rounded-full h-4 w-4 border-2 border-white/30 border-t-white"></div>
 					{/if}
-					{isSplitMode ? `Add ${splitLines.length} Transactions` : 'Add Transaction'}
+					{isSplitMode ? `Split across ${splitLines.length} categories` : 'Add Transaction'}
 				</button>
 				{#if onCancel}
 					<button

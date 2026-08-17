@@ -281,6 +281,19 @@ describe('computeBiggestPurchase', () => {
 		expect(result).toEqual({ merchant: 'Shared Place', amount: 200 });
 	});
 
+	it('uses the combined user share of a split purchase', () => {
+		const txs = [
+			makeTx({ merchant: 'Split Store', amount: 180, categoryId: 1, parentTransactionId: 100 }),
+			makeTx({ merchant: 'Split Store', amount: 170, categoryId: 2, parentTransactionId: 100 }),
+			makeTx({ merchant: 'Large Single', amount: 300, categoryId: 2 })
+		];
+
+		expect(computeBiggestPurchase(txs, categories)).toEqual({
+			merchant: 'Split Store',
+			amount: 350
+		});
+	});
+
 	it('excludes rent transactions by default', () => {
 		const txs = [
 			makeTx({ merchant: 'Landlord', amount: 2000, categoryId: 3 }), // Rent
@@ -295,6 +308,19 @@ describe('computeBiggestPurchase', () => {
 			makeTx({ merchant: 'Landlord', amount: 2000, categoryId: 3 })
 		];
 		expect(computeBiggestPurchase(txs, categories)).toBeNull();
+	});
+
+	it('keeps a split purchase when only some allocations are excluded', () => {
+		const txs = [
+			makeTx({ merchant: 'Move-in', amount: 1000, categoryId: 3, parentTransactionId: 100 }),
+			makeTx({ merchant: 'Move-in', amount: 200, categoryId: 2, parentTransactionId: 100 }),
+			makeTx({ merchant: 'Best Buy', amount: 500, categoryId: 2 })
+		];
+
+		expect(computeBiggestPurchase(txs, categories)).toEqual({
+			merchant: 'Move-in',
+			amount: 1200
+		});
 	});
 
 	it('respects custom exclude list', () => {

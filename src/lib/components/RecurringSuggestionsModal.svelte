@@ -257,6 +257,10 @@
 										<span class="text-charcoal-muted/50">&middot;</span>
 										<span class="text-primary-500">Shared</span>
 									{/if}
+									{#if suggestion.allocationTemplate && suggestion.allocationTemplate.length > 1}
+										<span class="text-charcoal-muted/50">&middot;</span>
+										<span>Split across {suggestion.allocationTemplate.length} categories</span>
+									{/if}
 								</div>
 							</div>
 
@@ -335,6 +339,10 @@
 									{#if suggestion.isShared}
 										<span class="text-charcoal-muted/50">&middot;</span>
 										<span class="text-primary-500">Shared</span>
+									{/if}
+									{#if suggestion.allocationTemplate && suggestion.allocationTemplate.length > 1}
+										<span class="text-charcoal-muted/50">&middot;</span>
+										<span>Split across {suggestion.allocationTemplate.length} categories</span>
 									{/if}
 								</div>
 							</div>

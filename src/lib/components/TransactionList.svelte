@@ -177,9 +177,7 @@
 	let displayedRows = $derived(allRows.slice(0, displayCount));
 	let hasMore = $derived(allRows.length > displayCount);
 	let rowGroups = $derived(groupRowsByDate(displayedRows));
-	let displayedTxCount = $derived(
-		displayedRows.reduce((n, r) => n + (r.type === 'single' ? 1 : r.children.length), 0)
-	);
+	let displayedTxCount = $derived(displayedRows.length);
 
 	// Reset display + expanded state when resetKey changes (month/filter changes).
 	// This intentionally ignores data refreshes (edits) that don't change the viewing context,
@@ -546,7 +544,7 @@
 		{#if hasMore}
 			<div class="flex flex-col items-center gap-1 pt-2">
 				<span class="text-xs text-charcoal-muted">
-					Showing {displayedTxCount} of {transactions.length} transactions
+					Showing {displayedTxCount} of {allRows.length} transactions
 				</span>
 				<button
 					type="button"

@@ -4,6 +4,7 @@
 	import { roundCurrency } from '$lib/utils/currency';
 	import { getInsightsEngine } from '$lib/insights';
 	import CalendarHeatmap from './CalendarHeatmap.svelte';
+	import { groupTransactionsIntoPurchases } from '$lib/utils/transaction-grouping';
 
 	interface Props {
 		transactions: Transaction[];
@@ -43,8 +44,9 @@
 		const yearTransactions = transactions.filter(
 			(t) => new Date(t.date).getFullYear() === year && t.isShared
 		);
+		const sharedPurchases = groupTransactionsIntoPurchases(yearTransactions);
 
-		if (yearTransactions.length === 0) return null;
+		if (sharedPurchases.length === 0) return null;
 
 		let totalShared = 0;
 		let totalSettled = 0;
@@ -62,7 +64,7 @@
 			totalShared: roundCurrency(totalShared),
 			totalPartnerShare: roundCurrency(totalPartnerShare),
 			totalSettled: roundCurrency(totalSettled),
-			count: yearTransactions.length
+			count: sharedPurchases.length
 		};
 	});
 

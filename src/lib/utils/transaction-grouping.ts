@@ -1,6 +1,136 @@
 import { format, isToday, isYesterday, startOfDay } from 'date-fns';
 import type { Transaction } from '$lib/db';
-import { sumCurrency } from './currency';
+import { getUserAmount, roundCurrency, sumCurrency } from './currency';
+
+/** A category allocation within a reconstructed purchase. */
+export interface PurchaseAllocation {
+	categoryId: number;
+	amount: number;
+}
+
+/**
+ * A complete purchase reconstructed from the transaction rows stored in the DB.
+ * Standalone transactions have one source transaction and one allocation. Split
+ * children with the same parentTransactionId share a purchase.
+ */
+export interface TransactionPurchase {
+	/** Stable within this grouping operation; useful for keyed maps and sets. */
+	key: string;
+	parentTransactionId?: number;
+	sourceTransactions: Transaction[];
+	allocations: PurchaseAllocation[];
+	merchant: string;
+	date: Date;
+	totalAmount: number;
+	userAmount: number;
+	partnerAmount: number;
+	dominantCategoryId: number;
+	isSplit: boolean;
+	isShared: boolean;
+}
+
+/**
+ * Reconstruct complete purchases from allocation-level transaction records.
+ * Deleted rows and hidden split parents are always excluded. Ordering follows
+ * the first visible appearance of a purchase in the input.
+ */
+export function groupTransactionsIntoPurchases(
+	transactions: Transaction[]
+): TransactionPurchase[] {
+	const purchases: TransactionPurchase[] = [];
+	const purchaseIndexByParent = new Map<number, number>();
+
+	for (let inputIndex = 0; inputIndex < transactions.length; inputIndex++) {
+		const transaction = transactions[inputIndex];
+		if (transaction.isDeleted || transaction.isSplitParent) continue;
+
+		const parentId = transaction.parentTransactionId;
+		let purchaseIndex: number | undefined;
+		if (parentId != null) {
+			purchaseIndex = purchaseIndexByParent.get(parentId);
+		}
+
+		if (purchaseIndex === undefined) {
+			purchaseIndex = purchases.length;
+			if (parentId != null) purchaseIndexByParent.set(parentId, purchaseIndex);
+			purchases.push({
+				key: parentId != null
+					? `parent:${parentId}`
+					: `transaction:${transaction.id ?? inputIndex}`,
+				parentTransactionId: parentId,
+				sourceTransactions: [],
+				allocations: [],
+				merchant: transaction.merchant,
+				date: new Date(transaction.date),
+				totalAmount: 0,
+				userAmount: 0,
+				partnerAmount: 0,
+				dominantCategoryId: transaction.categoryId,
+				isSplit: parentId != null,
+				isShared: transaction.isShared
+			});
+		}
+
+		const purchase = purchases[purchaseIndex];
+		purchase.sourceTransactions.push(transaction);
+		purchase.allocations.push({
+			categoryId: transaction.categoryId,
+			amount: roundCurrency(transaction.amount)
+		});
+	}
+
+	for (const purchase of purchases) {
+		purchase.totalAmount = sumCurrency(purchase.sourceTransactions.map((t) => t.amount));
+		purchase.userAmount = sumCurrency(purchase.sourceTransactions.map(getUserAmount));
+		purchase.partnerAmount = sumCurrency(
+			purchase.sourceTransactions.map((t) => t.partnerShare)
+		);
+		purchase.dominantCategoryId = purchase.allocations.reduce(
+			(dominant, allocation) => allocation.amount > dominant.amount ? allocation : dominant,
+			purchase.allocations[0]
+		).categoryId;
+		purchase.isShared = purchase.sourceTransactions.every((t) => t.isShared);
+	}
+
+	return purchases;
+}
+
+/**
+ * Scale a category allocation template to a new total using integer cents.
+ * Any rounding remainder is assigned to the largest original allocation.
+ */
+export function scalePurchaseAllocations(
+	allocations: PurchaseAllocation[],
+	newTotal: number
+): PurchaseAllocation[] {
+	if (allocations.length === 0) return [];
+
+	const targetCents = Math.round(newTotal * 100);
+	const originalCents = allocations.map((allocation) => Math.round(allocation.amount * 100));
+	const originalTotalCents = originalCents.reduce((sum, cents) => sum + cents, 0);
+	const largestIndex = originalCents.reduce(
+		(maxIndex, cents, index) => cents > originalCents[maxIndex] ? index : maxIndex,
+		0
+	);
+
+	if (originalTotalCents === 0) {
+		return allocations.map((allocation, index) => ({
+			...allocation,
+			amount: index === largestIndex ? targetCents / 100 : 0
+		}));
+	}
+
+	const scaledCents = originalCents.map((cents) =>
+		Math.round((cents * targetCents) / originalTotalCents)
+	);
+	const remainder = targetCents - scaledCents.reduce((sum, cents) => sum + cents, 0);
+	scaledCents[largestIndex] += remainder;
+
+	return allocations.map((allocation, index) => ({
+		...allocation,
+		amount: scaledCents[index] / 100
+	}));
+}
 
 /**
  * Represents a group of transactions for a single date

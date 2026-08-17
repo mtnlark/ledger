@@ -6,6 +6,7 @@
  */
 
 import type { Transaction } from '$lib/db';
+import { groupTransactionsIntoPurchases } from '$lib/utils/transaction-grouping';
 import type { TopMerchantResult } from '../types';
 
 /**
@@ -21,14 +22,8 @@ export function countMerchantVisits(
 	normalizeKey: (merchant: string) => string = (m) => m
 ): Map<string, number> {
 	const freq = new Map<string, number>();
-	const seenParents = new Set<number>();
-
-	for (const t of transactions) {
-		if (t.parentTransactionId) {
-			if (seenParents.has(t.parentTransactionId)) continue;
-			seenParents.add(t.parentTransactionId);
-		}
-		const key = normalizeKey(t.merchant);
+	for (const purchase of groupTransactionsIntoPurchases(transactions)) {
+		const key = normalizeKey(purchase.merchant);
 		freq.set(key, (freq.get(key) || 0) + 1);
 	}
 	return freq;

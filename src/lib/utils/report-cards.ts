@@ -3,6 +3,7 @@ import { getUserAmount } from '$lib/utils/currency';
 import { getMonthKey } from '$lib/db';
 import { roundCurrency } from './currency';
 import { matchesTag } from './tags';
+import { groupTransactionsIntoPurchases } from './transaction-grouping';
 
 export interface MonthlySpend {
 	month: string; // "YYYY-MM"
@@ -69,6 +70,7 @@ function buildReport(
 } | null {
 	const live = matches.filter((t) => !t.isDeleted && !t.isSplitParent);
 	if (live.length === 0) return null;
+	const purchases = groupTransactionsIntoPurchases(live);
 
 	let total = 0;
 	let firstDate = new Date(live[0].date);
@@ -76,9 +78,7 @@ function buildReport(
 	const monthKeys = trailingMonthKeys(12, today);
 	const monthTotals = new Map<string, number>(monthKeys.map((k) => [k, 0]));
 	const byCategory = new Map<number, number>();
-	// A split's children share one parent — count the group as a single visit
-	const seenParents = new Set<number>();
-	let visits = 0;
+	const visits = purchases.length;
 
 	for (const t of live) {
 		const share = userShare(t);
@@ -92,15 +92,6 @@ function buildReport(
 		if (monthTotals.has(key)) monthTotals.set(key, monthTotals.get(key)! + share);
 
 		byCategory.set(t.categoryId, (byCategory.get(t.categoryId) || 0) + share);
-
-		if (t.parentTransactionId != null) {
-			if (!seenParents.has(t.parentTransactionId)) {
-				seenParents.add(t.parentTransactionId);
-				visits++;
-			}
-		} else {
-			visits++;
-		}
 	}
 
 	const topCategories: CategorySpend[] = [...byCategory.entries()]

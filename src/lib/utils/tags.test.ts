@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { extractTags, removeTags, matchesTag, calculateTagTotal, replaceTag, stripTag } from './tags.js';
+import { extractTags, removeTags, matchesTag, calculateTagTotal, countPurchasesWithTag, replaceTag, stripTag } from './tags.js';
 import type { Transaction } from '$lib/db/constants.js';
 
 describe('extractTags', () => {
@@ -252,6 +252,31 @@ describe('calculateTagTotal', () => {
   it('is case insensitive', () => {
     const txs = [createTx(50, '#Italy dinner')];
     expect(calculateTagTotal(txs, 'italy')).toBe(50);
+  });
+});
+
+describe('countPurchasesWithTag', () => {
+  it('counts a tag once when it appears on multiple allocations of a split', () => {
+    const base = {
+      date: new Date(),
+      merchant: 'Target',
+      isShared: false,
+      splitType: 'percentage' as const,
+      splitValue: 50,
+      partnerShare: 0,
+      isSettled: false,
+      isEssential: false,
+      isSubscription: false,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+    const transactions: Transaction[] = [
+      { ...base, id: 1, amount: 60, categoryId: 1, notes: '#trip', parentTransactionId: 100 },
+      { ...base, id: 2, amount: 40, categoryId: 2, notes: '#trip', parentTransactionId: 100 },
+      { ...base, id: 3, amount: 20, categoryId: 1, notes: '#trip' }
+    ];
+
+    expect(countPurchasesWithTag(transactions, 'trip')).toBe(2);
   });
 });
 

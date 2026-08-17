@@ -8,8 +8,13 @@ import {
 	computeWeightedStdDev,
 	mode
 } from '$lib/insights/calculations/stats';
-import { roundCurrency, roundCoefficient, getUserAmount } from '$lib/utils/currency';
+import { roundCurrency, roundCoefficient } from '$lib/utils/currency';
 import { getCachedRecurring, setCachedRecurring } from './recurringCache';
+import {
+	groupTransactionsIntoPurchases,
+	type PurchaseAllocation,
+	type TransactionPurchase
+} from '$lib/utils/transaction-grouping';
 
 // Re-export cache functions for backward compatibility
 export { invalidateRecurringCache, getRecurringCacheVersion } from './recurringCache';
@@ -30,6 +35,8 @@ export interface DetectedRecurring {
 	variance: number;
 	/** Whether this recurring expense is typically shared */
 	isShared: boolean;
+	/** Category allocation pattern from the most recent split occurrence. */
+	allocationTemplate?: PurchaseAllocation[];
 }
 
 /**
@@ -103,11 +110,11 @@ interface PatternResult {
  * Check if transactions follow a recurring pattern (monthly, semi-annual, or annual)
  * Returns the frequency and day of month if pattern detected, null otherwise
  */
-function detectRecurringPattern(transactions: Transaction[]): PatternResult | null {
-	if (transactions.length < 2) return null;
+function detectRecurringPattern(purchases: TransactionPurchase[]): PatternResult | null {
+	if (purchases.length < 2) return null;
 
 	// Sort by date
-	const sorted = [...transactions].sort(
+	const sorted = [...purchases].sort(
 		(a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
 	);
 
@@ -170,46 +177,46 @@ export async function detectRecurringExpenses(providedTransactions?: Transaction
 	}
 
 	// Filter out split parent and soft-deleted transactions
-	const activeTransactions = allTransactions.filter((tx) => !tx.isSplitParent && !tx.isDeleted);
+	const purchases = groupTransactionsIntoPurchases(allTransactions);
 
 	// Get dismissed merchants to filter out
 	const dismissedMerchants = await getDismissedRecurring();
 
 	// Group transactions by normalized merchant name
 	// Exclude transactions already tagged as subscriptions (they're shown in subscriptions section)
-	const merchantGroups = new Map<string, Transaction[]>();
-	for (const tx of activeTransactions) {
+	const merchantGroups = new Map<string, TransactionPurchase[]>();
+	for (const purchase of purchases) {
 		// Skip transactions already tagged as subscriptions
-		if (tx.isSubscription) continue;
+		if (purchase.sourceTransactions.some((transaction) => transaction.isSubscription)) continue;
 
-		const key = normalizeMerchant(tx.merchant);
+		const key = normalizeMerchant(purchase.merchant);
 		// Skip dismissed merchants
 		if (dismissedMerchants.includes(key)) continue;
 		const existing = merchantGroups.get(key) || [];
-		merchantGroups.set(key, [...existing, tx]);
+		merchantGroups.set(key, [...existing, purchase]);
 	}
 
 	const detected: DetectedRecurring[] = [];
 
-	for (const [, transactions] of merchantGroups) {
+	for (const [, merchantPurchases] of merchantGroups) {
 		// Need at least 2 occurrences to detect a pattern
-		if (transactions.length < 2) continue;
+		if (merchantPurchases.length < 2) continue;
 
 		// Check for recurring pattern (monthly, semi-annual, or annual)
-		const pattern = detectRecurringPattern(transactions);
+		const pattern = detectRecurringPattern(merchantPurchases);
 		if (pattern === null) continue;
 
 		// Sort transactions chronologically (oldest first) for weighted variance
-		const sortedTransactions = [...transactions].sort(
+		const sortedPurchases = [...merchantPurchases].sort(
 			(a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
 		);
 
 		// Calculate weighted variance (recent transactions have more influence)
-		const amounts = sortedTransactions.map((t) => t.amount);
+		const amounts = sortedPurchases.map((purchase) => purchase.totalAmount);
 		const variance = calculateVariance(amounts, true, 0.85);
 
 		// Get adaptive thresholds based on occurrence count
-		const { maxVariance, fixedThreshold } = getAdaptiveVarianceThresholds(transactions.length);
+		const { maxVariance, fixedThreshold } = getAdaptiveVarianceThresholds(merchantPurchases.length);
 
 		// Skip if variance is too high to be considered recurring
 		if (variance >= maxVariance) continue;
@@ -221,30 +228,30 @@ export async function detectRecurringExpenses(providedTransactions?: Transaction
 		const avgAmount = average(amounts);
 
 		// Calculate user's portion (after split if shared)
-		const userAmounts = transactions.map((t) =>
-			getUserAmount(t)
-		);
+		const userAmounts = merchantPurchases.map((purchase) => purchase.userAmount);
 		const avgUserAmount = average(userAmounts);
 
 		// Determine if this is typically shared (majority of transactions are shared)
-		const sharedCount = transactions.filter((t) => t.isShared).length;
-		const isShared = sharedCount > transactions.length / 2;
+		const sharedCount = merchantPurchases.filter((purchase) => purchase.isShared).length;
+		const isShared = sharedCount > merchantPurchases.length / 2;
 
 		// Find most common category
-		const categoryIds = transactions.map((t) => t.categoryId);
+		const categoryIds = merchantPurchases.map((purchase) => purchase.dominantCategoryId);
 		const categoryId = mode(categoryIds);
+		const mostRecentSplit = [...sortedPurchases].reverse().find((purchase) => purchase.isSplit);
 
 		detected.push({
-			merchant: transactions[0].merchant, // Use original casing from first transaction
+			merchant: merchantPurchases[0].merchant, // Use original casing from first transaction
 			categoryId,
 			averageAmount: roundCurrency(avgAmount),
 			averageUserAmount: roundCurrency(avgUserAmount),
 			frequency: pattern.frequency,
 			dayOfMonth: pattern.dayOfMonth,
-			occurrenceCount: transactions.length,
+			occurrenceCount: merchantPurchases.length,
 			amountType,
 			variance: roundCoefficient(variance),
-			isShared
+			isShared,
+			allocationTemplate: mostRecentSplit?.allocations.map((allocation) => ({ ...allocation }))
 		});
 	}
 
@@ -255,4 +262,3 @@ export async function detectRecurringExpenses(providedTransactions?: Transaction
 	setCachedRecurring(detected);
 	return detected;
 }
-

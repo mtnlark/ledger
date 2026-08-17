@@ -4,6 +4,8 @@ import {
 	sortTransactionsByDate,
 	groupTransactionsByDate,
 	formatDateGroupLabel,
+	groupTransactionsIntoPurchases,
+	scalePurchaseAllocations,
 	buildListRows,
 	groupRowsByDate,
 	type SplitGroupRow
@@ -31,6 +33,87 @@ function createMockTransaction(overrides: Partial<Transaction> = {}): Transactio
 }
 
 describe('transaction-grouping', () => {
+	describe('groupTransactionsIntoPurchases', () => {
+		it('reconstructs split purchases while preserving first appearance order', () => {
+			const transactions = [
+				createMockTransaction({ id: 1, merchant: 'First', amount: 5 }),
+				createMockTransaction({ id: 10, parentTransactionId: 50, merchant: 'Split', amount: 30, categoryId: 1 }),
+				createMockTransaction({ id: 2, merchant: 'Middle', amount: 8 }),
+				createMockTransaction({ id: 11, parentTransactionId: 50, merchant: 'Split', amount: 70, categoryId: 2 })
+			];
+
+			const purchases = groupTransactionsIntoPurchases(transactions);
+
+			expect(purchases.map((purchase) => purchase.merchant)).toEqual(['First', 'Split', 'Middle']);
+			expect(purchases[1]).toMatchObject({
+				parentTransactionId: 50,
+				totalAmount: 100,
+				dominantCategoryId: 2,
+				isSplit: true
+			});
+			expect(purchases[1].sourceTransactions.map((transaction) => transaction.id)).toEqual([10, 11]);
+			expect(purchases[1].allocations).toEqual([
+				{ categoryId: 1, amount: 30 },
+				{ categoryId: 2, amount: 70 }
+			]);
+		});
+
+		it('combines user and partner shares and filters deleted and hidden parent rows', () => {
+			const purchases = groupTransactionsIntoPurchases([
+				createMockTransaction({ id: 50, amount: 100, isSplitParent: true }),
+				createMockTransaction({ id: 10, parentTransactionId: 50, amount: 40, isShared: true, partnerShare: 10 }),
+				createMockTransaction({ id: 11, parentTransactionId: 50, amount: 60, isShared: true, partnerShare: 20 }),
+				createMockTransaction({ id: 99, amount: 500, isDeleted: true })
+			]);
+
+			expect(purchases).toHaveLength(1);
+			expect(purchases[0]).toMatchObject({
+				totalAmount: 100,
+				userAmount: 70,
+				partnerAmount: 30,
+				isShared: true
+			});
+		});
+
+		it('keeps standalone and separate parent groups as distinct purchases', () => {
+			const purchases = groupTransactionsIntoPurchases([
+				createMockTransaction({ id: 1, amount: 10 }),
+				createMockTransaction({ id: 2, amount: 10 }),
+				createMockTransaction({ id: 3, parentTransactionId: 100, amount: 10 }),
+				createMockTransaction({ id: 4, parentTransactionId: 200, amount: 10 })
+			]);
+
+			expect(purchases).toHaveLength(4);
+		});
+	});
+
+	describe('scalePurchaseAllocations', () => {
+		it('scales proportionally and reconciles cents on the largest allocation', () => {
+			expect(scalePurchaseAllocations([
+				{ categoryId: 1, amount: 60 },
+				{ categoryId: 2, amount: 40 }
+			], 99.99)).toEqual([
+				{ categoryId: 1, amount: 59.99 },
+				{ categoryId: 2, amount: 40 }
+			]);
+		});
+
+		it('preserves the exact edited total for three-way allocations', () => {
+			const scaled = scalePurchaseAllocations([
+				{ categoryId: 1, amount: 1 },
+				{ categoryId: 2, amount: 1 },
+				{ categoryId: 3, amount: 1 }
+			], 10);
+
+			expect(scaled.reduce((sum, allocation) => sum + allocation.amount, 0)).toBe(10);
+			expect(scaled).toEqual([
+				{ categoryId: 1, amount: 3.34 },
+				{ categoryId: 2, amount: 3.33 },
+				{ categoryId: 3, amount: 3.33 }
+			]);
+		});
+	});
+
 	describe('sortTransactionsByDate', () => {
 		it('sorts transactions by date descending (newest first)', () => {
 			const transactions = [

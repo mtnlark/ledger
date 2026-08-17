@@ -4,6 +4,7 @@
 	import { roundCurrency, getUserAmount } from '$lib/utils/currency';
 	import { extractTags } from '$lib/utils/tags';
 	import InsightGroup from './InsightGroup.svelte';
+	import { groupTransactionsIntoPurchases } from '$lib/utils/transaction-grouping';
 
 	interface Props {
 		transactions: Transaction[];
@@ -22,16 +23,19 @@
 			(t) => new Date(t.date).getFullYear() === year
 		);
 
-		for (const t of yearTransactions) {
-			const tags = extractTags(t.notes);
-			if (tags.length === 0) continue;
-			const userAmount = getUserAmount(t);
-
-			for (const tag of tags) {
-				const existing = tagTotals.get(tag) || { total: 0, count: 0 };
-				existing.total += userAmount;
-				existing.count += 1;
-				tagTotals.set(tag, existing);
+		for (const purchase of groupTransactionsIntoPurchases(yearTransactions)) {
+			const tagsInPurchase = new Set<string>();
+			for (const transaction of purchase.sourceTransactions) {
+				const userAmount = getUserAmount(transaction);
+				for (const tag of extractTags(transaction.notes)) {
+					const existing = tagTotals.get(tag) || { total: 0, count: 0 };
+					existing.total += userAmount;
+					tagTotals.set(tag, existing);
+					tagsInPurchase.add(tag);
+				}
+			}
+			for (const tag of tagsInPurchase) {
+				tagTotals.get(tag)!.count += 1;
 			}
 		}
 

@@ -11,6 +11,7 @@
 	import { getBudgetStatus } from '$lib/utils/budget-status';
 	import { sumCurrency, roundCurrency } from '$lib/utils/currency';
 	import { getUserAmount } from '$lib/insights/calculations/spending';
+	import { groupTransactionsIntoPurchases } from '$lib/utils/transaction-grouping';
 
 	interface Props {
 		currentMonthTransactions: Transaction[];
@@ -232,6 +233,7 @@
 
 	// Compute total spent for the month
 	let totalSpent = $derived(engine.getTotalSpent(currentMonthTransactions, selectedMonth));
+	let transactionCount = $derived(groupTransactionsIntoPurchases(currentMonthTransactions).length);
 
 	// Get goals completed this month
 	let goalsCompletedThisMonth = $derived.by(() => {
@@ -347,7 +349,7 @@
 			icon: BarChart3,
 			iconColor: 'text-charcoal-muted',
 			headline: `${formatCurrency(totalSpent)} spent`,
-			subtext: `${currentMonthTransactions.length} transaction${currentMonthTransactions.length !== 1 ? 's' : ''}`
+			subtext: `${transactionCount} transaction${transactionCount !== 1 ? 's' : ''}`
 		};
 	});
 

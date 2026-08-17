@@ -1,6 +1,7 @@
 import type { Transaction } from '$lib/db/constants.js';
 import { getUserAmount } from '$lib/utils/currency';
 import { sumCurrency } from '$lib/utils/currency.js';
+import { groupTransactionsIntoPurchases } from '$lib/utils/transaction-grouping';
 
 /**
  * Regex pattern for matching hashtags in text.
@@ -70,6 +71,13 @@ export function calculateTagTotal(transactions: Transaction[], tag: string): num
     .filter(tx => extractTags(tx.notes).includes(normalizedTag))
     .map(tx => getUserAmount(tx));
   return sumCurrency(amounts);
+}
+
+/** Count complete purchases carrying a tag on one or more category allocations. */
+export function countPurchasesWithTag(transactions: Transaction[], tag: string): number {
+  return groupTransactionsIntoPurchases(
+    transactions.filter((transaction) => matchesTag(transaction, tag))
+  ).length;
 }
 
 /**

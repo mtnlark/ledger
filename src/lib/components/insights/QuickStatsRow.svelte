@@ -5,6 +5,7 @@
 	import { sumCurrency, calculatePercent, roundCurrency, getUserAmount } from '$lib/utils/currency';
 	import { formatCurrencyWhole } from '$lib/utils/format-helpers';
 	import { getBudgetStatus } from '$lib/utils/budget-status';
+	import { groupTransactionsIntoPurchases } from '$lib/utils/transaction-grouping';
 
 	interface Props {
 		transactions: Transaction[];
@@ -17,6 +18,7 @@
 	let { transactions, selectedMonth, categoryBudgets, budget, contributions }: Props = $props();
 
 	let isCurrentMonth = $derived(selectedMonth === getMonthKey(new Date()));
+	let transactionCount = $derived(groupTransactionsIntoPurchases(transactions).length);
 
 	// Total Spent (user's portion)
 	let totalSpent = $derived(
@@ -81,7 +83,7 @@
 	<div class="bg-surface rounded-xl p-4 text-center shadow-sm shadow-[var(--color-shadow)]">
 		<p class="font-mono text-xl font-medium text-charcoal">{formatCurrencyWhole(totalSpent)}</p>
 		<p class="text-xs text-charcoal-muted mt-1">
-			{transactions.length} transaction{transactions.length !== 1 ? 's' : ''}
+			{transactionCount} transaction{transactionCount !== 1 ? 's' : ''}
 		</p>
 	</div>
 

@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { db, initializeDatabase } from '$lib/db';
-import { addTransaction } from './transactions';
+import { addTransaction, splitTransaction } from './transactions';
 import { detectRecurringExpenses } from './recurring';
 
 describe('Recurring Expense Detection', () => {
@@ -71,6 +71,41 @@ describe('Recurring Expense Detection', () => {
 			expect(recurring[0].averageAmount).toBe(15.99);
 			expect(recurring[0].dayOfMonth).toBe(15);
 			expect(recurring[0].occurrenceCount).toBe(2);
+		});
+
+		it('treats two monthly split purchases as two full-price occurrences', async () => {
+			for (const date of [new Date(2025, 0, 15), new Date(2025, 1, 15)]) {
+				const parentId = await addTransaction({
+					date,
+					merchant: 'Gym and Spa',
+					amount: 100,
+					categoryId: 1,
+					isShared: false,
+					isSettled: false,
+					splitType: 'percentage',
+					splitValue: 0.5,
+					isEssential: false,
+					isSubscription: false
+				});
+				await splitTransaction(parentId, [
+					{ categoryId: 1, amount: 70 },
+					{ categoryId: 2, amount: 30 }
+				]);
+			}
+
+			const recurring = await detectRecurringExpenses();
+
+			expect(recurring).toHaveLength(1);
+			expect(recurring[0]).toMatchObject({
+				merchant: 'Gym and Spa',
+				averageAmount: 100,
+				occurrenceCount: 2,
+				categoryId: 1,
+				allocationTemplate: [
+					{ categoryId: 1, amount: 70 },
+					{ categoryId: 2, amount: 30 }
+				]
+			});
 		});
 
 		it('detects monthly recurring with 3+ transactions', async () => {
