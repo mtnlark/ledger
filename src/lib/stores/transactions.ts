@@ -132,7 +132,7 @@ async function bulkModifyTransactions(
 	}
 
 	invalidateTransactionCaches();
-	await persistData();
+	await persistData('transactions');
 }
 
 // Write per-transaction notes changes (computed once by the caller) to the DB
@@ -157,7 +157,7 @@ async function applyNotesUpdates(changes: { id: number; notes: string | undefine
 	}
 
 	invalidateTransactionCaches();
-	await persistData();
+	await persistData('transactions');
 }
 
 // Filters out split parent transactions and soft-deleted transactions
@@ -218,7 +218,7 @@ export async function addTransaction(
 	}
 
 	invalidateTransactionCaches();
-	await persistData();
+	await persistData('transactions');
 	return id;
 }
 
@@ -274,7 +274,7 @@ export async function updateTransaction(
 	}
 
 	invalidateTransactionCaches();
-	await persistData();
+	await persistData('transactions');
 }
 
 export async function deleteTransaction(id: number): Promise<void> {
@@ -290,7 +290,7 @@ export async function deleteTransaction(id: number): Promise<void> {
 	}
 
 	invalidateTransactionCaches();
-	await persistData();
+	await persistData('transactions');
 }
 
 export async function bulkDeleteTransactions(ids: number[]): Promise<void> {
@@ -305,7 +305,7 @@ export async function bulkDeleteTransactions(ids: number[]): Promise<void> {
 	}
 
 	invalidateTransactionCaches();
-	await persistData();
+	await persistData('transactions');
 }
 
 // Soft delete a transaction (marks as deleted but keeps in DB for undo)
@@ -330,7 +330,7 @@ export async function softDeleteTransaction(id: number): Promise<Transaction | n
 	}
 
 	invalidateTransactionCaches();
-	await persistData();
+	await persistData('transactions');
 	return transaction;
 }
 
@@ -384,7 +384,7 @@ export async function purgeDeletedTransactions(): Promise<number> {
 	}
 
 	invalidateTransactionCaches();
-	await persistData();
+	await persistData('transactions');
 	return deleted.length;
 }
 
@@ -456,7 +456,7 @@ export async function addSplitTransaction(
 	}
 
 	invalidateTransactionCaches();
-	await persistData();
+	await persistData('transactions');
 	return children.map((child) => child.id);
 }
 
@@ -513,7 +513,7 @@ export async function splitTransaction(
 	}
 
 	invalidateTransactionCaches();
-	await persistData();
+	await persistData('transactions');
 	return childIds;
 }
 
@@ -647,7 +647,7 @@ export async function updateSplitGroup(
 	}
 
 	invalidateTransactionCaches();
-	await persistData();
+	await persistData('transactions');
 	return childIds;
 }
 

@@ -187,5 +187,57 @@ describe('tauri-adapter', () => {
 			const data = JSON.parse(files.get(DATA_PATH)!) as StoredData;
 			expect(data.checksum).toBeDefined();
 		});
+
+		it('reads only changed tables after the initial snapshot', async () => {
+			await initializeTauriStorage();
+			await db.transactions.add({
+				date: new Date(2026, 0, 15),
+				merchant: 'Scoped Save',
+				amount: 25,
+				categoryId: 1,
+				isShared: false,
+				splitType: 'percentage',
+				splitValue: 0.5,
+				partnerShare: 0,
+				isSettled: false,
+				isEssential: false,
+				isSubscription: false,
+				createdAt: new Date(),
+				updatedAt: new Date()
+			});
+
+			const transactionRead = vi.spyOn(db.transactions, 'toArray');
+			const categoryRead = vi.spyOn(db.categories, 'toArray');
+			try {
+				await saveToFile('transactions');
+				expect(transactionRead).toHaveBeenCalledOnce();
+				expect(categoryRead).not.toHaveBeenCalled();
+			} finally {
+				transactionRead.mockRestore();
+				categoryRead.mockRestore();
+			}
+
+			const content = files.get(DATA_PATH)!;
+			const data = JSON.parse(content) as StoredData;
+			expect(data.transactions[0].merchant).toBe('Scoped Save');
+			expect(content).not.toContain('\n');
+			expect((await initializeTauriStorage()).status).toBe('loaded');
+		});
+
+		it('merges changed-table scopes from coalesced saves', async () => {
+			await initializeTauriStorage();
+			await db.settings.update(1, { partnerName: 'Sam' });
+			await db.categories.update(1, { name: 'Updated Category' });
+
+			const writeSpy = vi.mocked(mockedFs.writeTextFile);
+			writeSpy.mockClear();
+			await Promise.all([saveToFile('settings'), saveToFile('categories')]);
+
+			const tmpWrites = writeSpy.mock.calls.filter(([path]) => String(path).endsWith('.tmp'));
+			expect(tmpWrites).toHaveLength(1);
+			const data = JSON.parse(files.get(DATA_PATH)!) as StoredData;
+			expect(data.settings.partnerName).toBe('Sam');
+			expect(data.categories[0].name).toBe('Updated Category');
+		});
 	});
 });

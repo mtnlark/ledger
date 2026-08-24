@@ -14,7 +14,7 @@ export default defineConfig({
 					if (id.includes('node_modules/chart.js') || id.includes('node_modules/chartjs-')) {
 						return 'chart';
 					}
-					if (id.includes('node_modules/exceljs')) {
+					if (id.includes('node_modules/read-excel-file')) {
 						return 'excel';
 					}
 					if (id.includes('node_modules/dexie')) {

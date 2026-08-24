@@ -27,7 +27,7 @@ export async function addContribution(
 		await updateAccountBalance(contribution.accountId, contribution.amount);
 	}
 
-	await persistData();
+	await persistData(['savingsAccounts', 'savingsContributions']);
 	return id;
 }
 
@@ -105,7 +105,7 @@ export async function updateContribution(
 		...updates,
 		updatedAt: new Date()
 	});
-	await persistData();
+	await persistData(['savingsAccounts', 'savingsContributions']);
 }
 
 export async function deleteContribution(id: number): Promise<void> {
@@ -119,7 +119,7 @@ export async function deleteContribution(id: number): Promise<void> {
 	}
 
 	await db.savingsContributions.delete(id);
-	await persistData();
+	await persistData(['savingsAccounts', 'savingsContributions']);
 }
 
 // ============================================================================

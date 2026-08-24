@@ -71,7 +71,7 @@ export async function cancelSubscription(merchant: string, amount?: number): Pro
 		// Remove from confirmed active if it was there
 		confirmedActiveSubscriptions: confirmedActive.filter((m) => m !== normalized)
 	});
-	await persistData();
+	await persistData('settings');
 }
 
 /**
@@ -90,7 +90,7 @@ export async function reactivateSubscription(merchant: string, amount?: number):
 			(c) => !cancelledRecordMatches(c, normalized, amount)
 		)
 	});
-	await persistData();
+	await persistData('settings');
 }
 
 /**
@@ -118,7 +118,7 @@ export async function confirmSubscriptionActive(merchant: string): Promise<void>
 
 	if (Object.keys(updates).length > 0) {
 		await db.settings.update(1, updates);
-		await persistData();
+		await persistData('settings');
 	}
 }
 

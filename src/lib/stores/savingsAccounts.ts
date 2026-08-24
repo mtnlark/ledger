@@ -29,7 +29,7 @@ export async function addSavingsAccount(
 	};
 
 	const id = (await db.savingsAccounts.add(newAccount)) as number;
-	await persistData();
+	await persistData('savingsAccounts');
 	return id;
 }
 
@@ -44,12 +44,12 @@ export async function updateSavingsAccount(
 		...updates,
 		updatedAt: new Date()
 	});
-	await persistData();
+	await persistData('savingsAccounts');
 }
 
 export async function deleteSavingsAccount(id: number): Promise<void> {
 	await db.savingsAccounts.delete(id);
-	await persistData();
+	await persistData('savingsAccounts');
 }
 
 export async function moveSavingsAccountUp(id: number): Promise<void> {
@@ -67,7 +67,7 @@ export async function moveSavingsAccountUp(id: number): Promise<void> {
 		await db.savingsAccounts.update(current.id!, { sortOrder: above.sortOrder });
 		await db.savingsAccounts.update(above.id!, { sortOrder: current.sortOrder });
 	});
-	await persistData();
+	await persistData('savingsAccounts');
 }
 
 export async function moveSavingsAccountDown(id: number): Promise<void> {
@@ -85,7 +85,7 @@ export async function moveSavingsAccountDown(id: number): Promise<void> {
 		await db.savingsAccounts.update(current.id!, { sortOrder: below.sortOrder });
 		await db.savingsAccounts.update(below.id!, { sortOrder: current.sortOrder });
 	});
-	await persistData();
+	await persistData('savingsAccounts');
 }
 
 export async function reorderSavingsAccounts(orderedIds: number[]): Promise<void> {
@@ -94,7 +94,7 @@ export async function reorderSavingsAccounts(orderedIds: number[]): Promise<void
 			await db.savingsAccounts.update(orderedIds[i], { sortOrder: i + 1 });
 		}
 	});
-	await persistData();
+	await persistData('savingsAccounts');
 }
 
 // Internal helper: Update account balance by a delta amount
@@ -142,5 +142,5 @@ export async function completeGoal(accountId: number): Promise<void> {
 		updatedAt: new Date()
 	});
 
-	await persistData();
+	await persistData('savingsAccounts');
 }

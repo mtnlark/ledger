@@ -135,7 +135,7 @@ export async function fixTransactionDates(): Promise<{
 	}
 
 	if (fixed > 0) {
-		await persistData();
+		await persistData('transactions');
 	}
 
 	return { fixed, checked: transactions.length, details };
@@ -220,7 +220,7 @@ export async function repairCategoryIds(): Promise<{
 
 	// Persist changes to file storage (Tauri only)
 	if (fixed > 0) {
-		await persistData();
+		await persistData('transactions');
 	}
 
 	return { checked: transactions.length, fixed, details };

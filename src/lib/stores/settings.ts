@@ -24,12 +24,12 @@ export async function getSettings(): Promise<Settings> {
 
 export async function updateSettings(updates: Partial<Omit<Settings, 'id'>>): Promise<void> {
 	await db.settings.update(1, updates);
-	await persistData();
+	await persistData('settings');
 }
 
 export async function updatePartnerName(name: string): Promise<void> {
 	await db.settings.update(1, { partnerName: name });
-	await persistData();
+	await persistData('settings');
 }
 
 export async function updateDefaultSplit(
@@ -37,7 +37,7 @@ export async function updateDefaultSplit(
 	splitValue: number
 ): Promise<void> {
 	await db.settings.update(1, { defaultSplitType: splitType, defaultSplitValue: splitValue });
-	await persistData();
+	await persistData('settings');
 }
 
 export async function updateTheme(theme: 'light' | 'dark' | 'system'): Promise<void> {
@@ -46,7 +46,7 @@ export async function updateTheme(theme: 'light' | 'dark' | 'system'): Promise<v
 	if (typeof localStorage !== 'undefined') {
 		localStorage.setItem('ledger-theme', theme);
 	}
-	await persistData();
+	await persistData('settings');
 }
 
 export async function dismissRecurring(merchant: string): Promise<void> {
@@ -56,7 +56,7 @@ export async function dismissRecurring(merchant: string): Promise<void> {
 	if (!dismissed.includes(normalized)) {
 		await db.settings.update(1, { dismissedRecurring: [...dismissed, normalized] });
 		invalidateRecurringCache();
-		await persistData();
+		await persistData('settings');
 	}
 }
 
@@ -68,7 +68,7 @@ export async function restoreRecurring(merchant: string): Promise<void> {
 		dismissedRecurring: dismissed.filter((m) => m !== normalized)
 	});
 	invalidateRecurringCache();
-	await persistData();
+	await persistData('settings');
 }
 
 export async function getDismissedRecurring(): Promise<string[]> {
@@ -87,7 +87,7 @@ export async function setFixedRecurringAmount(merchant: string, amount: number):
 		fixedRecurringAmounts: [...filtered, { merchant: normalized, amount }]
 	});
 	invalidateRecurringCache();
-	await persistData();
+	await persistData('settings');
 }
 
 export async function removeFixedRecurringAmount(merchant: string): Promise<void> {
@@ -99,20 +99,20 @@ export async function removeFixedRecurringAmount(merchant: string): Promise<void
 		fixedRecurringAmounts: existing.filter((f) => f.merchant !== normalized)
 	});
 	invalidateRecurringCache();
-	await persistData();
+	await persistData('settings');
 }
 
 export async function updateNotifications(enabled: boolean): Promise<void> {
 	await db.settings.update(1, { notificationsEnabled: enabled });
-	await persistData();
+	await persistData('settings');
 }
 
 export async function updateICloudBackup(enabled: boolean): Promise<void> {
 	await db.settings.update(1, { iCloudBackupEnabled: enabled });
-	await persistData();
+	await persistData('settings');
 }
 
 export async function dismissRecurringSuggestionsForMonth(month: string): Promise<void> {
 	await db.settings.update(1, { lastAutoSuggestedMonth: month });
-	await persistData();
+	await persistData('settings');
 }

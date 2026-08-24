@@ -8,7 +8,7 @@
 
 import { db, DEFAULT_CATEGORIES, DEFAULT_SETTINGS, type Category } from '$lib/db';
 import { parseStoredDate } from '$lib/utils/date-helpers';
-import type { StoredData } from './types';
+import type { PersistedTableName, StoredData } from './types';
 
 /** Every table that participates in StoredData persistence. */
 const PERSISTED_TABLES = [
@@ -62,6 +62,52 @@ export async function dehydrateAll(): Promise<StoredData> {
 		linkedAccounts,
 		balanceSnapshots
 	};
+}
+
+export async function dehydrateChanged(
+	previous: StoredData,
+	tableNames: Iterable<PersistedTableName>
+): Promise<StoredData> {
+	const next: StoredData = {
+		...previous,
+		exportedAt: new Date().toISOString(),
+		checksum: undefined
+	};
+
+	await Promise.all(
+		[...new Set(tableNames)].map(async (tableName) => {
+			switch (tableName) {
+				case 'transactions':
+					next.transactions = await db.transactions.toArray();
+					break;
+				case 'categories':
+					next.categories = await db.categories.toArray();
+					break;
+				case 'monthlyBudgets':
+					next.monthlyBudgets = await db.monthlyBudgets.toArray();
+					break;
+				case 'categoryBudgets':
+					next.categoryBudgets = await db.categoryBudgets.toArray();
+					break;
+				case 'settings':
+					next.settings = (await db.settings.get(1)) ?? DEFAULT_SETTINGS;
+					break;
+				case 'savingsAccounts':
+					next.savingsAccounts = await db.savingsAccounts.toArray();
+					break;
+				case 'savingsContributions':
+					next.savingsContributions = await db.savingsContributions.toArray();
+					break;
+				case 'linkedAccounts':
+					next.linkedAccounts = await db.linkedAccounts.toArray();
+					break;
+				case 'balanceSnapshots':
+					next.balanceSnapshots = await db.balanceSnapshots.toArray();
+			}
+		})
+	);
+
+	return next;
 }
 
 /**

@@ -644,6 +644,15 @@ describe('importTransactions', () => {
 	});
 
 	describe('duplicate detection', () => {
+		it('skips duplicate rows within the imported file', async () => {
+			const transaction = makeImportedTransaction();
+			const result = await importTransactions([transaction, { ...transaction }]);
+
+			expect(result.imported).toBe(1);
+			expect(result.skipped).toBe(1);
+			expect(await db.transactions.count()).toBe(1);
+		});
+
 		it('skips duplicate transactions by default (same date, merchant, amount)', async () => {
 			// Pre-populate database with an existing transaction
 			const existingDate = new Date(2026, 0, 15);

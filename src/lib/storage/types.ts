@@ -26,6 +26,17 @@ export interface StoredData {
 	balanceSnapshots?: BalanceSnapshot[];
 }
 
+export type PersistedTableName =
+	| 'transactions'
+	| 'categories'
+	| 'monthlyBudgets'
+	| 'categoryBudgets'
+	| 'settings'
+	| 'savingsAccounts'
+	| 'savingsContributions'
+	| 'linkedAccounts'
+	| 'balanceSnapshots';
+
 /**
  * Result of attempting to read and validate the data file
  */

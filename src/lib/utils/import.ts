@@ -1,5 +1,5 @@
-import { db } from '$lib/db';
-import { getAllCategories, getCategoryByName } from '$lib/stores/categories';
+import { db, type Transaction } from '$lib/db';
+import { getAllCategories } from '$lib/stores/categories';
 import { excelDateToJS, parseDateString } from '$lib/utils/date-helpers';
 import { persistData } from '$lib/storage';
 import { roundCurrency } from '$lib/utils/currency';
@@ -23,7 +23,6 @@ export interface ImportResult {
 	errors: string[];
 }
 
-/** Plain cell value after flattening ExcelJS rich values (formulas, rich text, hyperlinks). */
 export type CellValue = string | number | boolean | Date | null;
 
 /**
@@ -130,91 +129,86 @@ export async function importTransactions(
 	let imported = 0;
 	let skipped = 0;
 
-	// Get all categories for matching
 	const categories = await getAllCategories();
-
-	// Get existing transactions for duplicate detection
 	const existingTransactions = skipDuplicates ? await db.transactions.toArray() : [];
+	const categoryByName = new Map(categories.map((category) => [category.name.toLowerCase(), category]));
+	const amountsByDayAndMerchant = new Map<string, number[]>();
 
-	for (const t of transactions) {
-		try {
-			// Find matching category
-			let category = await getCategoryByName(t.category);
-			if (!category) {
-				// Use first category as fallback, or skip
-				category = categories[0];
-				if (!category) {
-					errors.push(`No category found for "${t.merchant}" - skipped`);
-					skipped++;
-					continue;
-				}
-			}
-
-			// Check for duplicates (same date, merchant, amount)
-			if (skipDuplicates) {
-				const isDuplicate = existingTransactions.some((existing) => {
-					const existingDate = new Date(existing.date);
-					return (
-						existingDate.toDateString() === t.date.toDateString() &&
-						existing.merchant === t.merchant &&
-						Math.abs(existing.amount - t.amount) < 0.01
-					);
-				});
-
-				if (isDuplicate) {
-					skipped++;
-					continue;
-				}
-			}
-
-			// Calculate split type and value from partner share
-			let splitType: 'percentage' | 'fixed' = 'fixed';
-			let splitValue = t.partnerShare;
-
-			if (t.isShared && t.partnerShare > 0 && t.amount > 0) {
-				const ratio = t.partnerShare / t.amount;
-				const roundedRatio = roundCurrency(ratio);
-				// If it's close to a round percentage, use percentage mode
-				if (Math.abs(ratio - 0.5) < 0.01) {
-					splitType = 'percentage';
-					splitValue = 0.5;
-				} else if (Math.abs(ratio - roundedRatio) < 0.01) {
-					splitType = 'percentage';
-					splitValue = roundedRatio;
-				}
-			}
-
-			const now = new Date();
-
-			await db.transactions.add({
-				date: t.date,
-				merchant: t.merchant,
-				amount: t.amount,
-				categoryId: category.id!,
-				isShared: t.isShared,
-				splitType,
-				splitValue,
-				partnerShare: t.partnerShare,
-				isSettled: t.isSettled,
-				settledDate: t.isSettled ? now : undefined,
-				isEssential: false,
-				isSubscription: false,
-				createdAt: now,
-				updatedAt: now
-			});
-
-			imported++;
-		} catch (error) {
-			errors.push(`Failed to import "${t.merchant}": ${error}`);
+	if (skipDuplicates) {
+		for (const transaction of existingTransactions) {
+			const key = duplicateGroupKey(new Date(transaction.date), transaction.merchant);
+			const amounts = amountsByDayAndMerchant.get(key);
+			if (amounts) amounts.push(transaction.amount);
+			else amountsByDayAndMerchant.set(key, [transaction.amount]);
 		}
 	}
 
-	// Persist imported data to file storage (Tauri only)
-	if (imported > 0) {
-		await persistData();
+	const now = new Date();
+	const records: Omit<Transaction, 'id'>[] = [];
 
-		// Rebuild in-memory caches with imported transactions
-		// This ensures tag index and transaction cache are up-to-date immediately
+	for (const t of transactions) {
+		const category = categoryByName.get(t.category.toLowerCase()) ?? categories[0];
+		if (!category) {
+			errors.push(`No category found for "${t.merchant}" - skipped`);
+			skipped++;
+			continue;
+		}
+
+		const duplicateKey = duplicateGroupKey(t.date, t.merchant);
+		const matchingAmounts = amountsByDayAndMerchant.get(duplicateKey);
+		if (skipDuplicates && matchingAmounts?.some((amount) => Math.abs(amount - t.amount) < 0.01)) {
+			skipped++;
+			continue;
+		}
+
+		let splitType: 'percentage' | 'fixed' = 'fixed';
+		let splitValue = t.partnerShare;
+
+		if (t.isShared && t.partnerShare > 0 && t.amount > 0) {
+			const ratio = t.partnerShare / t.amount;
+			const roundedRatio = roundCurrency(ratio);
+			if (Math.abs(ratio - 0.5) < 0.01) {
+				splitType = 'percentage';
+				splitValue = 0.5;
+			} else if (Math.abs(ratio - roundedRatio) < 0.01) {
+				splitType = 'percentage';
+				splitValue = roundedRatio;
+			}
+		}
+
+		records.push({
+			date: t.date,
+			merchant: t.merchant,
+			amount: t.amount,
+			categoryId: category.id!,
+			isShared: t.isShared,
+			splitType,
+			splitValue,
+			partnerShare: t.partnerShare,
+			isSettled: t.isSettled,
+			settledDate: t.isSettled ? now : undefined,
+			isEssential: false,
+			isSubscription: false,
+			createdAt: now,
+			updatedAt: now
+		});
+
+		if (matchingAmounts) matchingAmounts.push(t.amount);
+		else amountsByDayAndMerchant.set(duplicateKey, [t.amount]);
+	}
+
+	if (records.length > 0) {
+		try {
+			await db.transaction('rw', db.transactions, () => db.transactions.bulkAdd(records));
+			imported = records.length;
+		} catch (error) {
+			errors.push(`Failed to import transactions: ${error}`);
+		}
+	}
+
+	if (imported > 0) {
+		await persistData('transactions');
+
 		const allTransactions = await db.transactions.toArray();
 		const cache = getTransactionCache();
 		cache.initialize(allTransactions);
@@ -229,53 +223,23 @@ export async function importTransactions(
 	};
 }
 
-/**
- * Flatten an ExcelJS cell value to a plain value. ExcelJS represents formulas,
- * rich text, and hyperlinks as objects; imports only need the display value.
- */
-function plainCellValue(value: unknown): CellValue {
-	if (value == null) return null;
-	if (value instanceof Date) {
-		// ExcelJS parses date cells as UTC; extract the UTC components into a
-		// local date so western timezones don't shift to the previous day
-		return new Date(value.getUTCFullYear(), value.getUTCMonth(), value.getUTCDate());
-	}
-	if (typeof value === 'object') {
-		const obj = value as Record<string, unknown>;
-		if ('result' in obj) return plainCellValue(obj.result); // formula cell
-		if ('richText' in obj) {
-			return (obj.richText as { text: string }[]).map((r) => r.text).join('');
-		}
-		if ('text' in obj) return plainCellValue(obj.text); // hyperlink cell
-		return null; // error cells and anything else unrecognized
-	}
-	if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
-		return value;
-	}
-	return null;
+function duplicateGroupKey(date: Date, merchant: string): string {
+	return `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}\0${merchant}`;
 }
 
-/**
- * Read the "Expenses" sheet of an Excel file into plain rows (header row first).
- * Dynamically imports ExcelJS to avoid loading it at app startup.
- */
 export async function readExcelFile(file: File): Promise<CellValue[][]> {
-	const { Workbook } = await import('exceljs');
-
-	const buffer = await file.arrayBuffer();
-	const workbook = new Workbook();
-	await workbook.xlsx.load(buffer);
-
-	const sheet = workbook.getWorksheet('Expenses');
-	if (!sheet) {
-		throw new Error('No "Expenses" sheet found in workbook');
+	const { readSheet, SheetNotFoundError } = await import('read-excel-file/browser');
+	try {
+		const rows = await readSheet(file, 'Expenses');
+		return rows.map((row) => row.map((value) =>
+			value instanceof Date
+				? new Date(value.getUTCFullYear(), value.getUTCMonth(), value.getUTCDate())
+				: value
+		)) as CellValue[][];
+	} catch (error) {
+		if (error instanceof SheetNotFoundError) {
+			throw new Error('No "Expenses" sheet found in workbook', { cause: error });
+		}
+		throw error;
 	}
-
-	const rows: CellValue[][] = [];
-	sheet.eachRow({ includeEmpty: true }, (row) => {
-		// row.values is 1-indexed with a padded first slot
-		const values = (row.values as unknown[]).slice(1);
-		rows.push(values.map(plainCellValue));
-	});
-	return rows;
 }

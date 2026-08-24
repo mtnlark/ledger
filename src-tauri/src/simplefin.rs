@@ -21,188 +21,188 @@ static ACCESS_URL_CACHE: Mutex<Option<Result<Option<String>, String>>> = Mutex::
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct SimplefinOrg {
-  pub name: Option<String>,
-  pub domain: Option<String>,
+    pub name: Option<String>,
+    pub domain: Option<String>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct SimplefinAccount {
-  pub id: String,
-  pub name: String,
-  pub currency: Option<String>,
-  /// Decimal string per the SimpleFIN protocol (e.g. "113985.51").
-  pub balance: String,
-  #[serde(rename = "available-balance")]
-  pub available_balance: Option<String>,
-  /// Unix seconds.
-  #[serde(rename = "balance-date")]
-  pub balance_date: i64,
-  pub org: Option<SimplefinOrg>,
+    pub id: String,
+    pub name: String,
+    pub currency: Option<String>,
+    /// Decimal string per the SimpleFIN protocol (e.g. "113985.51").
+    pub balance: String,
+    #[serde(rename = "available-balance")]
+    pub available_balance: Option<String>,
+    /// Unix seconds.
+    #[serde(rename = "balance-date")]
+    pub balance_date: i64,
+    pub org: Option<SimplefinOrg>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct AccountsResponse {
-  #[serde(default)]
-  pub errors: Vec<String>,
-  #[serde(default)]
-  pub accounts: Vec<SimplefinAccount>,
+    #[serde(default)]
+    pub errors: Vec<String>,
+    #[serde(default)]
+    pub accounts: Vec<SimplefinAccount>,
 }
 
 fn keyring_entry() -> Result<keyring::Entry, String> {
-  keyring::Entry::new(KEYRING_SERVICE, KEYRING_USER).map_err(|e| e.to_string())
+    keyring::Entry::new(KEYRING_SERVICE, KEYRING_USER).map_err(|e| e.to_string())
 }
 
 fn read_access_url_uncached() -> Result<Option<String>, String> {
-  match keyring_entry()?.get_password() {
-    Ok(url) => Ok(Some(url)),
-    Err(keyring::Error::NoEntry) => Ok(None),
-    Err(e) => Err(e.to_string()),
-  }
+    match keyring_entry()?.get_password() {
+        Ok(url) => Ok(Some(url)),
+        Err(keyring::Error::NoEntry) => Ok(None),
+        Err(e) => Err(e.to_string()),
+    }
 }
 
 fn get_access_url() -> Result<Option<String>, String> {
-  let mut cache = ACCESS_URL_CACHE
-    .lock()
-    .map_err(|_| "Access URL cache lock was poisoned".to_string())?;
-  if let Some(cached) = cache.as_ref() {
-    return cached.clone();
-  }
+    let mut cache = ACCESS_URL_CACHE
+        .lock()
+        .map_err(|_| "Access URL cache lock was poisoned".to_string())?;
+    if let Some(cached) = cache.as_ref() {
+        return cached.clone();
+    }
 
-  let result = read_access_url_uncached();
-  *cache = Some(result.clone());
-  result
+    let result = read_access_url_uncached();
+    *cache = Some(result.clone());
+    result
 }
 
 fn set_cached_access_url(value: Option<String>) -> Result<(), String> {
-  *ACCESS_URL_CACHE
-    .lock()
-    .map_err(|_| "Access URL cache lock was poisoned".to_string())? = Some(Ok(value));
-  Ok(())
+    *ACCESS_URL_CACHE
+        .lock()
+        .map_err(|_| "Access URL cache lock was poisoned".to_string())? = Some(Ok(value));
+    Ok(())
 }
 
 /// reqwest does not translate URL userinfo (user:pass@host) into an
 /// Authorization header, so split credentials out for explicit Basic auth.
 fn split_auth(access_url: &str) -> Result<(reqwest::Url, Option<(String, String)>), String> {
-  let parsed = reqwest::Url::parse(access_url.trim()).map_err(|_| "Invalid access URL".to_string())?;
-  let user = parsed.username().to_string();
-  if user.is_empty() {
-    return Ok((parsed, None));
-  }
-  let pass = parsed.password().unwrap_or_default().to_string();
-  let mut clean = parsed.clone();
-  clean.set_username("").ok();
-  clean.set_password(None).ok();
-  Ok((clean, Some((user, pass))))
+    let parsed =
+        reqwest::Url::parse(access_url.trim()).map_err(|_| "Invalid access URL".to_string())?;
+    let user = parsed.username().to_string();
+    if user.is_empty() {
+        return Ok((parsed, None));
+    }
+    let pass = parsed.password().unwrap_or_default().to_string();
+    let mut clean = parsed.clone();
+    clean.set_username("").ok();
+    clean.set_password(None).ok();
+    Ok((clean, Some((user, pass))))
 }
 
 async fn claim_setup_token(setup_token: &str) -> Result<String, String> {
-  let bytes = base64::engine::general_purpose::STANDARD
-    .decode(setup_token.trim())
-    .map_err(|_| "Invalid setup token (not base64)".to_string())?;
-  let claim_url = String::from_utf8(bytes).map_err(|_| "Invalid setup token".to_string())?;
+    let bytes = base64::engine::general_purpose::STANDARD
+        .decode(setup_token.trim())
+        .map_err(|_| "Invalid setup token (not base64)".to_string())?;
+    let claim_url = String::from_utf8(bytes).map_err(|_| "Invalid setup token".to_string())?;
 
-  let resp = reqwest::Client::new()
-    .post(claim_url.trim())
-    .header("Content-Length", "0")
-    .send()
-    .await
-    .map_err(|e| format!("Claim failed: {e}"))?;
-  if !resp.status().is_success() {
-    return Err(format!("Claim failed: HTTP {}", resp.status()));
-  }
-  let access_url = resp.text().await.map_err(|e| e.to_string())?;
-  Ok(access_url.trim().to_string())
+    let resp = reqwest::Client::new()
+        .post(claim_url.trim())
+        .header("Content-Length", "0")
+        .send()
+        .await
+        .map_err(|e| format!("Claim failed: {e}"))?;
+    if !resp.status().is_success() {
+        return Err(format!("Claim failed: HTTP {}", resp.status()));
+    }
+    let access_url = resp.text().await.map_err(|e| e.to_string())?;
+    Ok(access_url.trim().to_string())
 }
 
 async fn fetch_accounts_internal(access_url: &str) -> Result<AccountsResponse, String> {
-  let (base, auth) = split_auth(access_url)?;
-  let url = format!(
-    "{}/accounts?balances-only=1",
-    base.as_str().trim_end_matches('/')
-  );
+    let (base, auth) = split_auth(access_url)?;
+    let url = format!(
+        "{}/accounts?balances-only=1",
+        base.as_str().trim_end_matches('/')
+    );
 
-  let mut request = reqwest::Client::new().get(&url);
-  if let Some((user, pass)) = auth {
-    request = request.basic_auth(user, Some(pass));
-  }
+    let mut request = reqwest::Client::new().get(&url);
+    if let Some((user, pass)) = auth {
+        request = request.basic_auth(user, Some(pass));
+    }
 
-  let resp = request
-    .send()
-    .await
-    .map_err(|e| format!("SimpleFIN request failed: {e}"))?;
-  if !resp.status().is_success() {
-    return Err(format!("SimpleFIN returned HTTP {}", resp.status()));
-  }
-  resp
-    .json::<AccountsResponse>()
-    .await
-    .map_err(|e| format!("Could not parse SimpleFIN response: {e}"))
+    let resp = request
+        .send()
+        .await
+        .map_err(|e| format!("SimpleFIN request failed: {e}"))?;
+    if !resp.status().is_success() {
+        return Err(format!("SimpleFIN returned HTTP {}", resp.status()));
+    }
+    resp.json::<AccountsResponse>()
+        .await
+        .map_err(|e| format!("Could not parse SimpleFIN response: {e}"))
 }
 
 /// Link via a SimpleFIN setup token (base64 claim URL) or, for the public
 /// demo, a raw access URL. Validates by fetching before storing in Keychain.
 #[tauri::command]
 pub async fn simplefin_link(setup_token: String) -> Result<AccountsResponse, String> {
-  let token = setup_token.trim();
-  let access_url = if token.starts_with("http://") || token.starts_with("https://") {
-    token.to_string()
-  } else {
-    claim_setup_token(token).await?
-  };
+    let token = setup_token.trim();
+    let access_url = if token.starts_with("http://") || token.starts_with("https://") {
+        token.to_string()
+    } else {
+        claim_setup_token(token).await?
+    };
 
-  let accounts = fetch_accounts_internal(&access_url).await?;
-  let url_to_store = access_url.clone();
-  tauri::async_runtime::spawn_blocking(move || {
-    keyring_entry()?
-      .set_password(&url_to_store)
-      .map_err(|e| format!("Keychain error: {e}"))
-  })
-  .await
-  .map_err(|e| e.to_string())??;
-  set_cached_access_url(Some(access_url))?;
-  Ok(accounts)
+    let accounts = fetch_accounts_internal(&access_url).await?;
+    let url_to_store = access_url.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        keyring_entry()?
+            .set_password(&url_to_store)
+            .map_err(|e| format!("Keychain error: {e}"))
+    })
+    .await
+    .map_err(|e| e.to_string())??;
+    set_cached_access_url(Some(access_url))?;
+    Ok(accounts)
 }
 
 #[tauri::command]
 pub async fn simplefin_is_linked() -> Result<bool, String> {
-  let url = tauri::async_runtime::spawn_blocking(get_access_url)
-    .await
-    .map_err(|e| e.to_string())??;
-  Ok(url.is_some())
+    let url = tauri::async_runtime::spawn_blocking(get_access_url)
+        .await
+        .map_err(|e| e.to_string())??;
+    Ok(url.is_some())
 }
 
 #[tauri::command]
 pub async fn simplefin_unlink() -> Result<(), String> {
-  tauri::async_runtime::spawn_blocking(|| {
-    let result = match keyring_entry()?.delete_credential() {
-      Ok(()) | Err(keyring::Error::NoEntry) => Ok(()),
-      Err(e) => Err(e.to_string()),
-    };
-    if result.is_ok() {
-      set_cached_access_url(None)?;
-    }
-    result
-  })
-  .await
-  .map_err(|e| e.to_string())?
+    tauri::async_runtime::spawn_blocking(|| {
+        let result = match keyring_entry()?.delete_credential() {
+            Ok(()) | Err(keyring::Error::NoEntry) => Ok(()),
+            Err(e) => Err(e.to_string()),
+        };
+        if result.is_ok() {
+            set_cached_access_url(None)?;
+        }
+        result
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
 pub async fn simplefin_fetch_accounts() -> Result<AccountsResponse, String> {
-  let url = tauri::async_runtime::spawn_blocking(get_access_url)
-    .await
-    .map_err(|e| e.to_string())??
-    .ok_or_else(|| "SimpleFIN is not linked".to_string())?;
-  fetch_accounts_internal(&url).await
+    let url = tauri::async_runtime::spawn_blocking(get_access_url)
+        .await
+        .map_err(|e| e.to_string())??
+        .ok_or_else(|| "SimpleFIN is not linked".to_string())?;
+    fetch_accounts_internal(&url).await
 }
 
 #[cfg(test)]
 mod tests {
-  use super::*;
+    use super::*;
 
-  /// Captured from the public demo endpoint (trimmed); includes fields we
-  /// ignore (transactions, holdings) to prove tolerant parsing.
-  const DEMO_FIXTURE: &str = r#"{
+    /// Captured from the public demo endpoint (trimmed); includes fields we
+    /// ignore (transactions, holdings) to prove tolerant parsing.
+    const DEMO_FIXTURE: &str = r#"{
     "errors": [],
     "accounts": [
       {
@@ -236,36 +236,40 @@ mod tests {
     ]
   }"#;
 
-  #[test]
-  fn parses_demo_accounts_response() {
-    let parsed: AccountsResponse = serde_json::from_str(DEMO_FIXTURE).unwrap();
-    assert!(parsed.errors.is_empty());
-    assert_eq!(parsed.accounts.len(), 2);
+    #[test]
+    fn parses_demo_accounts_response() {
+        let parsed: AccountsResponse = serde_json::from_str(DEMO_FIXTURE).unwrap();
+        assert!(parsed.errors.is_empty());
+        assert_eq!(parsed.accounts.len(), 2);
 
-    let savings = &parsed.accounts[0];
-    assert_eq!(savings.id, "Demo Savings");
-    assert_eq!(savings.balance, "113985.51");
-    assert_eq!(savings.balance_date, 1781222400);
-    assert_eq!(savings.org.as_ref().unwrap().name.as_deref(), Some("SimpleFIN Demo"));
-  }
+        let savings = &parsed.accounts[0];
+        assert_eq!(savings.id, "Demo Savings");
+        assert_eq!(savings.balance, "113985.51");
+        assert_eq!(savings.balance_date, 1781222400);
+        assert_eq!(
+            savings.org.as_ref().unwrap().name.as_deref(),
+            Some("SimpleFIN Demo")
+        );
+    }
 
-  #[test]
-  fn tolerates_missing_optional_fields() {
-    let parsed: AccountsResponse =
-      serde_json::from_str(r#"{"accounts": [{"id": "x", "name": "X", "balance": "1.00", "balance-date": 0}]}"#)
+    #[test]
+    fn tolerates_missing_optional_fields() {
+        let parsed: AccountsResponse = serde_json::from_str(
+            r#"{"accounts": [{"id": "x", "name": "X", "balance": "1.00", "balance-date": 0}]}"#,
+        )
         .unwrap();
-    assert_eq!(parsed.accounts[0].available_balance, None);
-    assert!(parsed.accounts[0].org.is_none());
-  }
+        assert_eq!(parsed.accounts[0].available_balance, None);
+        assert!(parsed.accounts[0].org.is_none());
+    }
 
-  #[test]
-  fn splits_userinfo_into_basic_auth() {
-    let (url, auth) = split_auth("https://demo:demopass@example.org/simplefin").unwrap();
-    assert_eq!(url.as_str(), "https://example.org/simplefin");
-    assert_eq!(auth, Some(("demo".to_string(), "demopass".to_string())));
+    #[test]
+    fn splits_userinfo_into_basic_auth() {
+        let (url, auth) = split_auth("https://demo:demopass@example.org/simplefin").unwrap();
+        assert_eq!(url.as_str(), "https://example.org/simplefin");
+        assert_eq!(auth, Some(("demo".to_string(), "demopass".to_string())));
 
-    let (url2, auth2) = split_auth("https://example.org/simplefin").unwrap();
-    assert_eq!(url2.as_str(), "https://example.org/simplefin");
-    assert_eq!(auth2, None);
-  }
+        let (url2, auth2) = split_auth("https://example.org/simplefin").unwrap();
+        assert_eq!(url2.as_str(), "https://example.org/simplefin");
+        assert_eq!(auth2, None);
+    }
 }

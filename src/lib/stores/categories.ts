@@ -32,7 +32,7 @@ export async function addCategory(
 		sortOrder
 	}) as number;
 
-	await persistData();
+	await persistData('categories');
 	return id;
 }
 
@@ -41,14 +41,14 @@ export async function updateCategory(
 	updates: Partial<Omit<Category, 'id'>>
 ): Promise<void> {
 	await db.categories.update(id, updates);
-	await persistData();
+	await persistData('categories');
 }
 
 export async function toggleCategoryActive(id: number): Promise<void> {
 	const category = await db.categories.get(id);
 	if (category) {
 		await db.categories.update(id, { isActive: !category.isActive });
-		await persistData();
+		await persistData('categories');
 	}
 }
 
@@ -59,7 +59,7 @@ export async function reorderCategories(orderedIds: number[]): Promise<void> {
 			await db.categories.update(orderedIds[i], { sortOrder: i + 1 });
 		}
 	});
-	await persistData();
+	await persistData('categories');
 }
 
 export async function moveCategoryUp(id: number): Promise<void> {
@@ -77,7 +77,7 @@ export async function moveCategoryUp(id: number): Promise<void> {
 		await db.categories.update(current.id!, { sortOrder: above.sortOrder });
 		await db.categories.update(above.id!, { sortOrder: current.sortOrder });
 	});
-	await persistData();
+	await persistData('categories');
 }
 
 export async function moveCategoryDown(id: number): Promise<void> {
@@ -95,12 +95,12 @@ export async function moveCategoryDown(id: number): Promise<void> {
 		await db.categories.update(current.id!, { sortOrder: below.sortOrder });
 		await db.categories.update(below.id!, { sortOrder: current.sortOrder });
 	});
-	await persistData();
+	await persistData('categories');
 }
 
 export async function deleteCategory(id: number): Promise<void> {
 	await db.categories.delete(id);
-	await persistData();
+	await persistData('categories');
 }
 
 export async function getCategoryUsageCount(id: number): Promise<number> {

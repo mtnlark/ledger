@@ -675,7 +675,7 @@
 							<div class="flex items-center gap-3">
 								<input
 									type="file"
-									accept=".xlsx,.xls"
+									accept=".xlsx"
 									onchange={handleExcelImport}
 									bind:this={fileInput}
 									class="hidden"

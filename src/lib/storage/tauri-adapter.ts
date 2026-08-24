@@ -11,8 +11,8 @@ import {
 	DEFAULT_CATEGORIES,
 	type Category
 } from '$lib/db';
-import { dehydrateAll, hydrateAll } from './serialization';
-import type { StoredData, ReadDataResult, RecoveryResult } from './types';
+import { dehydrateAll, dehydrateChanged, hydrateAll } from './serialization';
+import type { PersistedTableName, StoredData, ReadDataResult, RecoveryResult } from './types';
 
 // Tauri API modules - loaded once during initialization
 let fs: typeof import('@tauri-apps/plugin-fs');
@@ -39,22 +39,37 @@ const BACKUP_DEBOUNCE_MS = 60000; // 1 minute
 // Temp file suffix for atomic writes
 const TEMP_SUFFIX = '.tmp';
 
+const PERSISTED_TABLE_NAMES: readonly PersistedTableName[] = [
+	'transactions',
+	'categories',
+	'monthlyBudgets',
+	'categoryBudgets',
+	'settings',
+	'savingsAccounts',
+	'savingsContributions',
+	'linkedAccounts',
+	'balanceSnapshots'
+];
+
+type SerializedTables = Partial<Record<PersistedTableName, string>>;
+
+let persistedSnapshot: StoredData | null = null;
+let serializedTables: SerializedTables = {};
+
 /**
  * Calculate SHA-256 checksum of data content (excluding checksum field)
  */
 async function calculateChecksum(data: StoredData): Promise<string> {
-	// Create a copy without the checksum field for hashing
 	const { checksum: _, ...dataWithoutChecksum } = data;
-	const content = JSON.stringify(dataWithoutChecksum);
+	return calculateContentChecksum(JSON.stringify(dataWithoutChecksum));
+}
 
-	// Use Web Crypto API (available in Tauri/WebView)
+async function calculateContentChecksum(content: string): Promise<string> {
 	const encoder = new TextEncoder();
 	const dataBuffer = encoder.encode(content);
 	const hashBuffer = await crypto.subtle.digest('SHA-256', dataBuffer);
-
-	// Convert to hex string
 	const hashArray = Array.from(new Uint8Array(hashBuffer));
-	return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+	return hashArray.map((byte) => byte.toString(16).padStart(2, '0')).join('');
 }
 
 /**
@@ -258,19 +273,42 @@ async function recoverFromAnySource(): Promise<RecoveryResult> {
  *
  * This ensures data.json is always in a complete, valid state.
  */
-async function writeDataFile(data: StoredData): Promise<void> {
+async function serializeData(
+	data: StoredData,
+	changedTables?: ReadonlySet<PersistedTableName>
+): Promise<{ content: string; tables: SerializedTables }> {
+	const nextTables: SerializedTables = { ...serializedTables };
+	for (const tableName of PERSISTED_TABLE_NAMES) {
+		if (!nextTables[tableName] || !changedTables || changedTables.has(tableName)) {
+			const value = tableName === 'settings' ? data.settings : (data[tableName] ?? []);
+			nextTables[tableName] = JSON.stringify(value);
+		}
+	}
+
+	const fields = [
+		`"version":${JSON.stringify(data.version)}`,
+		`"exportedAt":${JSON.stringify(data.exportedAt)}`,
+		...PERSISTED_TABLE_NAMES.map((tableName) => `"${tableName}":${nextTables[tableName]}`)
+	];
+	const contentWithoutChecksum = `{${fields.join(',')}}`;
+	const checksum = await calculateContentChecksum(contentWithoutChecksum);
+	return {
+		content: `${contentWithoutChecksum.slice(0, -1)},"checksum":${JSON.stringify(checksum)}}`,
+		tables: nextTables
+	};
+}
+
+async function writeDataFile(
+	data: StoredData,
+	changedTables?: ReadonlySet<PersistedTableName>
+): Promise<SerializedTables> {
 	ensureInitialized();
 
-	// Calculate and add checksum
-	const checksum = await calculateChecksum(data);
-	const dataWithChecksum: StoredData = { ...data, checksum };
-
-	const content = JSON.stringify(dataWithChecksum, null, 2);
+	const serialized = await serializeData(data, changedTables);
 	const tempPath = cachedDataPath + TEMP_SUFFIX;
 	const backupPath = cachedDataPath + '.bak';
 
-	// Step 1: Write to temp file
-	await fs.writeTextFile(tempPath, content);
+	await fs.writeTextFile(tempPath, serialized.content);
 
 	// Step 2: If main file exists, rename to .bak (overwrites any existing .bak)
 	if (await fs.exists(cachedDataPath)) {
@@ -286,8 +324,8 @@ async function writeDataFile(data: StoredData): Promise<void> {
 		}
 	}
 
-	// Step 3: Rename temp to final (atomic on most filesystems)
 	await fs.rename(tempPath, cachedDataPath);
+	return serialized.tables;
 }
 
 /**
@@ -425,6 +463,9 @@ type InitializationResult =
  * - If recovery fails: initialize with defaults, warn user about data loss
  */
 export async function initializeTauriStorage(): Promise<InitializationResult> {
+	persistedSnapshot = null;
+	serializedTables = {};
+
 	// Load APIs and cache paths first
 	await initializeApis();
 	await ensureDirectories();
@@ -520,6 +561,8 @@ async function runMigrationsIfNeeded(): Promise<void> {
  */
 async function loadDataIntoDexie(data: StoredData): Promise<void> {
 	await hydrateAll(data, { useDefaultsWhenMissing: true });
+	persistedSnapshot = data;
+	serializedTables = {};
 }
 
 /**
@@ -556,6 +599,41 @@ export class PersistenceError extends Error {
 // Dexie when it runs, so it captures both mutations in one write.
 let saveChain: Promise<void> = Promise.resolve();
 let saveQueued = false;
+let fullSavePending = false;
+const pendingTables = new Set<PersistedTableName>();
+
+function addPendingScope(tables?: PersistedTableName | readonly PersistedTableName[]): void {
+	if (!tables) {
+		fullSavePending = true;
+		pendingTables.clear();
+		return;
+	}
+	if (fullSavePending) return;
+	for (const table of typeof tables === 'string' ? [tables] : tables) {
+		pendingTables.add(table);
+	}
+}
+
+function takePendingScope(): Set<PersistedTableName> | undefined {
+	if (fullSavePending) {
+		fullSavePending = false;
+		pendingTables.clear();
+		return undefined;
+	}
+	const scope = new Set(pendingTables);
+	pendingTables.clear();
+	return scope;
+}
+
+function restorePendingScope(scope?: ReadonlySet<PersistedTableName>): void {
+	if (!scope) {
+		fullSavePending = true;
+		pendingTables.clear();
+		return;
+	}
+	if (fullSavePending) return;
+	for (const table of scope) pendingTables.add(table);
+}
 
 /**
  * Save current Dexie state to JSON file
@@ -563,8 +641,11 @@ let saveQueued = false;
  * calls arriving while a save is queued coalesce into that save.
  * @throws PersistenceError if saving fails
  */
-export function saveToFile(): Promise<void> {
+export function saveToFile(
+	tables?: PersistedTableName | readonly PersistedTableName[]
+): Promise<void> {
 	ensureInitialized();
+	addPendingScope(tables);
 
 	if (saveQueued) {
 		return saveChain;
@@ -574,10 +655,12 @@ export function saveToFile(): Promise<void> {
 		// A failed save must not poison the chain for subsequent saves
 		.catch(() => {})
 		.then(() => {
-			// Clear the flag before reading Dexie so mutations made after this
-			// point queue a fresh save rather than assuming this one saw them
+			const scope = takePendingScope();
 			saveQueued = false;
-			return performSave();
+			return performSave(scope).catch((error) => {
+				restorePendingScope(scope);
+				throw error;
+			});
 		});
 	return saveChain;
 }
@@ -586,7 +669,7 @@ export function saveToFile(): Promise<void> {
  * Serialize the full Dexie state and write it to disk (single writer;
  * only ever invoked through the saveToFile queue).
  */
-async function performSave(): Promise<void> {
+async function performSave(changedTables?: ReadonlySet<PersistedTableName>): Promise<void> {
 	// Create backup before saving (debounced)
 	try {
 		await createBackup();
@@ -595,10 +678,14 @@ async function performSave(): Promise<void> {
 		console.error('Backup creation failed:', error);
 	}
 
-	const data = await dehydrateAll();
+	const data = persistedSnapshot && changedTables
+		? await dehydrateChanged(persistedSnapshot, changedTables)
+		: await dehydrateAll();
 
 	try {
-		await writeDataFile(data);
+		const nextSerializedTables = await writeDataFile(data, changedTables);
+		persistedSnapshot = data;
+		serializedTables = nextSerializedTables;
 	} catch (error) {
 		const message = error instanceof Error ? error.message : String(error);
 		throw new PersistenceError(`Failed to save data: ${message}`, error);

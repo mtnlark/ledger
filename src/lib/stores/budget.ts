@@ -51,7 +51,7 @@ export async function saveBudget(
 		});
 	}
 
-	await persistData();
+	await persistData('monthlyBudgets');
 }
 
 /**

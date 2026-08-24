@@ -74,7 +74,7 @@ export async function saveCategoryBudget(
 		});
 	}
 
-	await persistData();
+	await persistData('categoryBudgets');
 }
 
 /**
@@ -86,7 +86,7 @@ export async function deleteCategoryBudget(categoryId: number, month: string): P
 	const existing = await getCategoryBudget(categoryId, month);
 	if (existing) {
 		await db.categoryBudgets.delete(existing.id!);
-		await persistData();
+		await persistData('categoryBudgets');
 	}
 }
 
@@ -102,7 +102,7 @@ export async function setCategoryBudgetRollover(
 	const existing = await getCategoryBudget(categoryId, month);
 	if (!existing) return;
 	await db.categoryBudgets.update(existing.id!, { rollsOver, updatedAt: new Date() });
-	await persistData();
+	await persistData('categoryBudgets');
 }
 
 /**
@@ -337,7 +337,7 @@ export async function copyBudgetsFromMonth(
 		}
 	}
 
-	await persistData();
+	await persistData('categoryBudgets');
 }
 
 /**

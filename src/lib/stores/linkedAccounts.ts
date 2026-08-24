@@ -54,7 +54,7 @@ export async function addLinkedAccount(input: NewLinkedAccount): Promise<number>
 
 	// The opening balance is the first history point
 	await upsertSnapshot(id, balance, input.source ?? 'manual', now);
-	await persistData();
+	await persistData(['linkedAccounts', 'balanceSnapshots']);
 	return id;
 }
 
@@ -63,7 +63,7 @@ export async function updateLinkedAccount(
 	updates: Partial<Omit<LinkedAccount, 'id' | 'createdAt'>>
 ): Promise<void> {
 	await db.linkedAccounts.update(id, { ...updates, updatedAt: new Date() });
-	await persistData();
+	await persistData('linkedAccounts');
 }
 
 /**
@@ -76,14 +76,14 @@ export async function swapLinkedAccountOrder(idA: number, idB: number): Promise<
 	if (!a || !b) return;
 	await db.linkedAccounts.update(idA, { sortOrder: b.sortOrder });
 	await db.linkedAccounts.update(idB, { sortOrder: a.sortOrder });
-	await persistData();
+	await persistData('linkedAccounts');
 }
 
 /** Deletes the account and its entire snapshot history. */
 export async function deleteLinkedAccount(id: number): Promise<void> {
 	await db.balanceSnapshots.where('accountId').equals(id).delete();
 	await db.linkedAccounts.delete(id);
-	await persistData();
+	await persistData(['linkedAccounts', 'balanceSnapshots']);
 }
 
 /**
@@ -99,7 +99,7 @@ export async function recordBalance(
 	const now = new Date();
 	await db.linkedAccounts.update(accountId, { currentBalance: rounded, updatedAt: now });
 	await upsertSnapshot(accountId, rounded, source, now);
-	await persistData();
+	await persistData(['linkedAccounts', 'balanceSnapshots']);
 }
 
 /** Update sync bookkeeping after a SimpleFIN attempt (does not touch balance). */
@@ -111,7 +111,7 @@ export async function setSyncStatus(
 	const updates: Partial<LinkedAccount> = { lastSyncStatus: status, updatedAt: new Date() };
 	if (syncedAt) updates.lastSyncedAt = syncedAt;
 	await db.linkedAccounts.update(accountId, updates);
-	await persistData();
+	await persistData('linkedAccounts');
 }
 
 export async function getAllSnapshots(): Promise<BalanceSnapshot[]> {

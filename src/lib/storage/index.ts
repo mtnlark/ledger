@@ -6,10 +6,10 @@
  */
 
 import { dehydrateAll, hydrateAll } from './serialization';
-import type { StoredData } from './types';
+import type { PersistedTableName, StoredData } from './types';
 import { initializeDatabase } from '$lib/db';
 
-export type { StoredData } from './types';
+export type { PersistedTableName, StoredData } from './types';
 
 /**
  * Result of storage initialization (exposed for UI feedback)
@@ -151,12 +151,14 @@ export function resetStorageState(): void {
  * Called after any data modification (no-op in tests)
  * Shows a toast notification on failure
  */
-export async function persistData(): Promise<void> {
+export async function persistData(
+	tables?: PersistedTableName | readonly PersistedTableName[]
+): Promise<void> {
 	if (!isTauri()) return;
 
 	try {
 		const { saveToFile } = await import('./tauri-adapter');
-		await saveToFile();
+		await saveToFile(tables);
 	} catch (error) {
 		console.error('Data persistence failed:', error);
 		_onError?.('Failed to save data to disk. Your changes may not persist.');
@@ -177,9 +179,12 @@ export async function createBackup(): Promise<void> {
  * Wrap a database operation with persistence
  * Use this for any write operation
  */
-export async function withPersistence<T>(operation: () => Promise<T>): Promise<T> {
+export async function withPersistence<T>(
+	operation: () => Promise<T>,
+	tables?: PersistedTableName | readonly PersistedTableName[]
+): Promise<T> {
 	const result = await operation();
-	await persistData();
+	await persistData(tables);
 	return result;
 }
 
