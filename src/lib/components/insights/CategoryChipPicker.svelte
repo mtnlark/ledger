@@ -18,7 +18,7 @@
 </script>
 
 <div class="flex gap-2 overflow-x-auto pb-2 -mx-1 px-1 scrollbar-thin">
-	{#each sortedCategories as cat}
+	{#each sortedCategories as cat (cat.id)}
 		{@const isSelected = cat.id === selectedId}
 		{@const spent = spending?.get(cat.id!) || 0}
 		<button

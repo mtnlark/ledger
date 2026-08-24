@@ -7,6 +7,7 @@
 
 import { dehydrateAll, hydrateAll } from './serialization';
 import type { StoredData } from './types';
+import { initializeDatabase } from '$lib/db';
 
 export type { StoredData } from './types';
 
@@ -19,11 +20,9 @@ export type StorageInitResult =
 	| { status: 'initialized_fresh' }
 	| { status: 'initialized_after_unrecoverable_corruption' };
 
-// Track if storage has been initialized
 let initialized = false;
-
-// Store the most recent init result for UI access
 let lastInitResult: StorageInitResult | null = null;
+let initializationPromise: Promise<StorageInitResult> | null = null;
 
 // UI feedback callbacks (registered by layout, keeps storage layer UI-agnostic)
 let _onWarning: ((message: string, duration?: number) => void) | null = null;
@@ -72,36 +71,40 @@ export async function initializeStorage(): Promise<StorageInitResult> {
 	if (initialized && lastInitResult) {
 		return lastInitResult;
 	}
-
-	try {
-		let result: StorageInitResult;
-
-		if (isTauri()) {
-			const { initializeTauriStorage } = await import('./tauri-adapter');
-			result = await initializeTauriStorage();
-		} else {
-			// Test/non-Tauri environment - just initialize Dexie defaults
-			const { initializeDatabase } = await import('$lib/db');
-			await initializeDatabase();
-			result = { status: 'initialized_fresh' };
-		}
-
-		initialized = true;
-		lastInitResult = result;
-
-		// Show user-facing notifications for recovery scenarios
-		showInitializationFeedback(result);
-
-		return result;
-	} catch (error) {
-		// Reset flag so retry is possible
-		initialized = false;
-		lastInitResult = null;
-
-		// Wrap and rethrow with context
-		const message = error instanceof Error ? error.message : String(error);
-		throw new StorageInitError(`Failed to initialize storage: ${message}`, error);
+	if (initializationPromise) {
+		return initializationPromise;
 	}
+
+	initializationPromise = (async () => {
+		try {
+			let result: StorageInitResult;
+
+			if (isTauri()) {
+				const { initializeTauriStorage } = await import('./tauri-adapter');
+				result = await initializeTauriStorage();
+			} else {
+				await initializeDatabase();
+				result = { status: 'initialized_fresh' };
+			}
+
+			initialized = true;
+			lastInitResult = result;
+
+			showInitializationFeedback(result);
+
+			return result;
+		} catch (error) {
+			initialized = false;
+			lastInitResult = null;
+
+			const message = error instanceof Error ? error.message : String(error);
+			throw new StorageInitError(`Failed to initialize storage: ${message}`, error);
+		} finally {
+			initializationPromise = null;
+		}
+	})();
+
+	return initializationPromise;
 }
 
 /**
@@ -139,6 +142,8 @@ export function isStorageInitialized(): boolean {
  */
 export function resetStorageState(): void {
 	initialized = false;
+	lastInitResult = null;
+	initializationPromise = null;
 }
 
 /**

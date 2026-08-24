@@ -179,7 +179,7 @@
 					</a>
 				</div>
 				<div class="space-y-3">
-					{#each byAccount as { account, total, count }}
+					{#each byAccount as { account, total, count } (account.id)}
 						<div class="flex items-center gap-3">
 							<span class="w-2.5 h-2.5 rounded-full shrink-0" style="background-color: {account.color};" aria-hidden="true"></span>
 							<div class="flex-1 min-w-0">
@@ -201,7 +201,7 @@
 				<div>
 					<h3 class="text-sm font-semibold text-charcoal-soft mb-3">By Source</h3>
 					<div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
-						{#each bySource as { source, total }}
+						{#each bySource as { source, total } (source)}
 							<div class="bg-surface-alt rounded-lg p-3 text-center">
 								<p class="font-mono text-lg font-medium text-charcoal">
 									{formatCurrencyWhole(total)}
@@ -263,7 +263,7 @@
 
 				<!-- Individual Goal Cards -->
 				<div class="space-y-3">
-					{#each goalInfos as { account, status, progress }}
+					{#each goalInfos as { account, status, progress } (account.id)}
 						<div class="bg-surface-alt rounded-lg p-3 border border-theme">
 							<div class="flex items-center gap-3 mb-2">
 								<span class="w-2.5 h-2.5 rounded-full shrink-0" style="background-color: {account.color};" aria-hidden="true"></span>

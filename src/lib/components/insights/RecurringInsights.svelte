@@ -387,7 +387,7 @@
 								<span class="font-mono text-charcoal">{formatCurrencyWhole(monthlySubCost)}/mo</span>
 							</h4>
 							<div class="space-y-2">
-								{#each monthlySubscriptions as sub}
+								{#each monthlySubscriptions as sub (sub.id)}
 									{@const userAmount = getUserAmount(sub)}
 									<div class="flex items-center gap-3 py-2 px-3 bg-cream rounded-lg">
 										<span class="w-2 h-2 rounded-full shrink-0" style="background-color: {getCategoryColor(sub.categoryId)};" aria-hidden="true"></span>
@@ -420,7 +420,7 @@
 								</span>
 							</h4>
 							<div class="space-y-2">
-								{#each semiAnnualSubscriptions as sub}
+								{#each semiAnnualSubscriptions as sub (sub.id)}
 									{@const userAmount = getUserAmount(sub)}
 									{@const monthlyEquiv = userAmount / 6}
 									<div class="flex items-center gap-3 py-2 px-3 bg-cream rounded-lg">
@@ -457,7 +457,7 @@
 								</span>
 							</h4>
 							<div class="space-y-2">
-								{#each annualSubscriptions as sub}
+								{#each annualSubscriptions as sub (sub.id)}
 									{@const userAmount = getUserAmount(sub)}
 									{@const monthlyEquiv = userAmount / 12}
 									<div class="flex items-center gap-3 py-2 px-3 bg-cream rounded-lg">
@@ -492,7 +492,7 @@
 					</h4>
 
 					<div class="space-y-2">
-						{#each upcomingRenewals as renewal}
+						{#each upcomingRenewals as renewal (`${renewal.merchant}-${renewal.amount}`)}
 							<div class="flex items-center gap-3 py-2 px-3 bg-primary-500/5 rounded-lg border border-primary-500/20">
 								<span class="w-2 h-2 rounded-full shrink-0" style="background-color: {getCategoryColor(renewal.categoryId)};" aria-hidden="true"></span>
 								<div class="flex-1 min-w-0">
@@ -524,7 +524,7 @@
 					</div>
 
 					<div class="space-y-2">
-						{#each possiblyInactiveSubscriptions as sub}
+						{#each possiblyInactiveSubscriptions as sub (sub.id)}
 							{@const userAmount = getUserAmount(sub)}
 							<div class="flex items-center gap-3 py-2 px-3 bg-warning-50 rounded-lg border border-warning-200">
 								<span class="w-2 h-2 rounded-full shrink-0" style="background-color: {getCategoryColor(sub.categoryId)};" aria-hidden="true"></span>

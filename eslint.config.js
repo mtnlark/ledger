@@ -53,10 +53,9 @@ export default ts.config(
 			'svelte/no-unused-svelte-ignore': 'off',
 			// Desktop app with no configurable base path; resolve() adds nothing
 			'svelte/no-navigation-without-resolve': 'off',
-			// Surfaced as warnings: fixing requires per-site semantic decisions
-			// (each keys) or reactivity-class migration (SvelteMap/SvelteSet)
-			'svelte/require-each-key': 'warn',
-			'svelte/prefer-svelte-reactivity': 'warn'
+			'svelte/require-each-key': 'error',
+			// Calculation-local collections and immutable replacements do not need reactive wrappers.
+			'svelte/prefer-svelte-reactivity': 'off'
 		}
 	},
 	{

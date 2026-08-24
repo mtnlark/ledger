@@ -156,7 +156,7 @@
 				bind:value={source}
 				class="w-full px-3 py-2.5 bg-surface-alt border border-theme rounded-lg focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-colors"
 			>
-				{#each sourceOptions as opt}
+				{#each sourceOptions as opt (opt.value)}
 					<option value={opt.value}>{opt.label}</option>
 				{/each}
 			</select>

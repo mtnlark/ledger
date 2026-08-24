@@ -32,7 +32,7 @@
 </script>
 
 <div aria-label="Insights tabs" role="tablist" class="flex gap-6 overflow-x-auto border-b border-theme">
-	{#each tabs as tab, i}
+	{#each tabs as tab, i (tab.id)}
 		<button
 			type="button"
 			role="tab"

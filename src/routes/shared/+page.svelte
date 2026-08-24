@@ -87,7 +87,7 @@
 					<Skeleton class="h-4" width="80px" rounded="sm" />
 				</div>
 				<div class="divide-y divide-theme">
-					{#each Array(3) as _}
+					{#each Array(3) as _, index (index)}
 						<div class="px-6 py-4 flex items-center gap-4">
 							<Skeleton class="w-5 h-5" rounded="sm" />
 							<Skeleton class="w-10 h-10" rounded="lg" />

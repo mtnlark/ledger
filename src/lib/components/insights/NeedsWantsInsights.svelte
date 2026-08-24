@@ -45,7 +45,7 @@
 				.slice(0, 3)
 				.map(([catId, amount]) => {
 					const cat = categories.find((c) => c.id === catId);
-					return { category: cat, amount };
+					return { category: cat, categoryId: catId, amount };
 				});
 
 		return {
@@ -152,7 +152,7 @@
 				<div>
 					<h4 class="text-sm font-medium text-charcoal-muted mb-2">Top Needs</h4>
 					<div class="space-y-2">
-						{#each topCategories.essential as { category, amount }}
+						{#each topCategories.essential as { category, categoryId, amount } (categoryId)}
 							{#if category}
 								<div class="flex items-center gap-2">
 									<span class="w-2 h-2 rounded-full shrink-0" style="background-color: {category.color || '#C45D3A'};" aria-hidden="true"></span>
@@ -170,7 +170,7 @@
 				<div>
 					<h4 class="text-sm font-medium text-charcoal-muted mb-2">Top Wants</h4>
 					<div class="space-y-2">
-						{#each topCategories.discretionary as { category, amount }}
+						{#each topCategories.discretionary as { category, categoryId, amount } (categoryId)}
 							{#if category}
 								<div class="flex items-center gap-2">
 									<span class="w-2 h-2 rounded-full shrink-0" style="background-color: {category.color || '#C45D3A'};" aria-hidden="true"></span>

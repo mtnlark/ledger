@@ -198,7 +198,7 @@
 			{#if topMerchants.length > 0}
 				{@const maxMerchant = topMerchants[0]?.amount || 1}
 				<div class="rounded-lg overflow-hidden">
-					{#each topMerchants as { merchant, amount }, i}
+					{#each topMerchants as { merchant, amount }, i (merchant)}
 						{@const pct = (amount / maxMerchant) * 100}
 						<button
 							type="button"

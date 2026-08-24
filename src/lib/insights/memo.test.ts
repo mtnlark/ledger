@@ -36,6 +36,15 @@ describe('memoByVersion', () => {
 		expect(fn).toHaveBeenCalledTimes(2);
 	});
 
+	it('recomputes when arguments change under the same version and key', () => {
+		const fn = vi.fn((x: number) => x * 2);
+		const memoized = memoByVersion(fn);
+
+		expect(memoized(1, 'a', 5)).toBe(10);
+		expect(memoized(1, 'a', 10)).toBe(20);
+		expect(fn).toHaveBeenCalledTimes(2);
+	});
+
 	it('uses new args on recomputation, not cached args', () => {
 		const fn = vi.fn((x: number) => x * 2);
 		const memoized = memoByVersion(fn);
@@ -113,6 +122,15 @@ describe('memoByVersionMultiKey', () => {
 		expect(fn).toHaveBeenCalledTimes(4);
 	});
 
+	it('recomputes a key when its arguments change', () => {
+		const fn = vi.fn((x: number) => x * 2);
+		const memoized = memoByVersionMultiKey(fn);
+
+		expect(memoized(1, 'a', 5)).toBe(10);
+		expect(memoized(1, 'a', 10)).toBe(20);
+		expect(fn).toHaveBeenCalledTimes(2);
+	});
+
 	it('evicts oldest entry when at capacity', () => {
 		const fn = vi.fn((x: number) => x * 2);
 		const memoized = memoByVersionMultiKey(fn, 3); // max 3 entries
@@ -137,6 +155,21 @@ describe('memoByVersionMultiKey', () => {
 		// 'b' was evicted when 'a' was re-added, so it requires recomputation
 		memoized(1, 'b', 2);
 		expect(fn).toHaveBeenCalledTimes(6);
+	});
+
+	it('keeps recently accessed entries', () => {
+		const fn = vi.fn((x: number) => x);
+		const memoized = memoByVersionMultiKey(fn, 2);
+
+		memoized(1, 'a', 1);
+		memoized(1, 'b', 2);
+		memoized(1, 'a', 1);
+		memoized(1, 'c', 3);
+		memoized(1, 'a', 1);
+
+		expect(fn).toHaveBeenCalledTimes(3);
+		memoized(1, 'b', 2);
+		expect(fn).toHaveBeenCalledTimes(4);
 	});
 
 	it('defaults to 12 max entries', () => {

@@ -161,8 +161,9 @@ export function groupTransactionsByDate(transactions: Transaction[]): Map<string
 	for (const tx of transactions) {
 		const date = startOfDay(new Date(tx.date));
 		const dateKey = format(date, 'yyyy-MM-dd');
-		const existing = groups.get(dateKey) || [];
-		groups.set(dateKey, [...existing, tx]);
+		const existing = groups.get(dateKey);
+		if (existing) existing.push(tx);
+		else groups.set(dateKey, [tx]);
 	}
 
 	return groups;

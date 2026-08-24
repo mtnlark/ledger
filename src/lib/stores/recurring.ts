@@ -162,7 +162,10 @@ function detectRecurringPattern(purchases: TransactionPurchase[]): PatternResult
  * Excludes transactions already tagged as subscriptions (those are shown separately)
  * Results are cached until invalidated
  */
-export async function detectRecurringExpenses(providedTransactions?: Transaction[]): Promise<DetectedRecurring[]> {
+export async function detectRecurringExpenses(
+	providedTransactions?: Transaction[],
+	options: { purchases?: TransactionPurchase[] } = {}
+): Promise<DetectedRecurring[]> {
 	// Return cached results if available
 	const cached = getCachedRecurring();
 	if (cached !== null) {
@@ -176,11 +179,10 @@ export async function detectRecurringExpenses(providedTransactions?: Transaction
 		return [];
 	}
 
-	// Filter out split parent and soft-deleted transactions
-	const purchases = groupTransactionsIntoPurchases(allTransactions);
+	const purchases = options.purchases ?? groupTransactionsIntoPurchases(allTransactions);
 
 	// Get dismissed merchants to filter out
-	const dismissedMerchants = await getDismissedRecurring();
+	const dismissedMerchants = new Set(await getDismissedRecurring());
 
 	// Group transactions by normalized merchant name
 	// Exclude transactions already tagged as subscriptions (they're shown in subscriptions section)
@@ -190,10 +192,10 @@ export async function detectRecurringExpenses(providedTransactions?: Transaction
 		if (purchase.sourceTransactions.some((transaction) => transaction.isSubscription)) continue;
 
 		const key = normalizeMerchant(purchase.merchant);
-		// Skip dismissed merchants
-		if (dismissedMerchants.includes(key)) continue;
-		const existing = merchantGroups.get(key) || [];
-		merchantGroups.set(key, [...existing, purchase]);
+		if (dismissedMerchants.has(key)) continue;
+		const existing = merchantGroups.get(key);
+		if (existing) existing.push(purchase);
+		else merchantGroups.set(key, [purchase]);
 	}
 
 	const detected: DetectedRecurring[] = [];

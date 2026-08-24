@@ -170,7 +170,7 @@
 							class="w-16 px-3 py-2.5 bg-surface-alt border border-theme rounded-lg focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-colors text-center text-xl"
 						/>
 						<div class="flex gap-1 flex-wrap">
-							{#each iconSuggestions[account.accountType] as emoji}
+							{#each iconSuggestions[account.accountType] as emoji (emoji)}
 								<button
 									type="button"
 									onclick={() => (icon = emoji)}
@@ -199,7 +199,7 @@
 							class="w-10 h-10 rounded-lg border border-theme cursor-pointer"
 						/>
 						<div class="flex gap-1 flex-wrap">
-							{#each colorPresets as preset}
+							{#each colorPresets as preset (preset)}
 								<button
 									type="button"
 									onclick={() => (color = preset)}

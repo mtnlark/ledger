@@ -138,15 +138,15 @@
 
 			<!-- Day-of-week headers -->
 			<div class="grid grid-cols-7 gap-1 mb-1">
-				{#each ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as dayLabel}
+				{#each ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as dayLabel (dayLabel)}
 					<div class="text-xs text-charcoal-muted text-center font-medium">{dayLabel}</div>
 				{/each}
 			</div>
 
 			<!-- Zoomed days grid -->
 			<div class="grid grid-cols-7 gap-1">
-				{#each monthData.grid as row}
-					{#each row as day}
+				{#each monthData.grid as row, rowIndex (rowIndex)}
+					{#each row as day, columnIndex (day.date?.getTime() ?? `empty-${rowIndex}-${columnIndex}`)}
 						{#if day.date === null}
 							<div class="w-full aspect-square"></div>
 						{:else if day.isFutureDay}
@@ -174,7 +174,7 @@
 	{:else}
 		<!-- Overview: 12-month grid -->
 		<div class="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
-			{#each monthsData as monthData, index}
+			{#each monthsData as monthData, index (monthData.month.getTime())}
 				<button
 					type="button"
 					onclick={() => handleMonthClick(index)}
@@ -187,9 +187,9 @@
 
 					<!-- Days grid (7 columns for Sun-Sat) -->
 					<div class="flex flex-col items-center" style="gap: {gap}px;">
-						{#each monthData.grid as row}
+						{#each monthData.grid as row, rowIndex (rowIndex)}
 							<div class="flex" style="gap: {gap}px;">
-								{#each row as day}
+								{#each row as day, columnIndex (day.date?.getTime() ?? `empty-${rowIndex}-${columnIndex}`)}
 									{#if day.date === null}
 										<!-- Empty placeholder -->
 										<div style="width: {cellSize}px; height: {cellSize}px;"></div>
@@ -221,7 +221,7 @@
 	{#if !compact}
 		<div class="flex items-center justify-end gap-1 text-xs text-charcoal-muted">
 			<span>Less</span>
-			{#each intensityColors as color}
+			{#each intensityColors as color (color)}
 				<div class="{color} rounded-sm" style="width: {cellSize}px; height: {cellSize}px;"></div>
 			{/each}
 			<span>More</span>

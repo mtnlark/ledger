@@ -271,7 +271,7 @@
 		</div>
 		{#if isLoading}
 			<!-- Loading skeletons -->
-			{#each Array(3) as _}
+			{#each Array(3) as _, index (index)}
 				<div class="bg-surface rounded-xl shadow-md shadow-[var(--color-shadow)] overflow-hidden">
 					<div class="px-6 py-4 flex items-center justify-between">
 						<div>

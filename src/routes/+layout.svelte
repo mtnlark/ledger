@@ -28,18 +28,12 @@
 	let isQuickWindow = $derived($page.url.pathname.startsWith('/quick-add'));
 
 	let cleanupListener: (() => void) | null = null;
-	let hasPurgedDeleted = false;
 
-	// One-time startup cleanup: permanently remove soft-deleted transactions from previous sessions
-	$effect(() => {
-		if (hasPurgedDeleted || isQuickWindow) return;
-		hasPurgedDeleted = true;
-
-		purgeDeletedTransactions().then((count) => {
-			if (count > 0 && import.meta.env.DEV) {
-				console.log(`Purged ${count} soft-deleted transactions from previous session`);
-			}
-		});
+	onMount(() => {
+		if (isQuickWindow) return;
+		void initializeStorage()
+			.then(() => purgeDeletedTransactions())
+			.catch((error) => console.error('Startup cleanup failed:', error));
 	});
 
 	// Apply theme reactively when settings change
@@ -61,9 +55,11 @@
 			return;
 		}
 
-		// Start notifications asynchronously
-		(async () => {
-			// Check if today has any transactions (for daily reminder skip logic)
+		let cancelled = false;
+		void (async () => {
+			await initializeStorage();
+			if (cancelled) return;
+
 			const now = new Date();
 			const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 			const todayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
@@ -73,17 +69,20 @@
 				.count();
 
 			const started = await initNotifications(s, todayCount > 0);
+			if (cancelled) return;
 
-			// If OS permission was revoked, silently disable notifications
 			if (!started && s.notificationsEnabled) {
 				const stillGranted = await isNotificationPermissionGranted();
 				if (!stillGranted) {
 					await updateSettings({ notificationsEnabled: false });
 				}
 			}
-		})();
+		})().catch((error) => console.error('Notification setup failed:', error));
 
-		return () => cleanupNotifications();
+		return () => {
+			cancelled = true;
+			cleanupNotifications();
+		};
 	});
 
 	// Receive transactions submitted from the quick-add window. This window is

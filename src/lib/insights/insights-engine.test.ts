@@ -94,6 +94,18 @@ describe('InsightsEngine', () => {
 			const janAgain = engine.getTotalSpent(janTxs, '2025-01');
 			expect(janAgain).toBe(100);
 		});
+
+		it('does not reuse a result when non-transaction inputs change', () => {
+			const engine = getInsightsEngine();
+			const firstBudget = { month: '2025-01', income: 5000, savedAmount: 0 };
+			const updatedBudget = { ...firstBudget, income: 6000 };
+
+			const first = engine.getPaceProjection(1000, firstBudget, 1000, 15, 31, 0, '2025-01');
+			const updated = engine.getPaceProjection(1000, updatedBudget, 1000, 15, 31, 0, '2025-01');
+
+			expect(first?.available).toBe(4000);
+			expect(updated?.available).toBe(5000);
+		});
 	});
 
 	describe('calculation correctness', () => {

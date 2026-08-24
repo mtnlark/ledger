@@ -11,10 +11,10 @@ export default defineConfig({
 		rollupOptions: {
 			output: {
 				manualChunks(id) {
-					if (id.includes('node_modules/chart.js') || id.includes('node_modules/chartjs-plugin-annotation')) {
+					if (id.includes('node_modules/chart.js') || id.includes('node_modules/chartjs-')) {
 						return 'chart';
 					}
-					if (id.includes('node_modules/xlsx')) {
+					if (id.includes('node_modules/exceljs')) {
 						return 'excel';
 					}
 					if (id.includes('node_modules/dexie')) {

@@ -88,7 +88,7 @@
 
 {#if topCategories.length > 0}
 	<div class="space-y-1">
-		{#each topCategories as cat}
+		{#each topCategories as cat (cat.id ?? 'other')}
 			{@const pct = (cat.amount / maxAmount) * 100}
 			<button
 				type="button"

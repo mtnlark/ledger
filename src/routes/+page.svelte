@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { afterNavigate } from '$app/navigation';
-	import { format, startOfDay, parseISO } from 'date-fns';
+	import { onMount } from 'svelte';
+	import { addDays, format, parseISO, startOfTomorrow } from 'date-fns';
 	import { getMonthKey, parseMonthKey, type Transaction, type Category, type Settings, type MonthlyBudget, DEFAULT_SETTINGS } from '$lib/db';
 	import { initializeStorage } from '$lib/storage';
 	import { getTransactionsByMonth, getTransactionsByMonthFromCache, getAllTransactions, getAvailableMonths } from '$lib/stores/transactions';
@@ -13,7 +14,7 @@
 	import { addRecurringSuggestionTransaction, getRecurringSuggestions, shouldShowRecurringBanner, type RecurringSuggestion } from '$lib/stores/recurringSuggestions';
 	import { sumCurrency, calculateTotalSpent } from '$lib/utils/currency';
 	import { groupTransactionsIntoPurchases } from '$lib/utils/transaction-grouping';
-	import { matchesTag } from '$lib/utils/tags';
+	import { extractTags } from '$lib/utils/tags';
 	import { tagIndex } from '$lib/stores/tags.svelte';
 	import { registerShortcutHandlers } from '$lib/stores/shortcuts';
 	import { getSelectedMonth, setSelectedMonth } from '$lib/stores/selectedMonth';
@@ -50,11 +51,8 @@
 	let addModalOpen = $state(false);
 	// Height of the sticky heading+toolbar block; date headers stick just below it
 	let toolbarHeight = $state(0);
-	// Future-dated transactions are hidden by default (toggle persists)
 	let showUpcoming = $state(false);
-	// Stale-ledger nudge: shown when nothing has been entered for a week
 	let staleNudgeDismissedAt = $state<string | null>(null);
-	// Report cards (merchant / tag drill-downs)
 	let merchantReportFor = $state<string | null>(null);
 	let tagReportFor = $state<string | null>(null);
 	let searchInputRef = $state<HTMLInputElement | null>(null);
@@ -72,12 +70,10 @@
 	let currentMonth = $state(getMonthKey(new Date()));
 	let availableMonths = $state<string[]>([getMonthKey(new Date())]);
 
-	// Recurring suggestions state
 	let showRecurringBanner = $state(false);
 	let showRecurringSuggestionsModal = $state(false);
 	let recurringSuggestions = $state<RecurringSuggestion[]>([]);
 
-	// Transaction CRUD actions (extracted module)
 	const actions = setupDashboardActions({
 		getCurrentMonth: () => currentMonth,
 		hasAllTransactions: () => allTransactions.length > 0,
@@ -90,7 +86,6 @@
 		}
 	});
 
-	// Confirm dialog state
 	let confirmDialog = $state<{
 		isOpen: boolean;
 		title: string;
@@ -133,7 +128,6 @@
 		closeConfirmDialog();
 	}
 
-	// Filter state
 	let filters = $state<FilterState>({
 		searchQuery: '',
 		categoryId: null,
@@ -146,7 +140,6 @@
 		sharedStatus: ''
 	});
 
-	// Check if we're using filters that require all transactions
 	let needsAllTransactions = $derived(
 		filters.dateFrom !== '' ||
 		filters.dateTo !== '' ||
@@ -158,65 +151,55 @@
 		`${currentMonth}|${filters.searchQuery}|${filters.categoryId}|${filters.dateFrom}|${filters.dateTo}|${filters.searchAllTime}|${filters.tags.join(',')}|${filters.amountMin}|${filters.amountMax}|${filters.sharedStatus}|${showUpcoming}`
 	);
 
-	// Determine which transaction set to filter from
 	let baseTransactions = $derived(needsAllTransactions ? allTransactions : transactions);
 
-	// Filtered transactions (search/category/date/tag/amount — before the upcoming filter)
 	let searchFilteredTransactions = $derived.by(() => {
-		let result = baseTransactions;
+		const query = filters.searchQuery.trim().toLowerCase();
+		const fromTime = filters.dateFrom ? parseISO(filters.dateFrom).getTime() : null;
+		const toTime = filters.dateTo
+			? addDays(parseISO(filters.dateTo), 1).getTime()
+			: null;
+		const selectedTags = new Set(filters.tags.map((tag) => tag.replace(/^#/, '').toLowerCase()));
+		const minAmount = filters.amountMin === '' ? null : Number(filters.amountMin);
+		const maxAmount = filters.amountMax === '' ? null : Number(filters.amountMax);
 
-		// Filter by search query (merchant name and notes)
-		if (filters.searchQuery.trim()) {
-			const query = filters.searchQuery.toLowerCase().trim();
-			result = result.filter(t =>
-				t.merchant.toLowerCase().includes(query) ||
-				(t.notes?.toLowerCase().includes(query) ?? false)
-			);
-		}
+		return baseTransactions.filter((transaction) => {
+			if (
+				query &&
+				!transaction.merchant.toLowerCase().includes(query) &&
+				!transaction.notes?.toLowerCase().includes(query)
+			) return false;
+			if (filters.categoryId !== null && transaction.categoryId !== filters.categoryId) return false;
 
-		// Filter by category
-		if (filters.categoryId !== null) {
-			result = result.filter(t => t.categoryId === filters.categoryId);
-		}
+			if (fromTime !== null || toTime !== null) {
+				const transactionTime = new Date(transaction.date).getTime();
+				if (fromTime !== null && transactionTime < fromTime) return false;
+				if (toTime !== null && transactionTime >= toTime) return false;
+			}
 
-		// Filter by date range
-		if (filters.dateFrom) {
-			const fromDate = startOfDay(parseISO(filters.dateFrom));
-			result = result.filter(t => startOfDay(new Date(t.date)) >= fromDate);
-		}
+			if (
+				selectedTags.size > 0 &&
+				!extractTags(transaction.notes).some((tag) => selectedTags.has(tag))
+			) return false;
 
-		if (filters.dateTo) {
-			const toDate = startOfDay(parseISO(filters.dateTo));
-			result = result.filter(t => startOfDay(new Date(t.date)) <= toDate);
-		}
+			switch (filters.sharedStatus) {
+				case 'shared':
+					if (!transaction.isShared) return false;
+					break;
+				case 'pending':
+					if (!transaction.isShared || transaction.isSettled) return false;
+					break;
+				case 'settled':
+					if (!transaction.isShared || !transaction.isSettled) return false;
+					break;
+				case 'personal':
+					if (transaction.isShared) return false;
+			}
 
-		// Filter by tags (OR logic - show transactions with ANY selected tag)
-		if (filters.tags.length > 0) {
-			result = result.filter(tx => filters.tags.some(tag => matchesTag(tx, tag)));
-		}
-
-		// Filter by shared status (settlement history: shared + settled + all time)
-		if (filters.sharedStatus === 'shared') {
-			result = result.filter(t => t.isShared);
-		} else if (filters.sharedStatus === 'pending') {
-			result = result.filter(t => t.isShared && !t.isSettled);
-		} else if (filters.sharedStatus === 'settled') {
-			result = result.filter(t => t.isShared && t.isSettled);
-		} else if (filters.sharedStatus === 'personal') {
-			result = result.filter(t => !t.isShared);
-		}
-
-		// Filter by amount range
-		if (filters.amountMin) {
-			const min = parseFloat(filters.amountMin);
-			if (!isNaN(min)) result = result.filter(t => t.amount >= min);
-		}
-		if (filters.amountMax) {
-			const max = parseFloat(filters.amountMax);
-			if (!isNaN(max)) result = result.filter(t => t.amount <= max);
-		}
-
-		return result;
+			if (minAmount !== null && Number.isFinite(minAmount) && transaction.amount < minAmount) return false;
+			if (maxAmount !== null && Number.isFinite(maxAmount) && transaction.amount > maxAmount) return false;
+			return true;
+		});
 	});
 
 	// Upcoming (future-dated) transactions are hidden by default so logging in on
@@ -225,20 +208,25 @@
 	// blank the page, so the filter is skipped.
 	let isFutureMonthView = $derived(currentMonth > getMonthKey(new Date()));
 
-	let upcomingCount = $derived.by(() => {
-		if (isFutureMonthView) return 0;
-		const today = startOfDay(new Date());
-		const upcoming = searchFilteredTransactions.filter(
-			(t) => startOfDay(new Date(t.date)) > today
-		);
-		return groupTransactionsIntoPurchases(upcoming).length;
+	let transactionsByTiming = $derived.by(() => {
+		if (isFutureMonthView) {
+			return { current: searchFilteredTransactions, upcoming: [] as Transaction[] };
+		}
+
+		const tomorrow = startOfTomorrow().getTime();
+		const current: Transaction[] = [];
+		const upcoming: Transaction[] = [];
+		for (const transaction of searchFilteredTransactions) {
+			const destination = new Date(transaction.date).getTime() < tomorrow ? current : upcoming;
+			destination.push(transaction);
+		}
+		return { current, upcoming };
 	});
 
-	let filteredTransactions = $derived.by(() => {
-		if (showUpcoming || isFutureMonthView) return searchFilteredTransactions;
-		const today = startOfDay(new Date());
-		return searchFilteredTransactions.filter((t) => startOfDay(new Date(t.date)) <= today);
-	});
+	let upcomingCount = $derived(groupTransactionsIntoPurchases(transactionsByTiming.upcoming).length);
+	let filteredTransactions = $derived(
+		showUpcoming || isFutureMonthView ? searchFilteredTransactions : transactionsByTiming.current
+	);
 
 	let filteredTransactionCount = $derived(
 		groupTransactionsIntoPurchases(filteredTransactions).length
@@ -258,7 +246,6 @@
 
 	let showStaleNudge = $derived.by(() => {
 		if (isLoading || daysSinceEntry < STALE_THRESHOLD_DAYS) return false;
-		// Dismissal re-arms after another threshold period
 		if (staleNudgeDismissedAt) {
 			const sinceDismiss = Math.floor(
 				(Date.now() - new Date(staleNudgeDismissedAt).getTime()) / 86_400_000
@@ -305,7 +292,6 @@
 	}
 
 	async function handleFilterChange(newFilters: FilterState) {
-		// If all-time search or date filters are being applied, load all transactions
 		const needsAll = newFilters.dateFrom !== '' || newFilters.dateTo !== '' || newFilters.searchAllTime;
 		if (needsAll && allTransactions.length === 0) {
 			allTransactions = await getAllTransactions();
@@ -316,23 +302,16 @@
 	let monthDisplay = $derived(format(parseMonthKey(currentMonth), 'MMMM yyyy'));
 	let totalSpent = $derived(calculateTotalSpent(transactions));
 
-	// Initial data load - runs once on mount
-	$effect(() => {
-		loadData();
-		// Empty dependency array equivalent - this effect runs once
-		return () => {};
-	});
+	onMount(() => void loadData());
 
 	async function loadData() {
 		isLoading = true;
 		try {
 			await initializeStorage();
-			// Restore selected month and upcoming-visibility from localStorage
 			currentMonth = getSelectedMonth();
 			showUpcoming = localStorage.getItem(SHOW_UPCOMING_KEY) === 'true';
 			staleNudgeDismissedAt = localStorage.getItem(STALE_NUDGE_KEY);
 
-			// Parallelize independent queries
 			const [cats, s, allTxns] = await Promise.all([
 				getAllCategories(),
 				getSettings(),
@@ -342,10 +321,8 @@
 			settings = s;
 			allTransactions = allTxns;
 
-			// Use cache for current month (avoids redundant DB query)
 			transactions = getTransactionsByMonthFromCache(currentMonth) ?? await getTransactionsByMonth(currentMonth);
 
-			// Parallelize remaining independent queries
 			const [monthBudget, months, contributions, rollover] = await Promise.all([
 				getBudgetForMonth(currentMonth),
 				getAvailableMonths(),
@@ -375,7 +352,6 @@
 		}
 	}
 
-	// Handle month change from picker
 	// Fetch data first, then update all state atomically to prevent UI mismatch
 	async function handleMonthChange(month: string) {
 		setSelectedMonth(month);
@@ -396,7 +372,6 @@
 		}
 	}
 
-	// Handle budget save
 	async function handleSaveBudget(data: { income: number; notes?: string }) {
 		try {
 			// Keep existing savedAmount for backward compatibility (not used in calculations anymore)
@@ -413,13 +388,11 @@
 		editingTransaction = transaction;
 	}
 
-	// Handle save edit — delegates to actions, then clears editing state on success
 	async function handleSaveEdit(id: number, data: TransactionUpdateData) {
 		const success = await actions.saveEdit(id, data, editingTransaction?.isSettled ?? false);
 		if (success) editingTransaction = null;
 	}
 
-	// Handle delete — wraps the action in a confirm dialog
 	function handleDelete(id: number) {
 		showConfirmDialog({
 			title: 'Delete Transaction',
@@ -430,7 +403,6 @@
 		});
 	}
 
-	// Handle bulk delete — wraps the action in a confirm dialog
 	function handleBulkDelete(ids: number[]) {
 		if (ids.length === 0) return;
 
@@ -447,42 +419,35 @@
 		});
 	}
 
-	// Handle bulk category change — delegates to actions with categories for toast
 	async function handleBulkCategoryChange(ids: number[], categoryId: number) {
 		if (ids.length === 0) return;
 		await actions.bulkCategoryChange(ids, categoryId, categories);
 	}
 
-	// Handle bulk tag add — delegates to actions
 	async function handleBulkTagAdd(ids: number[], tag: string) {
 		if (ids.length === 0) return;
 		await actions.bulkAddTag(ids, tag);
 	}
 
-	// Handle bulk tag remove — delegates to actions
 	async function handleBulkTagRemove(ids: number[], tag: string) {
 		if (ids.length === 0) return;
 		await actions.bulkRemoveTag(ids, tag);
 	}
 
-	// Handle opening split modal from edit modal
 	function handleOpenSplit(transaction: Transaction) {
-		editingTransaction = null; // Close edit modal
-		splittingTransaction = transaction; // Open split modal
+		editingTransaction = null;
+		splittingTransaction = transaction;
 	}
 
-	// Handle split transaction — delegates to actions, then clears splitting state on success
 	async function handleSplitTransaction(id: number, splits: { categoryId: number; amount: number }[]) {
 		const success = await actions.splitTransaction(id, splits);
 		if (success) splittingTransaction = null;
 	}
 
-	// Handle editing an entire split — open the split editor
 	function handleEditSplit(parentId: number, children: Transaction[]) {
 		editingSplit = { parentId, children };
 	}
 
-	// Handle deleting an entire split — split-specific confirm, then soft-delete all lines (undoable)
 	function handleDeleteSplit(childIds: number[]) {
 		if (childIds.length === 0) return;
 		showConfirmDialog({
@@ -494,7 +459,6 @@
 		});
 	}
 
-	// Handle saving the edited split group — delegates to actions, clears state on success
 	async function handleSaveSplitGroup(
 		parentId: number,
 		shared: {
@@ -511,7 +475,6 @@
 		if (success) editingSplit = null;
 	}
 
-	// Handle adding selected recurring suggestions
 	async function handleAddSelectedSuggestions(items: Array<RecurringSuggestion & { date: Date }>) {
 		try {
 			const results = await Promise.allSettled(
@@ -528,7 +491,6 @@
 				allTransactions = await getAllTransactions();
 			}
 
-			// Refresh suggestions (remove added ones)
 			recurringSuggestions = await getRecurringSuggestions(currentMonth);
 
 			// Only dismiss if all suggestions have been added
@@ -554,7 +516,6 @@
 		}
 	}
 
-	// Handle dismissing recurring suggestions for this month
 	async function handleDismissRecurringSuggestions() {
 		try {
 			await dismissRecurringSuggestionsForMonth(currentMonth);
@@ -589,7 +550,6 @@
 		}
 	});
 
-	// Keyboard shortcut handlers
 	function handleOpenQuickAdd() {
 		if (!isLoading) {
 			addModalOpen = true;
@@ -606,7 +566,6 @@
 		focusSearch: handleFocusSearch
 	}));
 
-	// Expose ref setter for TransactionFilters to use
 	function setSearchInputRef(el: HTMLInputElement | null) {
 		searchInputRef = el;
 	}

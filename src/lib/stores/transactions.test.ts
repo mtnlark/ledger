@@ -6,6 +6,7 @@ import {
 	deleteTransaction,
 	bulkDeleteTransactions,
 	bulkUpdateCategory,
+	addSplitTransaction,
 	splitTransaction,
 	updateSplitGroup,
 	getSplitChildren,
@@ -1261,6 +1262,48 @@ describe('Transaction Operations', () => {
 
 			const transaction = await db.transactions.get(id);
 			expect(transaction?.isEssential).toBe(true);
+		});
+	});
+
+	describe('addSplitTransaction', () => {
+		const transaction = {
+			date: new Date(2025, 11, 15),
+			merchant: 'Target',
+			amount: 100,
+			categoryId: 11,
+			isShared: true,
+			splitType: 'percentage' as const,
+			splitValue: 0.5,
+			isSettled: false,
+			isEssential: true,
+			isSubscription: false
+		};
+
+		it('creates a hidden parent and linked children in one operation', async () => {
+			const childIds = await addSplitTransaction(transaction, [
+				{ categoryId: 11, amount: 60 },
+				{ categoryId: 15, amount: 40 }
+			]);
+
+			const rows = await db.transactions.toArray();
+			const parent = rows.find((row) => row.isSplitParent);
+			const children = rows.filter((row) => row.parentTransactionId === parent?.id);
+
+			expect(rows).toHaveLength(3);
+			expect(parent).toMatchObject({ merchant: 'Target', amount: 100, partnerShare: 50 });
+			expect(childIds).toEqual(children.map((child) => child.id));
+			expect(children.map((child) => child.partnerShare)).toEqual([30, 20]);
+		});
+
+		it('does not create a parent when the split is invalid', async () => {
+			await expect(
+				addSplitTransaction(transaction, [
+					{ categoryId: 11, amount: 60 },
+					{ categoryId: 15, amount: 30 }
+				])
+			).rejects.toThrow('Split amounts must equal original transaction amount');
+
+			expect(await db.transactions.count()).toBe(0);
 		});
 	});
 

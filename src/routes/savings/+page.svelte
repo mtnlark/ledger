@@ -204,7 +204,7 @@
 
 				<!-- List skeleton -->
 				<div class="space-y-3">
-					{#each { length: 3 } as _}
+					{#each { length: 3 } as _, index (index)}
 						<div class="bg-surface rounded-lg shadow-sm shadow-theme p-4">
 							<div class="flex items-center gap-4">
 								<Skeleton width="48px" height="48px" class="rounded-lg" />

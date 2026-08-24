@@ -25,7 +25,7 @@ import {
 	type PurchaseAllocation,
 	type TransactionPurchase
 } from '$lib/utils/transaction-grouping';
-import { addTransaction, splitTransaction } from './transactions';
+import { addTransaction, addSplitTransaction } from './transactions';
 
 export interface RecurringSuggestion {
 	/** Unique ID - composite key (merchant|amount) for subscriptions, normalized merchant for detected */
@@ -53,7 +53,7 @@ export interface RecurringSuggestion {
 export async function addRecurringSuggestionTransaction(
 	suggestion: RecurringSuggestion & { date: Date }
 ): Promise<number[]> {
-	const parentId = await addTransaction({
+	const transaction = {
 		date: suggestion.date,
 		merchant: suggestion.merchant,
 		amount: suggestion.expectedAmount,
@@ -65,14 +65,14 @@ export async function addRecurringSuggestionTransaction(
 		isEssential: suggestion.isEssential,
 		isSubscription: suggestion.isSubscription,
 		subscriptionFrequency: suggestion.frequency
-	});
+	};
 
 	if (!suggestion.allocationTemplate || suggestion.allocationTemplate.length < 2) {
-		return [parentId];
+		return [await addTransaction(transaction)];
 	}
 
-	return splitTransaction(
-		parentId,
+	return addSplitTransaction(
+		transaction,
 		scalePurchaseAllocations(suggestion.allocationTemplate, suggestion.expectedAmount)
 	);
 }
@@ -94,11 +94,14 @@ export function shouldShowRecurringBanner(
  * For subscriptions (with composite key), matches by merchant + amount within tolerance.
  * For detected recurring (merchant-only key), matches by merchant name only.
  */
-function isAlreadyAdded(suggestion: RecurringSuggestion, monthTxns: Transaction[]): boolean {
+function isAlreadyAdded(
+	suggestion: RecurringSuggestion,
+	monthPurchases: TransactionPurchase[]
+): boolean {
 	const normalizedMerchant = normalizeMerchant(suggestion.merchant);
 	const tolerance = config.recurringSuggestions.amountTolerance;
 
-	return groupTransactionsIntoPurchases(monthTxns).some((purchase) => {
+	return monthPurchases.some((purchase) => {
 		if (normalizeMerchant(purchase.merchant) !== normalizedMerchant) return false;
 
 		// For subscription suggestions, also match by amount (within tolerance)
@@ -156,19 +159,20 @@ export function isExpectedThisMonth(
  * Groups by merchant+amount composite key so multiple subscriptions from
  * the same merchant with different amounts are tracked independently.
  */
-export async function getUserSubscriptions(providedTransactions?: Transaction[]): Promise<Map<string, RecurringSuggestion>> {
-	// Filter in-memory since isSubscription isn't indexed
-	const allTransactions = providedTransactions ?? await db.transactions.toArray();
-	const subscriptionPurchases = groupTransactionsIntoPurchases(allTransactions).filter((purchase) =>
+async function buildUserSubscriptions(
+	allTransactions: Transaction[],
+	allPurchases: TransactionPurchase[]
+): Promise<Map<string, RecurringSuggestion>> {
+	const subscriptionPurchases = allPurchases.filter((purchase) =>
 		purchase.sourceTransactions.some((transaction) => transaction.isSubscription)
 	);
 
-	// Group by composite key (merchant|amount)
 	const grouped = new Map<string, TransactionPurchase[]>();
 	for (const purchase of subscriptionPurchases) {
 		const key = subscriptionKey(purchase.merchant, purchase.totalAmount);
-		const existing = grouped.get(key) || [];
-		grouped.set(key, [...existing, purchase]);
+		const existing = grouped.get(key);
+		if (existing) existing.push(purchase);
+		else grouped.set(key, [purchase]);
 	}
 
 	const subscriptions = new Map<string, RecurringSuggestion>();
@@ -251,6 +255,13 @@ export async function getUserSubscriptions(providedTransactions?: Transaction[])
 	return subscriptions;
 }
 
+export async function getUserSubscriptions(
+	providedTransactions?: Transaction[]
+): Promise<Map<string, RecurringSuggestion>> {
+	const transactions = providedTransactions ?? await db.transactions.toArray();
+	return buildUserSubscriptions(transactions, groupTransactionsIntoPurchases(transactions));
+}
+
 /**
  * Pre-built lookup maps for last occurrence dates, avoiding N+1 queries.
  * - merchantLastDate: keyed by normalized merchant, latest date across all amounts
@@ -264,11 +275,11 @@ interface LastOccurrenceMaps {
 /**
  * Build last-occurrence lookup maps from all transactions in a single pass.
  */
-function buildLastOccurrenceMaps(allTxns: Transaction[]): LastOccurrenceMaps {
+function buildLastOccurrenceMaps(purchases: TransactionPurchase[]): LastOccurrenceMaps {
 	const merchantLastDate = new Map<string, Date>();
 	const merchantAmountLastDate = new Map<string, Date>();
 
-	for (const purchase of groupTransactionsIntoPurchases(allTxns)) {
+	for (const purchase of purchases) {
 		const merchant = normalizeMerchant(purchase.merchant);
 		const txDate = purchase.date;
 
@@ -287,6 +298,21 @@ function buildLastOccurrenceMaps(allTxns: Transaction[]): LastOccurrenceMaps {
 	}
 
 	return { merchantLastDate, merchantAmountLastDate };
+}
+
+function buildLatestSharedPurchaseMap(
+	purchases: TransactionPurchase[]
+): Map<string, TransactionPurchase> {
+	const latestByMerchant = new Map<string, TransactionPurchase>();
+	for (const purchase of purchases) {
+		if (!purchase.isShared) continue;
+		const merchant = normalizeMerchant(purchase.merchant);
+		const current = latestByMerchant.get(merchant);
+		if (!current || purchase.date.getTime() > current.date.getTime()) {
+			latestByMerchant.set(merchant, purchase);
+		}
+	}
+	return latestByMerchant;
 }
 
 /**
@@ -338,25 +364,19 @@ export async function getRecurringSuggestions(month: string, providedTransaction
 	const settings = await getSettings();
 	const cancelledSubs = await getCancelledSubscriptions();
 
-	// Use provided transactions or fall back to DB query
 	const allTxns = providedTransactions ?? await db.transactions.toArray();
+	const allPurchases = groupTransactionsIntoPurchases(allTxns);
 
-	// Get transactions for this month from the full set (avoids separate DB query)
 	const monthStart = parseMonthKey(month);
-	const monthEnd = new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 0);
-	const monthTxns = allTxns.filter((tx) => {
-		const d = new Date(tx.date);
-		return d >= monthStart && d <= monthEnd;
+	const nextMonth = new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 1);
+	const monthPurchases = allPurchases.filter((purchase) => {
+		return purchase.date >= monthStart && purchase.date < nextMonth;
 	});
 
-	// Get user-tagged subscriptions (priority) — pass full transactions to avoid re-querying
-	const userSubscriptions = await getUserSubscriptions(allTxns);
-
-	// Get detected recurring expenses — pass full transactions to avoid re-querying
-	const detectedRecurring = await detectRecurringExpenses(allTxns);
-
-	// Build last-occurrence maps once (fixes N+1: was fetching all txns per item)
-	const occurrenceMaps = buildLastOccurrenceMaps(allTxns);
+	const userSubscriptions = await buildUserSubscriptions(allTxns, allPurchases);
+	const detectedRecurring = await detectRecurringExpenses(allTxns, { purchases: allPurchases });
+	const occurrenceMaps = buildLastOccurrenceMaps(allPurchases);
+	const latestSharedByMerchant = buildLatestSharedPurchaseMap(allPurchases);
 
 	// Build merged suggestions map (subscriptions override detected)
 	const suggestionsMap = new Map<string, RecurringSuggestion>();
@@ -381,14 +401,8 @@ export async function getRecurringSuggestions(month: string, providedTransaction
 		let splitValue = settings.defaultSplitValue;
 
 		if (detected.isShared) {
-			// Find the most recent transaction for this merchant to get split settings
-			const merchantPurchases = groupTransactionsIntoPurchases(allTxns).filter(
-				(purchase) => normalizeMerchant(purchase.merchant) === key && purchase.isShared
-			);
-			if (merchantPurchases.length > 0) {
-				const recent = merchantPurchases.sort(
-					(a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
-				)[0];
+			const recent = latestSharedByMerchant.get(key);
+			if (recent) {
 				const recentTransaction = recent.sourceTransactions[0];
 				splitType = recentTransaction.splitType;
 				splitValue = recentTransaction.splitValue;
@@ -447,8 +461,7 @@ export async function getRecurringSuggestions(month: string, providedTransaction
 	// Convert to array
 	let suggestions = Array.from(suggestionsMap.values());
 
-	// Filter out already-added transactions
-	suggestions = suggestions.filter((s) => !isAlreadyAdded(s, monthTxns));
+	suggestions = suggestions.filter((suggestion) => !isAlreadyAdded(suggestion, monthPurchases));
 
 	// Sort by expected date, then amount
 	suggestions.sort((a, b) => {

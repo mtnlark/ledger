@@ -211,6 +211,18 @@ describe('getUserSubscriptions', () => {
 		expect(suggestions).toEqual([]);
 	});
 
+	it('treats transactions late on the last day as part of the target month', async () => {
+		const transactions = [
+			makeTransaction({ id: 10, date: new Date(2026, 0, 31, 18), isSubscription: true }),
+			makeTransaction({ id: 20, date: new Date(2026, 1, 28, 18), isSubscription: true }),
+			makeTransaction({ id: 30, date: new Date(2026, 2, 31, 18), isSubscription: true })
+		];
+
+		const suggestions = await getRecurringSuggestions('2026-03', transactions);
+
+		expect(suggestions).toEqual([]);
+	});
+
 	it('does not return non-subscription transactions', async () => {
 		await db.transactions.bulkAdd([
 			makeTransaction({ merchant: 'Grocery Store', amount: 50, isSubscription: false })

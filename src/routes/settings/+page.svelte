@@ -483,7 +483,7 @@
 
 				<div class="p-6">
 					<div class="flex gap-3">
-						{#each themeOptions as option}
+						{#each themeOptions as option (option.value)}
 							<button
 								type="button"
 								onclick={() => handleThemeChange(option.value)}
@@ -627,11 +627,11 @@
 
 				<div class="p-6">
 					<div class="space-y-3">
-						{#each shortcutList as shortcut}
+						{#each shortcutList as shortcut (shortcut.description)}
 							<div class="flex items-center justify-between">
 								<span class="text-sm text-charcoal-soft">{shortcut.description}</span>
 								<div class="flex items-center gap-1">
-									{#each shortcut.keys as key}
+								{#each shortcut.keys as key (key)}
 										<kbd class="inline-flex items-center justify-center min-w-[28px] h-7 px-2 bg-cream border border-theme-muted rounded-md text-xs font-mono font-medium text-charcoal-muted shadow-sm">
 											{key}
 										</kbd>

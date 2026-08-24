@@ -40,13 +40,19 @@ describe('Storage Layer', () => {
 		});
 
 		it('does not throw when called multiple times', async () => {
-			// First call
 			const result1 = await initializeStorage();
 			expect(result1.status).toBe('initialized_fresh');
 
-			// Second call should return cached result (due to initialized flag)
 			const result2 = await initializeStorage();
 			expect(result2.status).toBe('initialized_fresh');
+		});
+
+		it('coalesces concurrent initialization calls', async () => {
+			const results = await Promise.all(Array.from({ length: 10 }, () => initializeStorage()));
+
+			expect(results.every((result) => result.status === 'initialized_fresh')).toBe(true);
+			expect(await db.categories.count()).toBe(DEFAULT_CATEGORIES.length);
+			expect(await db.settings.count()).toBe(1);
 		});
 	});
 

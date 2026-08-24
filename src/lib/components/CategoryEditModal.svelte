@@ -264,7 +264,7 @@
 						Color
 					</span>
 					<div class="flex flex-wrap gap-2">
-						{#each colorPalette as paletteColor}
+						{#each colorPalette as paletteColor (paletteColor)}
 							<button
 								type="button"
 								onclick={() => (color = paletteColor)}

@@ -98,11 +98,11 @@
 
 			<!-- Shortcuts List -->
 			<div class="px-5 py-4 space-y-3">
-				{#each shortcuts as shortcut}
+				{#each shortcuts as shortcut (shortcut.description)}
 					<div class="flex items-center justify-between">
 						<span class="text-charcoal">{shortcut.description}</span>
 						<div class="flex items-center gap-1">
-							{#each shortcut.keys as key}
+						{#each shortcut.keys as key (key)}
 								<kbd class="inline-flex items-center justify-center min-w-[28px] h-7 px-2 bg-cream border border-theme-muted rounded-md text-xs font-mono font-medium text-charcoal-muted shadow-sm">
 									{key}
 								</kbd>

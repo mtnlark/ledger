@@ -22,12 +22,14 @@ vi.mock('$lib/stores/transactions', () => {
 
 	return {
 		addTransaction: vi.fn().mockResolvedValue(1),
+		addSplitTransaction: vi.fn().mockResolvedValue([2, 3]),
 		updateTransaction: vi.fn().mockResolvedValue(undefined),
 		deleteTransaction: vi.fn().mockResolvedValue(undefined),
 		bulkDeleteTransactions: vi.fn().mockResolvedValue(undefined),
 		bulkUpdateCategory: vi.fn().mockResolvedValue(undefined),
 		splitTransaction: vi.fn().mockResolvedValue([2, 3]),
 		getTransactionsByMonth: vi.fn().mockResolvedValue([]),
+		getTransactionsByMonthFromCache: vi.fn().mockReturnValue(null),
 		getAllTransactions: vi.fn().mockResolvedValue([]),
 		getAvailableMonths: vi.fn().mockResolvedValue(['2026-01']),
 		softDeleteTransaction: vi.fn().mockResolvedValue(mockDeletedTransaction),
@@ -54,10 +56,12 @@ vi.mock('$lib/utils/error-handler', () => ({
 import { setupDashboardActions, type DashboardContext } from '$lib/stores/dashboardActions';
 import {
 	addTransaction,
+	addSplitTransaction,
 	updateTransaction,
 	bulkUpdateCategory,
 	splitTransaction,
 	getTransactionsByMonth,
+	getTransactionsByMonthFromCache,
 	getAllTransactions,
 	getAvailableMonths,
 	softDeleteTransaction,
@@ -113,6 +117,16 @@ describe('dashboardActions', () => {
 			expect(getTransactionsByMonth).toHaveBeenCalledWith('2026-01');
 			expect(getAvailableMonths).toHaveBeenCalled();
 			expect(reloadFn).toHaveBeenCalled();
+		});
+
+		it('uses the in-memory month cache after a mutation when available', async () => {
+			const cached = [{ id: 1 }] as any;
+			vi.mocked(getTransactionsByMonthFromCache).mockReturnValueOnce(cached);
+
+			await actions.addTransaction(txnData);
+
+			expect(getTransactionsByMonth).not.toHaveBeenCalled();
+			expect(reloadFn).toHaveBeenCalledWith(expect.objectContaining({ transactions: cached }));
 		});
 
 		it('toasts success on completion', async () => {
@@ -191,12 +205,11 @@ describe('dashboardActions', () => {
 			]
 		};
 
-		it('creates parent then splits into linked children', async () => {
+		it('creates the parent and children atomically', async () => {
 			await actions.addSplitTransactions(splitData);
 
-			// Creates one parent with the total amount
-			expect(addTransaction).toHaveBeenCalledTimes(1);
-			expect(addTransaction).toHaveBeenCalledWith(
+			expect(addSplitTransaction).toHaveBeenCalledTimes(1);
+			expect(addSplitTransaction).toHaveBeenCalledWith(
 				expect.objectContaining({
 					date: splitData.date,
 					merchant: 'Split Store',
@@ -208,12 +221,11 @@ describe('dashboardActions', () => {
 					splitValue: 0.5,
 					isEssential: true,
 					isSubscription: false
-				})
+				}),
+				splitData.splits
 			);
-
-			// Then calls splitTransaction with parent ID and split lines
-			expect(splitTransaction).toHaveBeenCalledTimes(1);
-			expect(splitTransaction).toHaveBeenCalledWith(1, splitData.splits);
+			expect(addTransaction).not.toHaveBeenCalled();
+			expect(splitTransaction).not.toHaveBeenCalled();
 		});
 
 		it('reloads data and toasts with count', async () => {
@@ -225,9 +237,9 @@ describe('dashboardActions', () => {
 			expect(toast.success).toHaveBeenCalledWith('Transaction split across 2 categories');
 		});
 
-		it('calls handleError when parent creation fails', async () => {
+		it('calls handleError when creation fails', async () => {
 			const error = new Error('add fail');
-			vi.mocked(addTransaction).mockRejectedValueOnce(error);
+			vi.mocked(addSplitTransaction).mockRejectedValueOnce(error);
 
 			await actions.addSplitTransactions(splitData);
 
@@ -237,17 +249,6 @@ describe('dashboardActions', () => {
 			});
 		});
 
-		it('calls handleError when split fails', async () => {
-			const error = new Error('split fail');
-			vi.mocked(splitTransaction).mockRejectedValueOnce(error);
-
-			await actions.addSplitTransactions(splitData);
-
-			expect(handleError).toHaveBeenCalledWith(error, {
-				context: 'addSplitTransactions',
-				userMessage: 'Failed to add split transaction'
-			});
-		});
 	});
 
 	// ─── saveEdit ──────────────────────────────────────────────────────

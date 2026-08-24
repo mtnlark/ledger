@@ -299,7 +299,7 @@
 
 				<!-- List skeleton -->
 				<div class="space-y-2">
-					{#each { length: 5 } as _}
+					{#each { length: 5 } as _, index (index)}
 						<div class="bg-surface rounded-lg shadow-sm shadow-theme p-4 flex items-center gap-4">
 							<Skeleton width="40px" height="40px" class="rounded-lg" />
 							<div class="flex-1">
@@ -514,7 +514,7 @@
 							<h3 class="font-medium text-charcoal">Budget Alerts</h3>
 						</div>
 						<ul class="space-y-2">
-							{#each visibleBudgetAlerts as alert}
+							{#each visibleBudgetAlerts as alert (`${alert.type}-${alert.categoryName}`)}
 								<li class="flex items-center gap-3 text-sm group">
 									{#if alert.type === 'over'}
 										<span class="text-danger-600 flex-1">

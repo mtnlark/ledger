@@ -53,7 +53,7 @@
 	>
 		{#snippet preview()}
 			<p class="text-sm text-charcoal">
-				{#each tagSummary.slice(0, 2) as { tag, total }, i}
+				{#each tagSummary.slice(0, 2) as { tag, total }, i (tag)}
 					{#if i > 0} · {/if}
 					<span class="text-primary-600">#{tag}</span> {formatCurrencyWhole(total)}
 				{/each}
@@ -64,7 +64,7 @@
 		{/snippet}
 
 		<div class="space-y-1">
-			{#each tagSummary as { tag, total, count }}
+			{#each tagSummary as { tag, total, count } (tag)}
 				<button
 					type="button"
 					disabled={!onTagClick}

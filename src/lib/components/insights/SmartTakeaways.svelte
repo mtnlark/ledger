@@ -562,7 +562,7 @@
 			{#if isCurrentMonth}
 				<!-- Current month: bullet list format -->
 				<div class="space-y-2">
-					{#each takeaways as takeaway}
+					{#each takeaways as takeaway (takeaway.text)}
 						<div class="flex items-start gap-3">
 							<div class="flex-shrink-0 mt-0.5">
 								<takeaway.icon size={18} class={takeaway.iconColor} />
@@ -607,7 +607,7 @@
 									<div>
 										<h3 class="text-sm font-semibold text-charcoal mb-1.5">Spending</h3>
 										<ul class="space-y-1 pl-4">
-											{#each spendingInsights as insight}
+									{#each spendingInsights as insight (insight.text)}
 												<li class="text-sm text-charcoal-soft list-disc">{insight.text}</li>
 											{/each}
 										</ul>
@@ -619,7 +619,7 @@
 									<div>
 										<h3 class="text-sm font-semibold text-charcoal mb-1.5">Savings</h3>
 										<ul class="space-y-1 pl-4">
-											{#each savingsInsights as insight}
+									{#each savingsInsights as insight (insight.text)}
 												<li class="text-sm text-charcoal-soft list-disc">{insight.text}</li>
 											{/each}
 										</ul>
@@ -631,7 +631,7 @@
 									<div>
 										<h3 class="text-sm font-semibold text-charcoal mb-1.5">Highlights</h3>
 										<ul class="space-y-1 pl-4">
-											{#each highlightInsights as insight}
+									{#each highlightInsights as insight (insight.text)}
 												<li class="text-sm text-charcoal-soft list-disc">{insight.text}</li>
 											{/each}
 										</ul>

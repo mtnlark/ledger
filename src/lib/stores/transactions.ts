@@ -15,14 +15,104 @@ import {
 	validateSplitValue
 } from '$lib/utils/transaction-validation';
 
-// Re-export cache utilities for external use
 export { getTransactionCache, invalidateTransactionCache } from './transactionCache';
 export type { CachedTransaction } from './transactionCache';
 
-// Helper to invalidate all caches that depend on transaction data
+type NewTransaction = Omit<Transaction, 'id' | 'partnerShare' | 'createdAt' | 'updatedAt'>;
+type SplitLine = { categoryId: number; amount: number; notes?: string };
+
 function invalidateTransactionCaches(): void {
 	invalidateMerchantCache();
 	invalidateRecurringCache();
+}
+
+function validateNewTransaction(transaction: NewTransaction): void {
+	const amountResult = validateAmount(transaction.amount);
+	if (!amountResult.isValid) throw new Error(amountResult.error ?? 'Invalid amount');
+
+	const merchantResult = validateMerchant(transaction.merchant);
+	if (!merchantResult.isValid) throw new Error(merchantResult.error ?? 'Invalid merchant');
+
+	const categoryResult = validateCategory(transaction.categoryId);
+	if (!categoryResult.isValid) throw new Error(categoryResult.error ?? 'Invalid category');
+
+	if (!(transaction.date instanceof Date) || Number.isNaN(transaction.date.getTime())) {
+		throw new Error('Invalid date');
+	}
+
+	if (transaction.isShared) {
+		const splitResult = validateSplitValue(
+			transaction.splitType,
+			transaction.splitValue,
+			transaction.amount
+		);
+		if (!splitResult.isValid) throw new Error('Invalid split value');
+	}
+}
+
+function createTransactionRecord(transaction: NewTransaction, now: Date): Omit<Transaction, 'id'> {
+	return {
+		...transaction,
+		partnerShare: transaction.isShared
+			? calculatePartnerShare(transaction.amount, transaction.splitType, transaction.splitValue)
+			: 0,
+		createdAt: now,
+		updatedAt: now
+	};
+}
+
+function validateSplitLines(splits: SplitLine[], total: number): void {
+	if (splits.length < 2) throw new Error('Must have at least 2 split lines');
+	for (const split of splits) {
+		const amountResult = validateAmount(split.amount);
+		if (!amountResult.isValid) throw new Error(amountResult.error ?? 'Invalid split amount');
+		const categoryResult = validateCategory(split.categoryId);
+		if (!categoryResult.isValid) throw new Error(categoryResult.error ?? 'Invalid split category');
+	}
+	if (!currencyEquals(sumCurrency(splits.map((split) => split.amount)), total)) {
+		throw new Error('Split amounts must equal original transaction amount');
+	}
+}
+
+function createSplitChild(
+	parent: Transaction,
+	parentId: number,
+	split: SplitLine,
+	now: Date
+): Omit<Transaction, 'id'> {
+	return {
+		date: parent.date,
+		merchant: parent.merchant,
+		amount: split.amount,
+		categoryId: split.categoryId,
+		isShared: parent.isShared,
+		splitType: parent.splitType,
+		splitValue: parent.splitValue,
+		partnerShare: parent.isShared
+			? calculatePartnerShare(split.amount, parent.splitType, parent.splitValue)
+			: 0,
+		isSettled: parent.isSettled,
+		settledDate: parent.settledDate,
+		notes: split.notes,
+		isEssential: parent.isEssential,
+		isSubscription: parent.isSubscription,
+		subscriptionFrequency: parent.subscriptionFrequency,
+		parentTransactionId: parentId,
+		createdAt: now,
+		updatedAt: now
+	};
+}
+
+function updateCacheWithSplit(
+	parent: Transaction & { id: number },
+	children: Array<Transaction & { id: number }>
+): void {
+	const cache = getTransactionCache();
+	if (!cache.isLoaded) return;
+
+	cache.add(parent);
+	for (const child of children) cache.add(child);
+	tagIndex.rebuild(cache.getAll());
 }
 
 // Apply the same field update to many rows: one DB modify, mirrored into the
@@ -106,52 +196,12 @@ export async function getTransactionsByDateRange(
 // Returns the ID of the created transaction
 // Throws if validation fails
 export async function addTransaction(
-	transaction: Omit<Transaction, 'id' | 'partnerShare' | 'createdAt' | 'updatedAt'>
+	transaction: NewTransaction
 ): Promise<number> {
-	// Validate required fields
-	const amountResult = validateAmount(transaction.amount);
-	if (!amountResult.isValid) {
-		throw new Error(amountResult.error ?? 'Invalid amount');
-	}
-
-	const merchantResult = validateMerchant(transaction.merchant);
-	if (!merchantResult.isValid) {
-		throw new Error(merchantResult.error ?? 'Invalid merchant');
-	}
-
-	const categoryResult = validateCategory(transaction.categoryId);
-	if (!categoryResult.isValid) {
-		throw new Error(categoryResult.error ?? 'Invalid category');
-	}
-
-	// Validate date is a valid Date object
-	if (!(transaction.date instanceof Date) || isNaN(transaction.date.getTime())) {
-		throw new Error('Invalid date');
-	}
-
-	// Validate split value if shared
-	if (transaction.isShared) {
-		const splitResult = validateSplitValue(
-			transaction.splitType,
-			transaction.splitValue,
-			transaction.amount
-		);
-		if (!splitResult.isValid) {
-			throw new Error('Invalid split value');
-		}
-	}
+	validateNewTransaction(transaction);
 
 	const now = new Date();
-	const partnerShare = transaction.isShared
-		? calculatePartnerShare(transaction.amount, transaction.splitType, transaction.splitValue)
-		: 0;
-
-	const newTransaction: Omit<Transaction, 'id'> = {
-		...transaction,
-		partnerShare,
-		createdAt: now,
-		updatedAt: now
-	};
+	const newTransaction = createTransactionRecord(transaction, now);
 
 	const id = (await db.transactions.add(newTransaction)) as number;
 
@@ -378,25 +428,50 @@ export async function bulkRemoveTag(ids: number[], tag: string): Promise<void> {
 	await applyNotesUpdates(changes);
 }
 
-// Returns the child transaction IDs
+export async function addSplitTransaction(
+	transaction: NewTransaction,
+	splits: SplitLine[]
+): Promise<number[]> {
+	validateNewTransaction(transaction);
+	validateSplitLines(splits, transaction.amount);
+
+	const now = new Date();
+	const parentRecord = { ...createTransactionRecord(transaction, now), isSplitParent: true };
+	let parentId = 0;
+	const children: Array<Transaction & { id: number }> = [];
+
+	await db.transaction('rw', db.transactions, async () => {
+		parentId = (await db.transactions.add(parentRecord)) as number;
+		for (const split of splits) {
+			const childRecord = createSplitChild(parentRecord, parentId, split, now);
+			const id = (await db.transactions.add(childRecord)) as number;
+			children.push({ ...childRecord, id });
+		}
+	});
+
+	updateCacheWithSplit({ ...parentRecord, id: parentId }, children);
+
+	if (transaction.isSubscription && await isSubscriptionCancelled(transaction.merchant)) {
+		await reactivateSubscription(transaction.merchant);
+	}
+
+	invalidateTransactionCaches();
+	await persistData();
+	return children.map((child) => child.id);
+}
+
 export async function splitTransaction(
 	id: number,
-	splits: { categoryId: number; amount: number; notes?: string }[]
+	splits: SplitLine[]
 ): Promise<number[]> {
-	if (splits.length < 2) {
-		throw new Error('Must have at least 2 split lines');
-	}
+	if (splits.length < 2) throw new Error('Must have at least 2 split lines');
 
 	const parent = await db.transactions.get(id);
 	if (!parent) {
 		throw new Error('Transaction not found');
 	}
 
-	// Validate total equals parent amount (within rounding tolerance)
-	const total = splits.reduce((sum, s) => sum + s.amount, 0);
-	if (!currencyEquals(total, parent.amount)) {
-		throw new Error('Split amounts must equal original transaction amount');
-	}
+	validateSplitLines(splits, parent.amount);
 
 	// Cannot split a transaction that is already a child
 	if (parent.parentTransactionId) {
@@ -411,29 +486,7 @@ export async function splitTransaction(
 	// (a partial split would leave orphaned children or a childless parent)
 	await db.transaction('rw', db.transactions, async () => {
 		for (const split of splits) {
-			const partnerShare = parent.isShared
-				? calculatePartnerShare(split.amount, parent.splitType, parent.splitValue)
-				: 0;
-
-			const childData: Omit<Transaction, 'id'> = {
-				date: parent.date,
-				merchant: parent.merchant,
-				amount: split.amount,
-				categoryId: split.categoryId,
-				isShared: parent.isShared,
-				splitType: parent.splitType,
-				splitValue: parent.splitValue,
-				partnerShare,
-				isSettled: parent.isSettled,
-				settledDate: parent.settledDate,
-				notes: split.notes,
-				isEssential: parent.isEssential,
-				isSubscription: parent.isSubscription,
-				subscriptionFrequency: parent.subscriptionFrequency,
-				parentTransactionId: id,
-				createdAt: now,
-				updatedAt: now
-			};
+			const childData = createSplitChild(parent, id, split, now);
 
 			const childId = (await db.transactions.add(childData)) as number;
 			childIds.push(childId);

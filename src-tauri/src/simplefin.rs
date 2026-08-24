@@ -61,16 +61,23 @@ fn read_access_url_uncached() -> Result<Option<String>, String> {
 }
 
 fn get_access_url() -> Result<Option<String>, String> {
-  if let Some(cached) = ACCESS_URL_CACHE.lock().unwrap().as_ref() {
+  let mut cache = ACCESS_URL_CACHE
+    .lock()
+    .map_err(|_| "Access URL cache lock was poisoned".to_string())?;
+  if let Some(cached) = cache.as_ref() {
     return cached.clone();
   }
+
   let result = read_access_url_uncached();
-  *ACCESS_URL_CACHE.lock().unwrap() = Some(result.clone());
+  *cache = Some(result.clone());
   result
 }
 
-fn set_cached_access_url(value: Option<String>) {
-  *ACCESS_URL_CACHE.lock().unwrap() = Some(Ok(value));
+fn set_cached_access_url(value: Option<String>) -> Result<(), String> {
+  *ACCESS_URL_CACHE
+    .lock()
+    .map_err(|_| "Access URL cache lock was poisoned".to_string())? = Some(Ok(value));
+  Ok(())
 }
 
 /// reqwest does not translate URL userinfo (user:pass@host) into an
@@ -152,7 +159,7 @@ pub async fn simplefin_link(setup_token: String) -> Result<AccountsResponse, Str
   })
   .await
   .map_err(|e| e.to_string())??;
-  set_cached_access_url(Some(access_url));
+  set_cached_access_url(Some(access_url))?;
   Ok(accounts)
 }
 
@@ -172,7 +179,7 @@ pub async fn simplefin_unlink() -> Result<(), String> {
       Err(e) => Err(e.to_string()),
     };
     if result.is_ok() {
-      set_cached_access_url(None);
+      set_cached_access_url(None)?;
     }
     result
   })
