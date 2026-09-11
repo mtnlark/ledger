@@ -1,5 +1,5 @@
 import { db, type MonthlyBudget } from '$lib/db';
-import { persistData } from '$lib/storage';
+import { runMutation } from '$lib/storage/mutation';
 import { calculatePercent, roundCoefficient } from '$lib/utils/currency';
 
 interface CashFlowResult {
@@ -32,26 +32,26 @@ export async function saveBudget(
 	month: string,
 	data: { income: number; savedAmount: number; notes?: string }
 ): Promise<void> {
-	const existing = await getBudgetForMonth(month);
+	return runMutation(['monthlyBudgets'], async () => {
+		const existing = await getBudgetForMonth(month);
 
-	if (existing) {
-		// Update existing budget
-		await db.monthlyBudgets.update(existing.id!, {
-			income: data.income,
-			savedAmount: data.savedAmount,
-			notes: data.notes
-		});
-	} else {
-		// Create new budget
-		await db.monthlyBudgets.add({
-			month,
-			income: data.income,
-			savedAmount: data.savedAmount,
-			notes: data.notes
-		});
-	}
-
-	await persistData('monthlyBudgets');
+		if (existing) {
+			// Update existing budget
+			await db.monthlyBudgets.update(existing.id!, {
+				income: data.income,
+				savedAmount: data.savedAmount,
+				notes: data.notes
+			});
+		} else {
+			// Create new budget
+			await db.monthlyBudgets.add({
+				month,
+				income: data.income,
+				savedAmount: data.savedAmount,
+				notes: data.notes
+			});
+		}
+	});
 }
 
 /**

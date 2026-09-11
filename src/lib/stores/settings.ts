@@ -1,6 +1,6 @@
 import { db, type Settings, DEFAULT_SETTINGS } from '$lib/db';
 import { liveQuery } from 'dexie';
-import { persistData } from '$lib/storage';
+import { runMutation } from '$lib/storage/mutation';
 import { invalidateRecurringCache } from './recurringCache';
 import { normalizeMerchant } from '$lib/utils/string-helpers';
 
@@ -23,52 +23,58 @@ export async function getSettings(): Promise<Settings> {
 }
 
 export async function updateSettings(updates: Partial<Omit<Settings, 'id'>>): Promise<void> {
-	await db.settings.update(1, updates);
-	await persistData('settings');
+	return runMutation(['settings'], async () => {
+		await db.settings.update(1, updates);
+	});
 }
 
 export async function updatePartnerName(name: string): Promise<void> {
-	await db.settings.update(1, { partnerName: name });
-	await persistData('settings');
+	return runMutation(['settings'], async () => {
+		await db.settings.update(1, { partnerName: name });
+	});
 }
 
 export async function updateDefaultSplit(
 	splitType: 'percentage' | 'fixed',
 	splitValue: number
 ): Promise<void> {
-	await db.settings.update(1, { defaultSplitType: splitType, defaultSplitValue: splitValue });
-	await persistData('settings');
+	return runMutation(['settings'], async () => {
+		await db.settings.update(1, { defaultSplitType: splitType, defaultSplitValue: splitValue });
+	});
 }
 
 export async function updateTheme(theme: 'light' | 'dark' | 'system'): Promise<void> {
-	await db.settings.update(1, { theme });
-	// Sync to localStorage for flash prevention on page load
-	if (typeof localStorage !== 'undefined') {
-		localStorage.setItem('ledger-theme', theme);
-	}
-	await persistData('settings');
+	return runMutation(['settings'], async () => {
+		await db.settings.update(1, { theme });
+		// Sync to localStorage for flash prevention on page load
+		if (typeof localStorage !== 'undefined') {
+			localStorage.setItem('ledger-theme', theme);
+		}
+	});
 }
 
 export async function dismissRecurring(merchant: string): Promise<void> {
-	const settings = await getSettings();
-	const normalized = normalizeMerchant(merchant);
-	const dismissed = settings.dismissedRecurring ?? [];
-	if (!dismissed.includes(normalized)) {
-		await db.settings.update(1, { dismissedRecurring: [...dismissed, normalized] });
-		invalidateRecurringCache();
-		await persistData('settings');
-	}
+	return runMutation(['settings'], async () => {
+		const settings = await getSettings();
+		const normalized = normalizeMerchant(merchant);
+		const dismissed = settings.dismissedRecurring ?? [];
+		if (!dismissed.includes(normalized)) {
+			await db.settings.update(1, { dismissedRecurring: [...dismissed, normalized] });
+			invalidateRecurringCache();
+		}
+	});
 }
 
 export async function restoreRecurring(merchant: string): Promise<void> {
-	const settings = await getSettings();
-	const normalized = normalizeMerchant(merchant);
-	const dismissed = settings.dismissedRecurring ?? [];
-	await db.settings.update(1, {
-		dismissedRecurring: dismissed.filter((m) => m !== normalized)
+	return runMutation(['settings'], async () => {
+		const settings = await getSettings();
+		const normalized = normalizeMerchant(merchant);
+		const dismissed = settings.dismissedRecurring ?? [];
+		await db.settings.update(1, {
+			dismissedRecurring: dismissed.filter((m) => m !== normalized)
+		});
+		invalidateRecurringCache();
 	});
-	invalidateRecurringCache();
-	await persistData('settings');
 }
 
 export async function getDismissedRecurring(): Promise<string[]> {
@@ -77,42 +83,47 @@ export async function getDismissedRecurring(): Promise<string[]> {
 }
 
 export async function setFixedRecurringAmount(merchant: string, amount: number): Promise<void> {
-	const settings = await getSettings();
-	const normalized = normalizeMerchant(merchant);
-	const existing = settings.fixedRecurringAmounts ?? [];
+	return runMutation(['settings'], async () => {
+		const settings = await getSettings();
+		const normalized = normalizeMerchant(merchant);
+		const existing = settings.fixedRecurringAmounts ?? [];
 
-	const filtered = existing.filter((f) => f.merchant !== normalized);
+		const filtered = existing.filter((f) => f.merchant !== normalized);
 
-	await db.settings.update(1, {
-		fixedRecurringAmounts: [...filtered, { merchant: normalized, amount }]
+		await db.settings.update(1, {
+			fixedRecurringAmounts: [...filtered, { merchant: normalized, amount }]
+		});
+		invalidateRecurringCache();
 	});
-	invalidateRecurringCache();
-	await persistData('settings');
 }
 
 export async function removeFixedRecurringAmount(merchant: string): Promise<void> {
-	const settings = await getSettings();
-	const normalized = normalizeMerchant(merchant);
-	const existing = settings.fixedRecurringAmounts ?? [];
+	return runMutation(['settings'], async () => {
+		const settings = await getSettings();
+		const normalized = normalizeMerchant(merchant);
+		const existing = settings.fixedRecurringAmounts ?? [];
 
-	await db.settings.update(1, {
-		fixedRecurringAmounts: existing.filter((f) => f.merchant !== normalized)
+		await db.settings.update(1, {
+			fixedRecurringAmounts: existing.filter((f) => f.merchant !== normalized)
+		});
+		invalidateRecurringCache();
 	});
-	invalidateRecurringCache();
-	await persistData('settings');
 }
 
 export async function updateNotifications(enabled: boolean): Promise<void> {
-	await db.settings.update(1, { notificationsEnabled: enabled });
-	await persistData('settings');
+	return runMutation(['settings'], async () => {
+		await db.settings.update(1, { notificationsEnabled: enabled });
+	});
 }
 
 export async function updateICloudBackup(enabled: boolean): Promise<void> {
-	await db.settings.update(1, { iCloudBackupEnabled: enabled });
-	await persistData('settings');
+	return runMutation(['settings'], async () => {
+		await db.settings.update(1, { iCloudBackupEnabled: enabled });
+	});
 }
 
 export async function dismissRecurringSuggestionsForMonth(month: string): Promise<void> {
-	await db.settings.update(1, { lastAutoSuggestedMonth: month });
-	await persistData('settings');
+	return runMutation(['settings'], async () => {
+		await db.settings.update(1, { lastAutoSuggestedMonth: month });
+	});
 }

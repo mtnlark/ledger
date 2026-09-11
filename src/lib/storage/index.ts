@@ -5,6 +5,9 @@
  * JSON file persistence in the app data directory.
  */
 
+import Dexie from 'dexie';
+import { saveStatus, PersistenceError, assertCanMutate } from './status';
+export { saveStatus, PersistenceError, assertCanMutate } from './status';
 import { dehydrateAll, hydrateAll } from './serialization';
 import type { PersistedTableName, StoredData } from './types';
 import { initializeDatabase } from '$lib/db';
@@ -144,35 +147,41 @@ export function resetStorageState(): void {
 	initialized = false;
 	lastInitResult = null;
 	initializationPromise = null;
+	saveStatus.set('saved');
 }
 
 /**
  * Persist current database state to JSON file
  * Called after any data modification (no-op in tests)
- * Shows a toast notification on failure
+ * Throws an applied PersistenceError and updates the persistent save banner on failure
  */
 export async function persistData(
 	tables?: PersistedTableName | readonly PersistedTableName[]
 ): Promise<void> {
+	// Nested mutations persist only after their enclosing transaction commits.
+	if (Dexie.currentTransaction) return;
 	if (!isTauri()) return;
+	saveStatus.set('saving');
 
 	try {
 		const { saveToFile } = await import('./tauri-adapter');
 		await saveToFile(tables);
+		saveStatus.set('saved');
 	} catch (error) {
 		console.error('Data persistence failed:', error);
-		_onError?.('Failed to save data to disk. Your changes may not persist.');
+		saveStatus.set('unsaved');
+		throw new PersistenceError('Changes not saved to disk. Retry saving; do not repeat the operation.', true, error);
 	}
 }
 
 /**
  * Create a backup of current data (no-op in tests)
  */
-export async function createBackup(): Promise<void> {
+export async function createBackup(fresh = false): Promise<void> {
 	if (!isTauri()) return;
 
 	const { createBackup } = await import('./tauri-adapter');
-	await createBackup();
+	await createBackup(fresh);
 }
 
 /**
@@ -183,6 +192,7 @@ export async function withPersistence<T>(
 	operation: () => Promise<T>,
 	tables?: PersistedTableName | readonly PersistedTableName[]
 ): Promise<T> {
+	assertCanMutate();
 	const result = await operation();
 	await persistData(tables);
 	return result;
@@ -199,6 +209,37 @@ export async function getAllData(): Promise<StoredData> {
  * Replace all data (useful for import/restore)
  */
 export async function replaceAllData(data: StoredData): Promise<void> {
-	await hydrateAll(data);
-	await persistData();
+	const { runExclusive } = await import('./mutation');
+	return runExclusive(async () => {
+		assertCanMutate();
+		const { validateBackup } = await import('./backup');
+		const validated = validateBackup(data).data;
+		await createBackup(true);
+		await hydrateAll(validated);
+		await refreshDataCaches(true);
+		await persistData();
+	});
+}
+
+/** Retry the current database snapshot, never the mutation that produced it. */
+export async function retryPersistence(): Promise<void> {
+	const { runExclusive } = await import('./mutation');
+	await runExclusive(async () => { await persistData(); await refreshDataCaches(true); });
+}
+
+export async function refreshDataCaches(replaceViews = false): Promise<void> {
+	const [{ db }, { getTransactionCache }, { tagIndex }, { invalidateMerchantCache }, { invalidateRecurringCache }] = await Promise.all([
+		import('$lib/db'), import('$lib/stores/transactionCache'), import('$lib/stores/tags.svelte'),
+		import('$lib/stores/merchants'), import('$lib/stores/recurringCache')
+	]);
+	const cache = getTransactionCache();
+	cache.initialize(await db.transactions.toArray());
+	tagIndex.rebuild(cache.getAll());
+	invalidateMerchantCache();
+	invalidateRecurringCache();
+	if (typeof window !== 'undefined') {
+		if (replaceViews) window.dispatchEvent(new CustomEvent('ledger:data-replaced'));
+		window.dispatchEvent(new CustomEvent('ledger:transactions-changed'));
+		window.dispatchEvent(new CustomEvent('ledger:networth-changed'));
+	}
 }

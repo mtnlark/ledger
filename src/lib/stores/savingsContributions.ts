@@ -1,5 +1,5 @@
 import { db, type SavingsContribution, type ContributionSource } from '$lib/db';
-import { persistData } from '$lib/storage';
+import { runMutation } from '$lib/storage/mutation';
 import { getSavingsAccount, updateAccountBalance } from './savingsAccounts';
 import { getMonthDateRange } from '$lib/utils/date-helpers';
 import { sumCurrency } from '$lib/utils/currency';
@@ -11,24 +11,24 @@ const SOURCES_AFFECTING_AVAILABLE: ContributionSource[] = ['bank_transfer', 'oth
 export async function addContribution(
 	contribution: Omit<SavingsContribution, 'id' | 'createdAt' | 'updatedAt'>
 ): Promise<number> {
-	const now = new Date();
+	return runMutation(['savingsAccounts', 'savingsContributions'], async () => {
+		const now = new Date();
 
-	const newContribution: Omit<SavingsContribution, 'id'> = {
-		...contribution,
-		createdAt: now,
-		updatedAt: now
-	};
+		const newContribution: Omit<SavingsContribution, 'id'> = {
+			...contribution,
+			createdAt: now,
+			updatedAt: now
+		};
 
-	const id = (await db.savingsContributions.add(newContribution)) as number;
+		const id = (await db.savingsContributions.add(newContribution)) as number;
 
-	// Update account balance for savings type accounts
-	const account = await getSavingsAccount(contribution.accountId);
-	if (account?.accountType === 'savings') {
-		await updateAccountBalance(contribution.accountId, contribution.amount);
-	}
-
-	await persistData(['savingsAccounts', 'savingsContributions']);
-	return id;
+		// Update account balance for savings type accounts
+		const account = await getSavingsAccount(contribution.accountId);
+		if (account?.accountType === 'savings') {
+			await updateAccountBalance(contribution.accountId, contribution.amount);
+		}
+		return id;
+	});
 }
 
 export async function getContributionsForMonth(
@@ -89,37 +89,39 @@ export async function updateContribution(
 	id: number,
 	updates: Partial<Omit<SavingsContribution, 'id' | 'createdAt'>>
 ): Promise<void> {
-	const existing = await db.savingsContributions.get(id);
-	if (!existing) return;
+	return runMutation(['savingsAccounts', 'savingsContributions'], async () => {
+		const existing = await db.savingsContributions.get(id);
+		if (!existing) return;
 
-	// If amount changed, adjust the account balance for savings accounts
-	if (updates.amount !== undefined && updates.amount !== existing.amount) {
-		const account = await getSavingsAccount(existing.accountId);
-		if (account?.accountType === 'savings') {
-			const delta = updates.amount - existing.amount;
-			await updateAccountBalance(existing.accountId, delta);
+		// If amount changed, adjust the account balance for savings accounts
+		if (updates.amount !== undefined && updates.amount !== existing.amount) {
+			const account = await getSavingsAccount(existing.accountId);
+			if (account?.accountType === 'savings') {
+				const delta = updates.amount - existing.amount;
+				await updateAccountBalance(existing.accountId, delta);
+			}
 		}
-	}
 
-	await db.savingsContributions.update(id, {
-		...updates,
-		updatedAt: new Date()
+		await db.savingsContributions.update(id, {
+			...updates,
+			updatedAt: new Date()
+		});
 	});
-	await persistData(['savingsAccounts', 'savingsContributions']);
 }
 
 export async function deleteContribution(id: number): Promise<void> {
-	const contribution = await db.savingsContributions.get(id);
-	if (!contribution) return;
+	return runMutation(['savingsAccounts', 'savingsContributions'], async () => {
+		const contribution = await db.savingsContributions.get(id);
+		if (!contribution) return;
 
-	// Subtract from account balance for savings accounts
-	const account = await getSavingsAccount(contribution.accountId);
-	if (account?.accountType === 'savings') {
-		await updateAccountBalance(contribution.accountId, -contribution.amount);
-	}
+		// Subtract from account balance for savings accounts
+		const account = await getSavingsAccount(contribution.accountId);
+		if (account?.accountType === 'savings') {
+			await updateAccountBalance(contribution.accountId, -contribution.amount);
+		}
 
-	await db.savingsContributions.delete(id);
-	await persistData(['savingsAccounts', 'savingsContributions']);
+		await db.savingsContributions.delete(id);
+	});
 }
 
 // ============================================================================

@@ -1,3 +1,5 @@
+import { currentMutationTables } from '../storage/mutation-tracking';
+import { assertCanMutate } from '../storage/status';
 import Dexie, { type EntityTable } from 'dexie';
 import { roundCurrency } from '$lib/utils/currency';
 import type {
@@ -110,6 +112,18 @@ class LedgerDB extends Dexie {
 
 // Database instance
 export const db = new LedgerDB();
+// Enforce the save-failure barrier for every write, including background work.
+db.use({
+	stack: 'dbcore', name: 'durable-save-barrier',
+	create: (core) => ({ ...core, table: (name) => {
+		const table = core.table(name);
+		return { ...table, mutate: (request) => {
+			assertCanMutate();
+			currentMutationTables().add(name);
+			return table.mutate(request);
+		} };
+	} })
+});
 
 // Helper functions
 export function calculatePartnerShare(

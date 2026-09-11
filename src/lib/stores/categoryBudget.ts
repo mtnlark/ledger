@@ -1,6 +1,6 @@
 import { db, type CategoryBudget, navigateMonth } from '$lib/db';
 import { getUserAmount } from '$lib/utils/currency';
-import { persistData } from '$lib/storage';
+import { runMutation } from '$lib/storage/mutation';
 import { getMonthDateRange } from '$lib/utils/date-helpers';
 import {
 	generateDecayWeights,
@@ -52,29 +52,29 @@ export async function saveCategoryBudget(
 	month: string,
 	budgetAmount: number
 ): Promise<void> {
-	if (budgetAmount < 0) {
-		throw new Error('Budget amount cannot be negative');
-	}
+	return runMutation(['categoryBudgets'], async () => {
+		if (budgetAmount < 0) {
+			throw new Error('Budget amount cannot be negative');
+		}
 
-	const existing = await getCategoryBudget(categoryId, month);
-	const now = new Date();
+		const existing = await getCategoryBudget(categoryId, month);
+		const now = new Date();
 
-	if (existing) {
-		await db.categoryBudgets.update(existing.id!, {
-			budgetAmount,
-			updatedAt: now
-		});
-	} else {
-		await db.categoryBudgets.add({
-			month,
-			categoryId,
-			budgetAmount,
-			createdAt: now,
-			updatedAt: now
-		});
-	}
-
-	await persistData('categoryBudgets');
+		if (existing) {
+			await db.categoryBudgets.update(existing.id!, {
+				budgetAmount,
+				updatedAt: now
+			});
+		} else {
+			await db.categoryBudgets.add({
+				month,
+				categoryId,
+				budgetAmount,
+				createdAt: now,
+				updatedAt: now
+			});
+		}
+	});
 }
 
 /**
@@ -83,11 +83,12 @@ export async function saveCategoryBudget(
  * @param month - Month in "YYYY-MM" format
  */
 export async function deleteCategoryBudget(categoryId: number, month: string): Promise<void> {
-	const existing = await getCategoryBudget(categoryId, month);
-	if (existing) {
-		await db.categoryBudgets.delete(existing.id!);
-		await persistData('categoryBudgets');
-	}
+	return runMutation(['categoryBudgets'], async () => {
+		const existing = await getCategoryBudget(categoryId, month);
+		if (existing) {
+			await db.categoryBudgets.delete(existing.id!);
+		}
+	});
 }
 
 /**
@@ -99,10 +100,11 @@ export async function setCategoryBudgetRollover(
 	month: string,
 	rollsOver: boolean
 ): Promise<void> {
-	const existing = await getCategoryBudget(categoryId, month);
-	if (!existing) return;
-	await db.categoryBudgets.update(existing.id!, { rollsOver, updatedAt: new Date() });
-	await persistData('categoryBudgets');
+	return runMutation(['categoryBudgets'], async () => {
+		const existing = await getCategoryBudget(categoryId, month);
+		if (!existing) return;
+		await db.categoryBudgets.update(existing.id!, { rollsOver, updatedAt: new Date() });
+	});
 }
 
 /**
@@ -320,24 +322,24 @@ export async function copyBudgetsFromMonth(
 	sourceMonth: string,
 	targetMonth: string
 ): Promise<void> {
-	const sourceBudgets = await getCategoryBudgetsForMonth(sourceMonth);
-	const now = new Date();
+	return runMutation(['categoryBudgets'], async () => {
+		const sourceBudgets = await getCategoryBudgetsForMonth(sourceMonth);
+		const now = new Date();
 
-	for (const budget of sourceBudgets) {
-		const existing = await getCategoryBudget(budget.categoryId, targetMonth);
-		if (!existing) {
-			await db.categoryBudgets.add({
-				month: targetMonth,
-				categoryId: budget.categoryId,
-				budgetAmount: budget.budgetAmount,
-				rollsOver: budget.rollsOver,
-				createdAt: now,
-				updatedAt: now
-			});
+		for (const budget of sourceBudgets) {
+			const existing = await getCategoryBudget(budget.categoryId, targetMonth);
+			if (!existing) {
+				await db.categoryBudgets.add({
+					month: targetMonth,
+					categoryId: budget.categoryId,
+					budgetAmount: budget.budgetAmount,
+					rollsOver: budget.rollsOver,
+					createdAt: now,
+					updatedAt: now
+				});
+			}
 		}
-	}
-
-	await persistData('categoryBudgets');
+	});
 }
 
 /**

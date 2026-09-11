@@ -9,7 +9,7 @@
  */
 
 import { db, type Settings, type CancelledSubscription, DEFAULT_SETTINGS } from '$lib/db';
-import { persistData } from '$lib/storage';
+import { runMutation } from '$lib/storage/mutation';
 import { normalizeMerchant } from '$lib/utils/string-helpers';
 import { roundCurrency, currencyEquals } from '$lib/utils/currency';
 
@@ -50,28 +50,29 @@ function cancelledRecordMatches(
  * @param amount - Optional amount for targeted cancellation of a specific subscription
  */
 export async function cancelSubscription(merchant: string, amount?: number): Promise<void> {
-	const settings = await getSettings();
-	const normalized = normalizeMerchant(merchant);
-	const cancelled = settings.cancelledSubscriptions ?? [];
-	const confirmedActive = settings.confirmedActiveSubscriptions ?? [];
+	return runMutation(['settings'], async () => {
+		const settings = await getSettings();
+		const normalized = normalizeMerchant(merchant);
+		const cancelled = settings.cancelledSubscriptions ?? [];
+		const confirmedActive = settings.confirmedActiveSubscriptions ?? [];
 
-	// Check if already cancelled (exact match)
-	if (cancelled.some((c) => cancelledRecordMatches(c, normalized, amount))) {
-		return;
-	}
+		// Check if already cancelled (exact match)
+		if (cancelled.some((c) => cancelledRecordMatches(c, normalized, amount))) {
+			return;
+		}
 
-	const newCancelled: CancelledSubscription = {
-		merchant: normalized,
-		cancelledDate: new Date().toISOString(),
-		...(amount != null ? { amount: roundCurrency(amount) } : {})
-	};
+		const newCancelled: CancelledSubscription = {
+			merchant: normalized,
+			cancelledDate: new Date().toISOString(),
+			...(amount != null ? { amount: roundCurrency(amount) } : {})
+		};
 
-	await db.settings.update(1, {
-		cancelledSubscriptions: [...cancelled, newCancelled],
-		// Remove from confirmed active if it was there
-		confirmedActiveSubscriptions: confirmedActive.filter((m) => m !== normalized)
+		await db.settings.update(1, {
+			cancelledSubscriptions: [...cancelled, newCancelled],
+			// Remove from confirmed active if it was there
+			confirmedActiveSubscriptions: confirmedActive.filter((m) => m !== normalized)
+		});
 	});
-	await persistData('settings');
 }
 
 /**
@@ -81,16 +82,17 @@ export async function cancelSubscription(merchant: string, amount?: number): Pro
  * @param amount - Optional amount to reactivate a specific subscription only
  */
 export async function reactivateSubscription(merchant: string, amount?: number): Promise<void> {
-	const settings = await getSettings();
-	const normalized = normalizeMerchant(merchant);
-	const cancelled = settings.cancelledSubscriptions ?? [];
+	return runMutation(['settings'], async () => {
+		const settings = await getSettings();
+		const normalized = normalizeMerchant(merchant);
+		const cancelled = settings.cancelledSubscriptions ?? [];
 
-	await db.settings.update(1, {
-		cancelledSubscriptions: cancelled.filter(
-			(c) => !cancelledRecordMatches(c, normalized, amount)
-		)
+		await db.settings.update(1, {
+			cancelledSubscriptions: cancelled.filter(
+				(c) => !cancelledRecordMatches(c, normalized, amount)
+			)
+		});
 	});
-	await persistData('settings');
 }
 
 /**
@@ -100,26 +102,27 @@ export async function reactivateSubscription(merchant: string, amount?: number):
  * @param merchant - The merchant name to confirm as active
  */
 export async function confirmSubscriptionActive(merchant: string): Promise<void> {
-	const settings = await getSettings();
-	const normalized = normalizeMerchant(merchant);
-	const confirmedActive = settings.confirmedActiveSubscriptions ?? [];
-	const cancelled = settings.cancelledSubscriptions ?? [];
+	return runMutation(['settings'], async () => {
+		const settings = await getSettings();
+		const normalized = normalizeMerchant(merchant);
+		const confirmedActive = settings.confirmedActiveSubscriptions ?? [];
+		const cancelled = settings.cancelledSubscriptions ?? [];
 
-	const updates: Partial<Settings> = {};
+		const updates: Partial<Settings> = {};
 
-	if (!confirmedActive.includes(normalized)) {
-		updates.confirmedActiveSubscriptions = [...confirmedActive, normalized];
-	}
+		if (!confirmedActive.includes(normalized)) {
+			updates.confirmedActiveSubscriptions = [...confirmedActive, normalized];
+		}
 
-	// Also clear cancellation if present (confirming active = resubscription)
-	if (cancelled.some((c) => c.merchant === normalized)) {
-		updates.cancelledSubscriptions = cancelled.filter((c) => c.merchant !== normalized);
-	}
+		// Also clear cancellation if present (confirming active = resubscription)
+		if (cancelled.some((c) => c.merchant === normalized)) {
+			updates.cancelledSubscriptions = cancelled.filter((c) => c.merchant !== normalized);
+		}
 
-	if (Object.keys(updates).length > 0) {
-		await db.settings.update(1, updates);
-		await persistData('settings');
-	}
+		if (Object.keys(updates).length > 0) {
+			await db.settings.update(1, updates);
+		}
+	});
 }
 
 /**
