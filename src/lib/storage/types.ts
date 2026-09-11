@@ -19,7 +19,7 @@ export interface StoredData {
 	categories: Category[];
 	monthlyBudgets: MonthlyBudget[];
 	categoryBudgets: CategoryBudget[];
-	settings: Settings;
+	settings: Settings | null;
 	savingsAccounts?: SavingsAccount[];
 	savingsContributions?: SavingsContribution[];
 	linkedAccounts?: LinkedAccount[];

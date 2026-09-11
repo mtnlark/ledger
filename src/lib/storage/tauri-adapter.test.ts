@@ -236,7 +236,7 @@ describe('tauri-adapter', () => {
 			const tmpWrites = writeSpy.mock.calls.filter(([path]) => String(path).endsWith('.tmp'));
 			expect(tmpWrites).toHaveLength(1);
 			const data = JSON.parse(files.get(DATA_PATH)!) as StoredData;
-			expect(data.settings.partnerName).toBe('Sam');
+			expect(data.settings?.partnerName).toBe('Sam');
 			expect(data.categories[0].name).toBe('Updated Category');
 		});
 	});

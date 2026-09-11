@@ -11,6 +11,7 @@ import {
 	DEFAULT_CATEGORIES,
 	type Category
 } from '$lib/db';
+import { validateBackup, parseBackup, encodeBackup } from './backup';
 import { dehydrateAll, dehydrateChanged, hydrateAll } from './serialization';
 import type { PersistedTableName, StoredData, ReadDataResult, RecoveryResult } from './types';
 
@@ -159,6 +160,7 @@ async function readDataFile(): Promise<ReadDataResult> {
 	let data: StoredData;
 	try {
 		data = JSON.parse(content) as StoredData;
+		validateBackup(data);
 	} catch (error) {
 		const message = error instanceof Error ? error.message : String(error);
 		console.error('Failed to parse data file JSON:', error);
@@ -190,7 +192,8 @@ async function recoverFromBakFile(): Promise<RecoveryResult> {
 
 	try {
 		const content = await fs.readTextFile(bakPath);
-		const data = JSON.parse(content) as StoredData;
+		const data = (await parseBackup(content)).data;
+		validateBackup(data);
 		if (data.checksum && !(await verifyChecksum(data))) {
 			console.warn('data.json.bak has invalid checksum');
 			return { status: 'no_valid_backup', hadCandidates: true };
@@ -225,7 +228,8 @@ async function recoverFromBackups(): Promise<RecoveryResult> {
 		try {
 			const backupPath = await path.join(cachedBackupsDir, backupName);
 			const content = await fs.readTextFile(backupPath);
-			const data = JSON.parse(content) as StoredData;
+			const data = (await parseBackup(content)).data;
+		validateBackup(data);
 
 			// Verify checksum if present (but don't reject legacy backups without checksums)
 			if (data.checksum) {
@@ -331,9 +335,18 @@ async function writeDataFile(
 /**
  * Create a timestamped backup (debounced to max 1 per minute)
  */
-export async function createBackup(): Promise<void> {
+export async function createBackup(fresh = false): Promise<void> {
 	ensureInitialized();
 
+	if (fresh) {
+		await ensureDirectories();
+		const content = await encodeBackup(await dehydrateAll());
+		const backupPath = await path.join(cachedBackupsDir, `data-${new Date().toISOString().replace(/[:.]/g, '-')}-${crypto.randomUUID()}.json`);
+		await fs.writeTextFile(backupPath, content);
+		// A destructive operation must have a readable recovery snapshot.
+		await parseBackup(await fs.readTextFile(backupPath));
+		return;
+	}
 	// Debounce backups - don't create more than one per minute
 	const now = Date.now();
 	if (now - lastBackupTime < BACKUP_DEBOUNCE_MS) {
@@ -560,7 +573,7 @@ async function runMigrationsIfNeeded(): Promise<void> {
  * Load stored data into Dexie database
  */
 async function loadDataIntoDexie(data: StoredData): Promise<void> {
-	await hydrateAll(data, { useDefaultsWhenMissing: true });
+	await hydrateAll(data);
 	persistedSnapshot = data;
 	serializedTables = {};
 }

@@ -56,7 +56,7 @@ export async function dehydrateAll(): Promise<StoredData> {
 		categories,
 		monthlyBudgets,
 		categoryBudgets,
-		settings: settings ?? DEFAULT_SETTINGS,
+		settings: settings ?? null,
 		savingsAccounts,
 		savingsContributions,
 		linkedAccounts,
@@ -90,7 +90,7 @@ export async function dehydrateChanged(
 					next.categoryBudgets = await db.categoryBudgets.toArray();
 					break;
 				case 'settings':
-					next.settings = (await db.settings.get(1)) ?? DEFAULT_SETTINGS;
+					next.settings = (await db.settings.get(1)) ?? null;
 					break;
 				case 'savingsAccounts':
 					next.savingsAccounts = await db.savingsAccounts.toArray();
@@ -124,6 +124,7 @@ export async function hydrateAll(
 	const { useDefaultsWhenMissing = false } = options;
 
 	await db.transaction('rw', PERSISTED_TABLES, async () => {
+		await db.settings.clear();
 		await db.transactions.clear();
 		await db.categories.clear();
 		await db.monthlyBudgets.clear();
@@ -159,6 +160,7 @@ export async function hydrateAll(
 				date: parseStoredDate(t.date),
 				createdAt: new Date(t.createdAt),
 				updatedAt: new Date(t.updatedAt),
+				deletedAt: t.deletedAt ? new Date(t.deletedAt) : undefined,
 				settledDate: t.settledDate ? new Date(t.settledDate) : undefined
 			}));
 			await db.transactions.bulkPut(transactions);
@@ -187,6 +189,7 @@ export async function hydrateAll(
 		if (data.linkedAccounts && data.linkedAccounts.length > 0) {
 			const linkedAccounts = data.linkedAccounts.map((la) => ({
 				...la,
+				upstreamBalanceAt: la.upstreamBalanceAt ? new Date(la.upstreamBalanceAt) : undefined,
 				lastSyncedAt: la.lastSyncedAt ? new Date(la.lastSyncedAt) : undefined,
 				createdAt: new Date(la.createdAt),
 				updatedAt: new Date(la.updatedAt)

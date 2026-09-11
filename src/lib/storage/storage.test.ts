@@ -188,11 +188,11 @@ describe('Storage Layer', () => {
 			expect(data.monthlyBudgets[0].income).toBe(5000);
 		});
 
-		it('returns DEFAULT_SETTINGS when settings missing', async () => {
+		it('preserves an empty settings table', async () => {
 			// Don't initialize - just open empty db
 			const data = await getAllData();
 
-			expect(data.settings).toEqual(DEFAULT_SETTINGS);
+			expect(data.settings).toBeNull();
 		});
 	});
 
@@ -244,7 +244,7 @@ describe('Storage Layer', () => {
 						updatedAt: new Date(testDate)
 					}
 				],
-				categories: DEFAULT_CATEGORIES as Category[],
+				categories: DEFAULT_CATEGORIES.map((c, i) => ({ ...c, id: i + 1 })) as Category[],
 				monthlyBudgets: [],
 				categoryBudgets: [],
 				settings: DEFAULT_SETTINGS
@@ -269,7 +269,7 @@ describe('Storage Layer', () => {
 				version: '1.0',
 				exportedAt: new Date().toISOString(),
 				transactions: [],
-				categories: DEFAULT_CATEGORIES as Category[],
+				categories: DEFAULT_CATEGORIES.map((c, i) => ({ ...c, id: i + 1 })) as Category[],
 				monthlyBudgets: [
 					{ id: 1, month: '2024-06', income: 6000, savedAmount: 1500 },
 					{ id: 2, month: '2024-07', income: 6500, savedAmount: 2000 }
@@ -293,7 +293,7 @@ describe('Storage Layer', () => {
 				version: '1.0',
 				exportedAt: new Date().toISOString(),
 				transactions: [],
-				categories: DEFAULT_CATEGORIES as Category[],
+				categories: DEFAULT_CATEGORIES.map((c, i) => ({ ...c, id: i + 1 })) as Category[],
 				monthlyBudgets: [],
 				categoryBudgets: [],
 				settings: {
@@ -357,7 +357,7 @@ describe('Storage Layer', () => {
 						updatedAt: new Date()
 					}
 				],
-				categories: DEFAULT_CATEGORIES as Category[],
+				categories: DEFAULT_CATEGORIES.map((c, i) => ({ ...c, id: i + 1 })) as Category[],
 				monthlyBudgets: [],
 				categoryBudgets: [],
 				settings: DEFAULT_SETTINGS
@@ -377,7 +377,7 @@ describe('Storage Layer', () => {
 				version: '1.0',
 				exportedAt: new Date().toISOString(),
 				transactions: [],
-				categories: DEFAULT_CATEGORIES as Category[],
+				categories: DEFAULT_CATEGORIES.map((c, i) => ({ ...c, id: i + 1 })) as Category[],
 				monthlyBudgets: [],
 				categoryBudgets: [
 					{

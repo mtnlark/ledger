@@ -259,6 +259,7 @@ export interface LinkedAccount {
 	source: BalanceSource;
 	simplefinId?: string; // upstream account id when source === 'simplefin'
 	lastSyncedAt?: Date;
+	upstreamBalanceAt?: Date;
 	lastSyncStatus: SyncStatus;
 	sortOrder: number;
 	isActive: boolean; // hide closed accounts without deleting history

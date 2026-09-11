@@ -1,7 +1,7 @@
-import { db, type Transaction, type Category } from '$lib/db';
+import { type Transaction, type Category } from '$lib/db';
 import { getUserAmount } from '$lib/utils/currency';
-import { persistData } from '$lib/storage';
-import { parseStoredDate } from '$lib/utils/date-helpers';
+import { getAllData, replaceAllData } from '$lib/storage';
+import { encodeBackup, parseBackup } from '$lib/storage/backup';
 import { format } from 'date-fns';
 
 /**
@@ -49,88 +49,17 @@ export async function exportTransactionsToCSV(
  * Export all data to JSON for backup
  */
 export async function exportAllDataToJSON(): Promise<string> {
-	const [transactions, categories, budgets, settings] = await Promise.all([
-		db.transactions.toArray(),
-		db.categories.toArray(),
-		db.monthlyBudgets.toArray(),
-		db.settings.get(1)
-	]);
-
-	const exportData = {
-		exportDate: new Date().toISOString(),
-		version: '1.0',
-		data: {
-			transactions,
-			categories,
-			budgets,
-			settings
-		}
-	};
-
-	return JSON.stringify(exportData, null, 2);
+	return encodeBackup(await getAllData());
 }
 
-/**
- * Import data from JSON backup
- */
-export async function importFromJSON(
-	jsonString: string
-): Promise<{ success: boolean; message: string }> {
+/** Restore only after the caller has presented parseBackup's preview. */
+export async function importFromJSON(jsonString: string): Promise<{ success: boolean; message: string }> {
 	try {
-		const importData = JSON.parse(jsonString);
-
-		if (!importData.data) {
-			return { success: false, message: 'Invalid backup format' };
-		}
-
-		const { transactions, categories, budgets, settings } = importData.data;
-
-		// Clear existing data and import
-		await db.transaction('rw', [db.transactions, db.categories, db.monthlyBudgets, db.settings], async () => {
-			// Clear existing
-			await db.transactions.clear();
-			await db.categories.clear();
-			await db.monthlyBudgets.clear();
-
-			// Import categories with their original IDs preserved
-			if (categories && categories.length > 0) {
-				await db.categories.bulkPut(categories);
-			}
-
-			// Import budgets with original IDs preserved
-			if (budgets && budgets.length > 0) {
-				await db.monthlyBudgets.bulkPut(budgets);
-			}
-
-			// Import transactions with original IDs preserved
-			if (transactions && transactions.length > 0) {
-				// Convert date strings back to Date objects
-				// Use parseStoredDate for transaction date to avoid timezone shift
-				const cleanTransactions = transactions.map((t: Transaction) => ({
-					...t,
-					date: parseStoredDate(t.date),
-					createdAt: new Date(t.createdAt),
-					updatedAt: new Date(t.updatedAt),
-					settledDate: t.settledDate ? new Date(t.settledDate) : undefined
-				}));
-				await db.transactions.bulkPut(cleanTransactions);
-			}
-
-			// Update settings if present
-			if (settings) {
-				await db.settings.put({ ...settings, id: 1 });
-			}
-		});
-
-		// Persist to file storage (Tauri only)
-		await persistData();
-
-		return {
-			success: true,
-			message: `Imported ${transactions?.length ?? 0} transactions, ${categories?.length ?? 0} categories, ${budgets?.length ?? 0} budgets`
-		};
+		const preview = await parseBackup(jsonString);
+		await replaceAllData(preview.data);
+		return { success: true, message: `Restored ${preview.counts.transactions} transactions and all backup tables` };
 	} catch (error) {
-		return { success: false, message: `Import failed: ${error}` };
+		return { success: false, message: `Restore failed: ${error}` };
 	}
 }
 
