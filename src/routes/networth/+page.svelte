@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { runMutation } from '$lib/storage/mutation';
 	import { onMount } from 'svelte';
 	import { afterNavigate } from '$app/navigation';
 	import { format } from 'date-fns';
@@ -184,17 +185,19 @@
 			// Also repairs accounts synced as negative assets before re-typing.
 			const balance = data.accountClass === 'liability' ? Math.abs(data.balance) : data.balance;
 			if (editingAccount) {
-				await updateLinkedAccount(editingAccount.id!, {
-					name: data.name,
-					institution: data.institution,
-					accountType: data.accountType,
-					accountClass: data.accountClass,
-					isActive: data.isActive
+				await runMutation(['linkedAccounts', 'balanceSnapshots'], async () => {
+					await updateLinkedAccount(editingAccount!.id!, {
+						name: data.name,
+						institution: data.institution,
+						accountType: data.accountType,
+						accountClass: data.accountClass,
+						isActive: data.isActive
+					});
+					if (balance !== editingAccount!.currentBalance) {
+						// Manual balance updates flow through recordBalance so history accrues
+						await recordBalance(editingAccount!.id!, balance, 'manual');
+					}
 				});
-				if (balance !== editingAccount.currentBalance) {
-					// Manual balance updates flow through recordBalance so history accrues
-					await recordBalance(editingAccount.id!, balance, 'manual');
-				}
 				toast.success('Account updated');
 			} else {
 				await addLinkedAccount({
@@ -218,7 +221,7 @@
 	async function handleDeleteConfirmed() {
 		if (!editingAccount) return;
 		try {
-			await deleteLinkedAccount(editingAccount.id!);
+			await deleteLinkedAccount(editingAccount!.id!);
 			toast.success('Account deleted');
 		} catch (error) {
 			console.error('Failed to delete account:', error);
@@ -268,15 +271,15 @@
 									</div>
 									<div class="flex-1 min-w-0">
 										<div class="flex items-center gap-2">
-											<span class="font-medium text-charcoal truncate">{account.name}</span>
+											<span class="font-medium text-charcoal truncate" title={account.upstreamBalanceAt ? `Bank balance as of ${new Date(account.upstreamBalanceAt).toLocaleString()}; fetched ${account.lastSyncedAt ? new Date(account.lastSyncedAt).toLocaleString() : 'unknown'}` : undefined}>{account.name}</span>
 											{#if !account.isActive}
 												<span class="badge bg-surface-alt text-charcoal-muted">Hidden</span>
 											{/if}
 											{#if account.source === 'simplefin'}
 												{#if account.lastSyncStatus === 'error'}
 													<span class="badge bg-danger-100 text-danger-600" title="Last sync failed — balance may be outdated; update it manually if needed">Sync error</span>
-												{:else if account.lastSyncStatus === 'stale'}
-													<span class="badge bg-warning-100 text-warning-600" title="Account not found upstream — balance kept from last successful sync">Stale</span>
+												{:else if account.lastSyncStatus === 'stale' || (account.upstreamBalanceAt && Date.now() - new Date(account.upstreamBalanceAt).getTime() > 72 * 3600000)}
+													<span class="badge bg-warning-100 text-warning-600" title="Upstream balance is over 72 hours old, or the account is unavailable">Stale</span>
 												{:else}
 													<span class="badge bg-success-100 text-success-600" title="Balance syncs from SimpleFIN">Synced</span>
 												{/if}

@@ -1,6 +1,6 @@
 import { liveQuery } from 'dexie';
 import { db, type LinkedAccount, type BalanceSnapshot, type BalanceSource, type SyncStatus } from '$lib/db';
-import { persistData } from '$lib/storage';
+import { runMutation } from '$lib/storage/mutation';
 import { roundCurrency } from '$lib/utils/currency';
 
 /**
@@ -32,38 +32,40 @@ export interface NewLinkedAccount {
 }
 
 export async function addLinkedAccount(input: NewLinkedAccount): Promise<number> {
-	const now = new Date();
-	const all = await db.linkedAccounts.toArray();
-	const sortOrder = all.reduce((max, a) => Math.max(max, a.sortOrder), -1) + 1;
-	const balance = roundCurrency(input.initialBalance);
+	return runMutation(['linkedAccounts', 'balanceSnapshots'], async () => {
+		const now = new Date();
+		const all = await db.linkedAccounts.toArray();
+		const sortOrder = all.reduce((max, a) => Math.max(max, a.sortOrder), -1) + 1;
+		const balance = roundCurrency(input.initialBalance);
 
-	const id = (await db.linkedAccounts.add({
-		name: input.name,
-		institution: input.institution,
-		accountClass: input.accountClass,
-		accountType: input.accountType,
-		currentBalance: balance,
-		source: input.source ?? 'manual',
-		simplefinId: input.simplefinId,
-		lastSyncStatus: 'never',
-		sortOrder,
-		isActive: true,
-		createdAt: now,
-		updatedAt: now
-	})) as number;
+		const id = (await db.linkedAccounts.add({
+			name: input.name,
+			institution: input.institution,
+			accountClass: input.accountClass,
+			accountType: input.accountType,
+			currentBalance: balance,
+			source: input.source ?? 'manual',
+			simplefinId: input.simplefinId,
+			lastSyncStatus: 'never',
+			sortOrder,
+			isActive: true,
+			createdAt: now,
+			updatedAt: now
+		})) as number;
 
-	// The opening balance is the first history point
-	await upsertSnapshot(id, balance, input.source ?? 'manual', now);
-	await persistData(['linkedAccounts', 'balanceSnapshots']);
-	return id;
+		// The opening balance is the first history point
+		await upsertSnapshot(id, balance, input.source ?? 'manual', now);
+		return id;
+	});
 }
 
 export async function updateLinkedAccount(
 	id: number,
 	updates: Partial<Omit<LinkedAccount, 'id' | 'createdAt'>>
 ): Promise<void> {
-	await db.linkedAccounts.update(id, { ...updates, updatedAt: new Date() });
-	await persistData('linkedAccounts');
+	return runMutation(['linkedAccounts', 'balanceSnapshots'], async () => {
+		await db.linkedAccounts.update(id, { ...updates, updatedAt: new Date() });
+	});
 }
 
 /**
@@ -72,18 +74,20 @@ export async function updateLinkedAccount(
  * balance-updated date, and reordering doesn't change balances.
  */
 export async function swapLinkedAccountOrder(idA: number, idB: number): Promise<void> {
-	const [a, b] = await Promise.all([db.linkedAccounts.get(idA), db.linkedAccounts.get(idB)]);
-	if (!a || !b) return;
-	await db.linkedAccounts.update(idA, { sortOrder: b.sortOrder });
-	await db.linkedAccounts.update(idB, { sortOrder: a.sortOrder });
-	await persistData('linkedAccounts');
+	return runMutation(['linkedAccounts', 'balanceSnapshots'], async () => {
+		const [a, b] = await Promise.all([db.linkedAccounts.get(idA), db.linkedAccounts.get(idB)]);
+		if (!a || !b) return;
+		await db.linkedAccounts.update(idA, { sortOrder: b.sortOrder });
+		await db.linkedAccounts.update(idB, { sortOrder: a.sortOrder });
+	});
 }
 
 /** Deletes the account and its entire snapshot history. */
 export async function deleteLinkedAccount(id: number): Promise<void> {
-	await db.balanceSnapshots.where('accountId').equals(id).delete();
-	await db.linkedAccounts.delete(id);
-	await persistData(['linkedAccounts', 'balanceSnapshots']);
+	return runMutation(['linkedAccounts', 'balanceSnapshots'], async () => {
+		await db.balanceSnapshots.where('accountId').equals(id).delete();
+		await db.linkedAccounts.delete(id);
+	});
 }
 
 /**
@@ -95,11 +99,12 @@ export async function recordBalance(
 	balance: number,
 	source: BalanceSource
 ): Promise<void> {
-	const rounded = roundCurrency(balance);
-	const now = new Date();
-	await db.linkedAccounts.update(accountId, { currentBalance: rounded, updatedAt: now });
-	await upsertSnapshot(accountId, rounded, source, now);
-	await persistData(['linkedAccounts', 'balanceSnapshots']);
+	return runMutation(['linkedAccounts', 'balanceSnapshots'], async () => {
+		const rounded = roundCurrency(balance);
+		const now = new Date();
+		await db.linkedAccounts.update(accountId, { currentBalance: rounded, updatedAt: now });
+		await upsertSnapshot(accountId, rounded, source, now);
+	});
 }
 
 /** Update sync bookkeeping after a SimpleFIN attempt (does not touch balance). */
@@ -108,10 +113,11 @@ export async function setSyncStatus(
 	status: SyncStatus,
 	syncedAt?: Date
 ): Promise<void> {
-	const updates: Partial<LinkedAccount> = { lastSyncStatus: status, updatedAt: new Date() };
-	if (syncedAt) updates.lastSyncedAt = syncedAt;
-	await db.linkedAccounts.update(accountId, updates);
-	await persistData('linkedAccounts');
+	return runMutation(['linkedAccounts', 'balanceSnapshots'], async () => {
+		const updates: Partial<LinkedAccount> = { lastSyncStatus: status, updatedAt: new Date() };
+		if (syncedAt) updates.lastSyncedAt = syncedAt;
+		await db.linkedAccounts.update(accountId, updates);
+	});
 }
 
 export async function getAllSnapshots(): Promise<BalanceSnapshot[]> {
@@ -136,4 +142,29 @@ async function upsertSnapshot(
 	} else {
 		await db.balanceSnapshots.add({ accountId, balance, source, capturedAt: when });
 	}
+}
+
+export interface BalanceSyncUpdate {
+	accountId: number;
+	status: SyncStatus;
+	balance?: number;
+	upstreamBalanceAt?: Date;
+}
+/** One atomic batch and one disk write for a completed sync. */
+export async function applyBalanceSync(updates: BalanceSyncUpdate[], capturedAt: Date): Promise<void> {
+	return runMutation(['linkedAccounts', 'balanceSnapshots'], async () => {
+		await db.transaction('rw', db.linkedAccounts, db.balanceSnapshots, async () => {
+			for (const update of updates) {
+				const current = await db.linkedAccounts.get(update.accountId);
+				if (!current) continue;
+				if (update.balance !== undefined && update.upstreamBalanceAt && (!current.upstreamBalanceAt || update.upstreamBalanceAt >= new Date(current.upstreamBalanceAt))) {
+					if (!Number.isFinite(update.balance)) throw new Error('Invalid bank balance');
+					await db.linkedAccounts.update(update.accountId, { currentBalance: update.balance, upstreamBalanceAt: update.upstreamBalanceAt, lastSyncedAt: capturedAt, lastSyncStatus: update.status, updatedAt: capturedAt });
+					await upsertSnapshot(update.accountId, update.balance, 'simplefin', capturedAt);
+				} else {
+					await db.linkedAccounts.update(update.accountId, { lastSyncStatus: update.balance === undefined ? update.status : 'error' });
+				}
+			}
+		});
+	});
 }

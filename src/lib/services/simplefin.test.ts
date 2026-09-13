@@ -27,8 +27,8 @@ describe('mapSimplefinAccount', () => {
 		expect(mapSimplefinAccount(raw({ org: null })).institution).toBe('');
 	});
 
-	it('rounds balances and survives malformed numbers', () => {
+	it('rounds balances and rejects malformed numbers', () => {
 		expect(mapSimplefinAccount(raw({ balance: '10.005' })).balance).toBe(10.01);
-		expect(mapSimplefinAccount(raw({ balance: 'not-a-number' })).balance).toBe(0);
+		expect(() => mapSimplefinAccount(raw({ balance: 'not-a-number' }))).toThrow('Invalid bank balance');
 	});
 });

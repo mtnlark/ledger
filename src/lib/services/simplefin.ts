@@ -1,10 +1,7 @@
 import { invoke } from '@tauri-apps/api/core';
 import { roundCurrency } from '$lib/utils/currency';
-import {
-	getAllLinkedAccounts,
-	recordBalance,
-	setSyncStatus
-} from '$lib/stores/linkedAccounts';
+import { getAllLinkedAccounts, applyBalanceSync, type BalanceSyncUpdate } from '$lib/stores/linkedAccounts';
+import { assertCanMutate } from '$lib/storage';
 
 /**
  * SimpleFIN sync (balances only, read-only). The access URL credential lives
@@ -38,11 +35,13 @@ export interface MappedSimplefinAccount {
 }
 
 export function mapSimplefinAccount(raw: SimplefinRawAccount): MappedSimplefinAccount {
+	if (typeof raw.balance !== 'string' || !/^-?\d+(?:\.\d+)?$/.test(raw.balance) || !Number.isFinite(Number(raw.balance))) throw new Error('Invalid bank balance');
+	if (!Number.isFinite(raw['balance-date']) || raw['balance-date'] <= 0 || !Number.isFinite(new Date(raw['balance-date'] * 1000).getTime())) throw new Error('Invalid balance timestamp');
 	return {
 		simplefinId: raw.id,
 		name: raw.name,
 		institution: raw.org?.name ?? raw.org?.domain ?? '',
-		balance: roundCurrency(parseFloat(raw.balance) || 0),
+		balance: roundCurrency(Number(raw.balance)),
 		balanceDate: new Date(raw['balance-date'] * 1000)
 	};
 }
@@ -76,62 +75,39 @@ export interface SyncResult {
  * that account 'error'/'stale' and keep its last balance — one flaky
  * institution must never block the others. Never throws.
  */
-export async function syncBalances(): Promise<SyncResult> {
-	const accounts = await getAllLinkedAccounts();
-	const targets = accounts.filter((a) => a.source === 'simplefin' && a.simplefinId);
-	if (targets.length === 0) return { synced: 0, failed: 0, skipped: true };
-
-	let upstream: SimplefinAccountsResponse;
+let activeSync: Promise<SyncResult> | null = null;
+export function syncBalances(): Promise<SyncResult> {
+	if (activeSync) return activeSync;
+	activeSync = performSync().finally(() => { activeSync = null; });
+	return activeSync;
+}
+async function performSync(): Promise<SyncResult> {
+	assertCanMutate();
+	const targets = (await getAllLinkedAccounts()).filter((a) => a.source === 'simplefin' && a.simplefinId);
+	if (!targets.length) return { synced: 0, failed: 0, skipped: true };
+	let upstream: SimplefinAccountsResponse = { accounts: [], errors: [] };
+	let fetchStatus: 'error' | 'stale' = 'stale';
 	try {
-		if (!(await isLinked())) {
-			for (const account of targets) await setSyncStatus(account.id!, 'stale');
-			return { synced: 0, failed: targets.length, skipped: false };
-		}
-		upstream = await fetchAccounts();
-	} catch (error) {
-		console.error('SimpleFIN fetch failed:', error);
-		for (const account of targets) {
-			try {
-				await setSyncStatus(account.id!, 'error');
-			} catch {
-				/* keep going */
-			}
-		}
-		return { synced: 0, failed: targets.length, skipped: false };
-	}
-
-	const byId = new Map(upstream.accounts.map((raw) => [raw.id, mapSimplefinAccount(raw)]));
-	let synced = 0;
-	let failed = 0;
-
-	for (const account of targets) {
+		if (await isLinked()) upstream = await fetchAccounts();
+	} catch { fetchStatus = 'error'; }
+	const now = new Date();
+	const updates: BalanceSyncUpdate[] = targets.map((account) => {
+		const raw = upstream.accounts.find((a) => a.id === account.simplefinId);
+		if (!raw) return { accountId: account.id!, status: fetchStatus };
 		try {
-			const mapped = byId.get(account.simplefinId!);
-			if (!mapped) {
-				// Upstream no longer reports this account
-				await setSyncStatus(account.id!, 'stale');
-				failed++;
-				continue;
-			}
-			// SimpleFIN reports credit/loan balances as negative; our model stores
-			// "amount owed" as positive with accountClass carrying the sign
-			const balance =
-				account.accountClass === 'liability' ? Math.abs(mapped.balance) : mapped.balance;
-			await recordBalance(account.id!, balance, 'simplefin');
-			await setSyncStatus(account.id!, 'ok', new Date());
-			synced++;
-		} catch (error) {
-			console.error(`SimpleFIN sync failed for ${account.name}:`, error);
-			try {
-				await setSyncStatus(account.id!, 'error');
-			} catch {
-				/* keep going */
-			}
-			failed++;
-		}
-	}
-
-	return { synced, failed, skipped: false };
+			const mapped = mapSimplefinAccount(raw);
+			if (account.upstreamBalanceAt && mapped.balanceDate < new Date(account.upstreamBalanceAt)) throw new Error('Balance timestamp regressed');
+			return {
+				accountId: account.id!,
+				balance: account.accountClass === 'liability' ? Math.abs(mapped.balance) : mapped.balance,
+				upstreamBalanceAt: mapped.balanceDate,
+				status: now.getTime() - mapped.balanceDate.getTime() > 72 * 3600000 ? 'stale' : 'ok'
+			};
+		} catch { return { accountId: account.id!, status: 'error' }; }
+	});
+	await applyBalanceSync(updates, now);
+	const synced = updates.filter((u) => u.balance !== undefined).length;
+	return { synced, failed: targets.length - synced, skipped: false };
 }
 
 const LAST_SYNC_KEY = 'ledger-simplefin-last-sync';

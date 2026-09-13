@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { assertCanMutate } from '$lib/storage';
+	import { runMutation } from '$lib/storage/mutation';
 	import { onMount } from 'svelte';
 	import type { LinkedAccount } from '$lib/db';
 	import { toast } from '$lib/stores/toast';
@@ -7,8 +9,7 @@
 		addLinkedAccount,
 		updateLinkedAccount,
 		deleteLinkedAccount,
-		recordBalance,
-		setSyncStatus
+		applyBalanceSync
 	} from '$lib/stores/linkedAccounts';
 	import {
 		isLinked as sfIsLinked,
@@ -48,6 +49,7 @@ async function sfConnect() {
 	if (!sfToken.trim() || sfBusy) return;
 	sfBusy = true;
 	try {
+		assertCanMutate();
 		const resp = await sfLink(sfToken.trim());
 		sfUpstream = resp.accounts.map(mapSimplefinAccount);
 		sfLinked = true;
@@ -79,30 +81,19 @@ function sfConnectedTo(simplefinId: string): LinkedAccount | undefined {
 
 async function sfAddUpstream(mapped: MappedSimplefinAccount) {
 	try {
-		const choice = sfMapping[mapped.simplefinId] ?? 'new';
-		if (choice === 'new') {
-			// Negative upstream balance ⇒ almost certainly a credit card / debt
-			const isLiability = mapped.balance < 0;
-			await addLinkedAccount({
-				name: mapped.name,
-				institution: mapped.institution,
-				accountClass: isLiability ? 'liability' : 'asset',
-				accountType: isLiability ? 'credit' : 'other',
-				initialBalance: Math.abs(mapped.balance),
-				source: 'simplefin',
-				simplefinId: mapped.simplefinId
-			});
-			const created = (await getAllLinkedAccounts()).find((a) => a.simplefinId === mapped.simplefinId);
-			if (created) await setSyncStatus(created.id!, 'ok', new Date());
-		} else {
-			const id = Number(choice);
-			const target = sfAccounts.find((a) => a.id === id);
-			await updateLinkedAccount(id, { source: 'simplefin', simplefinId: mapped.simplefinId });
-			const balance =
-				target?.accountClass === 'liability' ? Math.abs(mapped.balance) : mapped.balance;
-			await recordBalance(id, balance, 'simplefin');
-			await setSyncStatus(id, 'ok', new Date());
-		}
+		await runMutation(['linkedAccounts', 'balanceSnapshots'], async () => {
+			const choice = sfMapping[mapped.simplefinId] ?? 'new';
+			const target = sfAccounts.find((a) => a.id === Number(choice));
+			const isLiability = choice === 'new' ? mapped.balance < 0 : target?.accountClass === 'liability';
+			const balance = isLiability ? Math.abs(mapped.balance) : mapped.balance;
+			const id = choice === 'new' ? await addLinkedAccount({
+				name: mapped.name, institution: mapped.institution,
+				accountClass: isLiability ? 'liability' : 'asset', accountType: isLiability ? 'credit' : 'other',
+				initialBalance: balance, source: 'simplefin', simplefinId: mapped.simplefinId
+			}) : Number(choice);
+			if (choice !== 'new') await updateLinkedAccount(id, { source: 'simplefin', simplefinId: mapped.simplefinId });
+			await applyBalanceSync([{ accountId: id, balance, upstreamBalanceAt: mapped.balanceDate, status: Date.now() - mapped.balanceDate.getTime() > 72 * 3600000 ? 'stale' : 'ok' }], new Date());
+		});
 		await sfRefreshLocal();
 		toast.success(`${mapped.name} connected`);
 	} catch (error) {
@@ -115,21 +106,15 @@ async function sfDisconnect(mode: 'keep' | 'remove') {
 	if (sfBusy) return;
 	sfBusy = true;
 	try {
+		assertCanMutate();
 		await sfUnlink();
-		const synced = sfAccounts.filter((a) => a.source === 'simplefin');
-		if (mode === 'remove') {
-			// Demo/test cleanup: drop the accounts and their snapshot history
-			for (const account of synced) {
-				await deleteLinkedAccount(account.id!);
+		await runMutation(['linkedAccounts', 'balanceSnapshots'], async () => {
+			for (const account of sfAccounts.filter((a) => a.source === 'simplefin')) {
+				if (mode === 'remove') await deleteLinkedAccount(account.id!);
+				else await updateLinkedAccount(account.id!, { source: 'manual' });
 			}
-			toast.success('SimpleFIN disconnected — synced accounts removed');
-		} else {
-			// Safe default for real accounts: keep balances + history as manual
-			for (const account of synced) {
-				await updateLinkedAccount(account.id!, { source: 'manual' });
-			}
-			toast.success('SimpleFIN disconnected — accounts kept as manual');
-		}
+		});
+		toast.success(mode === 'remove' ? 'SimpleFIN disconnected — synced accounts removed' : 'SimpleFIN disconnected — accounts kept as manual');
 		sfLinked = false;
 		sfUpstream = null;
 		sfConfirmingUnlink = false;
