@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { toast } from '$lib/stores/toast';
 	import type { Category } from '$lib/db';
 	import { getAllCategories } from '$lib/stores/categories';
 	import { parseBackup, type BackupPreview } from '$lib/storage/backup';
@@ -47,7 +48,7 @@
 			<p>All current data will be replaced. A recovery backup must succeed first.</p>
 			<ul>{#each Object.entries(backup.counts) as [name, count] (name)}<li>{name}: {count}</li>{/each}</ul>
 			{#each backup.warnings as warning (warning)}<p>{warning}</p>{/each}
-			<button class="px-4 py-2 rounded-lg border border-theme mr-2 disabled:opacity-50" disabled={blocked} onclick={() => run(async () => { if (backup) await replaceAllData(backup.data); backup = null; message = 'Backup restored'; })}>Replace all data</button>
+			<button class="px-4 py-2 rounded-lg border border-theme mr-2 disabled:opacity-50" disabled={blocked} onclick={() => run(async () => { if (backup) await replaceAllData(backup.data); backup = null; toast.success('Backup restored'); })}>Replace all data</button>
 			<button class="px-4 py-2 rounded-lg border border-theme mr-2 disabled:opacity-50" disabled={busy} onclick={() => backup = null}>Cancel</button>
 		</div>
 	{/if}
