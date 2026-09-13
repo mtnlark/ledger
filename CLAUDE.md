@@ -29,7 +29,7 @@ Roadmap groups 1–9 complete: data-integrity hardening, savings goals, tags, no
 - **Storage**: Dexie (in-memory IndexedDB, cleared on startup) for queries; JSON files are the source of truth in `~/Library/Application Support/app.ledger.desktop/` (`data.json` + `backups/`, max 10).
 - **UI**: Tailwind v4 (`@tailwindcss/vite`, CSS-first config via `@theme` in `app.css`); "Warm Ledger" terracotta/cream design system.
 - **Charts**: Chart.js (+ `chartjs-plugin-annotation` for σ bands / mean lines).
-- **Other runtime deps**: `date-fns`, `lucide-svelte`, `exceljs` (Excel import). Full list in `package.json`.
+- **Other runtime deps**: `date-fns`, `lucide-svelte`, `read-excel-file` (Excel import; ExcelJS in tests). Full list in `package.json`.
 
 ---
 
@@ -222,7 +222,7 @@ Hashtags in the notes field (`#vacation`; letters/numbers/hyphens, must start al
 
 ### Menu-bar Quick Add
 - Tray icon (left-click) toggles a small always-on-top `quick-add` window rendering the full `TransactionForm`. Icon is a monochrome template glyph (`icons/tray.png`, `icon_as_template(true)`; needs the `image-png` cargo feature).
-- **Single-writer rule**: both windows share one IndexedDB origin. The quick window READS categories/settings/merchants from shared Dexie but NEVER calls `initializeStorage()` and never writes. Submits emit `ledger://quick-add-submit` (date as ISO string); the main window's layout listener performs the add, toasts, and dispatches the `ledger:transactions-changed` DOM event so the dashboard refreshes.
+- **Single-writer rule**: both windows share one IndexedDB origin. The quick window READS categories/settings/merchants from shared Dexie but NEVER calls `initializeStorage()` and never writes. Submits emit `ledger://quick-add-submit` with a request ID and ISO date. The main window deduplicates requests and emits `ledger://quick-add-result` only after durable persistence; timeout retries reuse the ID, and applied-but-unsaved retries save without inserting again.
 - Layout renders a bare shell for `/quick-add` (no SideNav/KeyboardShortcuts) and skips purge + notification effects. Rust `SUPPRESS_NEXT_ACTIVATE` atomic stops the activation observer from popping the main window; CloseRequested hides (not closes) the quick window.
 
 ### Notifications (opt-in, native macOS via Tauri plugin)
@@ -287,3 +287,12 @@ Car, Cash withdrawals, Clothes & accessories, Coffee & snacks, Donations, Electr
 ## File Storage
 
 macOS: `~/Library/Application Support/app.ledger.desktop/` — `data.json` (main) + `data.json.bak` (previous atomic write) + `backups/` (auto-timestamped before each save, max 10, debounced 1 min). Saves are serialized through a coalescing queue (`saveToFile`). Startup recovery order when `data.json` is missing or corrupted: `.bak` first (freshest), then timestamped backups; only a truly empty slate initializes fresh. With iCloud backup enabled, a single `~/Library/Mobile Documents/com~apple~CloudDocs/Ledger/ledger-backup.json` is overwritten each backup (requires iCloud Drive).
+
+### Data-integrity workflow updates
+
+- Settings and subscription stores share `db/settings.ts` for singleton writes, avoiding an import cycle through the compatibility re-exports. Writes recreate missing settings only when the user edits them.
+- `storage/mutation.ts` serializes logical IndexedDB transactions through disk acknowledgment; failed disk saves retain applied changes and block further writes until Retry succeeds. The layout shows persistent Retry and Export Backup controls.
+- Manual exports include all nine tables in the shared checksummed format. Restore previews validate structure, references and metadata; legacy omitted tables are emptied. A fresh verified recovery backup precedes atomic replacement, then caches and mounted views refresh.
+- Excel imports preview accepted, duplicate, invalid and blank rows, require unknown-category mapping, and preserve fixed partner amounts. Commit uses one transaction and save.
+- Shared category splits use purchase-level integer-cent allocation. Historical fixed-share repair is previewed, explicitly selected, backed up, and revalidated before atomic application.
+- Bank sync rejects malformed/regressed balances, tracks upstream time separately from capture time, marks data older than 72 hours stale, and saves once per batch. Needs/wants memoization retains unchanged category classifications.

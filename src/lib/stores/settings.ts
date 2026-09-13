@@ -1,4 +1,5 @@
 import { db, type Settings, DEFAULT_SETTINGS } from '$lib/db';
+import { writeSettings } from '$lib/db/settings';
 import { liveQuery } from 'dexie';
 import { runMutation } from '$lib/storage/mutation';
 import { invalidateRecurringCache } from './recurringCache';
@@ -24,7 +25,7 @@ export async function getSettings(): Promise<Settings> {
 
 export async function updateSettings(updates: Partial<Omit<Settings, 'id'>>): Promise<void> {
 	return runMutation(['settings'], async () => {
-		await db.settings.put({ ...DEFAULT_SETTINGS, ...await db.settings.get(1), ...updates, id: 1 });
+		await writeSettings(updates);
 	});
 }
 
