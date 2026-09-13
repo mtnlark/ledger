@@ -107,7 +107,7 @@ The main layers are:
 - **JSON storage** is the durable copy of the database. Ledger loads it into Dexie at startup and writes the full state back after changes.
 - **Rust and Tauri** provide the native window lifecycle, menu-bar integration, notifications, and the SimpleFIN connection.
 
-The quick-add window shares the same IndexedDB origin as the main window, but it does not write directly. It sends the completed transaction to the main window, which performs the database update and file save. This keeps one writer responsible for durable storage.
+The quick-add window shares the same IndexedDB origin as the main window, but it does not write directly. It sends the completed transaction to the main window, which performs the database update and file save. Every request carries an ID, and the quick-add window displays “Added” only after the main window acknowledges a successful disk save. Missing acknowledgments reuse the same request; applied-but-unsaved requests retry persistence without inserting again.
 
 ## Data storage and recovery
 
@@ -117,17 +117,17 @@ Ledger stores its main data file at:
 ~/Library/Application Support/app.ledger.desktop/data.json
 ```
 
-Each save passes through one queue, so two changes cannot write the same temporary file at the same time. Calls waiting in the queue can be combined into one write.
+Logical mutations run in IndexedDB transactions and share a queue through their disk acknowledgment. Related writes commit together, and unchanged tables reuse their serialized content. If disk persistence fails, the committed IndexedDB changes remain available, a persistent banner offers Retry and Export Backup, and further writes are blocked until saving succeeds. Retry saves the current snapshot without replaying the original operation.
 
 A durable write:
 
-1. serializes every persisted table;
+1. assembles every persisted table, reusing unchanged serialized tables;
 2. adds a SHA-256 checksum;
 3. writes a temporary file;
 4. preserves the previous file as `data.json.bak`;
 5. renames the temporary file to `data.json`.
 
-Ledger also keeps up to ten timestamped backups. If the main file cannot be parsed or fails its checksum, startup recovery tries `data.json.bak` first and then the timestamped backups from newest to oldest.
+Ledger keeps up to ten routine timestamped backups. Restore and historical repair also create fresh, verified recovery snapshots before changing records; these bypass the normal one-minute backup debounce. If the main file cannot be parsed or fails its checksum, startup recovery tries `data.json.bak` first and then the timestamped backups from newest to oldest.
 
 When iCloud backup is enabled, Ledger also writes a portable backup to:
 
@@ -135,11 +135,20 @@ When iCloud backup is enabled, Ledger also writes a portable backup to:
 ~/Library/Mobile Documents/com~apple~CloudDocs/Ledger/ledger-backup.json
 ```
 
-The settings page can import an Excel transaction sheet, export transactions as CSV, and import or export the complete database as JSON.
+Settings → Data provides the following workflows:
+
+- **Full Backup (JSON)** exports all nine persisted tables in the same checksummed format used by automatic and iCloud backups.
+- **Preview backup restore** validates version, structure, IDs, amounts, dates, enums and references before displaying table counts. Legacy automatic and manual exports are supported; legacy `budgets` becomes `monthlyBudgets`. Missing legacy tables are listed and emptied on restore. Replacement runs atomically after a fresh recovery backup succeeds, then refreshes caches and mounted views.
+- **Preview Excel import** reads the `Expenses` sheet and displays accepted rows, duplicates, invalid rows with source numbers and reasons, and blank rows. Numeric cells and US currency strings such as `$1,234.56` are supported. Unknown categories require a mapping. Only approved rows are committed, together in one transaction and one disk save. Fixed partner shares remain fixed amounts.
+- **Review historical fixed shares** lists inconsistent category splits. Only complete, undeleted, unsettled groups with clear evidence of the intended share can be selected for correction. The selected records are checked again after a fresh backup, then corrected atomically. Reviewing alone changes nothing.
+
+New category splits and group edits allocate the purchase-level partner share proportionally in integer cents, using largest remainders with line order breaking ties. Group editing reads the original parent purchase. Historical amounts never change automatically.
+
+Needs/wants calculations retain their category-essential map while category IDs and essential flags are unchanged, preserving transaction-version memoization.
 
 ## SimpleFIN and account credentials
 
-Ledger uses SimpleFIN only to read account balances. It cannot import transactions or move money.
+Ledger uses SimpleFIN only to read account balances. It cannot import transactions or move money. Each sync strictly validates balances and timestamps, preserves last-good values for failing accounts, and applies all account statuses and snapshots in one transaction and disk save. Overlapping sync requests share the same operation. Upstream balance time is stored separately from successful fetch time; balances older than 72 hours are labeled stale, and regressed upstream timestamps are rejected. History snapshots use capture time.
 
 The Rust backend connects to SimpleFIN and stores the account credential in the macOS Keychain. The Svelte frontend receives the balances but never sees that credential. It is not included in Ledger’s data file, local backups, or iCloud backups.
 
@@ -153,7 +162,7 @@ The Rust backend connects to SimpleFIN and stores the account credential in the 
 | Runtime queries | Dexie 4 over IndexedDB |
 | Durable storage | Checksummed JSON with queued writes and backup recovery |
 | Charts | Chart.js with annotation and treemap plugins |
-| Spreadsheet import | ExcelJS |
+| Spreadsheet import | read-excel-file (ExcelJS in tests) |
 | Tests | Vitest, Testing Library, and Rust unit tests |
 | Continuous integration | GitHub Actions on Linux and macOS |
 

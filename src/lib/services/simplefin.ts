@@ -72,8 +72,8 @@ export interface SyncResult {
 
 /**
  * Pull balances for all simplefin-sourced accounts. Per-account failures mark
- * that account 'error'/'stale' and keep its last balance — one flaky
- * institution must never block the others. Never throws.
+ * that account 'error'/'stale' and keep its last balance. Database and disk
+ * failures propagate so callers cannot report a successful save.
  */
 let activeSync: Promise<SyncResult> | null = null;
 export function syncBalances(): Promise<SyncResult> {
