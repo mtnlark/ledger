@@ -9,8 +9,10 @@
 	import { applyTheme, initThemeListener } from '$lib/stores/theme';
 	import { initNotifications, cleanupNotifications, isNotificationPermissionGranted } from '$lib/notifications';
 	import { purgeDeletedTransactions, addTransaction } from '$lib/stores/transactions';
+	import SaveStatusBanner from '$lib/components/SaveStatusBanner.svelte';
+	import { createQuickAddHandler, type QuickAddRequest } from '$lib/services/quick-add';
+	import { retryPersistence } from '$lib/storage';
 	import { registerStorageCallbacks, initializeStorage } from '$lib/storage';
-	import type { TransactionFormData } from '$lib/components/TransactionForm.svelte';
 	import { toast } from '$lib/stores/toast';
 	import { db } from '$lib/db';
 	import { onDestroy, onMount } from 'svelte';
@@ -22,6 +24,12 @@
 	});
 
 	let { children } = $props();
+	let dataRevision = $state(0);
+	onMount(() => {
+		const refresh = () => { dataRevision++; };
+		window.addEventListener('ledger:data-replaced', refresh);
+		return () => window.removeEventListener('ledger:data-replaced', refresh);
+	});
 
 	// The menu-bar quick-add window renders this same layout; it gets a bare
 	// shell and skips anything that writes or schedules (single-writer rule).
@@ -93,21 +101,13 @@
 		if (isQuickWindow) return;
 		(async () => {
 			try {
-				const { listen } = await import('@tauri-apps/api/event');
-				unlistenQuickAdd = await listen<Omit<TransactionFormData, 'date'> & { date: string }>(
-					'ledger://quick-add-submit',
-					async (event) => {
-						try {
-							await initializeStorage();
-							await addTransaction({ ...event.payload, date: new Date(event.payload.date) });
-							toast.success('Transaction added');
-							window.dispatchEvent(new CustomEvent('ledger:transactions-changed'));
-						} catch (error) {
-							console.error('Quick add failed:', error);
-							toast.error('Failed to add transaction');
-						}
-					}
-				);
+				const { listen, emit } = await import('@tauri-apps/api/event');
+				const handle = createQuickAddHandler(async (data) => { await initializeStorage(); return addTransaction(data); }, retryPersistence);
+				unlistenQuickAdd = await listen<QuickAddRequest>('ledger://quick-add-submit', async (event) => {
+					const result = await handle(event.payload);
+					await emit('ledger://quick-add-result', result);
+					if (result.status === 'saved') window.dispatchEvent(new CustomEvent('ledger:transactions-changed'));
+				});
 			} catch {
 				// Not running inside Tauri (tests / plain web) — quick add unavailable
 			}
@@ -158,7 +158,8 @@
 
 		<!-- Main content -->
 		<div class="flex-1" id="main-content">
-			{@render children()}
+			<SaveStatusBanner />
+			{#key dataRevision}{@render children()}{/key}
 		</div>
 	</div>
 

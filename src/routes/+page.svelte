@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { runMutation } from '$lib/storage/mutation';
 	import { afterNavigate } from '$app/navigation';
 	import { onMount } from 'svelte';
 	import { addDays, format, parseISO, startOfTomorrow } from 'date-fns';
@@ -477,14 +478,12 @@
 
 	async function handleAddSelectedSuggestions(items: Array<RecurringSuggestion & { date: Date }>) {
 		try {
-			const results = await Promise.allSettled(
-				items.map((item) => addRecurringSuggestionTransaction(item))
-			);
+			await runMutation(['transactions', 'settings'], async () => {
+				for (const item of items) await addRecurringSuggestionTransaction(item);
+			});
+			const succeeded = items.length;
 
-			const succeeded = results.filter((r) => r.status === 'fulfilled').length;
-			const failed = results.filter((r) => r.status === 'rejected').length;
-
-			// Always reload — some may have succeeded
+			// Refresh after the entire batch has been saved.
 			transactions = await getTransactionsByMonth(currentMonth);
 			availableMonths = await getAvailableMonths();
 			if (allTransactions.length > 0) {
@@ -502,15 +501,7 @@
 			showRecurringBanner = recurringSuggestions.length > 0;
 			showRecurringSuggestionsModal = false;
 
-			if (failed === 0) {
-				toast.success(succeeded === 1
-					? 'Transaction added'
-					: `${succeeded} transactions added`);
-			} else if (succeeded > 0) {
-				toast.warning(`${succeeded} added, ${failed} failed`);
-			} else {
-				toast.error('Failed to add transactions');
-			}
+			toast.success(succeeded === 1 ? 'Transaction added' : `${succeeded} transactions added`);
 		} catch (error) {
 			handleError(error, { context: 'handleAddSelectedSuggestions', userMessage: 'Failed to add transactions' });
 		}

@@ -176,7 +176,7 @@ describe('dashboardActions', () => {
 			const error = new Error('fail');
 			vi.mocked(addTransaction).mockRejectedValueOnce(error);
 
-			await actions.addTransaction(txnData);
+			await expect(actions.addTransaction(txnData)).rejects.toThrow('fail');
 
 			expect(handleError).toHaveBeenCalledWith(error, {
 				context: 'addTransaction',
@@ -241,7 +241,7 @@ describe('dashboardActions', () => {
 			const error = new Error('add fail');
 			vi.mocked(addSplitTransaction).mockRejectedValueOnce(error);
 
-			await actions.addSplitTransactions(splitData);
+			await expect(actions.addSplitTransactions(splitData)).rejects.toThrow('add fail');
 
 			expect(handleError).toHaveBeenCalledWith(error, {
 				context: 'addSplitTransactions',

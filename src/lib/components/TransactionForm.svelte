@@ -75,6 +75,7 @@
 	let subscriptionFrequency = $state<'monthly' | 'semi-annual' | 'annual'>('monthly');
 	let futureDateConfirmed = $state(false);
 	let isSubmitting = $state(false);
+	let submitError = $state('');
 
 	let touched = $state(new Set<string>());
 	let errors = $state<Record<string, string>>({});
@@ -214,6 +215,7 @@
 		}
 
 		isSubmitting = true;
+		submitError = '';
 		try {
 			// Handle split mode submission
 			if (isSplitMode) {
@@ -271,6 +273,8 @@
 			futureDateConfirmed = false;
 			touched = new Set();
 			errors = {};
+		} catch (error) {
+			submitError = error instanceof Error ? error.message : String(error);
 		} finally {
 			isSubmitting = false;
 		}
@@ -305,6 +309,8 @@
 		}
 	}
 </script>
+{#if submitError}<p role="alert" class="p-4 text-sm">{submitError}</p>{/if}
+
 
 <!-- Form body only; the host (AddTransactionModal) provides card chrome and title. -->
 <form onsubmit={handleSubmit}>

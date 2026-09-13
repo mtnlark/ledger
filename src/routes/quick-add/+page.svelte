@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { awaitQuickAddResult, type QuickAddRequest, type QuickAddResult } from '$lib/services/quick-add';
 	import { Check } from 'lucide-svelte';
 	import { DEFAULT_SETTINGS, type Category, type Settings } from '$lib/db';
 	import { getAllCategories } from '$lib/stores/categories';
@@ -10,6 +11,7 @@
 	let settings = $state<Settings>(DEFAULT_SETTINGS);
 	let ready = $state(false);
 	let justAdded = $state(false);
+	let pendingRequest: QuickAddRequest | null = null;
 
 	// This window reads the IndexedDB the main window owns and populates. It must
 	// NEVER call initializeStorage() (which clears and reloads the shared tables)
@@ -49,9 +51,18 @@
 	});
 
 	async function handleSubmit(data: TransactionFormData) {
-		// Hand the transaction to the main window — the single writer of data.json
-		const { emit } = await import('@tauri-apps/api/event');
-		await emit('ledger://quick-add-submit', { ...data, date: data.date.toISOString() });
+		const { emit, listen } = await import('@tauri-apps/api/event');
+		// Keep the exact payload and ID after a timeout or disk failure.
+		pendingRequest ??= { requestId: crypto.randomUUID(), data: { ...data, date: data.date.toISOString() } };
+		const request = pendingRequest;
+		const result = await awaitQuickAddResult(request, {
+			listen: (receive) => listen<QuickAddResult>('ledger://quick-add-result', (event) => receive(event.payload)),
+			emit: (payload) => emit('ledger://quick-add-submit', payload)
+		});
+		if (result.status === 'rejected') pendingRequest = null;
+		if (result.status !== 'saved') throw new Error(result.message ?? 'Changes not saved to disk. Submit again to retry saving.');
+		pendingRequest = null;
+
 		justAdded = true;
 		setTimeout(async () => {
 			justAdded = false;

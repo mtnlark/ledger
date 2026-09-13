@@ -103,6 +103,7 @@ export function setupDashboardActions(ctx: DashboardContext) {
 					context: 'addTransaction',
 					userMessage: 'Failed to add transaction'
 				});
+				throw error;
 			}
 		},
 
@@ -132,6 +133,7 @@ export function setupDashboardActions(ctx: DashboardContext) {
 					context: 'addSplitTransactions',
 					userMessage: 'Failed to add split transaction'
 				});
+				throw error;
 			}
 		},
 
