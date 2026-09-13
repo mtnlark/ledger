@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { format } from 'date-fns';
 	import { Plus, Trash2 } from 'lucide-svelte';
-	import type { Category, Settings, Transaction } from '$lib/db';
+	import { db, type Category, type Settings, type Transaction } from '$lib/db';
 	import { parseLocalDate } from '$lib/utils/date-helpers';
 	import { formatCurrency } from '$lib/utils/format-helpers';
 	import { sumCurrency } from '$lib/utils/currency';
@@ -58,23 +58,23 @@
 
 	let activeCategories = $derived(categories.filter((c) => c.isActive));
 
-	// Seed the form from the existing children whenever the modal opens.
+	// Read the original purchase; child fixed values are category allocations.
 	$effect(() => {
-		if (isOpen && children.length > 0) {
-			const first = children[0];
-			merchant = first.merchant;
-			dateStr = format(new Date(first.date), 'yyyy-MM-dd');
-			isShared = first.isShared;
-			splitType = first.splitType;
-			splitValue = first.splitValue;
-			isSettled = first.isSettled;
-			lines = children.map((c) => ({
-				categoryId: c.categoryId,
-				amount: c.amount,
-				notes: c.notes ?? ''
-			}));
+		const id = parentId;
+		if (!isOpen || id === null) return;
+		let cancelled = false;
+		void db.transactions.get(id).then((parent) => {
+			if (cancelled || !parent) return;
+			merchant = parent.merchant;
+			dateStr = format(new Date(parent.date), 'yyyy-MM-dd');
+			isShared = parent.isShared;
+			splitType = parent.splitType;
+			splitValue = parent.splitValue;
+			isSettled = parent.isSettled;
+			lines = children.map((c) => ({ categoryId: c.categoryId, amount: c.amount, notes: c.notes ?? '' }));
 			isSubmitting = false;
-		}
+		});
+		return () => { cancelled = true; };
 	});
 
 	// The new total is simply the sum of the lines — editing a split lets you
@@ -84,7 +84,7 @@
 	let isValid = $derived(
 		merchant.trim().length > 0 &&
 			lines.length >= 2 &&
-			lines.every((l) => l.categoryId > 0 && l.amount > 0)
+			lines.every((l) => l.categoryId > 0 && Number.isFinite(l.amount) && l.amount > 0)
 	);
 
 	function addLine() {

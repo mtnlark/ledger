@@ -1,5 +1,6 @@
 import { db, calculatePartnerShare, getMonthKey, type Transaction } from '$lib/db';
-import { persistData } from '$lib/storage';
+import { allocatePartnerShares } from '$lib/utils/split-allocation';
+import { runMutation } from '$lib/storage/mutation';
 import { invalidateMerchantCache } from './merchants';
 import { invalidateRecurringCache } from './recurring';
 import { isSubscriptionCancelled, reactivateSubscription } from './subscriptionSettings';
@@ -78,7 +79,8 @@ function createSplitChild(
 	parent: Transaction,
 	parentId: number,
 	split: SplitLine,
-	now: Date
+	now: Date,
+	partnerShare: number
 ): Omit<Transaction, 'id'> {
 	return {
 		date: parent.date,
@@ -87,10 +89,8 @@ function createSplitChild(
 		categoryId: split.categoryId,
 		isShared: parent.isShared,
 		splitType: parent.splitType,
-		splitValue: parent.splitValue,
-		partnerShare: parent.isShared
-			? calculatePartnerShare(split.amount, parent.splitType, parent.splitValue)
-			: 0,
+		splitValue: parent.splitType === 'fixed' ? partnerShare : parent.splitValue,
+		partnerShare,
 		isSettled: parent.isSettled,
 		settledDate: parent.settledDate,
 		notes: split.notes,
@@ -123,41 +123,43 @@ async function bulkModifyTransactions(
 	fields: Partial<Transaction>,
 	afterCacheUpdate?: () => void
 ): Promise<void> {
-	await db.transactions.where('id').anyOf(ids).modify(fields);
+	return runMutation(['transactions', 'settings'], async () => {
+		await db.transactions.where('id').anyOf(ids).modify(fields);
 
-	const cache = getTransactionCache();
-	if (cache.isLoaded) {
-		cache.bulkUpdate(ids, fields);
-		afterCacheUpdate?.();
-	}
+		const cache = getTransactionCache();
+		if (cache.isLoaded) {
+			cache.bulkUpdate(ids, fields);
+			afterCacheUpdate?.();
+		}
 
-	invalidateTransactionCaches();
-	await persistData('transactions');
+		invalidateTransactionCaches();
+	});
 }
 
 // Write per-transaction notes changes (computed once by the caller) to the DB
 // in one rw transaction, mirror them into the cache, rebuild the tag index,
 // and persist. Shared by all tag operations.
 async function applyNotesUpdates(changes: { id: number; notes: string | undefined }[]): Promise<void> {
-	if (changes.length === 0) return;
-	const now = new Date();
+	return runMutation(['transactions', 'settings'], async () => {
+		if (changes.length === 0) return;
+		const now = new Date();
 
-	await db.transaction('rw', db.transactions, async () => {
-		for (const change of changes) {
-			await db.transactions.update(change.id, { notes: change.notes, updatedAt: now });
+		await db.transaction('rw', db.transactions, async () => {
+			for (const change of changes) {
+				await db.transactions.update(change.id, { notes: change.notes, updatedAt: now });
+			}
+		});
+
+		const cache = getTransactionCache();
+		if (cache.isLoaded) {
+			for (const change of changes) {
+				cache.update(change.id, { notes: change.notes, updatedAt: now });
+			}
+			tagIndex.rebuild(cache.getAll());
 		}
+
+		invalidateTransactionCaches();
 	});
-
-	const cache = getTransactionCache();
-	if (cache.isLoaded) {
-		for (const change of changes) {
-			cache.update(change.id, { notes: change.notes, updatedAt: now });
-		}
-		tagIndex.rebuild(cache.getAll());
-	}
-
-	invalidateTransactionCaches();
-	await persistData('transactions');
 }
 
 // Filters out split parent transactions and soft-deleted transactions
@@ -198,140 +200,145 @@ export async function getTransactionsByDateRange(
 export async function addTransaction(
 	transaction: NewTransaction
 ): Promise<number> {
-	validateNewTransaction(transaction);
+	return runMutation(['transactions', 'settings'], async () => {
+		validateNewTransaction(transaction);
 
-	const now = new Date();
-	const newTransaction = createTransactionRecord(transaction, now);
+		const now = new Date();
+		const newTransaction = createTransactionRecord(transaction, now);
 
-	const id = (await db.transactions.add(newTransaction)) as number;
+		const id = (await db.transactions.add(newTransaction)) as number;
 
-	// Update the cache incrementally
-	const cache = getTransactionCache();
-	if (cache.isLoaded) {
-		cache.add({ ...newTransaction, id } as Transaction & { id: number });
-		tagIndex.addTransaction({ id, notes: newTransaction.notes });
-	}
+		// Update the cache incrementally
+		const cache = getTransactionCache();
+		if (cache.isLoaded) {
+			cache.add({ ...newTransaction, id } as Transaction & { id: number });
+			tagIndex.addTransaction({ id, notes: newTransaction.notes });
+		}
 
-	// Auto-reactivate if adding a subscription for a cancelled merchant
-	if (transaction.isSubscription && await isSubscriptionCancelled(transaction.merchant)) {
-		await reactivateSubscription(transaction.merchant);
-	}
+		// Auto-reactivate if adding a subscription for a cancelled merchant
+		if (transaction.isSubscription && await isSubscriptionCancelled(transaction.merchant)) {
+			await reactivateSubscription(transaction.merchant);
+		}
 
-	invalidateTransactionCaches();
-	await persistData('transactions');
-	return id;
+		invalidateTransactionCaches();
+		return id;
+	});
 }
 
 export async function updateTransaction(
 	id: number,
 	updates: Partial<Omit<Transaction, 'id' | 'createdAt'>>
 ): Promise<void> {
-	const existing = await db.transactions.get(id);
-	if (!existing) return;
+	return runMutation(['transactions', 'settings'], async () => {
+		const existing = await db.transactions.get(id);
+		if (!existing) return;
 
-	// Recalculate partner share if relevant fields changed
-	let partnerShare = existing.partnerShare;
-	if (
-		updates.amount !== undefined ||
-		updates.splitType !== undefined ||
-		updates.splitValue !== undefined ||
-		updates.isShared !== undefined
-	) {
-		const isShared = updates.isShared ?? existing.isShared;
-		const amount = updates.amount ?? existing.amount;
-		const splitType = updates.splitType ?? existing.splitType;
-		const splitValue = updates.splitValue ?? existing.splitValue;
+		// Recalculate partner share if relevant fields changed
+		let partnerShare = existing.partnerShare;
+		if (
+			updates.amount !== undefined ||
+			updates.splitType !== undefined ||
+			updates.splitValue !== undefined ||
+			updates.isShared !== undefined
+		) {
+			const isShared = updates.isShared ?? existing.isShared;
+			const amount = updates.amount ?? existing.amount;
+			const splitType = updates.splitType ?? existing.splitType;
+			const splitValue = updates.splitValue ?? existing.splitValue;
 
-		partnerShare = isShared ? calculatePartnerShare(amount, splitType, splitValue) : 0;
-	}
-
-	const updatedFields = {
-		...updates,
-		partnerShare,
-		updatedAt: new Date()
-	};
-
-	await db.transactions.update(id, updatedFields);
-
-	// Update the cache incrementally
-	const cache = getTransactionCache();
-	if (cache.isLoaded) {
-		cache.update(id, updatedFields);
-		if (updates.notes !== undefined) {
-			tagIndex.updateTransaction(
-				{ id, notes: existing.notes },
-				{ id, notes: updates.notes }
-			);
+			partnerShare = isShared ? calculatePartnerShare(amount, splitType, splitValue) : 0;
 		}
-	}
 
-	// Auto-reactivate if marking as subscription for a cancelled merchant
-	if (updates.isSubscription === true) {
-		const merchant = updates.merchant ?? existing.merchant;
-		if (await isSubscriptionCancelled(merchant)) {
-			await reactivateSubscription(merchant);
+		const updatedFields = {
+			...updates,
+			partnerShare,
+			updatedAt: new Date()
+		};
+
+		await db.transactions.update(id, updatedFields);
+
+		// Update the cache incrementally
+		const cache = getTransactionCache();
+		if (cache.isLoaded) {
+			cache.update(id, updatedFields);
+			if (updates.notes !== undefined) {
+				tagIndex.updateTransaction(
+					{ id, notes: existing.notes },
+					{ id, notes: updates.notes }
+				);
+			}
 		}
-	}
 
-	invalidateTransactionCaches();
-	await persistData('transactions');
+		// Auto-reactivate if marking as subscription for a cancelled merchant
+		if (updates.isSubscription === true) {
+			const merchant = updates.merchant ?? existing.merchant;
+			if (await isSubscriptionCancelled(merchant)) {
+				await reactivateSubscription(merchant);
+			}
+		}
+
+		invalidateTransactionCaches();
+	});
 }
 
 export async function deleteTransaction(id: number): Promise<void> {
-	// Get transaction for tag index removal before deleting
-	const oldTx = await db.transactions.get(id);
-	await db.transactions.delete(id);
+	return runMutation(['transactions', 'settings'], async () => {
+		// Get transaction for tag index removal before deleting
+		const oldTx = await db.transactions.get(id);
+		await db.transactions.delete(id);
 
-	// Update the cache incrementally
-	const cache = getTransactionCache();
-	if (cache.isLoaded) {
-		cache.remove(id);
-		if (oldTx) tagIndex.removeTransaction({ id, notes: oldTx.notes });
-	}
+		// Update the cache incrementally
+		const cache = getTransactionCache();
+		if (cache.isLoaded) {
+			cache.remove(id);
+			if (oldTx) tagIndex.removeTransaction({ id, notes: oldTx.notes });
+		}
 
-	invalidateTransactionCaches();
-	await persistData('transactions');
+		invalidateTransactionCaches();
+	});
 }
 
 export async function bulkDeleteTransactions(ids: number[]): Promise<void> {
-	if (ids.length === 0) return;
-	await db.transactions.where('id').anyOf(ids).delete();
+	return runMutation(['transactions', 'settings'], async () => {
+		if (ids.length === 0) return;
+		await db.transactions.where('id').anyOf(ids).delete();
 
-	// Update the cache incrementally
-	const cache = getTransactionCache();
-	if (cache.isLoaded) {
-		cache.bulkRemove(ids);
-		tagIndex.rebuild(cache.getAll());
-	}
+		// Update the cache incrementally
+		const cache = getTransactionCache();
+		if (cache.isLoaded) {
+			cache.bulkRemove(ids);
+			tagIndex.rebuild(cache.getAll());
+		}
 
-	invalidateTransactionCaches();
-	await persistData('transactions');
+		invalidateTransactionCaches();
+	});
 }
 
 // Soft delete a transaction (marks as deleted but keeps in DB for undo)
 // Returns the transaction data for undo capture, or null if not found
 export async function softDeleteTransaction(id: number): Promise<Transaction | null> {
-	const transaction = await db.transactions.get(id);
-	if (!transaction) return null;
+	return runMutation(['transactions', 'settings'], async () => {
+		const transaction = await db.transactions.get(id);
+		if (!transaction) return null;
 
-	const now = new Date();
-	await db.transactions.update(id, {
-		isDeleted: true,
-		deletedAt: now,
-		updatedAt: now
+		const now = new Date();
+		await db.transactions.update(id, {
+			isDeleted: true,
+			deletedAt: now,
+			updatedAt: now
+		});
+
+		// Update the cache incrementally
+		const cache = getTransactionCache();
+		if (cache.isLoaded) {
+			cache.update(id, { isDeleted: true, deletedAt: now, updatedAt: now });
+			// Remove from tag index since transaction is now hidden
+			tagIndex.removeTransaction({ id: transaction.id!, notes: transaction.notes });
+		}
+
+		invalidateTransactionCaches();
+		return transaction;
 	});
-
-	// Update the cache incrementally
-	const cache = getTransactionCache();
-	if (cache.isLoaded) {
-		cache.update(id, { isDeleted: true, deletedAt: now, updatedAt: now });
-		// Remove from tag index since transaction is now hidden
-		tagIndex.removeTransaction({ id: transaction.id!, notes: transaction.notes });
-	}
-
-	invalidateTransactionCaches();
-	await persistData('transactions');
-	return transaction;
 }
 
 // Returns the deleted transactions for undo capture
@@ -370,22 +377,23 @@ export async function restoreTransactions(ids: number[]): Promise<void> {
 // Called on app startup to clean up items that weren't undone
 // Returns the count of purged transactions
 export async function purgeDeletedTransactions(): Promise<number> {
-	const deleted = await db.transactions.filter((t) => t.isDeleted === true).toArray();
-	if (deleted.length === 0) return 0;
+	return runMutation(['transactions', 'settings'], async () => {
+		const deleted = await db.transactions.filter((t) => t.isDeleted === true).toArray();
+		if (deleted.length === 0) return 0;
 
-	const ids = deleted.map((t) => t.id!);
-	await db.transactions.where('id').anyOf(ids).delete();
+		const ids = deleted.map((t) => t.id!);
+		await db.transactions.where('id').anyOf(ids).delete();
 
-	// Update the cache incrementally
-	const cache = getTransactionCache();
-	if (cache.isLoaded) {
-		cache.bulkRemove(ids);
-		tagIndex.rebuild(cache.getAll());
-	}
+		// Update the cache incrementally
+		const cache = getTransactionCache();
+		if (cache.isLoaded) {
+			cache.bulkRemove(ids);
+			tagIndex.rebuild(cache.getAll());
+		}
 
-	invalidateTransactionCaches();
-	await persistData('transactions');
-	return deleted.length;
+		invalidateTransactionCaches();
+		return deleted.length;
+	});
 }
 
 export async function bulkUpdateCategory(ids: number[], categoryId: number): Promise<void> {
@@ -432,89 +440,94 @@ export async function addSplitTransaction(
 	transaction: NewTransaction,
 	splits: SplitLine[]
 ): Promise<number[]> {
-	validateNewTransaction(transaction);
-	validateSplitLines(splits, transaction.amount);
+	return runMutation(['transactions', 'settings'], async () => {
+		validateNewTransaction(transaction);
+		validateSplitLines(splits, transaction.amount);
 
-	const now = new Date();
-	const parentRecord = { ...createTransactionRecord(transaction, now), isSplitParent: true };
-	let parentId = 0;
-	const children: Array<Transaction & { id: number }> = [];
+		const now = new Date();
+		const parentRecord = { ...createTransactionRecord(transaction, now), isSplitParent: true };
+		const allocations = allocatePartnerShares(splits.map((s) => s.amount), transaction.isShared, transaction.splitType, transaction.splitValue);
+		let parentId = 0;
+		const children: Array<Transaction & { id: number }> = [];
 
-	await db.transaction('rw', db.transactions, async () => {
-		parentId = (await db.transactions.add(parentRecord)) as number;
-		for (const split of splits) {
-			const childRecord = createSplitChild(parentRecord, parentId, split, now);
-			const id = (await db.transactions.add(childRecord)) as number;
-			children.push({ ...childRecord, id });
+		await db.transaction('rw', db.transactions, async () => {
+			parentId = (await db.transactions.add(parentRecord)) as number;
+			for (const [index, split] of splits.entries()) {
+				const childRecord = createSplitChild(parentRecord, parentId, split, now, allocations[index]);
+				const id = (await db.transactions.add(childRecord)) as number;
+				children.push({ ...childRecord, id });
+			}
+		});
+
+		updateCacheWithSplit({ ...parentRecord, id: parentId }, children);
+
+		if (transaction.isSubscription && await isSubscriptionCancelled(transaction.merchant)) {
+			await reactivateSubscription(transaction.merchant);
 		}
+
+		invalidateTransactionCaches();
+		return children.map((child) => child.id);
 	});
-
-	updateCacheWithSplit({ ...parentRecord, id: parentId }, children);
-
-	if (transaction.isSubscription && await isSubscriptionCancelled(transaction.merchant)) {
-		await reactivateSubscription(transaction.merchant);
-	}
-
-	invalidateTransactionCaches();
-	await persistData('transactions');
-	return children.map((child) => child.id);
 }
 
 export async function splitTransaction(
 	id: number,
 	splits: SplitLine[]
 ): Promise<number[]> {
-	if (splits.length < 2) throw new Error('Must have at least 2 split lines');
+	return runMutation(['transactions', 'settings'], async () => {
+		if (splits.length < 2) throw new Error('Must have at least 2 split lines');
 
-	const parent = await db.transactions.get(id);
-	if (!parent) {
-		throw new Error('Transaction not found');
-	}
-
-	validateSplitLines(splits, parent.amount);
-
-	// Cannot split a transaction that is already a child
-	if (parent.parentTransactionId) {
-		throw new Error('Cannot split a transaction that is already part of a split');
-	}
-
-	const now = new Date();
-	const childIds: number[] = [];
-	const childTransactions: Transaction[] = [];
-
-	// Atomic: create all children and mark the parent, or roll back entirely
-	// (a partial split would leave orphaned children or a childless parent)
-	await db.transaction('rw', db.transactions, async () => {
-		for (const split of splits) {
-			const childData = createSplitChild(parent, id, split, now);
-
-			const childId = (await db.transactions.add(childData)) as number;
-			childIds.push(childId);
-			childTransactions.push({ ...childData, id: childId } as Transaction);
+		const parent = await db.transactions.get(id);
+		if (!parent) {
+			throw new Error('Transaction not found');
 		}
 
-		// Mark the parent as split so it's hidden from normal queries
-		await db.transactions.update(id, {
-			isSplitParent: true,
-			updatedAt: now
+		validateSplitLines(splits, parent.amount);
+		if (parent.isSplitParent || parent.isDeleted) throw new Error('Transaction already split or deleted');
+		const allocations = allocatePartnerShares(splits.map((s) => s.amount), parent.isShared, parent.splitType, parent.splitValue);
+
+		// Cannot split a transaction that is already a child
+		if (parent.parentTransactionId) {
+			throw new Error('Cannot split a transaction that is already part of a split');
+		}
+
+		const now = new Date();
+		const childIds: number[] = [];
+		const childTransactions: Transaction[] = [];
+
+		// Atomic: create all children and mark the parent, or roll back entirely
+		// (a partial split would leave orphaned children or a childless parent)
+		await db.transaction('rw', db.transactions, async () => {
+			for (const [index, split] of splits.entries()) {
+				const childData = createSplitChild(parent, id, split, now, allocations[index]);
+
+				const childId = (await db.transactions.add(childData)) as number;
+				childIds.push(childId);
+				childTransactions.push({ ...childData, id: childId } as Transaction);
+			}
+
+			// Mark the parent as split so it's hidden from normal queries
+			await db.transactions.update(id, {
+				isSplitParent: true,
+				updatedAt: now
+			});
 		});
-	});
 
-	// Update the cache incrementally
-	const cache = getTransactionCache();
-	if (cache.isLoaded) {
-		// Mark parent as split (will be excluded from getAll)
-		cache.markSplitParent(id);
-		// Add child transactions
-		for (const child of childTransactions) {
-			cache.add({ ...child, id: child.id! });
+		// Update the cache incrementally
+		const cache = getTransactionCache();
+		if (cache.isLoaded) {
+			// Mark parent as split (will be excluded from getAll)
+			cache.markSplitParent(id);
+			// Add child transactions
+			for (const child of childTransactions) {
+				cache.add({ ...child, id: child.id! });
+			}
+			tagIndex.rebuild(cache.getAll());
 		}
-		tagIndex.rebuild(cache.getAll());
-	}
 
-	invalidateTransactionCaches();
-	await persistData('transactions');
-	return childIds;
+		invalidateTransactionCaches();
+		return childIds;
+	});
 }
 
 export async function getSplitChildren(parentId: number): Promise<Transaction[]> {
@@ -542,113 +555,115 @@ export async function updateSplitGroup(
 	shared: SplitGroupUpdate,
 	lines: { categoryId: number; amount: number; notes?: string }[]
 ): Promise<number[]> {
-	if (lines.length < 2) {
-		throw new Error('Must have at least 2 split lines');
-	}
-
-	const parent = await db.transactions.get(parentId);
-	if (!parent) {
-		throw new Error('Transaction not found');
-	}
-	if (!parent.isSplitParent) {
-		throw new Error('Transaction is not a split');
-	}
-
-	const now = new Date();
-	const total = sumCurrency(lines.map((l) => l.amount));
-	const settledDate = shared.isSettled ? (parent.settledDate ?? now) : undefined;
-
-	const childIds: number[] = [];
-	const childTransactions: Transaction[] = [];
-	let oldChildIds: number[] = [];
-
-	// Atomic: replace children and update the parent as one unit, or roll back
-	// (a partial edit would delete the old lines without recreating them)
-	await db.transaction('rw', db.transactions, async () => {
-		// Remove the existing children before recreating from the new lines.
-		const oldChildren = await db.transactions
-			.where('parentTransactionId')
-			.equals(parentId)
-			.toArray();
-		oldChildIds = oldChildren.map((c) => c.id!).filter((id) => id != null);
-		if (oldChildIds.length > 0) {
-			await db.transactions.bulkDelete(oldChildIds);
+	return runMutation(['transactions', 'settings'], async () => {
+		if (lines.length < 2) {
+			throw new Error('Must have at least 2 split lines');
 		}
 
-		// Update the parent in place (remains isSplitParent, so still hidden).
-		await db.transactions.update(parentId, {
-			merchant: shared.merchant,
-			date: shared.date,
-			amount: total,
-			isShared: shared.isShared,
-			splitType: shared.splitType,
-			splitValue: shared.splitValue,
-			isSettled: shared.isSettled,
-			settledDate,
-			partnerShare: shared.isShared
-				? calculatePartnerShare(total, shared.splitType, shared.splitValue)
-				: 0,
-			updatedAt: now
-		});
+		const parent = await db.transactions.get(parentId);
+		if (!parent) {
+			throw new Error('Transaction not found');
+		}
+		if (!parent.isSplitParent) {
+			throw new Error('Transaction is not a split');
+		}
 
-		// Recreate children from the new lines.
-		for (const line of lines) {
-			const partnerShare = shared.isShared
-				? calculatePartnerShare(line.amount, shared.splitType, shared.splitValue)
-				: 0;
+		const now = new Date();
+		const total = sumCurrency(lines.map((l) => l.amount));
+		validateSplitLines(lines, total);
+		validateNewTransaction({ ...parent, ...shared, amount: total });
+		const allocations = allocatePartnerShares(lines.map((l) => l.amount), shared.isShared, shared.splitType, shared.splitValue);
+		const settledDate = shared.isSettled ? (parent.settledDate ?? now) : undefined;
 
-			const childData: Omit<Transaction, 'id'> = {
-				date: shared.date,
+		const childIds: number[] = [];
+		const childTransactions: Transaction[] = [];
+		let oldChildIds: number[] = [];
+
+		// Atomic: replace children and update the parent as one unit, or roll back
+		// (a partial edit would delete the old lines without recreating them)
+		await db.transaction('rw', db.transactions, async () => {
+			// Remove the existing children before recreating from the new lines.
+			const oldChildren = await db.transactions
+				.where('parentTransactionId')
+				.equals(parentId)
+				.toArray();
+			oldChildIds = oldChildren.map((c) => c.id!).filter((id) => id != null);
+			if (oldChildIds.length > 0) {
+				await db.transactions.bulkDelete(oldChildIds);
+			}
+
+			// Update the parent in place (remains isSplitParent, so still hidden).
+			await db.transactions.update(parentId, {
 				merchant: shared.merchant,
-				amount: line.amount,
-				categoryId: line.categoryId,
+				date: shared.date,
+				amount: total,
 				isShared: shared.isShared,
 				splitType: shared.splitType,
 				splitValue: shared.splitValue,
-				partnerShare,
 				isSettled: shared.isSettled,
 				settledDate,
-				notes: line.notes,
-				isEssential: parent.isEssential,
-				isSubscription: parent.isSubscription,
-				subscriptionFrequency: parent.subscriptionFrequency,
-				parentTransactionId: parentId,
-				createdAt: now,
+				partnerShare: shared.isShared
+					? calculatePartnerShare(total, shared.splitType, shared.splitValue)
+					: 0,
 				updatedAt: now
-			};
+			});
 
-			const childId = (await db.transactions.add(childData)) as number;
-			childIds.push(childId);
-			childTransactions.push({ ...childData, id: childId } as Transaction);
-		}
-	});
+			// Recreate children from the new lines.
+			for (const [index, line] of lines.entries()) {
+				const partnerShare = allocations[index];
 
-	// Reconcile the cache incrementally.
-	const cache = getTransactionCache();
-	if (cache.isLoaded) {
-		if (oldChildIds.length > 0) {
-			cache.bulkRemove(oldChildIds);
-		}
-		cache.update(parentId, {
-			merchant: shared.merchant,
-			date: shared.date,
-			amount: total,
-			isShared: shared.isShared,
-			splitType: shared.splitType,
-			splitValue: shared.splitValue,
-			isSettled: shared.isSettled,
-			settledDate,
-			updatedAt: now
+				const childData: Omit<Transaction, 'id'> = {
+					date: shared.date,
+					merchant: shared.merchant,
+					amount: line.amount,
+					categoryId: line.categoryId,
+					isShared: shared.isShared,
+					splitType: shared.splitType,
+					splitValue: shared.splitType === 'fixed' ? partnerShare : shared.splitValue,
+					partnerShare,
+					isSettled: shared.isSettled,
+					settledDate,
+					notes: line.notes,
+					isEssential: parent.isEssential,
+					isSubscription: parent.isSubscription,
+					subscriptionFrequency: parent.subscriptionFrequency,
+					parentTransactionId: parentId,
+					createdAt: now,
+					updatedAt: now
+				};
+
+				const childId = (await db.transactions.add(childData)) as number;
+				childIds.push(childId);
+				childTransactions.push({ ...childData, id: childId } as Transaction);
+			}
 		});
-		for (const child of childTransactions) {
-			cache.add({ ...child, id: child.id! });
-		}
-		tagIndex.rebuild(cache.getAll());
-	}
 
-	invalidateTransactionCaches();
-	await persistData('transactions');
-	return childIds;
+		// Reconcile the cache incrementally.
+		const cache = getTransactionCache();
+		if (cache.isLoaded) {
+			if (oldChildIds.length > 0) {
+				cache.bulkRemove(oldChildIds);
+			}
+			cache.update(parentId, {
+				merchant: shared.merchant,
+				date: shared.date,
+				amount: total,
+				isShared: shared.isShared,
+				splitType: shared.splitType,
+				splitValue: shared.splitValue,
+				isSettled: shared.isSettled,
+				settledDate,
+				updatedAt: now
+			});
+			for (const child of childTransactions) {
+				cache.add({ ...child, id: child.id! });
+			}
+			tagIndex.rebuild(cache.getAll());
+		}
+
+		invalidateTransactionCaches();
+		return childIds;
+	});
 }
 
 export async function isSplitParent(id: number): Promise<boolean> {

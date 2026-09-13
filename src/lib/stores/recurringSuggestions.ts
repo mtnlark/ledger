@@ -208,7 +208,7 @@ async function buildUserSubscriptions(
 			const sharedTx = sharedPurchase?.sourceTransactions[0];
 			if (sharedTx) {
 				splitType = sharedTx.splitType;
-				splitValue = sharedTx.splitValue;
+				splitValue = sharedTx.splitType === 'fixed' && sharedPurchase?.isSplit ? sharedPurchase.partnerAmount : sharedTx.splitValue;
 			}
 		}
 

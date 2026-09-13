@@ -1,3 +1,4 @@
+import { invalidateTransactionCache } from './transactionCache';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { db, initializeDatabase } from '$lib/db';
 import {
@@ -26,6 +27,7 @@ import {
 
 describe('Transaction Operations', () => {
 	beforeEach(async () => {
+		invalidateTransactionCache();
 		await db.delete();
 		await db.open();
 		await initializeDatabase();

@@ -33,7 +33,7 @@ interface SplitLinesValidationResult extends ValidationResult {
  * Validate transaction amount
  */
 export function validateAmount(amount: number): ValidationResult {
-	if (amount <= 0) {
+	if (!Number.isFinite(amount) || amount <= 0) {
 		return { isValid: false, error: 'Amount must be greater than 0' };
 	}
 	return { isValid: true };
@@ -53,7 +53,7 @@ export function validateMerchant(merchant: string): ValidationResult {
  * Validate category selection
  */
 export function validateCategory(categoryId: number): ValidationResult {
-	if (categoryId <= 0) {
+	if (!Number.isSafeInteger(categoryId) || categoryId <= 0) {
 		return { isValid: false, error: 'Category is required' };
 	}
 	return { isValid: true };
@@ -71,6 +71,7 @@ export function validateSplitValue(
 	splitValue: number,
 	amount: number
 ): SplitValueValidationResult {
+	if (!Number.isFinite(splitValue) || !Number.isFinite(amount) || !['fixed', 'percentage'].includes(splitType)) return { isValid: false };
 	if (splitType === 'percentage') {
 		if (splitValue < 0) {
 			return { isValid: false, correctedValue: 0 };
