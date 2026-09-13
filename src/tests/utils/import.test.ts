@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-vi.mock('$lib/storage', () => ({
+vi.mock('$lib/storage', async (importOriginal) => ({
+	...await importOriginal<typeof import('$lib/storage')>(),
 	persistData: vi.fn().mockResolvedValue(undefined)
 }));
 
@@ -467,11 +468,9 @@ describe('parseExpensesSheet', () => {
 			expect(result[0].partnerShare).toBe(0);
 		});
 
-		it('handles non-numeric partner share string as 0', async () => {
+		it('rejects non-numeric partner share strings', async () => {
 			const rows = makeRows([['2026-01-15', 'Store', 100, 'Groceries', 'Y', 'abc', 'N']]);
-			const result = await parseExpensesSheet(rows as CellValue[][]);
-
-			expect(result[0].partnerShare).toBe(0);
+			expect(await parseExpensesSheet(rows as CellValue[][])).toEqual([]);
 		});
 	});
 
@@ -803,7 +802,7 @@ describe('importTransactions', () => {
 			expect(result.imported).toBe(1);
 		});
 
-		it('uses tolerance of 0.01 for amount comparison', async () => {
+		it('compares rounded integer cents for duplicates', async () => {
 			const existingDate = new Date(2026, 0, 15);
 			await db.transactions.add({
 				date: existingDate,
@@ -828,7 +827,7 @@ describe('importTransactions', () => {
 
 			const result = await importTransactions(transactions);
 
-			expect(result.skipped).toBe(1);
+			expect(result.imported).toBe(1);
 		});
 	});
 
@@ -845,36 +844,24 @@ describe('importTransactions', () => {
 			expect(dbTransactions[0].categoryId).toBe(groceries!.id);
 		});
 
-		it('falls back to first category when category not found', async () => {
-			const transactions = [
-				makeImportedTransaction({ category: 'Nonexistent Category' })
-			];
-
-			const result = await importTransactions(transactions);
-
-			expect(result.imported).toBe(1);
-
-			const dbTransactions = await db.transactions.toArray();
-			const firstCategory = await db.categories.orderBy('sortOrder').first();
-			expect(dbTransactions[0].categoryId).toBe(firstCategory!.id);
+		it('requires explicit mapping for unknown categories', async () => {
+			const rows = [makeImportedTransaction({ category: 'Unknown' })];
+			await expect(importTransactions(rows)).rejects.toThrow('Map unknown category');
+			expect(await db.transactions.count()).toBe(0);
+			const category = await db.categories.toCollection().first();
+			await importTransactions(rows, { categoryMapping: { Unknown: category!.id! } });
+			expect((await db.transactions.toArray())[0].categoryId).toBe(category!.id);
 		});
 
-		it('skips and records error when no categories exist at all', async () => {
+		it('rejects import when no categories exist', async () => {
 			await db.categories.clear();
-
-			const transactions = [makeImportedTransaction()];
-
-			const result = await importTransactions(transactions);
-
-			expect(result.imported).toBe(0);
-			expect(result.skipped).toBe(1);
-			expect(result.errors).toHaveLength(1);
-			expect(result.errors[0]).toContain('No category found');
+			await expect(importTransactions([makeImportedTransaction()])).rejects.toThrow('Map unknown category');
+			expect(await db.transactions.count()).toBe(0);
 		});
 	});
 
 	describe('split type calculation', () => {
-		it('uses percentage mode with value 0.5 for 50/50 splits', async () => {
+		it('preserves a fixed 50/50 amount', async () => {
 			const transactions = [
 				makeImportedTransaction({
 					isShared: true,
@@ -886,11 +873,11 @@ describe('importTransactions', () => {
 			await importTransactions(transactions);
 
 			const dbTransactions = await db.transactions.toArray();
-			expect(dbTransactions[0].splitType).toBe('percentage');
-			expect(dbTransactions[0].splitValue).toBe(0.5);
+			expect(dbTransactions[0].splitType).toBe('fixed');
+			expect(dbTransactions[0].splitValue).toBe(50);
 		});
 
-		it('uses percentage mode for round percentage splits', async () => {
+		it('preserves fixed amounts even when a percentage looks round', async () => {
 			const transactions = [
 				makeImportedTransaction({
 					isShared: true,
@@ -902,8 +889,8 @@ describe('importTransactions', () => {
 			await importTransactions(transactions);
 
 			const dbTransactions = await db.transactions.toArray();
-			expect(dbTransactions[0].splitType).toBe('percentage');
-			expect(dbTransactions[0].splitValue).toBe(0.3);
+			expect(dbTransactions[0].splitType).toBe('fixed');
+			expect(dbTransactions[0].splitValue).toBe(30);
 		});
 
 		it('uses fixed mode for non-shared transactions', async () => {
@@ -995,14 +982,9 @@ describe('importTransactions', () => {
 			expect(result.skipped).toBe(1);
 		});
 
-		it('returns success:false when there are errors', async () => {
-			await db.categories.clear();
-
-			const transactions = [makeImportedTransaction()];
-			const result = await importTransactions(transactions);
-
-			expect(result.success).toBe(false);
-			expect(result.errors.length).toBeGreaterThan(0);
+		it('rolls back valid rows when another row is invalid', async () => {
+			await expect(importTransactions([makeImportedTransaction(), makeImportedTransaction({ merchant: 'Other', category: 'Unknown' })])).rejects.toThrow();
+			expect(await db.transactions.count()).toBe(0);
 		});
 	});
 

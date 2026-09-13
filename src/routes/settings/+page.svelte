@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { afterNavigate } from '$app/navigation';
-	import { Upload, Download, Database, FileSpreadsheet, Sun, Moon, Monitor, Cloud, CloudOff, Command, Bell, BellOff } from 'lucide-svelte';
+	import { Download, Database, Sun, Moon, Monitor, Cloud, CloudOff, Command, Bell, BellOff } from 'lucide-svelte';
 	import { type Settings, type Category, type Transaction, DEFAULT_SETTINGS } from '$lib/db';
 	import { initializeStorage } from '$lib/storage';
 	import { getSettings, updateSettings, updateTheme, updateICloudBackup, updateNotifications } from '$lib/stores/settings';
@@ -10,9 +10,8 @@
 	import { getTransactionsByMonth, getAvailableMonths } from '$lib/stores/transactions';
 	import { getAllCategories } from '$lib/stores/categories';
 	import CategoryManager from '$lib/components/CategoryManager.svelte';
-	import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
-	import { readExcelFile, parseExpensesSheet, importTransactions } from '$lib/utils/import';
-	import { exportTransactionsToCSV, exportAllDataToJSON, importFromJSON, downloadFile } from '$lib/utils/export';
+	import DataReview from '$lib/components/settings/DataReview.svelte';
+	import { exportTransactionsToCSV, exportAllDataToJSON, downloadFile } from '$lib/utils/export';
 	import { toast } from '$lib/stores/toast';
 	import ConnectedAccountsSection from '$lib/components/settings/ConnectedAccountsSection.svelte';
 
@@ -24,14 +23,7 @@
 	let isSaving = $state(false);
 
 	// Import/Export state
-	let isImporting = $state(false);
 	let isExporting = $state(false);
-	let fileInput = $state<HTMLInputElement | null>(null);
-	let jsonFileInput = $state<HTMLInputElement | null>(null);
-
-	// JSON import confirmation
-	let showJsonImportConfirm = $state(false);
-	let pendingJsonFile = $state<File | null>(null);
 
 	// iCloud state
 	let iCloudAvailable = $state(false);
@@ -178,74 +170,6 @@
 			console.error('Failed to update reminder time:', error);
 			toast.error('Failed to update reminder time');
 		}
-	}
-
-	// Import from Excel
-	async function handleExcelImport(event: Event) {
-		const input = event.target as HTMLInputElement;
-		const file = input.files?.[0];
-		if (!file) return;
-
-		isImporting = true;
-
-		try {
-			const rows = await readExcelFile(file);
-			const parsed = await parseExpensesSheet(rows);
-			const result = await importTransactions(parsed, { skipDuplicates: true });
-
-			if (result.success) {
-				toast.success(`Imported ${result.imported} transactions (${result.skipped} skipped)`);
-			} else {
-				toast.warning(`Imported ${result.imported}, skipped ${result.skipped}. ${result.errors.length} errors.`);
-			}
-		} catch (error) {
-			toast.error(`Import failed: ${error}`);
-		} finally {
-			isImporting = false;
-			if (input) input.value = '';
-		}
-	}
-
-	// Import from JSON backup — show confirmation first
-	function handleJSONImportSelect(event: Event) {
-		const input = event.target as HTMLInputElement;
-		const file = input.files?.[0];
-		if (!file) return;
-
-		pendingJsonFile = file;
-		showJsonImportConfirm = true;
-		if (input) input.value = '';
-	}
-
-	async function handleJSONImportConfirm() {
-		showJsonImportConfirm = false;
-		const file = pendingJsonFile;
-		pendingJsonFile = null;
-		if (!file) return;
-
-		isImporting = true;
-
-		try {
-			const text = await file.text();
-			const result = await importFromJSON(text);
-
-			if (result.success) {
-				toast.success(result.message);
-				// Reload data to reflect imported changes
-				await loadData();
-			} else {
-				toast.error(result.message);
-			}
-		} catch (error) {
-			toast.error(`Import failed: ${error}`);
-		} finally {
-			isImporting = false;
-		}
-	}
-
-	function handleJSONImportCancel() {
-		showJsonImportConfirm = false;
-		pendingJsonFile = null;
 	}
 
 	// Export to CSV
@@ -667,58 +591,7 @@
 				</div>
 
 				<div class="p-6 space-y-6">
-					<!-- Import Section -->
-					<div>
-						<h3 class="text-sm font-medium text-charcoal mb-3">Import Data</h3>
-						<div class="space-y-3">
-							<!-- Excel Import -->
-							<div class="flex items-center gap-3">
-								<input
-									type="file"
-									accept=".xlsx"
-									onchange={handleExcelImport}
-									bind:this={fileInput}
-									class="hidden"
-									id="excel-import"
-								/>
-								<label
-									for="excel-import"
-									class="inline-flex items-center gap-2 px-4 py-2 bg-surface-alt text-charcoal-soft font-medium rounded-lg hover:bg-surface-hover cursor-pointer transition-colors border border-theme"
-								>
-									<FileSpreadsheet size={16} />
-									Import from Excel
-								</label>
-								<span class="text-xs text-charcoal-muted">(.xlsx with "Expenses" sheet)</span>
-							</div>
-
-							<!-- JSON Import -->
-							<div class="flex items-center gap-3">
-								<input
-									type="file"
-									accept=".json"
-									onchange={handleJSONImportSelect}
-									bind:this={jsonFileInput}
-									class="hidden"
-									id="json-import"
-								/>
-								<label
-									for="json-import"
-									class="inline-flex items-center gap-2 px-4 py-2 bg-surface-alt text-charcoal-soft font-medium rounded-lg hover:bg-surface-hover cursor-pointer transition-colors border border-theme"
-								>
-									<Upload size={16} />
-									Restore from Backup
-								</label>
-								<span class="text-xs text-charcoal-muted">(.json backup file)</span>
-							</div>
-						</div>
-
-						{#if isImporting}
-							<div class="mt-3 flex items-center gap-2 text-sm text-charcoal-soft">
-								<div class="animate-spin rounded-full h-4 w-4 border-b-2 border-primary-600"></div>
-								<span>Importing...</span>
-							</div>
-						{/if}
-					</div>
+					<DataReview />
 
 					<!-- Divider -->
 					<div class="border-t border-dashed border-theme-dashed"></div>
@@ -835,13 +708,3 @@
 		{/if}
 	</main>
 </div>
-
-<ConfirmDialog
-	isOpen={showJsonImportConfirm}
-	title="Replace All Data?"
-	message="This will replace all your data with the contents of the backup file. This cannot be undone."
-	confirmText="Replace Data"
-	variant="danger"
-	onConfirm={handleJSONImportConfirm}
-	onCancel={handleJSONImportCancel}
-/>
