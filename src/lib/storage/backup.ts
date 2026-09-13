@@ -32,6 +32,22 @@ const enums: Record<string, string[]> = {
 	accountClass: ['asset', 'liability'], lastSyncStatus: ['ok', 'stale', 'error', 'never'],
 	subscriptionFrequency: ['monthly', 'semi-annual', 'annual']
 };
+function validateSettingsLists(settings: Row): void {
+	for (const name of ['dismissedRecurring', 'confirmedActiveSubscriptions']) {
+		const value = settings[name];
+		if (value !== undefined && (!Array.isArray(value) || value.some((item) => typeof item !== 'string'))) fail(`settings.${name} must be a text array`);
+	}
+	for (const [name, fields] of Object.entries({ cancelledSubscriptions: ['merchant', 'cancelledDate'], completedGoals: ['accountName', 'targetAmount', 'completedDate'], fixedRecurringAmounts: ['merchant', 'amount'] })) {
+		const value = settings[name];
+		if (value === undefined) continue;
+		if (!Array.isArray(value)) fail(`settings.${name} must be an array`);
+		for (const item of value) {
+			if (!object(item) || fields.some((field) => item[field] === undefined || item[field] === null)) fail(`settings.${name} contains an invalid record`);
+			validateFields(item, `settings.${name}`);
+		}
+	}
+	if (settings.dailyReminderTime !== undefined && (typeof settings.dailyReminderTime !== 'string' || !/^([01]\d|2[0-3]):[0-5]\d$/.test(settings.dailyReminderTime))) fail('invalid reminder time');
+}
 function validateFields(row: Row, label: string): void {
 	for (const [key, value] of Object.entries(row)) {
 		if (value === undefined) continue;
@@ -39,7 +55,7 @@ function validateFields(row: Row, label: string): void {
 		if (dates.has(key) && !date(value)) fail(`${label}.${key} is not a valid date`);
 		if (enums[key] && !enums[key].includes(value as string)) fail(`${label}.${key} is unsupported`);
 		if ((key.startsWith('is') || key.endsWith('Enabled') || key === 'rollsOver') && typeof value !== 'boolean') fail(`${label}.${key} must be boolean`);
-		if (['name', 'merchant', 'institution', 'partnerName', 'currency', 'notes'].includes(key) && typeof value !== 'string') fail(`${label}.${key} must be text`);
+		if (['name', 'accountName', 'merchant', 'institution', 'partnerName', 'currency', 'notes', 'simplefinId', 'icon', 'color'].includes(key) && typeof value !== 'string') fail(`${label}.${key} must be text`);
 		if (key === 'month' && (typeof value !== 'string' || !/^\d{4}-(0[1-9]|1[0-2])$/.test(value))) fail(`${label}.month is invalid`);
 		if (Array.isArray(value)) for (const item of value) if (object(item)) validateFields(item, `${label}.${key}`);
 	}
@@ -73,6 +89,7 @@ export function validateBackup(input: unknown): BackupPreview {
 			seen.add(id);
 			for (const field of required[table]) if (entry[field] === undefined || entry[field] === null) fail(`${table} ${id} missing ${field}`);
 			validateFields(entry, `${table} ${id}`);
+			if (table === 'settings') validateSettingsLists(entry);
 			if (table === 'savingsAccounts' && !['savings', 'retirement', 'investment'].includes(entry.accountType as string)) fail('invalid savings account type');
 			if (table === 'linkedAccounts' && !['checking', 'savings', 'credit', 'investment', 'retirement', 'loan', 'other'].includes(entry.accountType as string)) fail('invalid linked account type');
 			if (table === 'savingsContributions' && !['payroll_deduction', 'bank_transfer', 'interest', 'employer_match', 'other'].includes(entry.source as string)) fail('invalid contribution source');

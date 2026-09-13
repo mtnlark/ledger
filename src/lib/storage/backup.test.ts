@@ -116,3 +116,9 @@ it('allows settings to be saved after restoring an explicitly empty settings tab
 	await updatePartnerName('New partner');
 	expect((await db.settings.get(1))?.partnerName).toBe('New partner');
 });
+
+
+it.each([{ dismissedRecurring: 5 }, { confirmedActiveSubscriptions: [false] }, { cancelledSubscriptions: [true] }, { cancelledSubscriptions: [{ merchant: 'Store' }] }, { completedGoals: [{ accountName: 12, targetAmount: 5, completedDate: '2026-01-01' }] }, { dailyReminderTime: '25:00' }])('rejects malformed nested settings %j', async (fields) => {
+	await seed(); const data = await dehydrateAll();
+	expect(() => validateBackup({ ...data, settings: { ...data.settings, ...fields } })).toThrow('Invalid backup');
+});
