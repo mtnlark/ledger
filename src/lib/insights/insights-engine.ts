@@ -132,11 +132,20 @@ export class InsightsEngine {
 		return this._getTotalSpent(this.version, key, transactions);
 	}
 
-	/** Build a category essential map for needs/wants classification. */
+	private essentialMap = new Map<number, boolean>();
+	/** Preserve map identity until category IDs or classifications change. */
 	private buildCategoryEssentialMap(categories: Category[]): Map<number, boolean> {
-		return new Map(
-			categories.filter((c) => c.id != null).map((c) => [c.id!, c.isEssential])
-		);
+		let count = 0;
+		let changed = false;
+		for (const category of categories) {
+			if (category.id == null) continue;
+			count++;
+			if (!this.essentialMap.has(category.id) || this.essentialMap.get(category.id) !== category.isEssential) changed = true;
+		}
+		if (changed || count !== this.essentialMap.size) {
+			this.essentialMap = new Map(categories.filter((c) => c.id != null).map((c) => [c.id!, c.isEssential]));
+		}
+		return this.essentialMap;
 	}
 
 	/** Calculate needs vs wants breakdown (compact result). */

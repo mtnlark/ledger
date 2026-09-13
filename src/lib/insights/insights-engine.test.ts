@@ -203,3 +203,22 @@ describe('InsightsEngine', () => {
 		});
 	});
 });
+
+describe('needs/wants category memoization', () => {
+	it('reuses results for unchanged classifications, and invalidates IDs, flags and transaction versions', () => {
+		resetInsightsEngine(); mockVersion = 1;
+		const engine = getInsightsEngine();
+		const transactions = [makeTx({ isEssential: false })];
+		const categories = [{ id: 1, name: 'Food', isActive: true, sortOrder: 1, isEssential: true }];
+		const first = engine.getNeedsVsWantsFull(transactions, categories, 'month');
+		expect(engine.getNeedsVsWantsFull(transactions, categories.map((c) => ({ ...c, name: 'Renamed' })), 'month')).toBe(first);
+		categories[0].isEssential = false;
+		const wants = engine.getNeedsVsWantsFull(transactions, categories, 'month');
+		expect(wants).not.toBe(first); expect(wants.wants).toBe(100);
+		categories[0].id = 2;
+		const changedId = engine.getNeedsVsWantsFull(transactions, categories, 'month');
+		expect(changedId).not.toBe(wants);
+		mockVersion++;
+		expect(engine.getNeedsVsWantsFull(transactions, categories, 'month')).not.toBe(changedId);
+	});
+});
