@@ -30,7 +30,7 @@ const dates = new Set(['date', 'createdAt', 'updatedAt', 'settledDate', 'deleted
 const enums: Record<string, string[]> = {
 	splitType: ['percentage', 'fixed'], defaultSplitType: ['percentage', 'fixed'], theme: ['light', 'dark', 'system'],
 	accountClass: ['asset', 'liability'], lastSyncStatus: ['ok', 'stale', 'error', 'never'],
-	subscriptionFrequency: ['weekly', 'monthly', 'quarterly', 'yearly', 'annual', 'biweekly']
+	subscriptionFrequency: ['monthly', 'semi-annual', 'annual']
 };
 function validateFields(row: Row, label: string): void {
 	for (const [key, value] of Object.entries(row)) {

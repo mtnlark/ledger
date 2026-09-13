@@ -360,7 +360,7 @@ const CURRENT_MIGRATION_VERSION = 11;
  * Each migration is idempotent and checks if it needs to run.
  * Returns true if any migrations were applied (caller should persist).
  */
-export async function runMigrations(): Promise<boolean> {
+export async function runMigrations(options: { preserveEmptyTables?: boolean } = {}): Promise<boolean> {
 	const settings = await db.settings.get(1);
 	if (settings?.migrationVersion === CURRENT_MIGRATION_VERSION) {
 		return false; // All migrations already applied
@@ -372,7 +372,7 @@ export async function runMigrations(): Promise<boolean> {
 	await migrateTransactionEssential();
 	await migrateTransactionSubscription();
 	await migrateTransactionDates();
-	await migrateSeedSavingsAccounts();
+	if (!options.preserveEmptyTables) await migrateSeedSavingsAccounts();
 	await migrateSettingsCompletedGoals();
 	await migrateSettingsNotifications();
 	await migrateFormSplitLinkage();

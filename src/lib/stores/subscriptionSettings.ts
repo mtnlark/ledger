@@ -9,6 +9,7 @@
  */
 
 import { db, type Settings, type CancelledSubscription, DEFAULT_SETTINGS } from '$lib/db';
+import { updateSettings } from './settings';
 import { runMutation } from '$lib/storage/mutation';
 import { normalizeMerchant } from '$lib/utils/string-helpers';
 import { roundCurrency, currencyEquals } from '$lib/utils/currency';
@@ -67,7 +68,7 @@ export async function cancelSubscription(merchant: string, amount?: number): Pro
 			...(amount != null ? { amount: roundCurrency(amount) } : {})
 		};
 
-		await db.settings.update(1, {
+		await updateSettings({
 			cancelledSubscriptions: [...cancelled, newCancelled],
 			// Remove from confirmed active if it was there
 			confirmedActiveSubscriptions: confirmedActive.filter((m) => m !== normalized)
@@ -87,7 +88,7 @@ export async function reactivateSubscription(merchant: string, amount?: number):
 		const normalized = normalizeMerchant(merchant);
 		const cancelled = settings.cancelledSubscriptions ?? [];
 
-		await db.settings.update(1, {
+		await updateSettings({
 			cancelledSubscriptions: cancelled.filter(
 				(c) => !cancelledRecordMatches(c, normalized, amount)
 			)
@@ -120,7 +121,7 @@ export async function confirmSubscriptionActive(merchant: string): Promise<void>
 		}
 
 		if (Object.keys(updates).length > 0) {
-			await db.settings.update(1, updates);
+			await updateSettings(updates);
 		}
 	});
 }

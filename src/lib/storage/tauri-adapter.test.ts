@@ -42,7 +42,7 @@ vi.mock('@tauri-apps/api/path', () => ({
 	join: async (...parts: string[]) => parts.join('/').replace(/\/{2,}/g, '/')
 }));
 
-import { initializeTauriStorage, saveToFile } from './tauri-adapter';
+import { initializeTauriStorage, saveToFile, createBackup } from './tauri-adapter';
 import * as mockedFs from '@tauri-apps/plugin-fs';
 
 const DATA_PATH = '/appdata/data.json';
@@ -240,4 +240,45 @@ describe('tauri-adapter', () => {
 			expect(data.categories[0].name).toBe('Updated Category');
 		});
 	});
+});
+
+
+describe('validated recovery and fresh backups', () => {
+	it('skips structurally invalid JSON recovery candidates', async () => {
+		files.clear(); dirs.clear();
+		files.set(BAK_PATH, JSON.stringify({ version: '1.0', data: {} }));
+		files.set(`${BACKUPS_DIR}/data-2026-01-01.json`, JSON.stringify(makeStoredData('Valid recovery')));
+		expect((await initializeTauriStorage()).status).toBe('recovered');
+		expect((await db.transactions.toArray())[0].merchant).toBe('Valid recovery');
+	});
+	it('fresh backups capture the current database, bypass debounce and are readable', async () => {
+		files.clear(); dirs.clear();
+		files.set(DATA_PATH, JSON.stringify(makeStoredData('Original')));
+		await initializeTauriStorage();
+		await db.transactions.update(1, { merchant: 'Current unsaved snapshot' });
+		await createBackup(true); await createBackup(true);
+		const backups = [...files.entries()].filter(([name]) => name.startsWith(BACKUPS_DIR + '/'));
+		expect(backups).toHaveLength(2);
+		const { parseBackup } = await import('./backup');
+		for (const [, content] of backups) expect((await parseBackup(content)).data.transactions[0].merchant).toBe('Current unsaved snapshot');
+	});
+});
+
+
+it('preserves explicitly empty tables through startup migrations', async () => {
+	files.clear(); dirs.clear();
+	const empty = makeStoredData('unused'); empty.transactions = []; empty.categories = []; empty.settings = null;
+	empty.savingsAccounts = []; empty.savingsContributions = []; empty.linkedAccounts = []; empty.balanceSnapshots = [];
+	files.set(DATA_PATH, JSON.stringify(empty));
+	expect((await initializeTauriStorage()).status).toBe('loaded');
+	expect(await db.savingsAccounts.count()).toBe(0); expect(await db.settings.count()).toBe(0);
+});
+
+
+it('does not treat an empty checksum as a legacy file', async () => {
+	files.clear(); dirs.clear();
+	files.set(DATA_PATH, JSON.stringify({ ...makeStoredData('Bad checksum'), checksum: '' }));
+	files.set(BAK_PATH, JSON.stringify(makeStoredData('Valid fallback')));
+	expect((await initializeTauriStorage()).status).toBe('recovered');
+	expect((await db.transactions.toArray())[0].merchant).toBe('Valid fallback');
 });

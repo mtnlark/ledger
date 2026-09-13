@@ -24,13 +24,13 @@ export async function getSettings(): Promise<Settings> {
 
 export async function updateSettings(updates: Partial<Omit<Settings, 'id'>>): Promise<void> {
 	return runMutation(['settings'], async () => {
-		await db.settings.update(1, updates);
+		await db.settings.put({ ...DEFAULT_SETTINGS, ...await db.settings.get(1), ...updates, id: 1 });
 	});
 }
 
 export async function updatePartnerName(name: string): Promise<void> {
 	return runMutation(['settings'], async () => {
-		await db.settings.update(1, { partnerName: name });
+		await updateSettings({ partnerName: name });
 	});
 }
 
@@ -39,13 +39,13 @@ export async function updateDefaultSplit(
 	splitValue: number
 ): Promise<void> {
 	return runMutation(['settings'], async () => {
-		await db.settings.update(1, { defaultSplitType: splitType, defaultSplitValue: splitValue });
+		await updateSettings({ defaultSplitType: splitType, defaultSplitValue: splitValue });
 	});
 }
 
 export async function updateTheme(theme: 'light' | 'dark' | 'system'): Promise<void> {
 	return runMutation(['settings'], async () => {
-		await db.settings.update(1, { theme });
+		await updateSettings({ theme });
 		// Sync to localStorage for flash prevention on page load
 		if (typeof localStorage !== 'undefined') {
 			localStorage.setItem('ledger-theme', theme);
@@ -59,7 +59,7 @@ export async function dismissRecurring(merchant: string): Promise<void> {
 		const normalized = normalizeMerchant(merchant);
 		const dismissed = settings.dismissedRecurring ?? [];
 		if (!dismissed.includes(normalized)) {
-			await db.settings.update(1, { dismissedRecurring: [...dismissed, normalized] });
+			await updateSettings({ dismissedRecurring: [...dismissed, normalized] });
 			invalidateRecurringCache();
 		}
 	});
@@ -70,7 +70,7 @@ export async function restoreRecurring(merchant: string): Promise<void> {
 		const settings = await getSettings();
 		const normalized = normalizeMerchant(merchant);
 		const dismissed = settings.dismissedRecurring ?? [];
-		await db.settings.update(1, {
+		await updateSettings({
 			dismissedRecurring: dismissed.filter((m) => m !== normalized)
 		});
 		invalidateRecurringCache();
@@ -90,7 +90,7 @@ export async function setFixedRecurringAmount(merchant: string, amount: number):
 
 		const filtered = existing.filter((f) => f.merchant !== normalized);
 
-		await db.settings.update(1, {
+		await updateSettings({
 			fixedRecurringAmounts: [...filtered, { merchant: normalized, amount }]
 		});
 		invalidateRecurringCache();
@@ -103,7 +103,7 @@ export async function removeFixedRecurringAmount(merchant: string): Promise<void
 		const normalized = normalizeMerchant(merchant);
 		const existing = settings.fixedRecurringAmounts ?? [];
 
-		await db.settings.update(1, {
+		await updateSettings({
 			fixedRecurringAmounts: existing.filter((f) => f.merchant !== normalized)
 		});
 		invalidateRecurringCache();
@@ -112,18 +112,18 @@ export async function removeFixedRecurringAmount(merchant: string): Promise<void
 
 export async function updateNotifications(enabled: boolean): Promise<void> {
 	return runMutation(['settings'], async () => {
-		await db.settings.update(1, { notificationsEnabled: enabled });
+		await updateSettings({ notificationsEnabled: enabled });
 	});
 }
 
 export async function updateICloudBackup(enabled: boolean): Promise<void> {
 	return runMutation(['settings'], async () => {
-		await db.settings.update(1, { iCloudBackupEnabled: enabled });
+		await updateSettings({ iCloudBackupEnabled: enabled });
 	});
 }
 
 export async function dismissRecurringSuggestionsForMonth(month: string): Promise<void> {
 	return runMutation(['settings'], async () => {
-		await db.settings.update(1, { lastAutoSuggestedMonth: month });
+		await updateSettings({ lastAutoSuggestedMonth: month });
 	});
 }

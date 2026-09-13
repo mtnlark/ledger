@@ -27,41 +27,43 @@ const PERSISTED_TABLES = [
  * Read the full Dexie state into a StoredData snapshot.
  */
 export async function dehydrateAll(): Promise<StoredData> {
-	const [
-		transactions,
-		categories,
-		monthlyBudgets,
-		categoryBudgets,
-		settings,
-		savingsAccounts,
-		savingsContributions,
-		linkedAccounts,
-		balanceSnapshots
-	] = await Promise.all([
-		db.transactions.toArray(),
-		db.categories.toArray(),
-		db.monthlyBudgets.toArray(),
-		db.categoryBudgets.toArray(),
-		db.settings.get(1),
-		db.savingsAccounts.toArray(),
-		db.savingsContributions.toArray(),
-		db.linkedAccounts.toArray(),
-		db.balanceSnapshots.toArray()
-	]);
+	return db.transaction('r', PERSISTED_TABLES, async () => {
+		const [
+			transactions,
+			categories,
+			monthlyBudgets,
+			categoryBudgets,
+			settings,
+			savingsAccounts,
+			savingsContributions,
+			linkedAccounts,
+			balanceSnapshots
+		] = await Promise.all([
+			db.transactions.toArray(),
+			db.categories.toArray(),
+			db.monthlyBudgets.toArray(),
+			db.categoryBudgets.toArray(),
+			db.settings.get(1),
+			db.savingsAccounts.toArray(),
+			db.savingsContributions.toArray(),
+			db.linkedAccounts.toArray(),
+			db.balanceSnapshots.toArray()
+		]);
 
-	return {
-		version: '1.0',
-		exportedAt: new Date().toISOString(),
-		transactions,
-		categories,
-		monthlyBudgets,
-		categoryBudgets,
-		settings: settings ?? null,
-		savingsAccounts,
-		savingsContributions,
-		linkedAccounts,
-		balanceSnapshots
-	};
+		return {
+			version: '1.0',
+			exportedAt: new Date().toISOString(),
+			transactions,
+			categories,
+			monthlyBudgets,
+			categoryBudgets,
+			settings: settings ?? null,
+			savingsAccounts,
+			savingsContributions,
+			linkedAccounts,
+			balanceSnapshots
+		};
+	});
 }
 
 export async function dehydrateChanged(

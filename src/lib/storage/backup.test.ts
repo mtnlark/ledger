@@ -92,6 +92,10 @@ describe('validation before mutation', () => {
 			expect(() => validateBackup(data)).toThrow('Invalid backup');
 		}
 	});
+	it('accepts every supported subscription frequency', async () => {
+		await seed(); const data = await dehydrateAll();
+		for (const subscriptionFrequency of ['monthly', 'semi-annual', 'annual'] as const) { data.transactions[0].subscriptionFrequency = subscriptionFrequency; expect(() => validateBackup(data)).not.toThrow(); }
+	});
 	it('rejects checksum tampering and explicitly malformed optional tables', async () => {
 		await seed(); const encoded = JSON.parse(await exportAllDataToJSON()); encoded.transactions[0].amount = 999;
 		await expect(parseBackup(JSON.stringify(encoded))).rejects.toThrow('checksum');
@@ -104,4 +108,11 @@ describe('validation before mutation', () => {
 		expect((await db.transactions.get(1))?.deletedAt).toEqual(when);
 		expect((await db.linkedAccounts.get(1))?.upstreamBalanceAt).toEqual(when);
 	});
+});
+
+
+it('allows settings to be saved after restoring an explicitly empty settings table', async () => {
+	const { updatePartnerName } = await import('$lib/stores/settings');
+	await updatePartnerName('New partner');
+	expect((await db.settings.get(1))?.partnerName).toBe('New partner');
 });

@@ -78,7 +78,7 @@ async function calculateContentChecksum(content: string): Promise<string> {
  * Returns true if checksum is valid or not present (for backwards compatibility)
  */
 async function verifyChecksum(data: StoredData): Promise<boolean> {
-	if (!data.checksum) {
+	if (data.checksum === undefined) {
 		// No checksum = legacy data, accept it
 		return true;
 	}
@@ -497,7 +497,7 @@ export async function initializeTauriStorage(): Promise<InitializationResult> {
 	// Handle successful read
 	if (readResult.status === 'success') {
 		await loadDataIntoDexie(readResult.data);
-		await runMigrationsIfNeeded();
+		await runMigrationsIfNeeded(true);
 		return { status: 'loaded' };
 	}
 
@@ -511,7 +511,7 @@ export async function initializeTauriStorage(): Promise<InitializationResult> {
 			console.warn(`data.json missing; recovered from ${recoveryResult.backupName}`);
 			await loadDataIntoDexie(recoveryResult.data);
 			await saveToFile();
-			await runMigrationsIfNeeded();
+			await runMigrationsIfNeeded(true);
 			return { status: 'recovered', backupName: recoveryResult.backupName };
 		}
 
@@ -544,7 +544,7 @@ export async function initializeTauriStorage(): Promise<InitializationResult> {
 		await loadDataIntoDexie(recoveryResult.data);
 		// Save recovered data as new main file
 		await saveToFile();
-		await runMigrationsIfNeeded();
+		await runMigrationsIfNeeded(true);
 		return { status: 'recovered', backupName: recoveryResult.backupName };
 	}
 
@@ -561,9 +561,9 @@ export async function initializeTauriStorage(): Promise<InitializationResult> {
  * Migrations that create/modify records (e.g. form-split linkage) must be
  * persisted immediately, since Dexie is cleared on every startup.
  */
-async function runMigrationsIfNeeded(): Promise<void> {
+async function runMigrationsIfNeeded(preserveEmptyTables = false): Promise<void> {
 	const { runMigrations } = await import('$lib/db/migrations');
-	const migrated = await runMigrations();
+	const migrated = await runMigrations({ preserveEmptyTables });
 	if (migrated) {
 		await saveToFile();
 	}
