@@ -129,6 +129,8 @@ A durable write:
 
 Ledger keeps up to ten routine timestamped backups. Restore and historical repair also create fresh, verified recovery snapshots before changing records; these bypass the normal one-minute backup debounce. If the main file cannot be parsed or fails its checksum, startup recovery tries `data.json.bak` first and then the timestamped backups from newest to oldest.
 
+Older Ledger versions could leave references to deleted categories or accounts. A readable primary file with those references is preserved at startup with a review warning; it is never silently replaced by an older backup. Restore and recovery candidates still require valid references.
+
 When iCloud backup is enabled, Ledger also writes a portable backup to:
 
 ```text

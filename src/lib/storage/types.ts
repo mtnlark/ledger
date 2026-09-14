@@ -41,7 +41,7 @@ export type PersistedTableName =
  * Result of attempting to read and validate the data file
  */
 export type ReadDataResult =
-	| { status: 'success'; data: StoredData }
+	| { status: 'success'; data: StoredData; warnings?: string[] }
 	| { status: 'not_found' }
 	| { status: 'corrupted'; error: string }
 	| { status: 'checksum_mismatch'; data: StoredData };

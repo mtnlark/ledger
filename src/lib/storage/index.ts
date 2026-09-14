@@ -18,7 +18,7 @@ export type { PersistedTableName, StoredData } from './types';
  * Result of storage initialization (exposed for UI feedback)
  */
 export type StorageInitResult =
-	| { status: 'loaded' }
+	| { status: 'loaded'; warnings?: string[] }
 	| { status: 'recovered'; backupName: string }
 	| { status: 'initialized_fresh' }
 	| { status: 'initialized_after_unrecoverable_corruption' };
@@ -115,6 +115,9 @@ export async function initializeStorage(): Promise<StorageInitResult> {
  * Falls back silently if no callbacks registered (e.g. in tests).
  */
 function showInitializationFeedback(result: StorageInitResult): void {
+	if (result.status === 'loaded' && result.warnings?.length) {
+		_onWarning?.(`Existing data needs review; all records were preserved. ${result.warnings.join('; ')}`, 15000);
+	}
 	// Only show feedback for recovery scenarios, not normal load
 	if (result.status === 'loaded' || result.status === 'initialized_fresh') {
 		return;

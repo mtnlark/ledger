@@ -296,3 +296,5 @@ macOS: `~/Library/Application Support/app.ledger.desktop/` — `data.json` (main
 - Excel imports preview accepted, duplicate, invalid and blank rows, require unknown-category mapping, and preserve fixed partner amounts. Commit uses one transaction and save.
 - Shared category splits use purchase-level integer-cent allocation. Historical fixed-share repair is previewed, explicitly selected, backed up, and revalidated before atomic application.
 - Bank sync rejects malformed/regressed balances, tracks upstream time separately from capture time, marks data older than 72 hours stale, and saves once per batch. Needs/wants memoization retains unchanged category classifications.
+
+- Primary-file compatibility: dangling references from older releases are reported and preserved on normal startup. Restore and recovery validation remain strict; a reference warning must not silently roll the primary data back to an older backup.

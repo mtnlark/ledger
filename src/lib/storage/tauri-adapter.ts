@@ -11,7 +11,7 @@ import {
 	DEFAULT_CATEGORIES,
 	type Category
 } from '$lib/db';
-import { validateBackup, parseBackup, encodeBackup } from './backup';
+import { validatePrimaryData, parseBackup, encodeBackup } from './backup';
 import { dehydrateAll, dehydrateChanged, hydrateAll } from './serialization';
 import type { PersistedTableName, StoredData, ReadDataResult, RecoveryResult } from './types';
 
@@ -158,9 +158,10 @@ async function readDataFile(): Promise<ReadDataResult> {
 	}
 
 	let data: StoredData;
+	let warnings: string[];
 	try {
 		data = JSON.parse(content) as StoredData;
-		validateBackup(data);
+		warnings = validatePrimaryData(data).warnings;
 	} catch (error) {
 		const message = error instanceof Error ? error.message : String(error);
 		console.error('Failed to parse data file JSON:', error);
@@ -174,7 +175,7 @@ async function readDataFile(): Promise<ReadDataResult> {
 		return { status: 'checksum_mismatch', data };
 	}
 
-	return { status: 'success', data };
+	return { status: 'success', data, ...(warnings.length ? { warnings } : {}) };
 }
 
 /**
@@ -193,7 +194,6 @@ async function recoverFromBakFile(): Promise<RecoveryResult> {
 	try {
 		const content = await fs.readTextFile(bakPath);
 		const data = (await parseBackup(content)).data;
-		validateBackup(data);
 		if (data.checksum && !(await verifyChecksum(data))) {
 			console.warn('data.json.bak has invalid checksum');
 			return { status: 'no_valid_backup', hadCandidates: true };
@@ -229,7 +229,6 @@ async function recoverFromBackups(): Promise<RecoveryResult> {
 			const backupPath = await path.join(cachedBackupsDir, backupName);
 			const content = await fs.readTextFile(backupPath);
 			const data = (await parseBackup(content)).data;
-		validateBackup(data);
 
 			// Verify checksum if present (but don't reject legacy backups without checksums)
 			if (data.checksum) {
@@ -460,7 +459,7 @@ async function copyBackupToICloud(backupContent: string): Promise<void> {
  * Result of storage initialization
  */
 type InitializationResult =
-	| { status: 'loaded' }
+	| { status: 'loaded'; warnings?: string[] }
 	| { status: 'recovered'; backupName: string }
 	| { status: 'initialized_fresh' }
 	| { status: 'initialized_after_unrecoverable_corruption' };
@@ -498,7 +497,7 @@ export async function initializeTauriStorage(): Promise<InitializationResult> {
 	if (readResult.status === 'success') {
 		await loadDataIntoDexie(readResult.data);
 		await runMigrationsIfNeeded(true);
-		return { status: 'loaded' };
+		return { status: 'loaded', ...(readResult.warnings?.length ? { warnings: readResult.warnings } : {}) };
 	}
 
 	// Handle a missing data file. This is usually a true first run, but it can

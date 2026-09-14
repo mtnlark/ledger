@@ -282,3 +282,19 @@ it('does not treat an empty checksum as a legacy file', async () => {
 	expect((await initializeTauriStorage()).status).toBe('recovered');
 	expect((await db.transactions.toArray())[0].merchant).toBe('Valid fallback');
 });
+
+
+it('preserves dangling references in the primary file without rolling back to an older backup', async () => {
+	files.clear(); dirs.clear();
+	const primary = makeStoredData('Current records'); primary.settings!.migrationVersion = 11;
+	primary.categoryBudgets = [{ id: 21, categoryId: 999, month: '2026-09', budgetAmount: 10, createdAt: new Date(), updatedAt: new Date() }];
+	const content = JSON.stringify(primary);
+	files.set(DATA_PATH, content); files.set(BAK_PATH, JSON.stringify(makeStoredData('Older records')));
+	const result = await initializeTauriStorage();
+	expect(result).toMatchObject({ status: 'loaded', warnings: ['categoryBudgets 21 has a missing categoryId reference'] });
+	expect((await db.transactions.toArray())[0].merchant).toBe('Current records');
+	expect((await db.categoryBudgets.get(21))?.budgetAmount).toBe(10);
+	expect(files.get(DATA_PATH)).toBe(content);
+	const { parseBackup } = await import('./backup');
+	await expect(parseBackup(content)).rejects.toThrow('missing categoryId');
+});

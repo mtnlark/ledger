@@ -61,7 +61,13 @@ function validateFields(row: Row, label: string): void {
 	}
 }
 /** Pure structure validation shared by manual restore and startup recovery. */
-export function validateBackup(input: unknown): BackupPreview {
+export function validateBackup(input: unknown): BackupPreview { return validateData(input, false); }
+/** Existing primary files may contain dangling references created by older Ledger versions.
+ * Preserve those records, but never admit them as automatic recovery or restore candidates.
+ */
+export function validatePrimaryData(input: unknown): BackupPreview { return validateData(input, true); }
+function validateData(input: unknown, preserveMissingReferences: boolean): BackupPreview {
+	const referenceWarnings: string[] = [];
 	if (!object(input) || input.version !== '1.0') fail('unsupported or missing version');
 	const legacy = Object.hasOwn(input, 'data');
 	const source = legacy ? input.data : input;
@@ -102,15 +108,22 @@ export function validateBackup(input: unknown): BackupPreview {
 	for (const table of TABLE_NAMES.filter((name) => name !== 'settings')) {
 		for (const row of normalized[table] as Row[]) {
 			for (const [key, target] of [['categoryId', 'categories'], ['parentTransactionId', 'transactions'], ['accountId', table === 'savingsContributions' ? 'savingsAccounts' : 'linkedAccounts']]) {
-				if (row[key] !== undefined && !ids.get(target)?.has(row[key] as number)) fail(`${table} ${row.id} has a missing ${key} reference`);
+				if (row[key] === undefined) continue;
+				if (typeof row[key] !== 'number' || !Number.isSafeInteger(row[key]) || (row[key] as number) <= 0) fail(`${table} ${row.id} has an invalid ${key}`);
+				if (!ids.get(target)?.has(row[key] as number)) {
+					const message = `${table} ${row.id} has a missing ${key} reference`;
+					if (!preserveMissingReferences) fail(message);
+					referenceWarnings.push(message);
+				}
 			}
 			if (row.parentTransactionId !== undefined) {
 				const parent = (normalized.transactions as Row[]).find((t) => t.id === row.parentTransactionId);
+				if (!parent && preserveMissingReferences) continue;
 				if (parent?.id === row.id || !parent?.isSplitParent || parent.parentTransactionId !== undefined) fail('invalid split parent reference');
 			}
 		}
 	}
-	return { data: normalized as unknown as StoredData, counts, missingTables, warnings: missingTables.map((name) => `Legacy backup omits ${name}; this table will be emptied.`) };
+	return { data: normalized as unknown as StoredData, counts, missingTables, warnings: [...referenceWarnings, ...(preserveMissingReferences ? [] : missingTables.map((name) => `Legacy backup omits ${name}; this table will be emptied.`))] };
 }
 export async function checksum(data: unknown): Promise<string> {
 	const { checksum: _checksum, ...rest } = data as Row;
