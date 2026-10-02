@@ -1,10 +1,10 @@
 <script lang="ts">
 	import { format } from 'date-fns';
-	import { Plus, ChevronDown, ChevronUp, MoreVertical, Pencil, Trash2, Target, TrendingUp, AlertTriangle, Lightbulb, PartyPopper, CheckCircle2, ArrowUp, ArrowDown } from 'lucide-svelte';
+	import { Plus, ChevronDown, ChevronUp, MoreVertical, Pencil, Trash2, Target, TrendingUp, AlertTriangle, Lightbulb, PartyPopper, CheckCircle2, ArrowUp, ArrowDown, X } from 'lucide-svelte';
 	import type { SavingsAccount, SavingsContribution } from '$lib/db';
 	import { formatCurrency, formatCurrencyWhole } from '$lib/utils/format-helpers';
 	import { sumCurrency, calculatePercent } from '$lib/utils/currency';
-	import { deleteSavingsAccount, completeGoal } from '$lib/stores/savingsAccounts';
+	import { deleteSavingsAccount, completeGoal, updateSavingsAccount } from '$lib/stores/savingsAccounts';
 	import { getGoalStatus, type GoalStatus } from '$lib/stores/savingsContributions';
 	import { toast } from '$lib/stores/toast';
 
@@ -29,6 +29,7 @@
 	// Expand/collapse state for contributions list
 	let isExpanded = $state(false);
 	let showMenu = $state(false);
+	let isDismissingGoalPrompt = $state(false);
 
 	// Total contributed this month
 	let monthTotal = $derived(sumCurrency(contributions.map((c) => c.amount)));
@@ -101,6 +102,20 @@
 		} catch (error) {
 			console.error('Failed to complete goal:', error);
 			toast.error('Failed to complete goal');
+		}
+	}
+
+	async function handleDismissGoalPrompt() {
+		if (!account.id || isDismissingGoalPrompt) return;
+		isDismissingGoalPrompt = true;
+		try {
+			await updateSavingsAccount(account.id, { isGoalPromptDismissed: true });
+			await onAccountUpdated();
+		} catch (error) {
+			console.error('Failed to dismiss goal suggestion:', error);
+			toast.error('Failed to dismiss goal suggestion');
+		} finally {
+			isDismissingGoalPrompt = false;
 		}
 	}
 
@@ -319,14 +334,24 @@
 	{/if}
 
 	<!-- Set Goal Link (for savings accounts without goals) -->
-	{#if !hasGoal && account.accountType === 'savings'}
-		<div class="px-4 pb-4 -mt-2">
+	{#if !hasGoal && account.accountType === 'savings' && !account.isGoalPromptDismissed}
+		<div class="px-4 pb-4 -mt-2 flex items-center gap-2">
 			<button
 				onclick={onEditAccount}
 				class="text-xs text-primary-600 hover:text-primary-700 font-medium flex items-center gap-1"
 			>
 				<Target size={12} />
 				Set a goal →
+			</button>
+			<button
+				type="button"
+				onclick={handleDismissGoalPrompt}
+				disabled={isDismissingGoalPrompt}
+				class="p-1 text-charcoal-muted hover:text-charcoal hover:bg-surface-hover rounded transition-colors disabled:opacity-50"
+				aria-label="Dismiss goal suggestion"
+				title="Dismiss goal suggestion"
+			>
+				<X size={12} />
 			</button>
 		</div>
 	{/if}

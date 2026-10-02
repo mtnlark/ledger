@@ -87,7 +87,7 @@ describe('tauri-adapter', () => {
 		await db.open();
 	});
 
-	it('persists cleared goal fields and keeps them cleared after startup reload', async () => {
+	it('persists goal removal and a dismissed goal suggestion after startup reload', async () => {
 		const tauriWindow = window as unknown as { __TAURI__?: object };
 		const previousTauri = tauriWindow.__TAURI__;
 		tauriWindow.__TAURI__ = {};
@@ -99,17 +99,19 @@ describe('tauri-adapter', () => {
 			});
 			expect(JSON.parse(files.get(DATA_PATH)!).savingsAccounts.find((a: { id: number }) => a.id === id).targetAmount).toBe(10000);
 
-			await updateSavingsAccount(id, { targetAmount: undefined, targetDate: undefined });
+			await updateSavingsAccount(id, { targetAmount: undefined, targetDate: undefined, isGoalPromptDismissed: true });
 			const saved = JSON.parse(files.get(DATA_PATH)!).savingsAccounts.find((a: { id: number }) => a.id === id);
 			expect(saved.targetAmount).toBeUndefined();
 			expect(saved.targetDate).toBeUndefined();
 			expect(saved.currentBalance).toBe(500);
+			expect(saved.isGoalPromptDismissed).toBe(true);
 
 			await initializeTauriStorage();
 			const restored = await db.savingsAccounts.get(id);
 			expect(restored).toMatchObject({ name: 'Car Fund', currentBalance: 500 });
 			expect(restored?.targetAmount).toBeUndefined();
 			expect(restored?.targetDate).toBeUndefined();
+			expect(restored?.isGoalPromptDismissed).toBe(true);
 		} finally {
 			if (previousTauri === undefined) delete tauriWindow.__TAURI__;
 			else tauriWindow.__TAURI__ = previousTauri;

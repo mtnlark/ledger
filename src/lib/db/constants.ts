@@ -119,6 +119,7 @@ export interface SavingsAccount {
 	currentBalance?: number; // Only tracked for 'savings' type
 	targetAmount?: number; // Goal target (e.g., $10,000)
 	targetDate?: Date; // Goal deadline (e.g., Dec 31, 2026)
+	isGoalPromptDismissed?: boolean;
 	createdAt: Date;
 	updatedAt: Date;
 }
