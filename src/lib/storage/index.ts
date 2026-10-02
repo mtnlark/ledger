@@ -6,7 +6,7 @@
  */
 
 import Dexie from 'dexie';
-import { saveStatus, PersistenceError, assertCanMutate } from './status';
+import { saveStatus, PersistenceError, assertCanMutate, setInitializationFailed } from './status';
 export { saveStatus, PersistenceError, assertCanMutate } from './status';
 import { dehydrateAll, hydrateAll } from './serialization';
 import type { PersistedTableName, StoredData } from './types';
@@ -98,6 +98,7 @@ export async function initializeStorage(): Promise<StorageInitResult> {
 			return result;
 		} catch (error) {
 			initialized = false;
+			setInitializationFailed(true);
 			lastInitResult = null;
 
 			const message = error instanceof Error ? error.message : String(error);
@@ -147,6 +148,7 @@ export function isStorageInitialized(): boolean {
  * Reset initialization state (for testing or error recovery)
  */
 export function resetStorageState(): void {
+	setInitializationFailed(false);
 	initialized = false;
 	lastInitResult = null;
 	initializationPromise = null;
@@ -185,6 +187,15 @@ export async function createBackup(fresh = false): Promise<void> {
 
 	const { createBackup } = await import('./tauri-adapter');
 	await createBackup(fresh);
+}
+
+/** Preserve even an inconsistent original outside routine backup pruning/recovery. */
+export async function preserveOriginalSnapshot(data: StoredData | string, reason: string): Promise<string> {
+	if (!isTauri()) throw new Error('Original preservation requires the desktop app');
+	const { checksum } = await import('./backup');
+	const content = typeof data === 'string' ? data : JSON.stringify({ ...data, checksum: await checksum(data) });
+	const { preserveOriginalContent } = await import('./tauri-adapter');
+	return preserveOriginalContent(content, reason);
 }
 
 /**

@@ -27,7 +27,11 @@ function invalidateTransactionCaches(): void {
 	invalidateRecurringCache();
 }
 
-function validateNewTransaction(transaction: NewTransaction): void {
+async function requireCategory(id: number): Promise<void> {
+	if (!(await db.categories.get(id))) throw new Error('Missing category reference');
+}
+
+async function validateNewTransaction(transaction: NewTransaction & { id?: number }): Promise<void> {
 	const amountResult = validateAmount(transaction.amount);
 	if (!amountResult.isValid) throw new Error(amountResult.error ?? 'Invalid amount');
 
@@ -37,10 +41,19 @@ function validateNewTransaction(transaction: NewTransaction): void {
 	const categoryResult = validateCategory(transaction.categoryId);
 	if (!categoryResult.isValid) throw new Error(categoryResult.error ?? 'Invalid category');
 
-	if (!(transaction.date instanceof Date) || Number.isNaN(transaction.date.getTime())) {
+	if (!(transaction.date instanceof Date) || !Number.isFinite(transaction.date.getTime())) {
 		throw new Error('Invalid date');
 	}
 
+	await requireCategory(transaction.categoryId);
+	if (transaction.parentTransactionId !== undefined) {
+		const parent = await db.transactions.get(transaction.parentTransactionId);
+		if (!parent?.isSplitParent || parent.id === transaction.id || parent.parentTransactionId !== undefined) throw new Error('Invalid split parent reference');
+	}
+	if (!Number.isFinite(transaction.splitValue) || !['fixed', 'percentage'].includes(transaction.splitType)) throw new Error('Invalid split value');
+	for (const date of [transaction.settledDate, transaction.deletedAt]) {
+		if (date !== undefined && (!(date instanceof Date) || !Number.isFinite(date.getTime()))) throw new Error('Invalid date');
+	}
 	if (transaction.isShared) {
 		const splitResult = validateSplitValue(
 			transaction.splitType,
@@ -62,13 +75,14 @@ function createTransactionRecord(transaction: NewTransaction, now: Date): Omit<T
 	};
 }
 
-function validateSplitLines(splits: SplitLine[], total: number): void {
+async function validateSplitLines(splits: SplitLine[], total: number): Promise<void> {
 	if (splits.length < 2) throw new Error('Must have at least 2 split lines');
 	for (const split of splits) {
 		const amountResult = validateAmount(split.amount);
 		if (!amountResult.isValid) throw new Error(amountResult.error ?? 'Invalid split amount');
 		const categoryResult = validateCategory(split.categoryId);
 		if (!categoryResult.isValid) throw new Error(categoryResult.error ?? 'Invalid split category');
+		await requireCategory(split.categoryId);
 	}
 	if (!currencyEquals(sumCurrency(splits.map((split) => split.amount)), total)) {
 		throw new Error('Split amounts must equal original transaction amount');
@@ -123,7 +137,11 @@ async function bulkModifyTransactions(
 	fields: Partial<Transaction>,
 	afterCacheUpdate?: () => void
 ): Promise<void> {
-	return runMutation(['transactions', 'settings'], async () => {
+	return runMutation(['transactions', 'settings', 'categories'], async () => {
+		if (fields.categoryId !== undefined) {
+			await requireCategory(fields.categoryId);
+			for (const row of await db.transactions.where('id').anyOf(ids).toArray()) await validateNewTransaction({ ...row, ...fields });
+		}
 		await db.transactions.where('id').anyOf(ids).modify(fields);
 
 		const cache = getTransactionCache();
@@ -136,11 +154,11 @@ async function bulkModifyTransactions(
 	});
 }
 
-// Write per-transaction notes changes (computed once by the caller) to the DB
+// Write per-transaction notes changes computed within the enclosing mutation to the DB
 // in one rw transaction, mirror them into the cache, rebuild the tag index,
 // and persist. Shared by all tag operations.
 async function applyNotesUpdates(changes: { id: number; notes: string | undefined }[]): Promise<void> {
-	return runMutation(['transactions', 'settings'], async () => {
+	return runMutation(['transactions', 'settings', 'categories'], async () => {
 		if (changes.length === 0) return;
 		const now = new Date();
 
@@ -200,8 +218,8 @@ export async function getTransactionsByDateRange(
 export async function addTransaction(
 	transaction: NewTransaction
 ): Promise<number> {
-	return runMutation(['transactions', 'settings'], async () => {
-		validateNewTransaction(transaction);
+	return runMutation(['transactions', 'settings', 'categories'], async () => {
+		await validateNewTransaction(transaction);
 
 		const now = new Date();
 		const newTransaction = createTransactionRecord(transaction, now);
@@ -216,8 +234,8 @@ export async function addTransaction(
 		}
 
 		// Auto-reactivate if adding a subscription for a cancelled merchant
-		if (transaction.isSubscription && await isSubscriptionCancelled(transaction.merchant)) {
-			await reactivateSubscription(transaction.merchant);
+		if (transaction.isSubscription && await isSubscriptionCancelled(transaction.merchant, transaction.amount)) {
+			await reactivateSubscription(transaction.merchant, transaction.amount);
 		}
 
 		invalidateTransactionCaches();
@@ -229,9 +247,11 @@ export async function updateTransaction(
 	id: number,
 	updates: Partial<Omit<Transaction, 'id' | 'createdAt'>>
 ): Promise<void> {
-	return runMutation(['transactions', 'settings'], async () => {
+	return runMutation(['transactions', 'settings', 'categories'], async () => {
 		const existing = await db.transactions.get(id);
 		if (!existing) return;
+
+		await validateNewTransaction({ ...existing, ...updates });
 
 		// Recalculate partner share if relevant fields changed
 		let partnerShare = existing.partnerShare;
@@ -272,8 +292,11 @@ export async function updateTransaction(
 		// Auto-reactivate if marking as subscription for a cancelled merchant
 		if (updates.isSubscription === true) {
 			const merchant = updates.merchant ?? existing.merchant;
-			if (await isSubscriptionCancelled(merchant)) {
-				await reactivateSubscription(merchant);
+			const amount = existing.parentTransactionId
+				? sumCurrency((await db.transactions.where('parentTransactionId').equals(existing.parentTransactionId).toArray()).map((row) => row.amount))
+				: updates.amount ?? existing.amount;
+			if (await isSubscriptionCancelled(merchant, amount)) {
+				await reactivateSubscription(merchant, amount);
 			}
 		}
 
@@ -282,7 +305,7 @@ export async function updateTransaction(
 }
 
 export async function deleteTransaction(id: number): Promise<void> {
-	return runMutation(['transactions', 'settings'], async () => {
+	return runMutation(['transactions', 'settings', 'categories'], async () => {
 		// Get transaction for tag index removal before deleting
 		const oldTx = await db.transactions.get(id);
 		await db.transactions.delete(id);
@@ -299,7 +322,7 @@ export async function deleteTransaction(id: number): Promise<void> {
 }
 
 export async function bulkDeleteTransactions(ids: number[]): Promise<void> {
-	return runMutation(['transactions', 'settings'], async () => {
+	return runMutation(['transactions', 'settings', 'categories'], async () => {
 		if (ids.length === 0) return;
 		await db.transactions.where('id').anyOf(ids).delete();
 
@@ -317,7 +340,7 @@ export async function bulkDeleteTransactions(ids: number[]): Promise<void> {
 // Soft delete a transaction (marks as deleted but keeps in DB for undo)
 // Returns the transaction data for undo capture, or null if not found
 export async function softDeleteTransaction(id: number): Promise<Transaction | null> {
-	return runMutation(['transactions', 'settings'], async () => {
+	return runMutation(['transactions', 'settings', 'categories'], async () => {
 		const transaction = await db.transactions.get(id);
 		if (!transaction) return null;
 
@@ -343,41 +366,45 @@ export async function softDeleteTransaction(id: number): Promise<Transaction | n
 
 // Returns the deleted transactions for undo capture
 export async function softDeleteTransactions(ids: number[]): Promise<Transaction[]> {
-	if (ids.length === 0) return [];
+	return runMutation(['transactions', 'settings', 'categories'], async () => {
+		if (ids.length === 0) return [];
 
-	// Get transactions before deleting
-	const transactions = await db.transactions.where('id').anyOf(ids).toArray();
-	if (transactions.length === 0) return [];
+		// Get transactions before deleting
+		const transactions = await db.transactions.where('id').anyOf(ids).toArray();
+		if (transactions.length === 0) return [];
 
-	const now = new Date();
-	await bulkModifyTransactions(ids, { isDeleted: true, deletedAt: now, updatedAt: now }, () => {
-		// Remove from tag index since transactions are now hidden
-		for (const tx of transactions) {
-			tagIndex.removeTransaction({ id: tx.id!, notes: tx.notes });
-		}
+		const now = new Date();
+		await bulkModifyTransactions(ids, { isDeleted: true, deletedAt: now, updatedAt: now }, () => {
+			// Remove from tag index since transactions are now hidden
+			for (const tx of transactions) {
+				tagIndex.removeTransaction({ id: tx.id!, notes: tx.notes });
+			}
+		});
+		return transactions;
 	});
-	return transactions;
 }
 
 export async function restoreTransactions(ids: number[]): Promise<void> {
-	if (ids.length === 0) return;
+	return runMutation(['transactions', 'settings', 'categories'], async () => {
+		if (ids.length === 0) return;
 
-	// Get transactions first so we can restore their tags
-	const transactions = await db.transactions.where('id').anyOf(ids).toArray();
+		// Get transactions first so we can restore their tags
+		const transactions = await db.transactions.where('id').anyOf(ids).toArray();
 
-	const now = new Date();
-	await bulkModifyTransactions(ids, { isDeleted: false, deletedAt: undefined, updatedAt: now }, () => {
-		// Re-add to tag index since transactions are visible again
-		for (const tx of transactions) {
-			tagIndex.addTransaction({ id: tx.id!, notes: tx.notes });
-		}
+		const now = new Date();
+		await bulkModifyTransactions(ids, { isDeleted: false, deletedAt: undefined, updatedAt: now }, () => {
+			// Re-add to tag index since transactions are visible again
+			for (const tx of transactions) {
+				tagIndex.addTransaction({ id: tx.id!, notes: tx.notes });
+			}
+		});
 	});
 }
 
 // Called on app startup to clean up items that weren't undone
 // Returns the count of purged transactions
 export async function purgeDeletedTransactions(): Promise<number> {
-	return runMutation(['transactions', 'settings'], async () => {
+	return runMutation(['transactions', 'settings', 'categories'], async () => {
 		const deleted = await db.transactions.filter((t) => t.isDeleted === true).toArray();
 		if (deleted.length === 0) return 0;
 
@@ -402,47 +429,51 @@ export async function bulkUpdateCategory(ids: number[], categoryId: number): Pro
 }
 
 export async function bulkAddTag(ids: number[], tag: string): Promise<void> {
-	if (ids.length === 0) return;
+	return runMutation(['transactions', 'settings', 'categories'], async () => {
+		if (ids.length === 0) return;
 
-	const normalizedTag = tag.replace(/^#/, '').toLowerCase();
-	const transactions = await db.transactions.where('id').anyOf(ids).toArray();
-	if (transactions.length === 0) return;
+		const normalizedTag = tag.replace(/^#/, '').toLowerCase();
+		const transactions = await db.transactions.where('id').anyOf(ids).toArray();
+		if (transactions.length === 0) return;
 
-	const changes: { id: number; notes: string | undefined }[] = [];
-	for (const tx of transactions) {
-		const newNotes = appendTag(tx.notes, normalizedTag);
-		if (newNotes !== (tx.notes || '')) {
-			changes.push({ id: tx.id!, notes: newNotes });
+		const changes: { id: number; notes: string | undefined }[] = [];
+		for (const tx of transactions) {
+			const newNotes = appendTag(tx.notes, normalizedTag);
+			if (newNotes !== (tx.notes || '')) {
+				changes.push({ id: tx.id!, notes: newNotes });
+			}
 		}
-	}
-	await applyNotesUpdates(changes);
+		await applyNotesUpdates(changes);
+	});
 }
 
 export async function bulkRemoveTag(ids: number[], tag: string): Promise<void> {
-	if (ids.length === 0) return;
+	return runMutation(['transactions', 'settings', 'categories'], async () => {
+		if (ids.length === 0) return;
 
-	const normalizedTag = tag.replace(/^#/, '').toLowerCase();
-	const transactions = await db.transactions.where('id').anyOf(ids).toArray();
-	if (transactions.length === 0) return;
+		const normalizedTag = tag.replace(/^#/, '').toLowerCase();
+		const transactions = await db.transactions.where('id').anyOf(ids).toArray();
+		if (transactions.length === 0) return;
 
-	const changes: { id: number; notes: string | undefined }[] = [];
-	for (const tx of transactions) {
-		if (!tx.notes) continue;
-		const newNotes = stripTag(tx.notes, normalizedTag);
-		if (newNotes !== tx.notes) {
-			changes.push({ id: tx.id!, notes: newNotes || undefined });
+		const changes: { id: number; notes: string | undefined }[] = [];
+		for (const tx of transactions) {
+			if (!tx.notes) continue;
+			const newNotes = stripTag(tx.notes, normalizedTag);
+			if (newNotes !== tx.notes) {
+				changes.push({ id: tx.id!, notes: newNotes || undefined });
+			}
 		}
-	}
-	await applyNotesUpdates(changes);
+		await applyNotesUpdates(changes);
+	});
 }
 
 export async function addSplitTransaction(
 	transaction: NewTransaction,
 	splits: SplitLine[]
 ): Promise<number[]> {
-	return runMutation(['transactions', 'settings'], async () => {
-		validateNewTransaction(transaction);
-		validateSplitLines(splits, transaction.amount);
+	return runMutation(['transactions', 'settings', 'categories'], async () => {
+		await validateNewTransaction(transaction);
+		await validateSplitLines(splits, transaction.amount);
 
 		const now = new Date();
 		const parentRecord = { ...createTransactionRecord(transaction, now), isSplitParent: true };
@@ -461,8 +492,8 @@ export async function addSplitTransaction(
 
 		updateCacheWithSplit({ ...parentRecord, id: parentId }, children);
 
-		if (transaction.isSubscription && await isSubscriptionCancelled(transaction.merchant)) {
-			await reactivateSubscription(transaction.merchant);
+		if (transaction.isSubscription && await isSubscriptionCancelled(transaction.merchant, transaction.amount)) {
+			await reactivateSubscription(transaction.merchant, transaction.amount);
 		}
 
 		invalidateTransactionCaches();
@@ -474,7 +505,7 @@ export async function splitTransaction(
 	id: number,
 	splits: SplitLine[]
 ): Promise<number[]> {
-	return runMutation(['transactions', 'settings'], async () => {
+	return runMutation(['transactions', 'settings', 'categories'], async () => {
 		if (splits.length < 2) throw new Error('Must have at least 2 split lines');
 
 		const parent = await db.transactions.get(id);
@@ -482,7 +513,8 @@ export async function splitTransaction(
 			throw new Error('Transaction not found');
 		}
 
-		validateSplitLines(splits, parent.amount);
+		await validateNewTransaction(parent);
+		await validateSplitLines(splits, parent.amount);
 		if (parent.isSplitParent || parent.isDeleted) throw new Error('Transaction already split or deleted');
 		const allocations = allocatePartnerShares(splits.map((s) => s.amount), parent.isShared, parent.splitType, parent.splitValue);
 
@@ -555,7 +587,7 @@ export async function updateSplitGroup(
 	shared: SplitGroupUpdate,
 	lines: { categoryId: number; amount: number; notes?: string }[]
 ): Promise<number[]> {
-	return runMutation(['transactions', 'settings'], async () => {
+	return runMutation(['transactions', 'settings', 'categories'], async () => {
 		if (lines.length < 2) {
 			throw new Error('Must have at least 2 split lines');
 		}
@@ -570,8 +602,8 @@ export async function updateSplitGroup(
 
 		const now = new Date();
 		const total = sumCurrency(lines.map((l) => l.amount));
-		validateSplitLines(lines, total);
-		validateNewTransaction({ ...parent, ...shared, amount: total });
+		await validateSplitLines(lines, total);
+		await validateNewTransaction({ ...parent, ...shared, amount: total });
 		const allocations = allocatePartnerShares(lines.map((l) => l.amount), shared.isShared, shared.splitType, shared.splitValue);
 		const settledDate = shared.isSettled ? (parent.settledDate ?? now) : undefined;
 
@@ -880,55 +912,59 @@ export async function getDailySpending(
 
 // Returns the number of transactions updated
 export async function renameTag(oldTag: string, newTag: string): Promise<number> {
-	// Normalize both tags (strip # prefix, lowercase)
-	const normalizedOld = oldTag.replace(/^#/, '').toLowerCase();
-	const normalizedNew = newTag.replace(/^#/, '').toLowerCase();
+	return runMutation(['transactions', 'settings', 'categories'], async () => {
+		// Normalize both tags (strip # prefix, lowercase)
+		const normalizedOld = oldTag.replace(/^#/, '').toLowerCase();
+		const normalizedNew = newTag.replace(/^#/, '').toLowerCase();
 
-	// If same after normalization, nothing to do
-	if (normalizedOld === normalizedNew) return 0;
+		// If same after normalization, nothing to do
+		if (normalizedOld === normalizedNew) return 0;
 
-	// Validate new tag format
-	if (!/^[a-zA-Z0-9][a-zA-Z0-9-]*$/.test(normalizedNew)) {
-		throw new Error('Invalid tag name. Tags must start with a letter or number and contain only letters, numbers, and hyphens.');
-	}
+		// Validate new tag format
+		if (!/^[a-zA-Z0-9][a-zA-Z0-9-]*$/.test(normalizedNew)) {
+			throw new Error('Invalid tag name. Tags must start with a letter or number and contain only letters, numbers, and hyphens.');
+		}
 
-	// Query all transactions from db
-	const allTransactions = await db.transactions.toArray();
+		// Query all transactions from db
+		const allTransactions = await db.transactions.toArray();
 
-	// Filter to those whose notes contain the old tag
-	const tagPattern = new RegExp(`#${normalizedOld}(?![a-zA-Z0-9-])`, 'i');
-	const matching = allTransactions.filter((t) => t.notes && tagPattern.test(t.notes));
+		// Filter to those whose notes contain the old tag
+		const tagPattern = new RegExp(`#${normalizedOld}(?![a-zA-Z0-9-])`, 'i');
+		const matching = allTransactions.filter((t) => t.notes && tagPattern.test(t.notes));
 
-	if (matching.length === 0) return 0;
+		if (matching.length === 0) return 0;
 
-	await applyNotesUpdates(
-		matching.map((tx) => ({
-			id: tx.id!,
-			notes: replaceTag(tx.notes!, normalizedOld, normalizedNew)
-		}))
-	);
-	return matching.length;
+		await applyNotesUpdates(
+			matching.map((tx) => ({
+				id: tx.id!,
+				notes: replaceTag(tx.notes!, normalizedOld, normalizedNew)
+			}))
+		);
+		return matching.length;
+	});
 }
 
 // Returns the number of transactions updated
 export async function deleteTag(tag: string): Promise<number> {
-	// Normalize tag (strip # prefix, lowercase)
-	const normalizedTag = tag.replace(/^#/, '').toLowerCase();
+	return runMutation(['transactions', 'settings', 'categories'], async () => {
+		// Normalize tag (strip # prefix, lowercase)
+		const normalizedTag = tag.replace(/^#/, '').toLowerCase();
 
-	// Query all transactions from db
-	const allTransactions = await db.transactions.toArray();
+		// Query all transactions from db
+		const allTransactions = await db.transactions.toArray();
 
-	// Filter to those whose notes contain the tag
-	const tagPattern = new RegExp(`#${normalizedTag}(?![a-zA-Z0-9-])`, 'i');
-	const matching = allTransactions.filter((t) => t.notes && tagPattern.test(t.notes));
+		// Filter to those whose notes contain the tag
+		const tagPattern = new RegExp(`#${normalizedTag}(?![a-zA-Z0-9-])`, 'i');
+		const matching = allTransactions.filter((t) => t.notes && tagPattern.test(t.notes));
 
-	if (matching.length === 0) return 0;
+		if (matching.length === 0) return 0;
 
-	await applyNotesUpdates(
-		matching.map((tx) => ({
-			id: tx.id!,
-			notes: stripTag(tx.notes!, normalizedTag) || undefined
-		}))
-	);
-	return matching.length;
+		await applyNotesUpdates(
+			matching.map((tx) => ({
+				id: tx.id!,
+				notes: stripTag(tx.notes!, normalizedTag) || undefined
+			}))
+		);
+		return matching.length;
+	});
 }

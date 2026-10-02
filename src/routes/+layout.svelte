@@ -11,10 +11,9 @@
 	import { purgeDeletedTransactions, addTransaction } from '$lib/stores/transactions';
 	import SaveStatusBanner from '$lib/components/SaveStatusBanner.svelte';
 	import { createQuickAddHandler, type QuickAddRequest } from '$lib/services/quick-add';
-	import { retryPersistence } from '$lib/storage';
+	import { refreshDataCaches, retryPersistence } from '$lib/storage';
 	import { registerStorageCallbacks, initializeStorage } from '$lib/storage';
 	import { toast } from '$lib/stores/toast';
-	import { db } from '$lib/db';
 	import { onDestroy, onMount } from 'svelte';
 
 	// Wire storage layer UI feedback to toast (keeps storage UI-agnostic)
@@ -25,6 +24,18 @@
 
 	let { children } = $props();
 	let dataRevision = $state(0);
+	let startupError = $state('');
+	let retryingStartup = $state(false);
+	async function startStorage() {
+		retryingStartup = true;
+		try {
+			await initializeStorage();
+			await purgeDeletedTransactions();
+			if (startupError) await refreshDataCaches(true);
+			startupError = '';
+		} catch (error) { startupError = error instanceof Error ? error.message : String(error); }
+		finally { retryingStartup = false; }
+	}
 	onMount(() => {
 		const refresh = () => { dataRevision++; };
 		window.addEventListener('ledger:data-replaced', refresh);
@@ -39,9 +50,7 @@
 
 	onMount(() => {
 		if (isQuickWindow) return;
-		void initializeStorage()
-			.then(() => purgeDeletedTransactions())
-			.catch((error) => console.error('Startup cleanup failed:', error));
+		void startStorage();
 	});
 
 	// Apply theme reactively when settings change
@@ -68,15 +77,7 @@
 			await initializeStorage();
 			if (cancelled) return;
 
-			const now = new Date();
-			const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-			const todayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
-			const todayCount = await db.transactions
-				.where('date')
-				.between(todayStart, todayEnd, true, true)
-				.count();
-
-			const started = await initNotifications(s, todayCount > 0);
+			const started = await initNotifications(s);
 			if (cancelled) return;
 
 			if (!started && s.notificationsEnabled) {
@@ -158,6 +159,7 @@
 
 		<!-- Main content -->
 		<div class="flex-1" id="main-content">
+			{#if startupError}<div role="alert" class="p-4 border border-theme">{startupError} <button class="underline" disabled={retryingStartup} onclick={startStorage}>{retryingStartup ? 'Loading...' : 'Retry loading'}</button></div>{/if}
 			<SaveStatusBanner />
 			{#key dataRevision}{@render children()}{/key}
 		</div>

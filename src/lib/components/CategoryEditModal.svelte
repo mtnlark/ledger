@@ -45,13 +45,15 @@
 	// Fetch usage count when category changes (for delete warning)
 	$effect(() => {
 		const id = category?.id;
+		let cancelled = false;
 		if (id) {
 			getCategoryUsageCount(id).then((count) => {
-				usageCount = count;
+				if (!cancelled) usageCount = count;
 			});
 		} else {
 			usageCount = 0;
 		}
+		return () => { cancelled = true; };
 	});
 
 	function handleEmojiSelect(event: Event) {
@@ -162,8 +164,13 @@
 
 		isDeleting = true;
 		try {
-			await deleteCategory(category.id);
-			toast.success('Category deleted');
+			if (await getCategoryUsageCount(category.id)) {
+				await updateCategory(category.id, { isActive: false });
+				toast.success('Category deactivated');
+			} else {
+				await deleteCategory(category.id);
+				toast.success('Category deleted');
+			}
 			onSave();
 		} catch (error) {
 			toast.error('Failed to delete category');
@@ -326,15 +333,14 @@
 								class="flex items-center gap-2 text-sm text-red-600 hover:text-red-700 transition-colors"
 							>
 								<Trash2 size={16} />
-								Delete category
+								{usageCount > 0 ? 'Deactivate category' : 'Delete category'}
 							</button>
 						{:else}
 							<div class="bg-red-50 border border-red-200 rounded-lg p-4 space-y-3">
-								<p class="text-sm text-red-800 font-medium">Delete "{category?.name}"?</p>
+								<p class="text-sm text-red-800 font-medium">{usageCount > 0 ? 'Deactivate' : 'Delete'} "{category?.name}"?</p>
 								{#if usageCount > 0}
 									<p class="text-sm text-red-700">
-										This category is used by <strong>{usageCount}</strong> transaction{usageCount === 1 ? '' : 's'}.
-										Those transactions will show "Unknown" category.
+										This category has <strong>{usageCount}</strong> transaction or budget reference{usageCount === 1 ? '' : 's'}. Deactivation preserves that history and hides the category from new entries.
 									</p>
 								{:else}
 									<p class="text-sm text-red-700">This action cannot be undone.</p>
@@ -353,7 +359,7 @@
 										disabled={isDeleting}
 										class="px-3 py-1.5 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50"
 									>
-										{isDeleting ? 'Deleting...' : 'Yes, delete'}
+										{isDeleting ? 'Saving...' : usageCount > 0 ? 'Yes, deactivate' : 'Yes, delete'}
 									</button>
 								</div>
 							</div>

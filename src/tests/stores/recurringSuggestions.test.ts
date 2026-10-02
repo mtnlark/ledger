@@ -276,6 +276,7 @@ describe('getUserSubscriptions', () => {
 
 describe('addRecurringSuggestionTransaction', () => {
 	beforeEach(async () => {
+		await db.categories.bulkPut([1, 2].map((id) => ({ id, name: `Category ${id}`, isActive: true, isEssential: false, sortOrder: id })));
 		await db.transactions.clear();
 		await db.settings.clear();
 		await db.settings.add({ ...DEFAULT_SETTINGS });

@@ -66,6 +66,15 @@ describe('TransactionForm', () => {
 		expect(data.date).toBeInstanceOf(Date);
 	});
 
+	it('requires a date even when all other fields are valid', async () => {
+		const { onSubmit } = setup();
+		await fillBaseFields();
+		await fireEvent.input(screen.getByLabelText('Date'), { target: { value: '' } });
+		await fireEvent.submit(document.querySelector('form')!);
+		expect(onSubmit).not.toHaveBeenCalled();
+		expect(screen.getByText('Date is required')).toBeInTheDocument();
+	});
+
 	it('does not submit when merchant is empty', async () => {
 		const { onSubmit } = setup();
 		await fireEvent.input(screen.getByLabelText('Amount'), { target: { value: '10' } });

@@ -2,16 +2,25 @@ import { db, type SavingsContribution, type ContributionSource } from '$lib/db';
 import { runMutation } from '$lib/storage/mutation';
 import { getSavingsAccount, updateAccountBalance } from './savingsAccounts';
 import { getMonthDateRange } from '$lib/utils/date-helpers';
+import { validateAmount, validateDate } from '$lib/utils/transaction-validation';
 import { sumCurrency } from '$lib/utils/currency';
 
 // Sources that affect "available to spend" (reduce it when contributed)
 // Payroll deductions, interest, and employer matches are "free money" or pre-tax
 const SOURCES_AFFECTING_AVAILABLE: ContributionSource[] = ['bank_transfer', 'other'];
 
+async function validateContribution(contribution: Omit<SavingsContribution, 'id' | 'createdAt' | 'updatedAt'>): Promise<void> {
+	if (!validateDate(contribution.date).isValid || !(contribution.date instanceof Date)) throw new Error('Invalid date');
+	if (!validateAmount(contribution.amount).isValid) throw new Error('Invalid contribution amount');
+	if (!Number.isSafeInteger(contribution.accountId) || !(await getSavingsAccount(contribution.accountId))) throw new Error('Missing savings account reference');
+	if (!['payroll_deduction', 'bank_transfer', 'interest', 'employer_match', 'other'].includes(contribution.source)) throw new Error('Invalid contribution source');
+}
+
 export async function addContribution(
 	contribution: Omit<SavingsContribution, 'id' | 'createdAt' | 'updatedAt'>
 ): Promise<number> {
 	return runMutation(['savingsAccounts', 'savingsContributions'], async () => {
+		await validateContribution(contribution);
 		const now = new Date();
 
 		const newContribution: Omit<SavingsContribution, 'id'> = {
@@ -93,13 +102,15 @@ export async function updateContribution(
 		const existing = await db.savingsContributions.get(id);
 		if (!existing) return;
 
-		// If amount changed, adjust the account balance for savings accounts
-		if (updates.amount !== undefined && updates.amount !== existing.amount) {
-			const account = await getSavingsAccount(existing.accountId);
-			if (account?.accountType === 'savings') {
-				const delta = updates.amount - existing.amount;
-				await updateAccountBalance(existing.accountId, delta);
-			}
+		await validateContribution({ ...existing, ...updates });
+
+		const destination = updates.accountId ?? existing.accountId;
+		const amount = updates.amount ?? existing.amount;
+		if (destination === existing.accountId) {
+			await updateAccountBalance(destination, sumCurrency([amount, -existing.amount]));
+		} else {
+			await updateAccountBalance(existing.accountId, -existing.amount);
+			await updateAccountBalance(destination, amount);
 		}
 
 		await db.savingsContributions.update(id, {
@@ -362,8 +373,10 @@ export async function getGoalStatus(
 
 	// Calculate months remaining until target date
 	const now = new Date();
-	const monthsRemaining = Math.max(
-		0,
+	const deadline = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate());
+	const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+	const monthsRemaining = deadline < today ? 0 : Math.max(
+		1,
 		(targetDate.getFullYear() - now.getFullYear()) * 12 +
 			(targetDate.getMonth() - now.getMonth())
 	);

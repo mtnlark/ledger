@@ -43,6 +43,7 @@ export type PersistedTableName =
 export type ReadDataResult =
 	| { status: 'success'; data: StoredData; warnings?: string[] }
 	| { status: 'not_found' }
+	| { status: 'io_error'; error: string }
 	| { status: 'corrupted'; error: string }
 	| { status: 'checksum_mismatch'; data: StoredData };
 

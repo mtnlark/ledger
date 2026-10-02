@@ -13,6 +13,7 @@ import { isNotificationPermissionGranted, registerNotificationClickHandler } fro
 export { requestNotificationPermission, isNotificationPermissionGranted } from './tauri-notifications';
 
 // Track the click handler unlisten function so we only register once
+let generation = 0;
 let unlistenClickHandler: (() => void) | null = null;
 
 /**
@@ -25,17 +26,18 @@ let unlistenClickHandler: (() => void) | null = null;
  * @returns true if notifications were initialized, false if permission was revoked
  */
 export async function initNotifications(
-	settings: Settings,
-	hasTodayTransactions: boolean
+	settings: Settings
 ): Promise<boolean> {
 	// If OS permission was revoked, don't start anything
+	const startedGeneration = ++generation;
 	const granted = await isNotificationPermissionGranted();
+	if (startedGeneration !== generation) return false;
 	if (!granted) {
 		stopScheduler();
 		return false;
 	}
 
-	startScheduler(settings, hasTodayTransactions);
+	startScheduler(settings);
 	checkAppOpenNotifications(settings);
 
 	// Register click handler once (brings app to front when notification is clicked)
@@ -50,6 +52,7 @@ export async function initNotifications(
  * Stop the notification scheduler. Safe to call multiple times.
  */
 export function cleanupNotifications(): void {
+	generation++;
 	stopScheduler();
 	if (unlistenClickHandler) {
 		unlistenClickHandler();

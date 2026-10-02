@@ -4,7 +4,8 @@
 //! never in app data, data.json, or backups (which can copy to iCloud). It is
 //! claimed/stored/read entirely on the Rust side; JavaScript never sees it.
 
-use std::sync::Mutex;
+use std::sync::{Mutex, OnceLock};
+use std::time::Duration;
 
 use base64::Engine;
 use serde::{Deserialize, Serialize};
@@ -96,33 +97,71 @@ fn split_auth(access_url: &str) -> Result<(reqwest::Url, Option<(String, String)
     Ok((clean, Some((user, pass))))
 }
 
+const CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
+const REQUEST_TIMEOUT: Duration = Duration::from_secs(30);
+static HTTP_CLIENT: OnceLock<Result<reqwest::Client, String>> = OnceLock::new();
+
+fn build_http_client(total: Duration) -> Result<reqwest::Client, String> {
+    reqwest::Client::builder()
+        .connect_timeout(CONNECT_TIMEOUT)
+        .timeout(total)
+        // Claiming consumes a one-use token; never retry automatically.
+        .retry(reqwest::retry::never())
+        .build()
+        .map_err(|e| format!("Could not initialize SimpleFIN client: {e}"))
+}
+fn http_client() -> Result<&'static reqwest::Client, String> {
+    HTTP_CLIENT
+        .get_or_init(|| build_http_client(REQUEST_TIMEOUT))
+        .as_ref()
+        .map_err(Clone::clone)
+}
+fn http_error(action: &str, error: reqwest::Error) -> String {
+    if error.is_timeout() {
+        format!("{action}: request timed out")
+    } else {
+        format!("{action}: {}", error.without_url())
+    }
+}
 async fn claim_setup_token(setup_token: &str) -> Result<String, String> {
+    claim_with_client(http_client()?, setup_token).await
+}
+async fn claim_with_client(client: &reqwest::Client, setup_token: &str) -> Result<String, String> {
     let bytes = base64::engine::general_purpose::STANDARD
         .decode(setup_token.trim())
         .map_err(|_| "Invalid setup token (not base64)".to_string())?;
     let claim_url = String::from_utf8(bytes).map_err(|_| "Invalid setup token".to_string())?;
 
-    let resp = reqwest::Client::new()
+    let resp = client
         .post(claim_url.trim())
         .header("Content-Length", "0")
         .send()
         .await
-        .map_err(|e| format!("Claim failed: {e}"))?;
+        .map_err(|e| http_error("Claim failed", e))?;
     if !resp.status().is_success() {
         return Err(format!("Claim failed: HTTP {}", resp.status()));
     }
-    let access_url = resp.text().await.map_err(|e| e.to_string())?;
+    let access_url = resp
+        .text()
+        .await
+        .map_err(|e| http_error("Claim response failed", e))?;
     Ok(access_url.trim().to_string())
 }
 
 async fn fetch_accounts_internal(access_url: &str) -> Result<AccountsResponse, String> {
+    fetch_with_client(http_client()?, access_url).await
+}
+async fn fetch_with_client(
+    client: &reqwest::Client,
+    access_url: &str,
+) -> Result<AccountsResponse, String> {
     let (base, auth) = split_auth(access_url)?;
     let url = format!(
         "{}/accounts?balances-only=1",
         base.as_str().trim_end_matches('/')
     );
 
-    let mut request = reqwest::Client::new().get(&url);
+    let mut request = client.get(&url);
     if let Some((user, pass)) = auth {
         request = request.basic_auth(user, Some(pass));
     }
@@ -130,13 +169,13 @@ async fn fetch_accounts_internal(access_url: &str) -> Result<AccountsResponse, S
     let resp = request
         .send()
         .await
-        .map_err(|e| format!("SimpleFIN request failed: {e}"))?;
+        .map_err(|e| http_error("SimpleFIN request failed", e))?;
     if !resp.status().is_success() {
         return Err(format!("SimpleFIN returned HTTP {}", resp.status()));
     }
     resp.json::<AccountsResponse>()
         .await
-        .map_err(|e| format!("Could not parse SimpleFIN response: {e}"))
+        .map_err(|e| http_error("Could not parse SimpleFIN response", e))
 }
 
 /// Link via a SimpleFIN setup token (base64 claim URL) or, for the public
@@ -271,5 +310,119 @@ mod tests {
         let (url2, auth2) = split_auth("https://example.org/simplefin").unwrap();
         assert_eq!(url2.as_str(), "https://example.org/simplefin");
         assert_eq!(auth2, None);
+    }
+    fn stalled_server(body: bool) -> (String, std::thread::JoinHandle<()>) {
+        use std::io::{Read, Write};
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let url = format!("http://{}", listener.local_addr().unwrap());
+        let handle = std::thread::spawn(move || {
+            let (mut stream, _) = listener.accept().unwrap();
+            let mut request = [0; 4096];
+            let bytes_read = stream.read(&mut request).unwrap();
+            assert!(
+                bytes_read > 0,
+                "client disconnected before sending a request"
+            );
+            if body {
+                stream.write_all(b"HTTP/1.1 200 OK\r\nContent-Length: 4096\r\nContent-Type: application/json\r\n\r\n{").unwrap();
+                stream.flush().unwrap();
+            }
+            std::thread::sleep(std::time::Duration::from_millis(400));
+        });
+        (url, handle)
+    }
+
+    #[test]
+    fn stalled_claim_headers_and_body_settle() {
+        let mut durations = Vec::new();
+        for body in [false, true] {
+            let (url, handle) = stalled_server(body);
+            let token = base64::engine::general_purpose::STANDARD.encode(url);
+            let started = std::time::Instant::now();
+            let result = tauri::async_runtime::block_on(claim_with_client(
+                &build_http_client(Duration::from_millis(100)).unwrap(),
+                &token,
+            ));
+            let elapsed = started.elapsed();
+            handle.join().unwrap();
+            assert!(result.is_err());
+            durations.push(elapsed);
+        }
+        assert!(
+            durations
+                .iter()
+                .all(|d| *d < std::time::Duration::from_millis(250)),
+            "stalled headers/bodies remained pending until server disconnect: {durations:?}"
+        );
+    }
+    #[test]
+    fn stalled_fetch_headers_and_body_settle() {
+        let mut durations = Vec::new();
+        for body in [false, true] {
+            let (url, handle) = stalled_server(body);
+            let started = std::time::Instant::now();
+            let result = tauri::async_runtime::block_on(fetch_with_client(
+                &build_http_client(Duration::from_millis(100)).unwrap(),
+                &url,
+            ));
+            let elapsed = started.elapsed();
+            handle.join().unwrap();
+            assert!(result.is_err());
+            durations.push(elapsed);
+        }
+        assert!(
+            durations
+                .iter()
+                .all(|d| *d < std::time::Duration::from_millis(250)),
+            "stalled headers/bodies remained pending until server disconnect: {durations:?}"
+        );
+    }
+
+    #[test]
+    #[ignore = "30-second production timeout smoke against localhost"]
+    fn production_claim_timeout_smoke() {
+        production_timeout_smoke(true);
+    }
+    #[test]
+    #[ignore = "30-second production timeout smoke against localhost"]
+    fn production_fetch_timeout_smoke() {
+        production_timeout_smoke(false);
+    }
+    fn production_timeout_smoke(claim: bool) {
+        use std::io::{Read, Write};
+        for body in [false, true] {
+            let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+            let url = format!("http://{}", listener.local_addr().unwrap());
+            let handle = std::thread::spawn(move || {
+                let (mut stream, _) = listener.accept().unwrap();
+                let mut request = [0; 4096];
+                let bytes_read = stream.read(&mut request).unwrap();
+                assert!(
+                    bytes_read > 0,
+                    "client disconnected before sending a request"
+                );
+                if body {
+                    stream.write_all(b"HTTP/1.1 200 OK\r\nContent-Length: 4096\r\nContent-Type: application/json\r\n\r\n{").unwrap();
+                    stream.flush().unwrap();
+                }
+                std::thread::sleep(Duration::from_secs(31));
+            });
+            let started = std::time::Instant::now();
+            let error = if claim {
+                let token = base64::engine::general_purpose::STANDARD.encode(url);
+                tauri::async_runtime::block_on(claim_setup_token(&token)).unwrap_err()
+            } else {
+                tauri::async_runtime::block_on(fetch_accounts_internal(&url)).unwrap_err()
+            };
+            let elapsed = started.elapsed();
+            assert!(elapsed >= Duration::from_secs(29) && elapsed < Duration::from_secs(31));
+            assert!(error.contains("timed out"), "{error}");
+            handle.join().unwrap();
+            println!(
+                "production {} {} settled in {elapsed:?}",
+                if claim { "claim" } else { "fetch" },
+                if body { "body" } else { "headers" }
+            );
+        }
     }
 }

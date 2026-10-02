@@ -31,8 +31,19 @@ export interface NewLinkedAccount {
 	simplefinId?: string;
 }
 
+export function isSimplefinConnected(account: Pick<LinkedAccount, 'source' | 'simplefinId'>): boolean {
+	return account.source === 'simplefin' && !!account.simplefinId;
+}
+async function validateMapping(account: Pick<LinkedAccount, 'source' | 'simplefinId' | 'isActive'>, id?: number): Promise<void> {
+	if (account.source === 'simplefin' && !account.simplefinId?.trim()) throw new Error('SimpleFIN account ID is required');
+	if (!isSimplefinConnected(account) || !account.isActive) return;
+	const duplicate = await db.linkedAccounts.filter((a) => a.id !== id && a.isActive && isSimplefinConnected(a) && a.simplefinId === account.simplefinId).first();
+	if (duplicate) throw new Error('SimpleFIN account is already connected');
+}
+
 export async function addLinkedAccount(input: NewLinkedAccount): Promise<number> {
 	return runMutation(['linkedAccounts', 'balanceSnapshots'], async () => {
+		await validateMapping({ source: input.source ?? 'manual', simplefinId: input.simplefinId, isActive: true });
 		const now = new Date();
 		const all = await db.linkedAccounts.toArray();
 		const sortOrder = all.reduce((max, a) => Math.max(max, a.sortOrder), -1) + 1;
@@ -64,6 +75,9 @@ export async function updateLinkedAccount(
 	updates: Partial<Omit<LinkedAccount, 'id' | 'createdAt'>>
 ): Promise<void> {
 	return runMutation(['linkedAccounts', 'balanceSnapshots'], async () => {
+		const current = await db.linkedAccounts.get(id);
+		if (!current) throw new Error('Account no longer exists');
+		await validateMapping({ ...current, ...updates }, id);
 		await db.linkedAccounts.update(id, { ...updates, updatedAt: new Date() });
 	});
 }

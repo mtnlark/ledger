@@ -8,6 +8,7 @@
 
 import { config } from '$lib/config';
 import type { Settings } from '$lib/db/constants';
+import { db } from '$lib/db';
 import { sendNotification } from './tauri-notifications';
 
 // localStorage keys for last-fired tracking
@@ -19,7 +20,16 @@ let intervalId: ReturnType<typeof setInterval> | null = null;
 
 // Current state captured from the most recent startScheduler call
 let currentSettings: Settings | null = null;
-let currentHasTodayTransactions = false;
+type EligibilityQuery = (day: Date) => Promise<boolean>;
+let currentEligibilityQuery: EligibilityQuery = hasVisibleTransactionsForDay;
+let generation = 0;
+let dailyCheck: object | null = null;
+export async function hasVisibleTransactionsForDay(day: Date): Promise<boolean> {
+	const start = new Date(day.getFullYear(), day.getMonth(), day.getDate());
+	const end = new Date(day.getFullYear(), day.getMonth(), day.getDate() + 1);
+	return (await db.transactions.where('date').between(start, end, true, false)
+		.filter((t) => !t.isDeleted && !t.isSplitParent).count()) > 0;
+}
 
 /**
  * Format a date as "YYYY-MM-DD".
@@ -51,7 +61,7 @@ function parseTime(time: string): { hours: number; minutes: number } {
 /**
  * Check and possibly fire the daily reminder.
  */
-function tickDaily(now: Date): void {
+async function tickDaily(now: Date): Promise<void> {
 	if (!currentSettings?.dailyReminderEnabled) return;
 
 	const today = toDateString(now);
@@ -63,12 +73,21 @@ function tickDaily(now: Date): void {
 		return;
 	}
 
-	// Mark as fired first (even if we skip sending — the day is "handled")
-	localStorage.setItem(DAILY_KEY, today);
+	if (dailyCheck) return;
+	const token = {};
+	dailyCheck = token;
+	const startedGeneration = generation;
+	try {
+		const hasTransactions = await currentEligibilityQuery(now);
+		if (startedGeneration !== generation || !currentSettings || toDateString(new Date()) !== today) return;
+		localStorage.setItem(DAILY_KEY, today);
+		if (!hasTransactions) await sendNotification('Ledger', "Don't forget to log today's expenses!");
+	} catch (error) {
+		console.error('Daily reminder eligibility check failed:', error);
+	} finally {
+		if (dailyCheck === token) dailyCheck = null;
+	}
 
-	if (currentHasTodayTransactions) return;
-
-	sendNotification('Ledger', "Don't forget to log today's expenses!");
 }
 
 /**
@@ -122,7 +141,7 @@ function tickMonthly(now: Date): void {
 function tick(): void {
 	if (!currentSettings) return;
 	const now = new Date();
-	tickDaily(now);
+	void tickDaily(now);
 	tickWeekly(now);
 	tickMonthly(now);
 }
@@ -133,10 +152,10 @@ function tick(): void {
  * Runs an immediate tick, then sets up a recurring interval.
  * Calling this again will stop the previous scheduler first.
  */
-export function startScheduler(settings: Settings, hasTodayTransactions: boolean): void {
+export function startScheduler(settings: Settings, query: EligibilityQuery = hasVisibleTransactionsForDay): void {
 	stopScheduler();
 	currentSettings = settings;
-	currentHasTodayTransactions = hasTodayTransactions;
+	currentEligibilityQuery = query;
 
 	// Immediate tick
 	tick();
@@ -149,6 +168,8 @@ export function startScheduler(settings: Settings, hasTodayTransactions: boolean
  * Stop the notification scheduler.
  */
 export function stopScheduler(): void {
+	generation++;
+	dailyCheck = null;
 	if (intervalId !== null) {
 		clearInterval(intervalId);
 		intervalId = null;
@@ -161,5 +182,5 @@ export function stopScheduler(): void {
  */
 export function _resetForTesting(): void {
 	stopScheduler();
-	currentHasTodayTransactions = false;
+	currentEligibilityQuery = hasVisibleTransactionsForDay;
 }

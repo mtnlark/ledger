@@ -56,3 +56,12 @@ describe('bank sync batches', () => {
 		expect(persistData).toHaveBeenCalledTimes(1);
 	});
 });
+
+it('timeout preserves balances and releases activeSync for a later attempt', async () => {
+	await account(1);
+	invoke.mockImplementation(async (command) => { if (command === 'simplefin_is_linked') return true; throw new Error('request timed out'); });
+	expect(await syncBalances()).toEqual({ synced: 0, failed: 1, skipped: false });
+	expect(await db.linkedAccounts.get(1)).toMatchObject({ currentBalance: 99, lastSyncStatus: 'error' });
+	invoke.mockImplementation(async (command) => command === 'simplefin_is_linked' ? true : { accounts: [raw('1')], errors: [] });
+	expect((await syncBalances()).synced).toBe(1);
+});

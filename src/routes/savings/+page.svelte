@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { groupContributionsByAccount } from '$lib/utils/contribution-grouping';
 	import { afterNavigate } from '$app/navigation';
 	import { getMonthKey, type SavingsAccount, type SavingsContribution } from '$lib/db';
 	import { initializeStorage } from '$lib/storage';
@@ -54,14 +55,7 @@
 	let savingsRate = $derived(monthlyIncome > 0 ? totalAffectingAvailable / monthlyIncome : 0);
 
 	// Group contributions by account
-	let contributionsByAccount = $derived.by(() => {
-		const map = new Map<number, SavingsContribution[]>();
-		for (const c of contributions) {
-			const existing = map.get(c.accountId) || [];
-			map.set(c.accountId, [...existing, c]);
-		}
-		return map;
-	});
+	let contributionsByAccount = $derived(groupContributionsByAccount(contributions));
 
 	// Load data
 	async function loadData() {

@@ -11,6 +11,7 @@ import {
 	DEFAULT_CATEGORIES,
 	type Category
 } from '$lib/db';
+import { assertStorageReadable, setInitializationFailed } from './status';
 import { validatePrimaryData, parseBackup, encodeBackup } from './backup';
 import { dehydrateAll, dehydrateChanged, hydrateAll } from './serialization';
 import type { PersistedTableName, StoredData, ReadDataResult, RecoveryResult } from './types';
@@ -144,17 +145,14 @@ async function ensureDirectories(): Promise<void> {
 async function readDataFile(): Promise<ReadDataResult> {
 	ensureInitialized();
 
-	if (!(await fs.exists(cachedDataPath))) {
-		return { status: 'not_found' };
-	}
-
 	let content: string;
 	try {
+		if (!(await fs.exists(cachedDataPath))) return { status: 'not_found' };
 		content = await fs.readTextFile(cachedDataPath);
 	} catch (error) {
 		const message = error instanceof Error ? error.message : String(error);
 		console.error('Failed to read data file:', error);
-		return { status: 'corrupted', error: `File read error: ${message}` };
+		return { status: 'io_error', error: `File I/O error: ${message}` };
 	}
 
 	let data: StoredData;
@@ -192,7 +190,7 @@ async function recoverFromBakFile(): Promise<RecoveryResult> {
 	}
 
 	try {
-		const content = await fs.readTextFile(bakPath);
+		const content = await fs.readTextFile(bakPath).catch((error) => { throw new Error(`Backup I/O error: ${error}`, { cause: error }); });
 		const data = (await parseBackup(content)).data;
 		if (data.checksum && !(await verifyChecksum(data))) {
 			console.warn('data.json.bak has invalid checksum');
@@ -201,6 +199,7 @@ async function recoverFromBakFile(): Promise<RecoveryResult> {
 		console.log('Successfully recovered from data.json.bak');
 		return { status: 'recovered', data, backupName: 'data.json.bak' };
 	} catch (error) {
+		if (error instanceof Error && error.message.startsWith('Backup I/O')) throw error;
 		console.warn('data.json.bak is invalid', error);
 		return { status: 'no_valid_backup', hadCandidates: true };
 	}
@@ -227,7 +226,7 @@ async function recoverFromBackups(): Promise<RecoveryResult> {
 	for (const backupName of backupFiles) {
 		try {
 			const backupPath = await path.join(cachedBackupsDir, backupName);
-			const content = await fs.readTextFile(backupPath);
+			const content = await fs.readTextFile(backupPath).catch((error) => { throw new Error(`Backup I/O error: ${error}`, { cause: error }); });
 			const data = (await parseBackup(content)).data;
 
 			// Verify checksum if present (but don't reject legacy backups without checksums)
@@ -242,6 +241,7 @@ async function recoverFromBackups(): Promise<RecoveryResult> {
 			console.log(`Successfully recovered from backup: ${backupName}`);
 			return { status: 'recovered', data, backupName };
 		} catch (error) {
+			if (error instanceof Error && error.message.startsWith('Backup I/O')) throw error;
 			console.warn(`Backup ${backupName} is invalid, trying next...`, error);
 			continue;
 		}
@@ -301,13 +301,9 @@ async function serializeData(
 	};
 }
 
-async function writeDataFile(
-	data: StoredData,
-	changedTables?: ReadonlySet<PersistedTableName>
-): Promise<SerializedTables> {
+async function writeDataFile(serialized: { content: string; tables: SerializedTables }): Promise<SerializedTables> {
 	ensureInitialized();
 
-	const serialized = await serializeData(data, changedTables);
 	const tempPath = cachedDataPath + TEMP_SUFFIX;
 	const backupPath = cachedDataPath + '.bak';
 
@@ -329,6 +325,23 @@ async function writeDataFile(
 
 	await fs.rename(tempPath, cachedDataPath);
 	return serialized.tables;
+}
+
+/** Retain an immutable original, including invalid content, outside recovery/pruning. */
+export async function preserveOriginalContent(content: string, reason: string): Promise<string> {
+	ensureInitialized();
+	const directory = await path.join(cachedAppDataDir, 'originals');
+	if (!(await fs.exists(directory))) await fs.mkdir(directory, { recursive: true });
+	const originalPath = await path.join(directory, `original-${crypto.randomUUID()}.json`);
+	if (await fs.exists(originalPath)) throw new Error('Original snapshot already exists; it cannot be overwritten');
+	const digest = await calculateContentChecksum(content);
+	const envelope = { version: 'ledger-original-1', capturedAt: new Date().toISOString(), reason, content, checksum: digest };
+	await fs.writeTextFile(originalPath, JSON.stringify(envelope));
+	const readback = JSON.parse(await fs.readTextFile(originalPath));
+	if (readback.content !== content || readback.checksum !== digest || await calculateContentChecksum(readback.content) !== digest) {
+		throw new Error('Original snapshot readback verification failed');
+	}
+	return originalPath;
 }
 
 /**
@@ -475,6 +488,10 @@ type InitializationResult =
  * - If recovery fails: initialize with defaults, warn user about data loss
  */
 export async function initializeTauriStorage(): Promise<InitializationResult> {
+	try { return await initializeFromFile(); }
+	catch (error) { setInitializationFailed(true); throw error; }
+}
+async function initializeFromFile(): Promise<InitializationResult> {
 	persistedSnapshot = null;
 	serializedTables = {};
 
@@ -482,16 +499,21 @@ export async function initializeTauriStorage(): Promise<InitializationResult> {
 	await initializeApis();
 	await ensureDirectories();
 
-	// Clear any stale IndexedDB data first - JSON file is our source of truth
-	try {
-		await db.delete();
-		await db.open();
-	} catch (error) {
-		console.error('Failed to reset IndexedDB:', error);
-		throw new Error(`Failed to initialize database: ${error}`, { cause: error });
+	let readResult = await readDataFile();
+	if (readResult.status === 'io_error') readResult = await readDataFile();
+	if (readResult.status === 'io_error') {
+		setInitializationFailed(true);
+		throw new Error(readResult.error);
 	}
-
-	const readResult = await readDataFile();
+	// Reads and candidate validation happen before any IndexedDB replacement.
+	const recoveryResult = readResult.status === 'success' ? null : await recoverFromAnySource();
+	if (readResult.status === 'corrupted' || readResult.status === 'checksum_mismatch') {
+		await preserveOriginalContent(await fs.readTextFile(cachedDataPath), 'startup corruption');
+	}
+	setInitializationFailed(false);
+	if (readResult.status !== 'success' && recoveryResult?.status !== 'recovered') {
+		await hydrateAll({ version: '1.0', exportedAt: new Date().toISOString(), transactions: [], categories: [], monthlyBudgets: [], categoryBudgets: [], settings: null });
+	}
 
 	// Handle successful read
 	if (readResult.status === 'success') {
@@ -504,17 +526,16 @@ export async function initializeTauriStorage(): Promise<InitializationResult> {
 	// also mean a crash landed between the rename-to-.bak and rename-from-tmp
 	// steps of an atomic write — so check recovery sources before starting fresh.
 	if (readResult.status === 'not_found') {
-		const recoveryResult = await recoverFromAnySource();
 
-		if (recoveryResult.status === 'recovered') {
-			console.warn(`data.json missing; recovered from ${recoveryResult.backupName}`);
-			await loadDataIntoDexie(recoveryResult.data);
+		if (recoveryResult!.status === 'recovered') {
+			console.warn(`data.json missing; recovered from ${recoveryResult!.backupName}`);
+			await loadDataIntoDexie(recoveryResult!.data);
 			await saveToFile();
 			await runMigrationsIfNeeded(true);
-			return { status: 'recovered', backupName: recoveryResult.backupName };
+			return { status: 'recovered', backupName: recoveryResult!.backupName };
 		}
 
-		if (recoveryResult.hadCandidates) {
+		if (recoveryResult!.hadCandidates) {
 			// Backups exist but none were readable: data existed and was lost
 			console.error('data.json missing and no backup was readable. DATA HAS BEEN LOST.');
 			await initializeDefaults();
@@ -536,15 +557,14 @@ export async function initializeTauriStorage(): Promise<InitializationResult> {
 		console.error(`Corruption details: ${readResult.error}`);
 	}
 
-	const recoveryResult = await recoverFromAnySource();
 
-	if (recoveryResult.status === 'recovered') {
-		console.log(`Recovered from backup: ${recoveryResult.backupName}`);
-		await loadDataIntoDexie(recoveryResult.data);
+	if (recoveryResult!.status === 'recovered') {
+		console.log(`Recovered from backup: ${recoveryResult!.backupName}`);
+		await loadDataIntoDexie(recoveryResult!.data);
 		// Save recovered data as new main file
 		await saveToFile();
 		await runMigrationsIfNeeded(true);
-		return { status: 'recovered', backupName: recoveryResult.backupName };
+		return { status: 'recovered', backupName: recoveryResult!.backupName };
 	}
 
 	// No valid backup - must initialize fresh (data loss)
@@ -657,6 +677,7 @@ export function saveToFile(
 	tables?: PersistedTableName | readonly PersistedTableName[]
 ): Promise<void> {
 	ensureInitialized();
+	try { assertStorageReadable(); } catch (error) { return Promise.reject(error); }
 	addPendingScope(tables);
 
 	if (saveQueued) {
@@ -682,20 +703,17 @@ export function saveToFile(
  * only ever invoked through the saveToFile queue).
  */
 async function performSave(changedTables?: ReadonlySet<PersistedTableName>): Promise<void> {
-	// Create backup before saving (debounced)
-	try {
-		await createBackup();
-	} catch (error) {
-		// Log backup failure but continue with save
-		console.error('Backup creation failed:', error);
-	}
-
 	const data = persistedSnapshot && changedTables
 		? await dehydrateChanged(persistedSnapshot, changedTables)
 		: await dehydrateAll();
+	// Validate before JSON converts invalid dates/amounts to null and before any rotation.
+	validatePrimaryData(data);
+	const serialized = await serializeData(data, changedTables);
+	try { await createBackup(); }
+	catch (error) { console.error('Backup creation failed:', error); }
 
 	try {
-		const nextSerializedTables = await writeDataFile(data, changedTables);
+		const nextSerializedTables = await writeDataFile(serialized);
 		persistedSnapshot = data;
 		serializedTables = nextSerializedTables;
 	} catch (error) {

@@ -8,7 +8,7 @@ import { saveStatus, resetStorageState } from '$lib/storage';
 import { dehydrateAll } from '$lib/storage/serialization';
 import { addSplitTransaction } from '$lib/stores/transactions';
 const retry = vi.hoisted(() => vi.fn());
-vi.mock('$lib/storage', async (importOriginal) => ({ ...await importOriginal<typeof import('$lib/storage')>(), retryPersistence: retry }));
+vi.mock('$lib/storage', async (importOriginal) => ({ ...await importOriginal<typeof import('$lib/storage')>(), retryPersistence: retry, preserveOriginalSnapshot: vi.fn().mockResolvedValue('/original.json') }));
 vi.mock('$lib/utils/import', async (importOriginal) => ({ ...await importOriginal<typeof import('$lib/utils/import')>(), readExcelFile: async () => [
 	['Date', 'Merchant', 'Amount', 'Category'], ['2026-06-01', 'Test import', '$12.30', 'Unknown'], ['2026-06-02', 'Invalid', 'bad', 'Food'], []
 ] }));

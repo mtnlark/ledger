@@ -1,0 +1,62 @@
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { cleanup, fireEvent, render, screen } from '@testing-library/svelte';
+import HistoricalDataReview from '../settings/HistoricalDataReview.svelte';
+import AddContributionModal from '../AddContributionModal.svelte';
+import EditContributionModal from '../EditContributionModal.svelte';
+import CategoryEditModal from '../CategoryEditModal.svelte';
+import { db, DEFAULT_SETTINGS } from '$lib/db';
+import { resetStorageState } from '$lib/storage';
+vi.mock('svelte/transition', async (original) => ({ ...await original<typeof import('svelte/transition')>(), scale: () => ({ duration: 0 }) }));
+vi.mock('$lib/storage', async (original) => ({ ...await original<typeof import('$lib/storage')>(), preserveOriginalSnapshot: vi.fn().mockResolvedValue('/original.json') }));
+beforeEach(async () => { resetStorageState(); await db.delete(); await db.open(); await db.settings.put(DEFAULT_SETTINGS); });
+afterEach(cleanup);
+it('requires placeholder approval and shows proposed changes before applying', async () => {
+	await db.categoryBudgets.put({ id: 1, categoryId: 99, month: '2026-09', budgetAmount: 20, createdAt: new Date(), updatedAt: new Date() });
+	render(HistoricalDataReview);
+	await fireEvent.click(screen.getByRole('button', { name: 'Review ledger integrity' }));
+	await fireEvent.input(await screen.findByLabelText('Placeholder name for category 99'), { target: { value: 'Historical category' } });
+	await fireEvent.click(screen.getByRole('button', { name: 'Preview supplied corrections' }));
+	expect(await screen.findByRole('status')).toHaveTextContent('Select or supply');
+	expect(await db.categories.count()).toBe(0);
+	await fireEvent.click(screen.getByRole('checkbox', { name: 'Approve inactive placeholder at the original category ID' }));
+	await fireEvent.click(screen.getByRole('button', { name: 'Preview supplied corrections' }));
+	await screen.findByText('Correction preview: Current ledger');
+	expect(await db.categories.count()).toBe(0);
+	await fireEvent.click(screen.getByRole('button', { name: 'Preserve original and apply approved corrections' }));
+	await screen.findByText('Reviewed corrections saved');
+	expect(await db.categories.get(99)).toMatchObject({ name: 'Historical category', isActive: false });
+});
+it('requires a supplied confirmed balance and accepts numeric form binding', async () => {
+	await db.savingsAccounts.put({ id: 1, name: 'Fund', accountType: 'savings', currentBalance: 100, sortOrder: 1, createdAt: new Date(), updatedAt: new Date() });
+	render(HistoricalDataReview);
+	await fireEvent.click(screen.getByRole('button', { name: 'Review ledger integrity' }));
+	await fireEvent.click(await screen.findByText(/Fund · balance/));
+	await fireEvent.input(screen.getByLabelText('Confirmed replacement balance for Fund'), { target: { value: '125.25' } });
+	await fireEvent.click(screen.getByRole('checkbox', { name: 'Approve replacement balance for Fund' }));
+	await fireEvent.click(screen.getByRole('button', { name: 'Preview supplied corrections' }));
+	await screen.findByText('Correction preview: Current ledger');
+	await fireEvent.click(screen.getByRole('button', { name: 'Preserve original and apply approved corrections' }));
+	await screen.findByText('Reviewed corrections saved'); expect((await db.savingsAccounts.get(1))?.currentBalance).toBe(125.25);
+});
+it.each(['add', 'edit'])('blocks a blank contribution date in the %s form', async (kind) => {
+	const account = { id: 1, name: 'Fund', accountType: 'savings' as const, currentBalance: 100, sortOrder: 1, createdAt: new Date(), updatedAt: new Date() };
+	await db.savingsAccounts.put(account);
+	const contribution = { id: 1, accountId: 1, amount: 10, date: new Date(), source: 'other' as const, createdAt: new Date(), updatedAt: new Date() };
+	const onSave = vi.fn();
+	if (kind === 'add') render(AddContributionModal, { isOpen: true, accounts: [account], currentMonth: '2026-10', preselectedAccountId: 1, onSave, onClose: vi.fn() });
+	else { await db.savingsContributions.put(contribution); render(EditContributionModal, { isOpen: true, contribution, accounts: [account], onSave, onDelete: vi.fn(), onClose: vi.fn() }); }
+	await fireEvent.input(await screen.findByLabelText('Amount'), { target: { value: '25' } });
+	await fireEvent.input(screen.getByLabelText('Date'), { target: { value: '' } });
+	await fireEvent.submit(document.querySelector('form')!);
+	expect(onSave).not.toHaveBeenCalled(); expect(await screen.findByRole('alert')).toHaveTextContent('Date is required');
+	expect((await db.savingsAccounts.get(1))?.currentBalance).toBe(100);
+});
+it('offers deactivation for a category used only by a historical budget', async () => {
+	const category = { id: 1, name: 'Food', icon: '🍎', color: '#123456', isActive: true, isEssential: false, sortOrder: 1 };
+	await db.categories.put(category); await db.categoryBudgets.put({ id: 1, categoryId: 1, month: '2020-01', budgetAmount: 10, createdAt: new Date(), updatedAt: new Date() });
+	const onSave = vi.fn(); render(CategoryEditModal, { category, onSave, onClose: vi.fn() });
+	await fireEvent.click(await screen.findByRole('button', { name: 'Deactivate category' }));
+	await fireEvent.click(screen.getByRole('button', { name: 'Yes, deactivate' }));
+	await vi.waitFor(() => expect(onSave).toHaveBeenCalled());
+	expect(await db.categories.get(1)).toMatchObject({ isActive: false }); expect(await db.categoryBudgets.count()).toBe(1);
+});

@@ -1,4 +1,5 @@
-import type { StoredData, PersistedTableName } from './types';
+// Frozen pre-fix validator for benchmark equivalence only.
+import type { StoredData, PersistedTableName } from '$lib/storage/types';
 
 export const TABLE_NAMES: PersistedTableName[] = ['transactions', 'categories', 'monthlyBudgets', 'categoryBudgets', 'settings', 'savingsAccounts', 'savingsContributions', 'linkedAccounts', 'balanceSnapshots'];
 export interface BackupPreview {
@@ -10,7 +11,7 @@ export interface BackupPreview {
 type Row = Record<string, unknown>;
 function object(value: unknown): value is Row { return !!value && typeof value === 'object' && !Array.isArray(value); }
 function fail(message: string): never { throw new Error(`Invalid backup: ${message}`); }
-export function isStoredDateValid(value: unknown): boolean {
+function date(value: unknown): boolean {
 	if (value instanceof Date) return Number.isFinite(value.getTime());
 	if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}(T.*)?$/.test(value)) return false;
 	const d = new Date(value);
@@ -26,13 +27,13 @@ const required: Record<string, string[]> = {
 	balanceSnapshots: ['accountId', 'balance', 'source', 'capturedAt'], settings: ['partnerName', 'defaultSplitType', 'defaultSplitValue', 'currency', 'theme']
 };
 const numeric = new Set(['amount', 'partnerShare', 'splitValue', 'income', 'savedAmount', 'budgetAmount', 'currentBalance', 'targetAmount', 'balance', 'sortOrder', 'defaultSplitValue', 'migrationVersion']);
-export const DATE_FIELDS = new Set(['date', 'createdAt', 'updatedAt', 'settledDate', 'deletedAt', 'targetDate', 'lastSyncedAt', 'upstreamBalanceAt', 'capturedAt', 'cancelledDate', 'completedDate']);
+const dates = new Set(['date', 'createdAt', 'updatedAt', 'settledDate', 'deletedAt', 'targetDate', 'lastSyncedAt', 'upstreamBalanceAt', 'capturedAt', 'cancelledDate', 'completedDate']);
 const enums: Record<string, string[]> = {
 	splitType: ['percentage', 'fixed'], defaultSplitType: ['percentage', 'fixed'], theme: ['light', 'dark', 'system'],
 	accountClass: ['asset', 'liability'], lastSyncStatus: ['ok', 'stale', 'error', 'never'],
 	subscriptionFrequency: ['monthly', 'semi-annual', 'annual']
 };
-function validateSettingsLists(settings: Row, allowDateDefects = false): void {
+function validateSettingsLists(settings: Row): void {
 	for (const name of ['dismissedRecurring', 'confirmedActiveSubscriptions']) {
 		const value = settings[name];
 		if (value !== undefined && (!Array.isArray(value) || value.some((item) => typeof item !== 'string'))) fail(`settings.${name} must be a text array`);
@@ -42,22 +43,22 @@ function validateSettingsLists(settings: Row, allowDateDefects = false): void {
 		if (value === undefined) continue;
 		if (!Array.isArray(value)) fail(`settings.${name} must be an array`);
 		for (const item of value) {
-			if (!object(item) || fields.some((field) => (item[field] === undefined || item[field] === null) && !(allowDateDefects && DATE_FIELDS.has(field)))) fail(`settings.${name} contains an invalid record`);
-			validateFields(item, `settings.${name}`, allowDateDefects);
+			if (!object(item) || fields.some((field) => item[field] === undefined || item[field] === null)) fail(`settings.${name} contains an invalid record`);
+			validateFields(item, `settings.${name}`);
 		}
 	}
 	if (settings.dailyReminderTime !== undefined && (typeof settings.dailyReminderTime !== 'string' || !/^([01]\d|2[0-3]):[0-5]\d$/.test(settings.dailyReminderTime))) fail('invalid reminder time');
 }
-function validateFields(row: Row, label: string, allowDateDefects = false): void {
+function validateFields(row: Row, label: string): void {
 	for (const [key, value] of Object.entries(row)) {
 		if (value === undefined) continue;
 		if (numeric.has(key) && (typeof value !== 'number' || !Number.isFinite(value))) fail(`${label}.${key} must be finite`);
-		if (!allowDateDefects && DATE_FIELDS.has(key) && !isStoredDateValid(value)) fail(`${label}.${key} is not a valid date`);
+		if (dates.has(key) && !date(value)) fail(`${label}.${key} is not a valid date`);
 		if (enums[key] && !enums[key].includes(value as string)) fail(`${label}.${key} is unsupported`);
 		if ((key.startsWith('is') || key.endsWith('Enabled') || key === 'rollsOver') && typeof value !== 'boolean') fail(`${label}.${key} must be boolean`);
 		if (['name', 'accountName', 'merchant', 'institution', 'partnerName', 'currency', 'notes', 'simplefinId', 'icon', 'color'].includes(key) && typeof value !== 'string') fail(`${label}.${key} must be text`);
 		if (key === 'month' && (typeof value !== 'string' || !/^\d{4}-(0[1-9]|1[0-2])$/.test(value))) fail(`${label}.month is invalid`);
-		if (Array.isArray(value)) for (const item of value) if (object(item)) validateFields(item, `${label}.${key}`, allowDateDefects);
+		if (Array.isArray(value)) for (const item of value) if (object(item)) validateFields(item, `${label}.${key}`);
 	}
 }
 /** Pure structure validation shared by manual restore and startup recovery. */
@@ -66,9 +67,7 @@ export function validateBackup(input: unknown): BackupPreview { return validateD
  * Preserve those records, but never admit them as automatic recovery or restore candidates.
  */
 export function validatePrimaryData(input: unknown): BackupPreview { return validateData(input, true); }
-/** Only dates and missing references may be deferred for an explicit repair review. */
-export function validateReviewableData(input: unknown): BackupPreview { return validateData(input, true, true); }
-function validateData(input: unknown, preserveMissingReferences: boolean, allowDateDefects = false): BackupPreview {
+function validateData(input: unknown, preserveMissingReferences: boolean): BackupPreview {
 	const referenceWarnings: string[] = [];
 	if (!object(input) || input.version !== '1.0') fail('unsupported or missing version');
 	const legacy = Object.hasOwn(input, 'data');
@@ -78,7 +77,7 @@ function validateData(input: unknown, preserveMissingReferences: boolean, allowD
 	if (legacy && Object.hasOwn(raw, 'budgets')) raw.monthlyBudgets = raw.budgets;
 	for (const key of ['transactions', 'categories', 'monthlyBudgets']) if (!Array.isArray(raw[key])) fail(`missing ${key} array`);
 	const exportedAt = legacy ? input.exportDate : input.exportedAt;
-	if (!isStoredDateValid(exportedAt)) fail('invalid export date');
+	if (!date(exportedAt)) fail('invalid export date');
 	const missingTables = TABLE_NAMES.filter((key) => !Object.hasOwn(raw, key));
 	const normalized: Row = { version: '1.0', exportedAt };
 	const counts: Record<string, number> = {};
@@ -95,9 +94,9 @@ function validateData(input: unknown, preserveMissingReferences: boolean, allowD
 			if (typeof id !== 'number' || !Number.isSafeInteger(id) || id <= 0 || seen.has(id)) fail(`${table} contains an invalid or duplicate ID`);
 			if (table === 'settings' && id !== 1) fail('settings ID must be 1');
 			seen.add(id);
-			for (const field of required[table]) if ((entry[field] === undefined || entry[field] === null) && !(allowDateDefects && DATE_FIELDS.has(field))) fail(`${table} ${id} missing ${field}`);
-			validateFields(entry, `${table} ${id}`, allowDateDefects);
-			if (table === 'settings') validateSettingsLists(entry, allowDateDefects);
+			for (const field of required[table]) if (entry[field] === undefined || entry[field] === null) fail(`${table} ${id} missing ${field}`);
+			validateFields(entry, `${table} ${id}`);
+			if (table === 'settings') validateSettingsLists(entry);
 			if (table === 'savingsAccounts' && !['savings', 'retirement', 'investment'].includes(entry.accountType as string)) fail('invalid savings account type');
 			if (table === 'linkedAccounts' && !['checking', 'savings', 'credit', 'investment', 'retirement', 'loan', 'other'].includes(entry.accountType as string)) fail('invalid linked account type');
 			if (table === 'savingsContributions' && !['payroll_deduction', 'bank_transfer', 'interest', 'employer_match', 'other'].includes(entry.source as string)) fail('invalid contribution source');
@@ -107,7 +106,6 @@ function validateData(input: unknown, preserveMissingReferences: boolean, allowD
 		counts[table] = rows.length;
 		normalized[table] = value;
 	}
-	const transactionsById = new Map((normalized.transactions as Row[]).map((row) => [row.id, row]));
 	for (const table of TABLE_NAMES.filter((name) => name !== 'settings')) {
 		for (const row of normalized[table] as Row[]) {
 			for (const [key, target] of [['categoryId', 'categories'], ['parentTransactionId', 'transactions'], ['accountId', table === 'savingsContributions' ? 'savingsAccounts' : 'linkedAccounts']]) {
@@ -120,7 +118,7 @@ function validateData(input: unknown, preserveMissingReferences: boolean, allowD
 				}
 			}
 			if (row.parentTransactionId !== undefined) {
-				const parent = transactionsById.get(row.parentTransactionId);
+				const parent = (normalized.transactions as Row[]).find((t) => t.id === row.parentTransactionId);
 				if (!parent && preserveMissingReferences) continue;
 				if (parent?.id === row.id || !parent?.isSplitParent || parent.parentTransactionId !== undefined) fail('invalid split parent reference');
 			}
@@ -128,17 +126,12 @@ function validateData(input: unknown, preserveMissingReferences: boolean, allowD
 	}
 	return { data: normalized as unknown as StoredData, counts, missingTables, warnings: [...referenceWarnings, ...(preserveMissingReferences ? [] : missingTables.map((name) => `Legacy backup omits ${name}; this table will be emptied.`))] };
 }
-export async function checksumText(text: string): Promise<string> {
-	const hash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
-	return Array.from(new Uint8Array(hash), (b) => b.toString(16).padStart(2, '0')).join('');
-}
 export async function checksum(data: unknown): Promise<string> {
 	const { checksum: _checksum, ...rest } = data as Row;
-	return checksumText(JSON.stringify(rest));
+	const hash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(JSON.stringify(rest)));
+	return Array.from(new Uint8Array(hash), (b) => b.toString(16).padStart(2, '0')).join('');
 }
-
 export async function encodeBackup(data: StoredData): Promise<string> {
-	validatePrimaryData(data);
 	return JSON.stringify({ ...data, checksum: await checksum(data) }, null, 2);
 }
 export async function parseBackup(text: string): Promise<BackupPreview> {
@@ -146,5 +139,3 @@ export async function parseBackup(text: string): Promise<BackupPreview> {
 	if (object(input) && input.checksum !== undefined && input.checksum !== await checksum(input)) fail('checksum mismatch');
 	return validateBackup(input);
 }
-
-export { required as REQUIRED_FIELDS };

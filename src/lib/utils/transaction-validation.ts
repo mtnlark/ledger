@@ -1,3 +1,4 @@
+import { parseLocalDate, formatDateForInput } from './date-helpers';
 /**
  * Result of a validation check
  */
@@ -39,11 +40,20 @@ export function validateAmount(amount: number): ValidationResult {
 	return { isValid: true };
 }
 
+export function validateDate(value: unknown): ValidationResult {
+	if (value instanceof Date && Number.isFinite(value.getTime())) return { isValid: true };
+	if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+		const parsed = parseLocalDate(value);
+		if (Number.isFinite(parsed.getTime()) && formatDateForInput(parsed) === value) return { isValid: true };
+	}
+	return { isValid: false, error: value ? 'Invalid date' : 'Date is required' };
+}
+
 /**
  * Validate merchant name
  */
 export function validateMerchant(merchant: string): ValidationResult {
-	if (!merchant.trim()) {
+	if (typeof merchant !== 'string' || !merchant.trim()) {
 		return { isValid: false, error: 'Merchant is required' };
 	}
 	return { isValid: true };
@@ -172,12 +182,16 @@ export function validateTransactionForm(data: {
 	merchant: string;
 	amount: number;
 	categoryId: number;
+	date?: string | Date;
 	isSplitMode: boolean;
 	splits?: SplitLine[];
 	isFutureDate?: boolean;
 	futureDateConfirmed?: boolean;
 }): { isValid: boolean; errors: Record<string, string> } {
 	const errors: Record<string, string> = {};
+
+	const dateResult = validateDate(data.date);
+	if (!dateResult.isValid) errors.date = dateResult.error!;
 
 	// Merchant validation
 	const merchantResult = validateMerchant(data.merchant);

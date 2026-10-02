@@ -1,0 +1,5 @@
+Run `python3 tools/native-smoke/prepare.py` to copy the current working files into a disposable workspace under `/private/tmp`. It writes `/private/tmp/ledger-native-smoke-manifest.json` with the workspace, configuration, separate app identifier, and fixture directory. Dependencies and Rust build cache are shared; the user's Ledger data is not read or modified.
+
+From that workspace, build with `CARGO_NET_OFFLINE=true npm run tauri -- build --debug --no-bundle --config smoke-config.json`. Launch the manifest's binary three times, quitting between phases. The injected smoke route runs automatically and writes `smoke-result.json` under the separate app data directory. The third phase must report `ok: true`, `stage: 3`, and `complete: true`.
+
+Phases verify native durable saves, invalid date rejection, contribution transfers, saved-record relaunch, selected damaged-file correction, both original snapshot readbacks, repaired-file restart, and strict backup restore. Fixtures and verified originals remain available for inspection. This harness adds no route to the production source tree.

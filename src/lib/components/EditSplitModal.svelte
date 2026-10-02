@@ -2,6 +2,7 @@
 	import { format } from 'date-fns';
 	import { Plus, Trash2 } from 'lucide-svelte';
 	import { db, type Category, type Settings, type Transaction } from '$lib/db';
+	import { validateDate } from '$lib/utils/transaction-validation';
 	import { parseLocalDate } from '$lib/utils/date-helpers';
 	import { formatCurrency } from '$lib/utils/format-helpers';
 	import { sumCurrency } from '$lib/utils/currency';
@@ -82,7 +83,7 @@
 	let total = $derived(sumCurrency(lines.map((l) => l.amount || 0)));
 
 	let isValid = $derived(
-		merchant.trim().length > 0 &&
+		validateDate(dateStr).isValid && merchant.trim().length > 0 &&
 			lines.length >= 2 &&
 			lines.every((l) => l.categoryId > 0 && Number.isFinite(l.amount) && l.amount > 0)
 	);
@@ -143,6 +144,7 @@
 					<label for="edit-split-date" class="block text-sm font-medium text-charcoal-soft mb-1.5">Date</label>
 					<input
 						type="date"
+						required
 						id="edit-split-date"
 						bind:value={dateStr}
 						class="w-full px-3 py-2.5 bg-surface-alt border border-theme rounded-lg focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-colors"

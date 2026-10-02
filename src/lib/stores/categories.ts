@@ -104,11 +104,13 @@ export async function moveCategoryDown(id: number): Promise<void> {
 }
 
 export async function deleteCategory(id: number): Promise<void> {
-	return runMutation(['categories'], async () => {
+	return runMutation(['categories', 'transactions', 'categoryBudgets'], async () => {
+		if (await getCategoryUsageCount(id)) throw new Error('Category is referenced. Deactivate it to preserve history.');
 		await db.categories.delete(id);
 	});
 }
 
 export async function getCategoryUsageCount(id: number): Promise<number> {
-	return db.transactions.where('categoryId').equals(id).count();
+	const [transactions, budgets] = await Promise.all([db.transactions.where('categoryId').equals(id).count(), db.categoryBudgets.where('categoryId').equals(id).count()]);
+	return transactions + budgets;
 }

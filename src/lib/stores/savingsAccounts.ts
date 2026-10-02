@@ -1,5 +1,6 @@
 import { db, type SavingsAccount, type CompletedGoal } from '$lib/db';
 import { liveQuery } from 'dexie';
+import { sumCurrency } from '$lib/utils/currency';
 import { runMutation } from '$lib/storage/mutation';
 import { getSettings, updateSettings } from './settings';
 
@@ -51,6 +52,7 @@ export async function updateSavingsAccount(
 
 export async function deleteSavingsAccount(id: number): Promise<void> {
 	return runMutation(['savingsAccounts', 'settings', 'savingsContributions'], async () => {
+		await db.savingsContributions.where('accountId').equals(id).delete();
 		await db.savingsAccounts.delete(id);
 	});
 }
@@ -109,7 +111,8 @@ export async function updateAccountBalance(id: number, delta: number): Promise<v
 	const account = await db.savingsAccounts.get(id);
 	if (!account || account.accountType !== 'savings') return;
 
-	const newBalance = (account.currentBalance ?? 0) + delta;
+	const newBalance = sumCurrency([account.currentBalance ?? 0, delta]);
+	if (!Number.isFinite(newBalance)) throw new Error('Invalid savings balance');
 	await db.savingsAccounts.update(id, {
 		currentBalance: newBalance,
 		updatedAt: new Date()

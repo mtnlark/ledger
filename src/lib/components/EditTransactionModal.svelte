@@ -77,6 +77,7 @@
 	function handleBlur(field: string) {
 		touched = new Set([...touched, field]);
 		const result = validateTransactionForm({
+			date: dateStr,
 			merchant,
 			amount,
 			categoryId,
@@ -93,8 +94,9 @@
 	}
 
 	function validateAllFields(): boolean {
-		touched = new Set(['merchant', 'amount', 'category']);
+		touched = new Set(['merchant', 'amount', 'category', 'date']);
 		const result = validateTransactionForm({
+			date: dateStr,
 			merchant,
 			amount,
 			categoryId,
@@ -204,11 +206,13 @@
 							<label for="edit-date" class="block text-sm font-medium text-charcoal-soft mb-1.5">Date</label>
 							<input
 								type="date"
+								required
 								id="edit-date"
 								bind:value={dateStr}
 								class="w-full px-3 py-2.5 bg-surface-alt border rounded-lg focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-colors {isFutureDate && !futureDateConfirmed ? 'border-warning-500' : 'border-theme'}"
 							/>
-							{#if isFutureDate && !futureDateConfirmed}
+							{#if errors.date}<p role="alert">{errors.date}</p>{/if}
+						{#if isFutureDate && !futureDateConfirmed}
 								<div class="mt-2 p-2 bg-warning-50 border border-warning-200 rounded-lg">
 									<p class="text-xs text-warning-700 mb-2">This date is in the future. Are you sure?</p>
 									<button

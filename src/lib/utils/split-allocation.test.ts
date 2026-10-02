@@ -1,10 +1,11 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+vi.mock('$lib/storage', async (original) => ({ ...await original<typeof import('$lib/storage')>(), preserveOriginalSnapshot: vi.fn().mockResolvedValue('/original.json') }));
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { allocatePartnerShares } from './split-allocation';
 import { db } from '$lib/db';
 import { addSplitTransaction, getSplitChildren, updateSplitGroup } from '$lib/stores/transactions';
 import { applySplitRepairs, previewSplitRepairs } from '$lib/storage/split-repair';
 const purchase = { merchant: 'Store', date: new Date('2026-06-01'), amount: 100, categoryId: 1, isShared: true, splitType: 'fixed' as const, splitValue: 30, isSettled: false, isEssential: false, isSubscription: false };
-beforeEach(async () => { await db.delete(); await db.open(); });
+beforeEach(async () => { await db.delete(); await db.open(); await db.categories.bulkPut([1, 2].map((id) => ({ id, name: `Category ${id}`, isActive: true, isEssential: false, sortOrder: id }))); });
 describe('purchase allocations', () => {
 	it('allocates fixed shares proportionally', () => { expect(allocatePartnerShares([60, 40], true, 'fixed', 30)).toEqual([18, 12]); });
 	it('allocates purchase-rounded percentage shares and resolves ties by line order', () => {

@@ -42,12 +42,13 @@ describe('Notification Scheduler', () => {
 		// Disable monthly/weekly to isolate daily tests
 		const dailyOnly = { weeklyReviewEnabled: false, monthlyBudgetSetupEnabled: false };
 
-		it('fires at configured time when no transactions today', () => {
+		it('fires at configured time when no transactions today', async () => {
 			// Tuesday Feb 4, 2026 at 20:00
 			vi.setSystemTime(new Date(2026, 1, 4, 20, 0));
 			const settings = makeSettings({ dailyReminderTime: '20:00', ...dailyOnly });
 
-			startScheduler(settings, false);
+			startScheduler(settings, async () => false);
+			await Promise.resolve();
 
 			expect(mockSend).toHaveBeenCalledTimes(1);
 			expect(mockSend).toHaveBeenCalledWith(
@@ -56,40 +57,43 @@ describe('Notification Scheduler', () => {
 			);
 		});
 
-		it('does not fire before configured time', () => {
+		it('does not fire before configured time', async () => {
 			// Tuesday Feb 4, 2026 at 19:59
 			vi.setSystemTime(new Date(2026, 1, 4, 19, 59));
 			const settings = makeSettings({ dailyReminderTime: '20:00', ...dailyOnly });
 
-			startScheduler(settings, false);
+			startScheduler(settings, async () => false);
+			await Promise.resolve();
 
 			expect(mockSend).not.toHaveBeenCalled();
 		});
 
-		it('does not fire if transactions exist today', () => {
+		it('does not fire if transactions exist today', async () => {
 			vi.setSystemTime(new Date(2026, 1, 4, 20, 0));
 			const settings = makeSettings({ dailyReminderTime: '20:00', ...dailyOnly });
 
-			startScheduler(settings, true); // has transactions
+			startScheduler(settings, async () => true);
+			await Promise.resolve(); // has transactions
 
 			expect(mockSend).not.toHaveBeenCalled();
 			// Should still mark as fired (skip notification but record the day)
 			expect(localStorage.getItem(DAILY_KEY)).toBe('2026-02-04');
 		});
 
-		it('does not double-fire on subsequent ticks', () => {
+		it('does not double-fire on subsequent ticks', async () => {
 			vi.setSystemTime(new Date(2026, 1, 4, 20, 0));
 			const settings = makeSettings({ dailyReminderTime: '20:00', ...dailyOnly });
 
-			startScheduler(settings, false);
+			startScheduler(settings, async () => false);
+			await Promise.resolve();
 			expect(mockSend).toHaveBeenCalledTimes(1);
 
 			// Advance 60s (next tick)
-			vi.advanceTimersByTime(60_000);
+			await vi.advanceTimersByTimeAsync(60_000);
 			expect(mockSend).toHaveBeenCalledTimes(1);
 		});
 
-		it('does not fire when dailyReminderEnabled is false', () => {
+		it('does not fire when dailyReminderEnabled is false', async () => {
 			vi.setSystemTime(new Date(2026, 1, 4, 20, 0));
 			const settings = makeSettings({
 				dailyReminderTime: '20:00',
@@ -97,21 +101,23 @@ describe('Notification Scheduler', () => {
 				...dailyOnly
 			});
 
-			startScheduler(settings, false);
+			startScheduler(settings, async () => false);
+			await Promise.resolve();
 			expect(mockSend).not.toHaveBeenCalled();
 		});
 
-		it('fires again the next day', () => {
+		it('fires again the next day', async () => {
 			// Day 1
 			vi.setSystemTime(new Date(2026, 1, 4, 20, 0));
 			const settings = makeSettings({ dailyReminderTime: '20:00', ...dailyOnly });
 
-			startScheduler(settings, false);
+			startScheduler(settings, async () => false);
+			await Promise.resolve();
 			expect(mockSend).toHaveBeenCalledTimes(1);
 
 			// Day 2 — update system time and tick
 			vi.setSystemTime(new Date(2026, 1, 5, 20, 0));
-			vi.advanceTimersByTime(60_000);
+			await vi.advanceTimersByTimeAsync(60_000);
 			expect(mockSend).toHaveBeenCalledTimes(2);
 		});
 	});
@@ -122,12 +128,13 @@ describe('Notification Scheduler', () => {
 		// Disable daily/monthly to isolate weekly tests
 		const weeklyOnly = { dailyReminderEnabled: false, monthlyBudgetSetupEnabled: false };
 
-		it('fires on Monday at 9am', () => {
+		it('fires on Monday at 9am', async () => {
 			// Monday Feb 2, 2026 at 09:00
 			vi.setSystemTime(new Date(2026, 1, 2, 9, 0));
 			const settings = makeSettings(weeklyOnly);
 
-			startScheduler(settings, false);
+			startScheduler(settings, async () => false);
+			await Promise.resolve();
 
 			expect(mockSend).toHaveBeenCalledTimes(1);
 			expect(mockSend).toHaveBeenCalledWith(
@@ -136,45 +143,49 @@ describe('Notification Scheduler', () => {
 			);
 		});
 
-		it('does not fire on Tuesday', () => {
+		it('does not fire on Tuesday', async () => {
 			// Tuesday Feb 3, 2026 at 09:00
 			vi.setSystemTime(new Date(2026, 1, 3, 9, 0));
 			const settings = makeSettings(weeklyOnly);
 
-			startScheduler(settings, false);
+			startScheduler(settings, async () => false);
+			await Promise.resolve();
 
 			expect(mockSend).not.toHaveBeenCalled();
 		});
 
-		it('does not fire before 9am on Monday', () => {
+		it('does not fire before 9am on Monday', async () => {
 			// Monday Feb 2, 2026 at 08:59
 			vi.setSystemTime(new Date(2026, 1, 2, 8, 59));
 			const settings = makeSettings(weeklyOnly);
 
-			startScheduler(settings, false);
+			startScheduler(settings, async () => false);
+			await Promise.resolve();
 
 			expect(mockSend).not.toHaveBeenCalled();
 		});
 
-		it('does not double-fire on subsequent ticks', () => {
+		it('does not double-fire on subsequent ticks', async () => {
 			vi.setSystemTime(new Date(2026, 1, 2, 9, 0));
 			const settings = makeSettings(weeklyOnly);
 
-			startScheduler(settings, false);
+			startScheduler(settings, async () => false);
+			await Promise.resolve();
 			expect(mockSend).toHaveBeenCalledTimes(1);
 
-			vi.advanceTimersByTime(60_000);
+			await vi.advanceTimersByTimeAsync(60_000);
 			expect(mockSend).toHaveBeenCalledTimes(1);
 		});
 
-		it('does not fire when weeklyReviewEnabled is false', () => {
+		it('does not fire when weeklyReviewEnabled is false', async () => {
 			vi.setSystemTime(new Date(2026, 1, 2, 9, 0));
 			const settings = makeSettings({
 				weeklyReviewEnabled: false,
 				...weeklyOnly
 			});
 
-			startScheduler(settings, false);
+			startScheduler(settings, async () => false);
+			await Promise.resolve();
 			expect(mockSend).not.toHaveBeenCalled();
 		});
 	});
@@ -182,12 +193,13 @@ describe('Notification Scheduler', () => {
 	// ── Monthly budget setup ────────────────────────────────────────
 
 	describe('monthly budget setup', () => {
-		it('fires on the 1st at 9am', () => {
+		it('fires on the 1st at 9am', async () => {
 			// Sunday Feb 1, 2026 at 09:00
 			vi.setSystemTime(new Date(2026, 1, 1, 9, 0));
 			const settings = makeSettings({ dailyReminderEnabled: false });
 
-			startScheduler(settings, false);
+			startScheduler(settings, async () => false);
+			await Promise.resolve();
 
 			expect(mockSend).toHaveBeenCalledWith(
 				'Ledger',
@@ -195,19 +207,20 @@ describe('Notification Scheduler', () => {
 			);
 		});
 
-		it('does not fire before 9am on the 1st', () => {
+		it('does not fire before 9am on the 1st', async () => {
 			vi.setSystemTime(new Date(2026, 1, 1, 8, 59));
 			const settings = makeSettings({
 				dailyReminderEnabled: false,
 				weeklyReviewEnabled: false
 			});
 
-			startScheduler(settings, false);
+			startScheduler(settings, async () => false);
+			await Promise.resolve();
 
 			expect(mockSend).not.toHaveBeenCalled();
 		});
 
-		it('catches up on 2nd+ if not yet fired this month', () => {
+		it('catches up on 2nd+ if not yet fired this month', async () => {
 			// Feb 3, 2026 at 10:00 — hasn't fired yet for February
 			vi.setSystemTime(new Date(2026, 1, 3, 10, 0));
 			const settings = makeSettings({
@@ -215,7 +228,8 @@ describe('Notification Scheduler', () => {
 				weeklyReviewEnabled: false
 			});
 
-			startScheduler(settings, false);
+			startScheduler(settings, async () => false);
+			await Promise.resolve();
 
 			expect(mockSend).toHaveBeenCalledWith(
 				'Ledger',
@@ -223,23 +237,24 @@ describe('Notification Scheduler', () => {
 			);
 		});
 
-		it('does not double-fire within same month', () => {
+		it('does not double-fire within same month', async () => {
 			vi.setSystemTime(new Date(2026, 1, 1, 9, 0));
 			const settings = makeSettings({
 				dailyReminderEnabled: false,
 				weeklyReviewEnabled: false
 			});
 
-			startScheduler(settings, false);
+			startScheduler(settings, async () => false);
+			await Promise.resolve();
 			expect(mockSend).toHaveBeenCalledTimes(1);
 
 			// Move to Feb 5 and tick
 			vi.setSystemTime(new Date(2026, 1, 5, 9, 0));
-			vi.advanceTimersByTime(60_000);
+			await vi.advanceTimersByTimeAsync(60_000);
 			expect(mockSend).toHaveBeenCalledTimes(1);
 		});
 
-		it('does not fire when monthlyBudgetSetupEnabled is false', () => {
+		it('does not fire when monthlyBudgetSetupEnabled is false', async () => {
 			vi.setSystemTime(new Date(2026, 1, 1, 9, 0));
 			const settings = makeSettings({
 				monthlyBudgetSetupEnabled: false,
@@ -247,7 +262,8 @@ describe('Notification Scheduler', () => {
 				weeklyReviewEnabled: false
 			});
 
-			startScheduler(settings, false);
+			startScheduler(settings, async () => false);
+			await Promise.resolve();
 			expect(mockSend).not.toHaveBeenCalled();
 		});
 	});
@@ -258,24 +274,26 @@ describe('Notification Scheduler', () => {
 		// Isolate to daily only for lifecycle tests
 		const dailyOnly = { weeklyReviewEnabled: false, monthlyBudgetSetupEnabled: false };
 
-		it('stopScheduler clears the interval', () => {
+		it('stopScheduler clears the interval', async () => {
 			vi.setSystemTime(new Date(2026, 1, 4, 19, 0));
 			const settings = makeSettings({ dailyReminderTime: '20:00', ...dailyOnly });
 
-			startScheduler(settings, false);
+			startScheduler(settings, async () => false);
+			await Promise.resolve();
 			stopScheduler();
 
 			// Move to 20:00 and tick — should NOT fire because scheduler was stopped
 			vi.setSystemTime(new Date(2026, 1, 4, 20, 0));
-			vi.advanceTimersByTime(60_000);
+			await vi.advanceTimersByTimeAsync(60_000);
 			expect(mockSend).not.toHaveBeenCalled();
 		});
 
-		it('restarting the scheduler works', () => {
+		it('restarting the scheduler works', async () => {
 			vi.setSystemTime(new Date(2026, 1, 4, 20, 0));
 			const settings = makeSettings({ dailyReminderTime: '20:00', ...dailyOnly });
 
-			startScheduler(settings, false);
+			startScheduler(settings, async () => false);
+			await Promise.resolve();
 			expect(mockSend).toHaveBeenCalledTimes(1);
 
 			stopScheduler();
@@ -283,7 +301,8 @@ describe('Notification Scheduler', () => {
 			// Restart for next day
 			mockSend.mockClear();
 			vi.setSystemTime(new Date(2026, 1, 5, 20, 0));
-			startScheduler(settings, false);
+			startScheduler(settings, async () => false);
+			await Promise.resolve();
 			expect(mockSend).toHaveBeenCalledTimes(1);
 		});
 	});

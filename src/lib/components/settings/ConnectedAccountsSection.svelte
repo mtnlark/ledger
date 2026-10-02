@@ -2,9 +2,10 @@
 	import { assertCanMutate } from '$lib/storage';
 	import { runMutation } from '$lib/storage/mutation';
 	import { onMount } from 'svelte';
-	import type { LinkedAccount } from '$lib/db';
+	import { db, type LinkedAccount } from '$lib/db';
 	import { toast } from '$lib/stores/toast';
 	import {
+		isSimplefinConnected,
 		getAllLinkedAccounts,
 		addLinkedAccount,
 		updateLinkedAccount,
@@ -30,7 +31,7 @@ let sfMapping = $state<Record<string, string>>({});
 let sfConfirmingUnlink = $state(false);
 let sfUnlinkMode = $state<'keep' | 'remove'>('keep');
 
-let sfManualAccounts = $derived(sfAccounts.filter((a) => a.source === 'manual'));
+let sfManualAccounts = $derived(sfAccounts.filter((a) => a.source === 'manual' && a.isActive));
 
 async function sfRefreshLocal() {
 	sfAccounts = await getAllLinkedAccounts();
@@ -76,14 +77,17 @@ async function sfLoadUpstream() {
 }
 
 function sfConnectedTo(simplefinId: string): LinkedAccount | undefined {
-	return sfAccounts.find((a) => a.simplefinId === simplefinId);
+	return sfAccounts.find((a) => a.isActive && isSimplefinConnected(a) && a.simplefinId === simplefinId);
 }
 
 async function sfAddUpstream(mapped: MappedSimplefinAccount) {
+	if (sfBusy) return;
+	sfBusy = true;
 	try {
 		await runMutation(['linkedAccounts', 'balanceSnapshots'], async () => {
 			const choice = sfMapping[mapped.simplefinId] ?? 'new';
-			const target = sfAccounts.find((a) => a.id === Number(choice));
+			const target = choice === 'new' ? undefined : await db.linkedAccounts.get(Number(choice));
+			if (choice !== 'new' && (!target || !target.isActive || target.source !== 'manual')) throw new Error('Account changed; reload and choose again');
 			const isLiability = choice === 'new' ? mapped.balance < 0 : target?.accountClass === 'liability';
 			const balance = isLiability ? Math.abs(mapped.balance) : mapped.balance;
 			const id = choice === 'new' ? await addLinkedAccount({
@@ -98,8 +102,8 @@ async function sfAddUpstream(mapped: MappedSimplefinAccount) {
 		toast.success(`${mapped.name} connected`);
 	} catch (error) {
 		console.error('Failed to connect account:', error);
-		toast.error('Failed to connect account');
-	}
+		toast.error(error instanceof Error ? error.message : 'Failed to connect account');
+	} finally { sfBusy = false; }
 }
 
 async function sfDisconnect(mode: 'keep' | 'remove') {
@@ -240,15 +244,16 @@ async function sfDisconnect(mode: 'keep' | 'remove') {
 							>
 								<option value="new">Create new</option>
 								{#each sfManualAccounts as manual (manual.id)}
-									<option value={String(manual.id)}>Link to: {manual.name}</option>
+									<option value={String(manual.id)}>{manual.simplefinId === up.simplefinId ? 'Reconnect:' : 'Link to:'} {manual.name}</option>
 								{/each}
 							</select>
 							<button
 								type="button"
 								onclick={() => sfAddUpstream(up)}
+								disabled={sfBusy}
 								class="px-3 py-1.5 text-sm font-medium bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition-colors"
 							>
-								Add
+								{sfMapping[up.simplefinId] && sfMapping[up.simplefinId] !== 'new' ? 'Reconnect' : 'Add'}
 							</button>
 						{/if}
 					</div>

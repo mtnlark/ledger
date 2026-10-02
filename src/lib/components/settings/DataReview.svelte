@@ -1,4 +1,5 @@
 <script lang="ts">
+	import HistoricalDataReview from './HistoricalDataReview.svelte';
 	import { toast } from '$lib/stores/toast';
 	import type { Category } from '$lib/db';
 	import { getAllCategories } from '$lib/stores/categories';
@@ -38,6 +39,7 @@
 	}
 </script>
 <div class="space-y-4">
+	<HistoricalDataReview />
 	<label class="block">Preview Excel import <input type="file" accept=".xlsx" disabled={blocked} onchange={(e) => choose(e, 'sheet')} /></label>
 	<label class="block">Preview backup restore <input type="file" accept=".json" disabled={blocked} onchange={(e) => choose(e, 'backup')} /></label>
 	<button class="px-4 py-2 rounded-lg border border-theme" disabled={blocked} onclick={() => run(async () => { categories = await getAllCategories(); repairs = await previewSplitRepairs(); selected = []; backup = null; sheet = null; })}>Review historical fixed shares</button>

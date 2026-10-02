@@ -2,6 +2,7 @@
 	import { Trash2 } from 'lucide-svelte';
 	import { CONTRIBUTION_SOURCES, type SavingsAccount, type SavingsContribution, type ContributionSource } from '$lib/db';
 	import { parseLocalDate, formatDateForInput } from '$lib/utils/date-helpers';
+	import { validateDate } from '$lib/utils/transaction-validation';
 	import { cleanNumberInput } from '$lib/utils/form-validation';
 	import { updateContribution, deleteContribution } from '$lib/stores/savingsContributions';
 	import { toast } from '$lib/stores/toast';
@@ -28,6 +29,7 @@
 	let source = $state<'bank_transfer' | 'payroll_deduction' | 'interest' | 'employer_match' | 'other'>('bank_transfer');
 	let notes = $state('');
 	let isSubmitting = $state(false);
+	let dateError = $state('');
 	let showDeleteConfirm = $state(false);
 
 	// Reset form when modal opens or contribution changes
@@ -50,6 +52,8 @@
 
 	async function handleSubmit(e: Event) {
 		e.preventDefault();
+		dateError = validateDate(dateStr).error ?? '';
+		if (dateError) return;
 		if (isSubmitting || !contribution?.id || !accountId || !amountStr) return;
 
 		const amount = parseFloat(cleanNumberInput(amountStr));
@@ -69,6 +73,7 @@
 			console.error('Failed to update contribution:', error);
 			toast.error('Failed to save changes. Please try again.');
 			isSubmitting = false;
+			dateError = '';
 		}
 	}
 
@@ -94,6 +99,7 @@
 
 <ModalContainer isOpen={isModalOpen} title="Edit Contribution" titleId="edit-contribution-title" {onClose}>
 	<form onsubmit={handleSubmit} class="p-6 space-y-4">
+		{#if dateError}<p role="alert">{dateError}</p>{/if}
 		<!-- Date & Amount Row -->
 		<div class="grid grid-cols-2 gap-4">
 			<div>
@@ -102,6 +108,7 @@
 				</label>
 				<input
 					type="date"
+					required
 					id="edit-contrib-date"
 					bind:value={dateStr}
 					class="w-full px-3 py-2.5 bg-surface-alt border border-theme rounded-lg focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-colors"
@@ -220,7 +227,7 @@
 		<div class="flex gap-3 pt-3">
 			<button
 				type="submit"
-				disabled={!accountId || !amountStr || isSubmitting}
+				disabled={!dateStr || !accountId || !amountStr || isSubmitting}
 				class="flex-1 bg-primary-500 text-white py-2.5 px-4 rounded-lg font-medium hover:bg-primary-600 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-primary-500/25 focus:ring-2 focus:ring-primary-500/20 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-none transition-all duration-150"
 			>
 				{isSubmitting ? 'Saving...' : 'Save Changes'}

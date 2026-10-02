@@ -52,8 +52,10 @@ export async function saveCategoryBudget(
 	month: string,
 	budgetAmount: number
 ): Promise<void> {
-	return runMutation(['categoryBudgets'], async () => {
-		if (budgetAmount < 0) {
+	return runMutation(['categoryBudgets', 'categories'], async () => {
+		if (!(await db.categories.get(categoryId))) throw new Error('Missing category reference');
+		if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) throw new Error('Invalid budget month');
+		if (!Number.isFinite(budgetAmount) || budgetAmount < 0) {
 			throw new Error('Budget amount cannot be negative');
 		}
 
@@ -322,11 +324,13 @@ export async function copyBudgetsFromMonth(
 	sourceMonth: string,
 	targetMonth: string
 ): Promise<void> {
-	return runMutation(['categoryBudgets'], async () => {
+	return runMutation(['categoryBudgets', 'categories'], async () => {
+		if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(targetMonth)) throw new Error('Invalid budget month');
 		const sourceBudgets = await getCategoryBudgetsForMonth(sourceMonth);
 		const now = new Date();
 
 		for (const budget of sourceBudgets) {
+			if (!(await db.categories.get(budget.categoryId))) throw new Error('Missing category reference');
 			const existing = await getCategoryBudget(budget.categoryId, targetMonth);
 			if (!existing) {
 				await db.categoryBudgets.add({

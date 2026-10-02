@@ -127,7 +127,9 @@ A durable write:
 4. preserves the previous file as `data.json.bak`;
 5. renames the temporary file to `data.json`.
 
-Ledger keeps up to ten routine timestamped backups. Restore and historical repair also create fresh, verified recovery snapshots before changing records; these bypass the normal one-minute backup debounce. If the main file cannot be parsed or fails its checksum, startup recovery tries `data.json.bak` first and then the timestamped backups from newest to oldest.
+Ledger keeps up to ten routine timestamped backups. Restore creates a fresh, verified recovery backup before changing records, bypassing the normal one-minute debounce. Historical repair preserves immutable, checksum-verified originals in a separate `originals/` directory. These originals are excluded from routine pruning and automatic recovery. If the main file cannot be parsed or fails its checksum, startup recovery tries `data.json.bak` first and then the timestamped backups from newest to oldest.
+
+A filesystem read failure is retried once. If it persists, initialization shows an error with Retry loading and blocks writes. Files and existing IndexedDB records remain intact. Startup selects and validates its snapshot before replacing IndexedDB. Content corruption still triggers recovery, with a verified copy of the damaged original retained first. Invalid dates, non-finite amounts, and serialization failures block saves before any backup or file rotation.
 
 Older Ledger versions could leave references to deleted categories or accounts. A readable primary file with those references is preserved at startup with a review warning; it is never silently replaced by an older backup. Restore and recovery candidates still require valid references.
 
@@ -142,15 +144,24 @@ Settings → Data provides the following workflows:
 - **Full Backup (JSON)** exports all nine persisted tables in the same checksummed format used by automatic and iCloud backups.
 - **Preview backup restore** validates version, structure, IDs, amounts, dates, enums and references before displaying table counts. Legacy automatic and manual exports are supported; legacy `budgets` becomes `monthlyBudgets`. Missing legacy tables are listed and emptied on restore. Replacement runs atomically after a fresh recovery backup succeeds, then refreshes caches and mounted views.
 - **Preview Excel import** reads the `Expenses` sheet and displays accepted rows, duplicates, invalid rows with source numbers and reasons, and blank rows. Numeric cells and US currency strings such as `$1,234.56` are supported. Unknown categories require a mapping. Only approved rows are committed, together in one transaction and one disk save. Fixed partner shares remain fixed amounts.
-- **Review historical fixed shares** lists inconsistent category splits. Only complete, undeleted, unsettled groups with clear evidence of the intended share can be selected for correction. The selected records are checked again after a fresh backup, then corrected atomically. Reviewing alone changes nothing.
+- **Review historical fixed shares** lists inconsistent category splits. Only complete, undeleted, unsettled groups with clear evidence of the intended share can be selected for correction. The selected records are checked again, the original snapshot is preserved, and approved corrections commit atomically after strict validation. Reviewing alone changes nothing.
+- **Review ledger integrity** identifies affected tables, record IDs, and fields. Missing categories require approval of an inactive placeholder at the original ID. Missing savings accounts require either recreation with a supplied type and confirmed balance, or deletion of the listed orphaned contributions. Balances, contributions, and purchase groups are shown as context; contribution totals never establish opening balances. Replacement balances and eligible fixed-share allocations require explicit approval.
+- **Review damaged JSON file** accepts parseable, checksum-valid snapshots with date or missing-reference defects, including verified preserved originals. Supply every needed correction, preview the strictly validated result, then explicitly apply it. Unparseable files, checksum mismatches, and unsupported structural damage remain blocked. The selected file and current ledger are both preserved before replacement. Stale previews require a new review; failed database writes roll back, and disk save failures use the existing Retry barrier. The stored format remains version `1.0`.
+
 
 New category splits and group edits allocate the purchase-level partner share proportionally in integer cents, using largest remainders with line order breaking ties. Group editing reads the original parent purchase. Historical amounts never change automatically.
 
 Needs/wants calculations retain their category-essential map while category IDs and essential flags are unchanged, preserving transaction-version memoization.
 
+Deleting a savings account also atomically deletes its contributions, matching the confirmation dialog. Moving a contribution reverses its original amount on the old savings account and applies the new amount to the destination; retirement and investment contribution behavior is preserved. Referenced categories cannot be deleted, including references from historical budgets, split parents, and soft-deleted transactions. The category editor offers deactivation instead.
+
+Daily reminders query undeleted, visible transactions when due, excluding split parents. Eligibility queries cannot overlap, stopped schedulers discard pending results, and query failures remain eligible for retry.
+
 ## SimpleFIN and account credentials
 
 Ledger uses SimpleFIN only to read account balances. It cannot import transactions or move money. Each sync strictly validates balances and timestamps, preserves last-good values for failing accounts, and applies all account statuses and snapshots in one transaction and disk save. Overlapping sync requests share the same operation. Upstream balance time is stored separately from successful fetch time; balances older than 72 hours are labeled stale, and regressed upstream timestamps are rejected. History snapshots use capture time.
+
+Unlinked accounts retained as manual accounts can be explicitly reconnected in Settings. Reconnection keeps their IDs and balance history, and duplicate active external mappings are rejected. HTTP requests share a client with a 10-second connection timeout and a 30-second total timeout, covering both response headers and bodies. Token claims are never automatically retried. Timeout failures preserve last-good balances, settle account status, and release the sync lock for another attempt.
 
 The Rust backend connects to SimpleFIN and stores the account credential in the macOS Keychain. The Svelte frontend receives the balances but never sees that credential. It is not included in Ledger’s data file, local backups, or iCloud backups.
 

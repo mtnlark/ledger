@@ -73,6 +73,7 @@ function createUndoStore() {
 
 			try {
 				await restoreTransactions(ids);
+				if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('ledger:transactions-changed'));
 
 				const message =
 					state.transactions.length === 1

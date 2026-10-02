@@ -1,0 +1,21 @@
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { cleanup, render, screen, waitFor } from '@testing-library/svelte';
+import Dashboard from '../../routes/+page.svelte';
+import { db, DEFAULT_SETTINGS } from '$lib/db';
+import { resetStorageState } from '$lib/storage';
+import { addTransaction, softDeleteTransaction } from '$lib/stores/transactions';
+import { undoStore } from '$lib/stores/undo';
+vi.mock('svelte/transition', async (original) => ({ ...await original<typeof import('svelte/transition')>(), slide: () => ({ duration: 0 }), fade: () => ({ duration: 0 }), scale: () => ({ duration: 0 }) }));
+beforeEach(async () => { vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} }); resetStorageState(); localStorage.clear(); await db.delete(); await db.open(); await db.settings.put(DEFAULT_SETTINGS); await db.categories.put({ id: 1, name: 'Food', isActive: true, isEssential: false, sortOrder: 1 }); });
+afterEach(() => { cleanup(); undoStore.clear(); vi.unstubAllGlobals(); });
+it('refreshes rows and spending totals in a mounted dashboard after undo', async () => {
+	const id = await addTransaction({ date: new Date(), merchant: 'Undo dashboard purchase', amount: 42.13, categoryId: 1, isShared: false, splitType: 'percentage', splitValue: 0.5, isSettled: false, isEssential: false, isSubscription: false });
+	render(Dashboard);
+	await screen.findByText('Undo dashboard purchase');
+	const original = (await softDeleteTransaction(id))!; undoStore.capture([original]);
+	window.dispatchEvent(new CustomEvent('ledger:transactions-changed'));
+	await waitFor(() => expect(screen.queryByText('Undo dashboard purchase')).not.toBeInTheDocument());
+	await undoStore.undo();
+	await screen.findByText('Undo dashboard purchase');
+	expect(screen.getAllByText('$42.13').length).toBeGreaterThan(0);
+});

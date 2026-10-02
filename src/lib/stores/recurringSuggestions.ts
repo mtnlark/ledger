@@ -405,7 +405,7 @@ export async function getRecurringSuggestions(month: string, providedTransaction
 			if (recent) {
 				const recentTransaction = recent.sourceTransactions[0];
 				splitType = recentTransaction.splitType;
-				splitValue = recentTransaction.splitValue;
+				splitValue = recentTransaction.splitType === 'fixed' && recent.isSplit ? recent.partnerAmount : recentTransaction.splitValue;
 			}
 		}
 

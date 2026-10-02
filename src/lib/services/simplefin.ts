@@ -1,6 +1,6 @@
 import { invoke } from '@tauri-apps/api/core';
 import { roundCurrency } from '$lib/utils/currency';
-import { getAllLinkedAccounts, applyBalanceSync, type BalanceSyncUpdate } from '$lib/stores/linkedAccounts';
+import { getAllLinkedAccounts, isSimplefinConnected, applyBalanceSync, type BalanceSyncUpdate } from '$lib/stores/linkedAccounts';
 import { assertCanMutate } from '$lib/storage';
 
 /**
@@ -83,7 +83,7 @@ export function syncBalances(): Promise<SyncResult> {
 }
 async function performSync(): Promise<SyncResult> {
 	assertCanMutate();
-	const targets = (await getAllLinkedAccounts()).filter((a) => a.source === 'simplefin' && a.simplefinId);
+	const targets = (await getAllLinkedAccounts()).filter((a) => a.isActive && isSimplefinConnected(a));
 	if (!targets.length) return { synced: 0, failed: 0, skipped: true };
 	let upstream: SimplefinAccountsResponse = { accounts: [], errors: [] };
 	let fetchStatus: 'error' | 'stale' = 'stale';

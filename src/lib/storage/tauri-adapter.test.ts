@@ -45,6 +45,8 @@ vi.mock('@tauri-apps/api/path', () => ({
 import { initializeTauriStorage, saveToFile, createBackup } from './tauri-adapter';
 import * as mockedFs from '@tauri-apps/plugin-fs';
 import { addSavingsAccount, updateSavingsAccount } from '$lib/stores/savingsAccounts';
+import { resetStorageState, persistData, saveStatus } from './index';
+import { get } from 'svelte/store';
 
 const DATA_PATH = '/appdata/data.json';
 const BAK_PATH = '/appdata/data.json.bak';
@@ -81,10 +83,44 @@ function makeStoredData(merchant: string): StoredData {
 
 describe('tauri-adapter', () => {
 	beforeEach(async () => {
+		resetStorageState();
 		files.clear();
 		dirs.clear();
 		await db.delete();
 		await db.open();
+	});
+
+	it('retries a transient primary read before selecting an older backup', async () => {
+		files.set(DATA_PATH, JSON.stringify(makeStoredData('Newer primary')));
+		files.set(BAK_PATH, JSON.stringify(makeStoredData('Older backup')));
+		vi.mocked(mockedFs.readTextFile).mockRejectedValueOnce(new Error('temporary I/O error'));
+		expect((await initializeTauriStorage()).status).toBe('loaded');
+		expect((await db.transactions.get(1))?.merchant).toBe('Newer primary');
+	});
+
+	it('preserves files and IndexedDB and blocks writes after persistent read failure', async () => {
+		await db.transactions.put({ ...makeStoredData('Existing database').transactions[0], date: new Date(), id: 1 });
+		files.set(DATA_PATH, JSON.stringify(makeStoredData('Newer primary')));
+		files.set(BAK_PATH, JSON.stringify(makeStoredData('Older backup')));
+		const originals = new Map(files);
+		vi.mocked(mockedFs.readTextFile).mockRejectedValueOnce(new Error('I/O unavailable')).mockRejectedValueOnce(new Error('I/O unavailable'));
+		await expect(initializeTauriStorage()).rejects.toThrow('I/O');
+		expect(files).toEqual(originals);
+		expect((await db.transactions.get(1))?.merchant).toBe('Existing database');
+		await expect(db.transactions.update(1, { merchant: 'Blocked' })).rejects.toThrow('Retry');
+		await expect(saveToFile()).rejects.toThrow('Retry');
+		expect((await initializeTauriStorage()).status).toBe('loaded');
+	});
+
+	it('retains a verified damaged original outside ordinary backup rotation', async () => {
+		files.set(DATA_PATH, '{"broken":');
+		files.set(BAK_PATH, JSON.stringify(makeStoredData('Healthy backup')));
+		await initializeTauriStorage();
+		const originals = [...files.entries()].filter(([name]) => name.startsWith('/appdata/originals/'));
+		expect(originals).toHaveLength(1);
+		const envelope = JSON.parse(originals[0][1]);
+		expect(envelope.content).toBe('{"broken":');
+		expect(envelope.checksum).toMatch(/^[a-f0-9]{64}$/);
 	});
 
 	it('persists goal removal and a dismissed goal suggestion after startup reload', async () => {
@@ -329,4 +365,36 @@ it('preserves dangling references in the primary file without rolling back to an
 	expect(files.get(DATA_PATH)).toBe(content);
 	const { parseBackup } = await import('./backup');
 	await expect(parseBackup(content)).rejects.toThrow('missing categoryId');
+});
+
+it('rejects an invalid snapshot before backing up or rotating the healthy primary', async () => {
+	resetStorageState(); files.clear(); dirs.clear();
+	files.set(DATA_PATH, JSON.stringify(makeStoredData('Healthy')));
+	await initializeTauriStorage();
+	await db.transactions.update(1, { date: new Date(NaN) });
+	const before = new Map(files);
+	await expect(saveToFile()).rejects.toThrow('date');
+	expect(files).toEqual(before);
+});
+
+it('never acknowledges a serialization failure or rotates any healthy file', async () => {
+	resetStorageState(); files.clear(); dirs.clear();
+	files.set(DATA_PATH, JSON.stringify(makeStoredData('Healthy'))); await initializeTauriStorage();
+	await db.settings.put({ ...DEFAULT_SETTINGS, extra: 1n } as typeof DEFAULT_SETTINGS);
+	const before = new Map(files);
+	const win = window as unknown as { __TAURI__?: object }; win.__TAURI__ = {};
+	try {
+		await expect(persistData()).rejects.toMatchObject({ applied: true });
+		expect(get(saveStatus)).toBe('unsaved'); expect(files).toEqual(before);
+	} finally { delete win.__TAURI__; resetStorageState(); }
+});
+it('preserves IndexedDB and primary content when a recovery candidate has an I/O failure', async () => {
+	resetStorageState(); files.clear(); dirs.clear(); await db.delete(); await db.open();
+	await db.transactions.put({ ...makeStoredData('Existing database').transactions[0], date: new Date() });
+	files.set(DATA_PATH, '{'); files.set(BAK_PATH, JSON.stringify(makeStoredData('Backup')));
+	const before = new Map(files), read = vi.mocked(mockedFs.readTextFile);
+	read.mockImplementationOnce(async () => '{').mockRejectedValueOnce(new Error('I/O unavailable'));
+	await expect(initializeTauriStorage()).rejects.toThrow('I/O');
+	expect(files).toEqual(before); expect((await db.transactions.get(1))?.merchant).toBe('Existing database');
+	resetStorageState();
 });
