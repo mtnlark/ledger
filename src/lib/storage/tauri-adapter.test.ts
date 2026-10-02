@@ -44,6 +44,7 @@ vi.mock('@tauri-apps/api/path', () => ({
 
 import { initializeTauriStorage, saveToFile, createBackup } from './tauri-adapter';
 import * as mockedFs from '@tauri-apps/plugin-fs';
+import { addSavingsAccount, updateSavingsAccount } from '$lib/stores/savingsAccounts';
 
 const DATA_PATH = '/appdata/data.json';
 const BAK_PATH = '/appdata/data.json.bak';
@@ -84,6 +85,35 @@ describe('tauri-adapter', () => {
 		dirs.clear();
 		await db.delete();
 		await db.open();
+	});
+
+	it('persists cleared goal fields and keeps them cleared after startup reload', async () => {
+		const tauriWindow = window as unknown as { __TAURI__?: object };
+		const previousTauri = tauriWindow.__TAURI__;
+		tauriWindow.__TAURI__ = {};
+		try {
+			await initializeTauriStorage();
+			const id = await addSavingsAccount({
+				name: 'Car Fund', accountType: 'savings', currentBalance: 500,
+				targetAmount: 10000, targetDate: new Date(2026, 11, 31), sortOrder: 10
+			});
+			expect(JSON.parse(files.get(DATA_PATH)!).savingsAccounts.find((a: { id: number }) => a.id === id).targetAmount).toBe(10000);
+
+			await updateSavingsAccount(id, { targetAmount: undefined, targetDate: undefined });
+			const saved = JSON.parse(files.get(DATA_PATH)!).savingsAccounts.find((a: { id: number }) => a.id === id);
+			expect(saved.targetAmount).toBeUndefined();
+			expect(saved.targetDate).toBeUndefined();
+			expect(saved.currentBalance).toBe(500);
+
+			await initializeTauriStorage();
+			const restored = await db.savingsAccounts.get(id);
+			expect(restored).toMatchObject({ name: 'Car Fund', currentBalance: 500 });
+			expect(restored?.targetAmount).toBeUndefined();
+			expect(restored?.targetDate).toBeUndefined();
+		} finally {
+			if (previousTauri === undefined) delete tauriWindow.__TAURI__;
+			else tauriWindow.__TAURI__ = previousTauri;
+		}
 	});
 
 	describe('startup recovery when data.json is missing', () => {

@@ -24,6 +24,7 @@
 	let currentBalanceStr = $state('');
 	let targetAmountStr = $state('');
 	let targetDateStr = $state('');
+	let targetDateInput = $state<HTMLInputElement | null>(null);
 	let isSubmitting = $state(false);
 	let showDeleteConfirm = $state(false);
 
@@ -41,8 +42,11 @@
 		}
 	});
 
-	// Check if goal has any values
-	let hasGoalValues = $derived(targetAmountStr.trim() !== '' || targetDateStr.trim() !== '');
+	let hasTargetAmount = $derived(targetAmountStr.trim() !== '');
+	let hasGoalValues = $derived(
+		account?.targetAmount !== undefined || account?.targetDate !== undefined ||
+		hasTargetAmount || targetDateStr.trim() !== ''
+	);
 
 	function handleBalanceInput(e: Event) {
 		const input = e.target as HTMLInputElement;
@@ -57,6 +61,8 @@
 	function handleRemoveGoal() {
 		targetAmountStr = '';
 		targetDateStr = '';
+		// A partial native date can be invalid even when its bound value is already empty.
+		if (targetDateInput) targetDateInput.value = '';
 	}
 
 	async function handleSubmit(e: Event) {
@@ -74,7 +80,7 @@
 			const targetAmount = targetAmountStr.trim()
 				? parseFloat(cleanNumberInput(targetAmountStr)) || undefined
 				: undefined;
-			const targetDate = targetDateStr.trim()
+			const targetDate = targetAmount !== undefined && targetDateStr.trim()
 				? new Date(targetDateStr + 'T00:00:00')
 				: undefined;
 
@@ -298,14 +304,16 @@
 								<input
 									type="date"
 									id="edit-account-target-date"
+									bind:this={targetDateInput}
 									bind:value={targetDateStr}
-									class="w-full px-3 py-2.5 bg-surface-alt border border-theme rounded-lg focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-colors"
+									disabled={!hasTargetAmount}
+									class="w-full px-3 py-2.5 bg-surface-alt border border-theme rounded-lg focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
 								/>
 							</div>
 						</div>
 
 						<p class="mt-2 text-xs text-charcoal-muted">
-							Set a goal to track your progress.
+							Enter a target amount to track a goal. The date is optional.
 						</p>
 					</div>
 				{/if}
