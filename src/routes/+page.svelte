@@ -12,8 +12,10 @@
 	import { getBudgetForMonth, saveBudget } from '$lib/stores/budget';
 	import { getEffectiveBudgetsForMonth } from '$lib/stores/categoryBudget';
 	import { getContributionsAffectingAvailable } from '$lib/stores/savingsContributions';
-	import { addRecurringSuggestionTransaction, getRecurringSuggestions, shouldShowRecurringBanner, type RecurringSuggestion } from '$lib/stores/recurringSuggestions';
-	import { sumCurrency, calculateTotalSpent } from '$lib/utils/currency';
+	import { getRecurringSuggestions, shouldShowRecurringBanner, type RecurringSuggestion } from '$lib/stores/recurringSuggestions';
+	import { saveSchedule } from '$lib/stores/planning';
+	import { formatDateForInput } from '$lib/utils/date-helpers';
+	import { sumCurrency } from '$lib/utils/currency';
 	import { groupTransactionsIntoPurchases } from '$lib/utils/transaction-grouping';
 	import { extractTags } from '$lib/utils/tags';
 	import { tagIndex } from '$lib/stores/tags.svelte';
@@ -25,6 +27,13 @@
 	import TransactionList from '$lib/components/TransactionList.svelte';
 	import AddTransactionModal from '$lib/components/AddTransactionModal.svelte';
 	import CashFlowCard from '$lib/components/CashFlowCard.svelte';
+	import BudgetForecastCard from '$lib/components/BudgetForecastCard.svelte';
+	import { calculateForecast } from '$lib/planning/forecast';
+	import { emptyPlanning } from '$lib/planning/types';
+	import type { EntryTemplate } from '$lib/planning/types';
+	import { getPurchaseRows, templateFromTransactions } from '$lib/stores/planning';
+	import { getAllContributions } from '$lib/stores/savingsContributions';
+	import type { SavingsContribution } from '$lib/db';
 	import BudgetModal from '$lib/components/BudgetModal.svelte';
 	import EditTransactionModal, { type TransactionUpdateData } from '$lib/components/EditTransactionModal.svelte';
 	import SplitTransactionModal from '$lib/components/SplitTransactionModal.svelte';
@@ -50,6 +59,11 @@
 	let isLoading = $state(true);
 	let isSelectionMode = $state(false);
 	let addModalOpen = $state(false);
+	let repeatTemplate = $state<EntryTemplate | null>(null);
+	async function repeatToday(transaction: Transaction) {
+		repeatTemplate = templateFromTransactions(await getPurchaseRows(transaction), transaction.merchant);
+		addModalOpen = true;
+	}
 	// Height of the sticky heading+toolbar block; date headers stick just below it
 	let toolbarHeight = $state(0);
 	let showUpcoming = $state(false);
@@ -63,6 +77,7 @@
 	let settings = $state<Settings>(DEFAULT_SETTINGS);
 	let budget = $state<MonthlyBudget | null>(null);
 	let savedFromContributions = $state(0);
+	let forecastContributions = $state<SavingsContribution[]>([]);
 	let rolloverAdjustment = $state(0);
 	let showBudgetModal = $state(false);
 	let editingTransaction = $state<Transaction | null>(null);
@@ -70,6 +85,7 @@
 	let editingSplit = $state<{ parentId: number; children: Transaction[] } | null>(null);
 	let currentMonth = $state(getMonthKey(new Date()));
 	let availableMonths = $state<string[]>([getMonthKey(new Date())]);
+	let forecast = $derived(calculateForecast({ month: currentMonth, transactions: allTransactions, contributions: forecastContributions, planning: settings.planning ?? emptyPlanning(), income: budget?.income ?? null, rolloverAdjustment }));
 
 	let showRecurringBanner = $state(false);
 	let showRecurringSuggestionsModal = $state(false);
@@ -247,6 +263,10 @@
 
 	let showStaleNudge = $derived.by(() => {
 		if (isLoading || daysSinceEntry < STALE_THRESHOLD_DAYS) return false;
+		if (settings.planning?.completeThrough) {
+			const confirmed = parseISO(settings.planning.completeThrough);
+			if (Date.now() - confirmed.getTime() < STALE_THRESHOLD_DAYS * 86400000) return false;
+		}
 		if (staleNudgeDismissedAt) {
 			const sinceDismiss = Math.floor(
 				(Date.now() - new Date(staleNudgeDismissedAt).getTime()) / 86_400_000
@@ -301,7 +321,6 @@
 	}
 
 	let monthDisplay = $derived(format(parseMonthKey(currentMonth), 'MMMM yyyy'));
-	let totalSpent = $derived(calculateTotalSpent(transactions));
 
 	onMount(() => void loadData());
 
@@ -321,6 +340,7 @@
 			categories = cats;
 			settings = s;
 			allTransactions = allTxns;
+			forecastContributions = await getAllContributions();
 
 			transactions = getTransactionsByMonthFromCache(currentMonth) ?? await getTransactionsByMonth(currentMonth);
 
@@ -478,8 +498,8 @@
 
 	async function handleAddSelectedSuggestions(items: Array<RecurringSuggestion & { date: Date }>) {
 		try {
-			await runMutation(['transactions', 'settings'], async () => {
-				for (const item of items) await addRecurringSuggestionTransaction(item);
+			await runMutation(['transactions', 'settings', 'categories', 'savingsAccounts'], async () => {
+				for (const item of items) await saveSchedule({ id: crypto.randomUUID(), merchant: item.merchant, date: formatDateForInput(item.date), amount: item.expectedAmount, categoryId: item.categoryId, frequency: item.frequency, amountType: item.amountType, isShared: item.isShared, splitType: item.splitType, splitValue: item.splitValue, active: true, allocations: item.allocationTemplate });
 			});
 			const succeeded = items.length;
 
@@ -490,6 +510,7 @@
 				allTransactions = await getAllTransactions();
 			}
 
+			settings = await getSettings();
 			recurringSuggestions = await getRecurringSuggestions(currentMonth);
 
 			// Only dismiss if all suggestions have been added
@@ -501,7 +522,7 @@
 			showRecurringBanner = recurringSuggestions.length > 0;
 			showRecurringSuggestionsModal = false;
 
-			toast.success(succeeded === 1 ? 'Transaction added' : `${succeeded} transactions added`);
+			toast.success(succeeded === 1 ? 'Commitment scheduled' : `${succeeded} commitments scheduled`);
 		} catch (error) {
 			handleError(error, { context: 'handleAddSelectedSuggestions', userMessage: 'Failed to add transactions' });
 		}
@@ -689,6 +710,7 @@
 					{allTransactions}
 					resetKey={transactionListResetKey}
 					onEdit={handleEdit}
+					onRepeat={repeatToday}
 					onDelete={handleDelete}
 					onEditSplit={handleEditSplit}
 					onDeleteSplit={handleDeleteSplit}
@@ -714,12 +736,14 @@
 				<aside class="space-y-4 lg:sticky lg:top-6">
 					<CashFlowCard
 						{budget}
-						{totalSpent}
-						{savedFromContributions}
+						totalSpent={forecast.recorded}
+						upcomingCommitments={forecast.upcoming}
+						savedFromContributions={forecast.savings}
 						{rolloverAdjustment}
 						onEditBudget={() => showBudgetModal = true}
 					/>
-					<WeekInReviewCard {allTransactions} {categories} />
+					<BudgetForecastCard {forecast} />
+					<WeekInReviewCard {allTransactions} {categories} {settings} {forecast} onSaved={loadData} />
 					{#if transactions.length > 0}
 						<div class="bg-surface rounded-xl shadow-sm shadow-theme p-4">
 							<h3 class="text-xs font-medium uppercase tracking-wider text-charcoal-muted mb-3">Top Categories</h3>
@@ -752,7 +776,8 @@
 	onSave={handleSaveEdit}
 	onSplit={handleOpenSplit}
 	onCancelSubscription={actions.cancelSubscription}
-	onClose={() => editingTransaction = null}
+	onClose={async () => { editingTransaction = null; settings = await getSettings(); }}
+	onEventSaved={loadData}
 />
 
 <!-- Split Transaction Modal -->
@@ -826,6 +851,7 @@
 	{categories}
 	{settings}
 	onSubmit={actions.addTransaction}
+	initialTemplate={repeatTemplate}
 	onSplitSubmit={actions.addSplitTransactions}
-	onClose={() => addModalOpen = false}
+	onClose={() => { addModalOpen = false; repeatTemplate = null; }}
 />

@@ -17,7 +17,8 @@ export async function getSavingsAccount(id: number): Promise<SavingsAccount | un
 export async function addSavingsAccount(
 	account: Omit<SavingsAccount, 'id' | 'createdAt' | 'updatedAt'>
 ): Promise<number> {
-	return runMutation(['savingsAccounts', 'settings', 'savingsContributions'], async () => {
+	return runMutation(['savingsAccounts', 'settings', 'savingsContributions', 'linkedAccounts'], async () => {
+		await validateAllocation(account);
 		const now = new Date();
 
 		// Only set currentBalance for savings type accounts
@@ -39,9 +40,10 @@ export async function updateSavingsAccount(
 	id: number,
 	updates: Partial<Omit<SavingsAccount, 'id' | 'createdAt'>>
 ): Promise<void> {
-	return runMutation(['savingsAccounts', 'settings', 'savingsContributions'], async () => {
+	return runMutation(['savingsAccounts', 'settings', 'savingsContributions', 'linkedAccounts'], async () => {
 		const existing = await db.savingsAccounts.get(id);
 		if (!existing) return;
+		if (updates.currentBalance !== undefined || updates.linkedAccountId !== undefined) await validateAllocation({ ...existing, ...updates }, id);
 
 		await db.savingsAccounts.update(id, {
 			...updates,
@@ -50,8 +52,18 @@ export async function updateSavingsAccount(
 	});
 }
 
+async function validateAllocation(account: Pick<SavingsAccount, 'linkedAccountId' | 'currentBalance'>, id?: number): Promise<void> {
+	if (account.linkedAccountId === undefined) return;
+	const bank = await db.linkedAccounts.get(account.linkedAccountId);
+	if (!bank?.isActive || bank.accountClass !== 'asset' || bank.accountType !== 'savings') throw new Error('Choose an active savings bank account');
+	const others = (await db.savingsAccounts.toArray()).filter(a => a.id !== id && a.linkedAccountId === bank.id);
+	if (sumCurrency([account.currentBalance ?? 0, ...others.map(a => a.currentBalance ?? 0)]) > bank.currentBalance) throw new Error('Allocations exceed the latest bank balance');
+}
+
 export async function deleteSavingsAccount(id: number): Promise<void> {
 	return runMutation(['savingsAccounts', 'settings', 'savingsContributions'], async () => {
+		const settings = await getSettings();
+		if (settings.planning) await updateSettings({ planning: { ...settings.planning, savingsPlans: settings.planning.savingsPlans.filter(p => p.accountId !== id) } });
 		await db.savingsContributions.where('accountId').equals(id).delete();
 		await db.savingsAccounts.delete(id);
 	});
@@ -113,6 +125,7 @@ export async function updateAccountBalance(id: number, delta: number): Promise<v
 
 	const newBalance = sumCurrency([account.currentBalance ?? 0, delta]);
 	if (!Number.isFinite(newBalance)) throw new Error('Invalid savings balance');
+	if (newBalance < 0) throw new Error('Savings event exceeds allocated funding');
 	await db.savingsAccounts.update(id, {
 		currentBalance: newBalance,
 		updatedAt: new Date()

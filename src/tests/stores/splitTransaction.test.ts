@@ -139,7 +139,7 @@ describe('splitTransaction – additional edge cases', () => {
 		expect(month.some((t) => t.id === parentId)).toBe(false);
 	});
 
-	it('child notes come from split data, not parent', async () => {
+	it('split lines retain parent notes alongside their own', async () => {
 		const parentId = await createParent({ notes: 'parent note' });
 
 		const childIds = await splitTransaction(parentId, [
@@ -149,8 +149,8 @@ describe('splitTransaction – additional edge cases', () => {
 
 		const child1 = await db.transactions.get(childIds[0]);
 		const child2 = await db.transactions.get(childIds[1]);
-		expect(child1?.notes).toBe('child note');
-		expect(child2?.notes).toBeUndefined();
+		expect(child1?.notes).toBe('parent note\nchild note');
+		expect(child2?.notes).toBe('parent note');
 	});
 
 	it('recalculates partner share per child for shared splits', async () => {

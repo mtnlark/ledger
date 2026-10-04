@@ -7,30 +7,31 @@
 	interface Props {
 		budget: MonthlyBudget | null;
 		totalSpent: number;
+		upcomingCommitments?: number;
 		savedFromContributions: number;
 		rolloverAdjustment?: number;
 		onEditBudget?: () => void;
 	}
 
-	let { budget, totalSpent, savedFromContributions, rolloverAdjustment = 0, onEditBudget }: Props = $props();
+	let { budget, totalSpent, upcomingCommitments = 0, savedFromContributions, rolloverAdjustment = 0, onEditBudget }: Props = $props();
 
 	// Computed values
 	let income = $derived(budget?.income ?? 0);
 	let saved = $derived(savedFromContributions);
 	let available = $derived(income - saved + rolloverAdjustment);
-	let surplus = $derived(available - totalSpent);
+	let surplus = $derived(available - totalSpent - upcomingCommitments);
 
 	// Use getBudgetStatus for consistent color determination across the app
 	// Rounds values to match displayed amounts (prevents display/status mismatch)
 	let spendingStatus = $derived(
-		available > 0 ? getBudgetStatus(Math.round(totalSpent), Math.round(available)) : null
+		available > 0 ? getBudgetStatus(Math.round(totalSpent + upcomingCommitments), Math.round(available)) : null
 	);
 </script>
 
 <div class="bg-surface rounded-xl shadow-md shadow-[var(--color-shadow)]">
 	<!-- Header -->
 	<div class="px-5 py-3.5 flex items-center justify-between">
-		<h2 class="text-xs font-medium uppercase tracking-wider text-charcoal-muted">Cash Flow</h2>
+		<h2 class="text-xs font-medium uppercase tracking-wider text-charcoal-muted">Monthly budget</h2>
 		{#if onEditBudget}
 			<button
 				onclick={onEditBudget}
@@ -65,7 +66,7 @@
 
 				<!-- Saved -->
 				<div class="flex items-baseline">
-					<span class="text-charcoal-soft text-sm">− Saved</span>
+					<span class="text-charcoal-soft text-sm">− Committed savings</span>
 					<span class="ledger-line"></span>
 					<span class="font-mono text-charcoal-soft">{formatCurrency(saved)}</span>
 				</div>
@@ -83,24 +84,30 @@
 
 				<!-- Available -->
 				<div class="flex items-baseline">
-					<span class="text-charcoal-soft text-sm">Available</span>
+					<span class="text-charcoal-soft text-sm">Spending budget</span>
 					<span class="ledger-line"></span>
 					<span class="font-mono font-medium text-charcoal">{formatCurrency(available)}</span>
 				</div>
 
 				<!-- Spent -->
 				<div class="flex items-baseline">
-					<span class="text-charcoal-soft text-sm">− Spent</span>
+					<span class="text-charcoal-soft text-sm">− Recorded spending</span>
 					<span class="ledger-line"></span>
 					<span class="font-mono text-charcoal-soft">{formatCurrency(totalSpent)}</span>
 				</div>
 
 				<!-- Divider -->
+				<div class="flex items-baseline">
+					<span class="text-charcoal-soft text-sm">− Upcoming commitments</span>
+					<span class="ledger-line"></span>
+					<span class="font-mono text-charcoal-soft">{formatCurrency(upcomingCommitments)}</span>
+				</div>
+				<p class="text-xs text-charcoal-muted">Your share, including future entries and unmatched bills. Planned savings are reserved.</p>
 				<div class="border-t border-theme my-2"></div>
 
 				<!-- Surplus - Hero Element -->
 				<div class="flex items-baseline">
-					<span class="text-charcoal-soft text-sm">Surplus</span>
+					<span class="text-charcoal-soft text-sm">Remaining monthly budget</span>
 					<span class="ledger-line"></span>
 					<span
 						class="font-mono text-2xl font-medium flex items-center gap-2 {surplus >= 0 ? 'text-success-500' : 'text-danger-500'}"

@@ -268,6 +268,7 @@
 			</div>
 
 			<!-- Goal Status -->
+			<p class="text-xs text-charcoal-muted mt-2">Status based on recent contributions. <a href="/planning" class="text-primary-600">Compare all goals against one funding pool →</a></p>
 			<div class="mt-2 flex items-center justify-between text-xs">
 				<div class="text-charcoal-muted">
 					<span class="font-mono">{Math.round(goalProgress)}%</span> complete

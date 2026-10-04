@@ -10,8 +10,10 @@ import { sumCurrency } from '$lib/utils/currency';
 const SOURCES_AFFECTING_AVAILABLE: ContributionSource[] = ['bank_transfer', 'other'];
 
 async function validateContribution(contribution: Omit<SavingsContribution, 'id' | 'createdAt' | 'updatedAt'>): Promise<void> {
+	if (contribution.kind !== undefined && !['contribution', 'withdrawal'].includes(contribution.kind)) throw new Error('Invalid savings event kind');
+	if (contribution.kind === 'withdrawal' && !['bank_transfer', 'other'].includes(contribution.source)) throw new Error('Withdrawals must return money to the monthly budget');
 	if (!validateDate(contribution.date).isValid || !(contribution.date instanceof Date)) throw new Error('Invalid date');
-	if (!validateAmount(contribution.amount).isValid) throw new Error('Invalid contribution amount');
+	if (!validateAmount(contribution.kind === 'withdrawal' ? -contribution.amount : contribution.amount).isValid) throw new Error('Invalid contribution amount');
 	if (!Number.isSafeInteger(contribution.accountId) || !(await getSavingsAccount(contribution.accountId))) throw new Error('Missing savings account reference');
 	if (!['payroll_deduction', 'bank_transfer', 'interest', 'employer_match', 'other'].includes(contribution.source)) throw new Error('Invalid contribution source');
 }
@@ -21,6 +23,8 @@ export async function addContribution(
 ): Promise<number> {
 	return runMutation(['savingsAccounts', 'savingsContributions'], async () => {
 		await validateContribution(contribution);
+		const balanceAccount = await getSavingsAccount(contribution.accountId);
+		if (contribution.kind === 'withdrawal' && balanceAccount?.accountType === 'savings' && sumCurrency([balanceAccount.currentBalance ?? 0, contribution.amount]) < 0) throw new Error('Withdrawal exceeds allocated savings');
 		const now = new Date();
 
 		const newContribution: Omit<SavingsContribution, 'id'> = {

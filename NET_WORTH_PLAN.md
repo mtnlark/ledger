@@ -204,9 +204,7 @@ This is the crux of how read-only balances coexist with the current setup.
 `SavingsAccount` (planning + goals) and a `LinkedAccount` (net worth + actual balance).
 That duplication is the accepted price of separating intent from reality in v1.
 
-**Optional v2 (not now):** add `LinkedAccount.savingsAccountId` to *link* the two
-non-destructively and surface the delta — "planned − actual = committed but not yet
-settled" (i.e. pending transfers). Purely additive; never overwrites.
+**Implemented planning link:** `SavingsAccount.linkedAccountId` references the corresponding real savings account. Multiple goals can use that account with explicit allocations, checked against its latest balance. Planning displays both balances and labels their delta as an **unexplained difference requiring review**, with the bank balance date/status. Balances alone cannot establish that a transfer is pending. Bank sync never overwrites the savings allocation. See `docs/planning.md`.
 
 ## 8. Open questions for review
 1. ~~Separate "Net Worth" page vs. fold into "Savings"?~~ **Resolved:** separate page.

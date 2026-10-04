@@ -365,7 +365,7 @@ export async function getRecurringSuggestions(month: string, providedTransaction
 	const cancelledSubs = await getCancelledSubscriptions();
 
 	const allTxns = providedTransactions ?? await db.transactions.toArray();
-	const allPurchases = groupTransactionsIntoPurchases(allTxns);
+	const allPurchases = groupTransactionsIntoPurchases(allTxns.filter(t => t.amount > 0 && !t.refundOfTransactionId && !t.isExpectedOneOff));
 
 	const monthStart = parseMonthKey(month);
 	const nextMonth = new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 1);
@@ -462,6 +462,7 @@ export async function getRecurringSuggestions(month: string, providedTransaction
 	let suggestions = Array.from(suggestionsMap.values());
 
 	suggestions = suggestions.filter((suggestion) => !isAlreadyAdded(suggestion, monthPurchases));
+	suggestions = suggestions.filter(s => !(settings.planning?.schedules ?? []).some(p => p.active && normalizeMerchant(p.merchant) === normalizeMerchant(s.merchant) && (p.amountType === 'variable' || currencyEquals(p.amount, s.expectedAmount))));
 
 	// Sort by expected date, then amount
 	suggestions.sort((a, b) => {

@@ -34,6 +34,7 @@ interface AddTransactionData {
 	notes?: string;
 	isEssential: boolean;
 	isSubscription: boolean;
+	isExpectedOneOff?: boolean;
 	subscriptionFrequency?: 'monthly' | 'semi-annual' | 'annual';
 }
 
@@ -46,8 +47,10 @@ export interface SplitTransactionFormData {
 	splitValue: number;
 	isEssential: boolean;
 	isSubscription: boolean;
+	isExpectedOneOff?: boolean;
 	subscriptionFrequency?: 'monthly' | 'semi-annual' | 'annual';
-	splits: { categoryId: number; amount: number }[];
+	splits: { categoryId: number; amount: number; notes?: string }[];
+	notes?: string;
 }
 
 export interface TransactionUpdateData {
@@ -121,7 +124,9 @@ export function setupDashboardActions(ctx: DashboardContext) {
 						splitValue: data.splitValue,
 						isEssential: data.isEssential,
 						isSubscription: data.isSubscription,
-						subscriptionFrequency: data.subscriptionFrequency
+						isExpectedOneOff: data.isExpectedOneOff,
+						subscriptionFrequency: data.subscriptionFrequency,
+						notes: data.notes
 					},
 					data.splits
 				);

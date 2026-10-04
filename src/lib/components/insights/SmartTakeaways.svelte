@@ -1,15 +1,16 @@
 <script lang="ts">
 	import { TrendingUp, TrendingDown, AlertTriangle, Gauge, Receipt, Store, BarChart3, PiggyBank, ChevronDown, ChevronUp, Trophy, Flame, PartyPopper } from 'lucide-svelte';
 	import { getMonthKey, navigateMonth, parseMonthKey } from '$lib/db';
-	import { CONTRIBUTION_SOURCES, type Transaction, type Category, type MonthlyBudget, type SavingsContribution, type CompletedGoal, type Settings, type CategoryBudget } from '$lib/db';
+	import { type Transaction, type Category, type MonthlyBudget, type SavingsContribution, type CompletedGoal, type Settings, type CategoryBudget } from '$lib/db';
 	import { config } from '$lib/config';
 	import { getInsightsEngine } from '$lib/insights';
-	import { computeStdDev } from '$lib/insights/calculations/stats';
+	import { calculateForecast } from '$lib/planning/forecast';
+	import { emptyPlanning } from '$lib/planning/types';
 	import { computeSavingsReview } from '$lib/insights/calculations/month-review';
 	import { formatCurrency, formatPercentage } from '$lib/utils/format-helpers';
 	import { filterUpToDate } from '$lib/utils/date-helpers';
 	import { getBudgetStatus } from '$lib/utils/budget-status';
-	import { sumCurrency, roundCurrency } from '$lib/utils/currency';
+	import { roundCurrency } from '$lib/utils/currency';
 	import { getUserAmount } from '$lib/insights/calculations/spending';
 	import { groupTransactionsIntoPurchases } from '$lib/utils/transaction-grouping';
 
@@ -28,6 +29,7 @@
 		settings?: Settings | null;
 		// Category budgets for budget context
 		categoryBudgets?: CategoryBudget[];
+		rolloverAdjustment?: number;
 	}
 
 	let {
@@ -41,7 +43,8 @@
 		allContributions = [],
 		allBudgets = [],
 		settings = null,
-		categoryBudgets = []
+		categoryBudgets = [],
+		rolloverAdjustment = 0
 	}: Props = $props();
 
 	const engine = getInsightsEngine();
@@ -95,23 +98,7 @@
 	// Transactions up to today (excludes future-dated recurring entries) for pace calculations
 	let pastTransactions = $derived(isCurrentMonth ? filterUpToDate(currentMonthTransactions) : []);
 
-	// Calculate savings that affect available (bank_transfer and other sources only)
-	let savedFromContributions = $derived.by(() => {
-		const affectingAvailable = contributions.filter(
-			(c) => CONTRIBUTION_SOURCES[c.source]?.affectsAvailable
-		);
-		return sumCurrency(affectingAvailable.map((c) => c.amount));
-	});
-
-	// Calculate pace projection (only meaningful for current month)
-	let paceProjection = $derived.by(() => {
-		if (!isCurrentMonth) return null;
-		const today = new Date();
-		const currentDay = today.getDate();
-		const daysInMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
-		const totalSpent = engine.getTotalSpent(pastTransactions, `${selectedMonth}-past`);
-		return engine.getPaceProjection(totalSpent, budget, savedFromContributions, currentDay, daysInMonth, config.insights.pace.minMonthFraction, selectedMonth);
-	});
+	let budgetForecast = $derived(isCurrentMonth && budget ? calculateForecast({ month: selectedMonth, transactions: allTransactions, contributions: allContributions.length ? allContributions : contributions, planning: settings?.planning ?? emptyPlanning(), income: budget.income, rolloverAdjustment }) : null);
 
 	// Get previous month for comparison
 	let previousMonthKey = $derived(navigateMonth(selectedMonth, -1));
@@ -128,15 +115,6 @@
 			const txs = getTransactionsForMonth(month);
 			return engine.getTotalSpent(txs, month);
 		});
-	});
-
-	// Compute historical spending stats for pace projection context
-	let monthlyTotalStats = $derived.by(() => {
-		if (historicalMonthlyTotals.length < 2) return null;
-		const mean = historicalMonthlyTotals.reduce((s, v) => s + v, 0) / historicalMonthlyTotals.length;
-		const sd = computeStdDev(historicalMonthlyTotals);
-		if (sd === 0) return null;
-		return { mean, stdDev: sd };
 	});
 
 	// Fallback: Spending velocity comparison (current month only)
@@ -475,18 +453,12 @@
 			});
 		}
 
-		// Add pace projection
-		if (paceProjection) {
-			const rangeContext = monthlyTotalStats
-				? ` (typical: ${formatCurrency(Math.round(monthlyTotalStats.mean - monthlyTotalStats.stdDev))}–${formatCurrency(Math.round(monthlyTotalStats.mean + monthlyTotalStats.stdDev))})`
-				: '';
+		if (budgetForecast && budgetForecast.remainder !== null) {
 			items.push({
 				type: 'pace',
 				icon: Gauge,
-				iconColor: paceProjection.isOverBudget ? 'text-danger-500' : 'text-success-500',
-				text: paceProjection.isOverBudget
-					? `On pace to spend ${formatCurrency(paceProjection.projected)} (${paceProjection.percentOfBudget}% of budget)`
-					: `On pace to spend ${formatCurrency(paceProjection.projected)} this month${rangeContext}`
+				iconColor: budgetForecast.remainder < 0 ? 'text-danger-500' : 'text-success-500',
+				text: `Expected month-end remainder: ${formatCurrency(budgetForecast.remainder)} (budget estimate)`
 			});
 		}
 

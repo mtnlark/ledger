@@ -37,7 +37,7 @@
 		if (isOpen && contribution) {
 			dateStr = formatDateForInput(new Date(contribution.date));
 			accountId = contribution.accountId;
-			amountStr = contribution.amount.toString();
+			amountStr = Math.abs(contribution.amount).toString();
 			source = contribution.source;
 			notes = contribution.notes ?? '';
 			isSubmitting = false;
@@ -64,7 +64,7 @@
 			await updateContribution(contribution.id, {
 				date: parseLocalDate(dateStr),
 				accountId: accountId as number,
-				amount,
+				amount: contribution.kind === 'withdrawal' ? -amount : amount,
 				source,
 				notes: notes.trim() || undefined
 			});

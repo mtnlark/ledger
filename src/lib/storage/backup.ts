@@ -1,4 +1,5 @@
 import type { StoredData, PersistedTableName } from './types';
+import { validatePlanningData } from '$lib/planning/validation';
 
 export const TABLE_NAMES: PersistedTableName[] = ['transactions', 'categories', 'monthlyBudgets', 'categoryBudgets', 'settings', 'savingsAccounts', 'savingsContributions', 'linkedAccounts', 'balanceSnapshots'];
 export interface BackupPreview {
@@ -25,7 +26,7 @@ const required: Record<string, string[]> = {
 	linkedAccounts: ['name', 'institution', 'accountClass', 'accountType', 'currentBalance', 'source', 'lastSyncStatus', 'sortOrder', 'isActive', 'createdAt', 'updatedAt'],
 	balanceSnapshots: ['accountId', 'balance', 'source', 'capturedAt'], settings: ['partnerName', 'defaultSplitType', 'defaultSplitValue', 'currency', 'theme']
 };
-const numeric = new Set(['amount', 'partnerShare', 'splitValue', 'income', 'savedAmount', 'budgetAmount', 'currentBalance', 'targetAmount', 'balance', 'sortOrder', 'defaultSplitValue', 'migrationVersion']);
+const numeric = new Set(['amount', 'partnerShare', 'splitValue', 'income', 'savedAmount', 'budgetAmount', 'currentBalance', 'targetAmount', 'balance', 'sortOrder', 'defaultSplitValue', 'migrationVersion', 'settledAmount']);
 export const DATE_FIELDS = new Set(['date', 'createdAt', 'updatedAt', 'settledDate', 'deletedAt', 'targetDate', 'lastSyncedAt', 'upstreamBalanceAt', 'capturedAt', 'cancelledDate', 'completedDate']);
 const enums: Record<string, string[]> = {
 	splitType: ['percentage', 'fixed'], defaultSplitType: ['percentage', 'fixed'], theme: ['light', 'dark', 'system'],
@@ -33,6 +34,7 @@ const enums: Record<string, string[]> = {
 	subscriptionFrequency: ['monthly', 'semi-annual', 'annual']
 };
 function validateSettingsLists(settings: Row, allowDateDefects = false): void {
+	if (settings.planning !== undefined) validatePlanningData(settings.planning);
 	for (const name of ['dismissedRecurring', 'confirmedActiveSubscriptions']) {
 		const value = settings[name];
 		if (value !== undefined && (!Array.isArray(value) || value.some((item) => typeof item !== 'string'))) fail(`settings.${name} must be a text array`);
@@ -101,6 +103,7 @@ function validateData(input: unknown, preserveMissingReferences: boolean, allowD
 			if (table === 'savingsAccounts' && !['savings', 'retirement', 'investment'].includes(entry.accountType as string)) fail('invalid savings account type');
 			if (table === 'linkedAccounts' && !['checking', 'savings', 'credit', 'investment', 'retirement', 'loan', 'other'].includes(entry.accountType as string)) fail('invalid linked account type');
 			if (table === 'savingsContributions' && !['payroll_deduction', 'bank_transfer', 'interest', 'employer_match', 'other'].includes(entry.source as string)) fail('invalid contribution source');
+			if (table === 'savingsContributions' && entry.kind !== undefined && (!['contribution', 'withdrawal'].includes(entry.kind as string) || (entry.kind === 'withdrawal' ? !((entry.amount as number) < 0) : !((entry.amount as number) > 0)))) fail('invalid savings event');
 			if (['linkedAccounts', 'balanceSnapshots'].includes(table) && !['manual', 'simplefin'].includes(entry.source as string)) fail('invalid balance source');
 		}
 		ids.set(table, seen);
@@ -110,7 +113,7 @@ function validateData(input: unknown, preserveMissingReferences: boolean, allowD
 	const transactionsById = new Map((normalized.transactions as Row[]).map((row) => [row.id, row]));
 	for (const table of TABLE_NAMES.filter((name) => name !== 'settings')) {
 		for (const row of normalized[table] as Row[]) {
-			for (const [key, target] of [['categoryId', 'categories'], ['parentTransactionId', 'transactions'], ['accountId', table === 'savingsContributions' ? 'savingsAccounts' : 'linkedAccounts']]) {
+			for (const [key, target] of [['categoryId', 'categories'], ['parentTransactionId', 'transactions'], ['refundOfTransactionId', 'transactions'], ['linkedAccountId', 'linkedAccounts'], ['accountId', table === 'savingsContributions' ? 'savingsAccounts' : 'linkedAccounts']]) {
 				if (row[key] === undefined) continue;
 				if (typeof row[key] !== 'number' || !Number.isSafeInteger(row[key]) || (row[key] as number) <= 0) fail(`${table} ${row.id} has an invalid ${key}`);
 				if (!ids.get(target)?.has(row[key] as number)) {
@@ -124,7 +127,26 @@ function validateData(input: unknown, preserveMissingReferences: boolean, allowD
 				if (!parent && preserveMissingReferences) continue;
 				if (parent?.id === row.id || !parent?.isSplitParent || parent.parentTransactionId !== undefined) fail('invalid split parent reference');
 			}
+			if (row.refundOfTransactionId !== undefined) {
+				const original = transactionsById.get(row.refundOfTransactionId);
+				if ((row.amount as number) >= 0 || original?.id === row.id || original?.refundOfTransactionId !== undefined || original?.isSplitParent) fail('invalid refund reference');
+			}
 		}
+	}
+	const planning = (normalized.settings as Row | null)?.planning;
+	if (planning) {
+		validatePlanningData(planning);
+		const reference = (id: number, target: string) => {
+			if (!ids.get(target)?.has(id)) {
+				const message = `planning has a missing ${target} reference (${id})`;
+				if (!preserveMissingReferences) fail(message);
+				referenceWarnings.push(message);
+			}
+		};
+		for (const schedule of planning.schedules) for (const id of [schedule.categoryId, ...(schedule.allocations ?? []).map(a => a.categoryId)]) reference(id, 'categories');
+		for (const plan of planning.savingsPlans) reference(plan.accountId, 'savingsAccounts');
+		for (const template of planning.templates) for (const id of [template.entry.categoryId, ...(template.splits ?? []).map(s => s.categoryId)]) reference(id, 'categories');
+		for (const payment of planning.settlements) for (const allocation of payment.allocations) reference(allocation.transactionId, 'transactions');
 	}
 	return { data: normalized as unknown as StoredData, counts, missingTables, warnings: [...referenceWarnings, ...(preserveMissingReferences ? [] : missingTables.map((name) => `Legacy backup omits ${name}; this table will be emptied.`))] };
 }

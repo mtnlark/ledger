@@ -98,7 +98,8 @@ export async function swapLinkedAccountOrder(idA: number, idB: number): Promise<
 
 /** Deletes the account and its entire snapshot history. */
 export async function deleteLinkedAccount(id: number): Promise<void> {
-	return runMutation(['linkedAccounts', 'balanceSnapshots'], async () => {
+	return runMutation(['linkedAccounts', 'balanceSnapshots', 'savingsAccounts'], async () => {
+		await db.savingsAccounts.filter(a => a.linkedAccountId === id).modify({ linkedAccountId: undefined });
 		await db.balanceSnapshots.where('accountId').equals(id).delete();
 		await db.linkedAccounts.delete(id);
 	});

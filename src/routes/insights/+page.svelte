@@ -79,6 +79,7 @@
 	let appSettings = $state<Settings | null>(null);
 	let activeTab = $state('overview');
 	let categoryBudgets = $state<CategoryBudget[]>([]);
+	let rolloverAdjustment = $state(0);
 	let linkedAccounts = $state<LinkedAccount[]>([]);
 	let balanceSnapshots = $state<BalanceSnapshot[]>([]);
 
@@ -165,7 +166,9 @@
 			selectedMonthTransactions = await getTransactionsByMonth(selectedMonth);
 			budget = await getBudgetForMonth(selectedMonth);
 			selectedMonthContributions = await getAllContributionsForMonth(selectedMonth);
-			categoryBudgets = effectiveBudgetRows(await getEffectiveBudgetsForMonth(selectedMonth), selectedMonth);
+			const effective = await getEffectiveBudgetsForMonth(selectedMonth);
+			categoryBudgets = effectiveBudgetRows(effective, selectedMonth);
+			rolloverAdjustment = effective.carryoverTotal - effective.deficitCarried;
 			// Get trends for all available months
 			monthlyTrends = await getMonthlySpendingTrends(availableMonths);
 			// Net worth data (month-independent)
@@ -218,6 +221,7 @@
 		budget = monthBudget;
 		selectedMonthContributions = monthContributions;
 		categoryBudgets = effectiveBudgetRows(monthCategoryBudgets, month);
+		rolloverAdjustment = monthCategoryBudgets.carryoverTotal - monthCategoryBudgets.deficitCarried;
 	}
 
 	// Reload subscription-related data when subscriptions change
@@ -310,6 +314,7 @@
 						{allContributions}
 						{allBudgets}
 						settings={appSettings}
+						{rolloverAdjustment}
 						{categoryBudgets}
 					/>
 					<QuickStatsRow

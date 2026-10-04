@@ -9,6 +9,7 @@
 	import { toast } from '$lib/stores/toast';
 	import SettlementTracker from '$lib/components/SettlementTracker.svelte';
 	import Skeleton from '$lib/components/Skeleton.svelte';
+	import SettlementPayments from '$lib/components/SettlementPayments.svelte';
 
 	// State
 	let isLoading = $state(true);
@@ -104,6 +105,7 @@
 				</div>
 			</div>
 		{:else}
+			<SettlementPayments transactions={unsettledTransactions} payments={settings.planning?.settlements ?? []} onSaved={loadData} />
 			<SettlementTracker
 				transactions={unsettledTransactions}
 				{categories}

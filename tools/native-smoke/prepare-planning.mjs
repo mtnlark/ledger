@@ -1,0 +1,21 @@
+import { execFileSync } from 'node:child_process';
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { randomUUID } from 'node:crypto';
+const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
+const workspace = mkdtempSync('/private/tmp/ledger-planning-dev-');
+const files = execFileSync('git', ['ls-files', '-z', '--cached', '--others', '--exclude-standard'], { cwd: root, encoding: 'utf8' }).split('\0').filter(Boolean);
+for (const name of files) { const destination = resolve(workspace, name); mkdirSync(dirname(destination), { recursive: true }); cpSync(resolve(root, name), destination); }
+symlinkSync(resolve(root, 'node_modules'), resolve(workspace, 'node_modules'));
+symlinkSync(resolve(root, 'src-tauri/target'), resolve(workspace, 'src-tauri/target'));
+const route = resolve(workspace, 'src/routes/audit-smoke'); mkdirSync(route, { recursive: true });
+cpSync(resolve(root, 'tools/native-smoke/planning.svelte'), resolve(route, '+page.svelte'));
+const layout = resolve(workspace, 'src/routes/+layout.svelte');
+writeFileSync(layout, readFileSync(layout, 'utf8').replace("$page.url.pathname.startsWith('/quick-add')", "$page.url.pathname.startsWith('/quick-add') || $page.url.pathname.startsWith('/audit-smoke')"));
+const identifier = `app.ledger.planningdev${randomUUID().replaceAll('-', '').slice(0, 12)}`;
+const config = { identifier, productName: 'Ledger Planning Dev', build: { beforeDevCommand: '', devUrl: 'http://127.0.0.1:5175' }, app: { windows: [{ label: 'main', title: 'Ledger Planning Dev', url: 'audit-smoke', width: 1200, height: 800 }], security: { devCsp: null } } };
+writeFileSync(resolve(workspace, 'planning-dev.json'), JSON.stringify(config));
+const manifest = { workspace, identifier, dataDir: `${process.env.HOME}/Library/Application Support/${identifier}` };
+writeFileSync('/private/tmp/ledger-planning-dev-manifest.json', JSON.stringify(manifest, null, 2));
+process.stdout.write(JSON.stringify(manifest, null, 2));

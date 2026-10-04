@@ -182,6 +182,7 @@
 		<!-- Title + month picker -->
 		<div class="flex items-center justify-between mb-5">
 			<h1 class="font-display text-2xl font-medium text-charcoal">Savings</h1>
+			<a href="/planning" class="text-sm text-primary-600">Plan contributions and compare bank balances</a>
 			<MonthPicker {currentMonth} {availableMonths} onMonthChange={handleMonthChange} />
 		</div>
 		{#if isLoading}

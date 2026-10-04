@@ -25,7 +25,9 @@ Its scope is intentionally focused:
 - Searches and filters by merchant, category, amount, date, and tag.
 - Splits one purchase across several categories while preserving it as one linked transaction group.
 - Separates future-dated entries from completed spending.
-- Detects recurring expenses and suggests entries at the start of a month.
+- Detects recurring bills and promotes accepted suggestions into editable schedules.
+- Repeats purchases today and saves templates with sharing, category splits, notes, and tags.
+- Records linked partial refunds without replacing purchases.
 - Uses soft deletion with a short undo window.
 
 ### Budgets
@@ -36,10 +38,20 @@ Its scope is intentionally focused:
 - Rolls unused amounts forward while treating earlier overspending as a separate one-month adjustment.
 - Uses the user’s share of a shared purchase in budget and cash-flow calculations.
 
+### Planning
+
+- Separates recorded spending, upcoming commitments, reserved savings, and remaining monthly budget.
+- Estimates the month-end remainder using bills and ordinary spending history.
+- Previews purchases and savings changes with visible effects on goal dates.
+- Funds competing goals from one pool and supports explicit allocations within a shared bank account.
+- Confirms record completeness and reviews one-offs in a three-step weekly workflow.
+
+See [planning behavior and calculations](docs/planning.md).
+
 ### Savings
 
 - Tracks savings, retirement, and investment accounts.
-- Records contributions by source, including transfers, payroll deductions, interest, and employer matches.
+- Records contributions by source, including transfers, payroll deductions, interest, and employer matches, plus explicit withdrawals.
 - Distinguishes contributions that reduce available cash from contributions that do not.
 - Tracks goal amounts and dates, projected completion, and the contribution needed to stay on schedule.
 
@@ -47,7 +59,7 @@ Its scope is intentionally focused:
 
 - Splits expenses with a partner by percentage or fixed amount.
 - Tracks the partner’s share separately from the user’s spending.
-- Shows the outstanding balance and supports batch settlement.
+- Records dated settlement payments with amounts and allocations, supports partial reimbursements and repayment of refund credits, and preserves legacy batch marking.
 
 ### Insights
 

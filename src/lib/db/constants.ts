@@ -1,3 +1,5 @@
+import type { PlanningData } from '$lib/planning/types';
+
 // Type definitions
 export interface Transaction {
 	id?: number;
@@ -14,6 +16,11 @@ export interface Transaction {
 	notes?: string;
 	isEssential: boolean; // Needs vs wants - defaults from category but can be overridden
 	isSubscription: boolean; // Recurring subscription payment
+	isExpectedOneOff?: boolean;
+	refundOfTransactionId?: number;
+	scheduleId?: string;
+	scheduleDate?: string;
+	settledAmount?: number; // Partial reimbursements, separate from your spending share
 	subscriptionFrequency?: 'monthly' | 'semi-annual' | 'annual'; // Billing frequency for subscriptions
 	parentTransactionId?: number; // Links split children to their parent transaction
 	isSplitParent?: boolean; // True if this transaction has been split into children
@@ -117,6 +124,7 @@ export interface SavingsAccount {
 	color?: string;
 	sortOrder: number;
 	currentBalance?: number; // Only tracked for 'savings' type
+	linkedAccountId?: number; // Reference only; bank balances never overwrite intentions
 	targetAmount?: number; // Goal target (e.g., $10,000)
 	targetDate?: Date; // Goal deadline (e.g., Dec 31, 2026)
 	isGoalPromptDismissed?: boolean;
@@ -130,6 +138,7 @@ export interface SavingsContribution {
 	accountId: number;
 	amount: number;
 	source: ContributionSource;
+	kind?: 'contribution' | 'withdrawal'; // Withdrawals have a negative amount
 	notes?: string;
 	createdAt: Date;
 	updatedAt: Date;
@@ -160,6 +169,7 @@ export interface Settings {
 	weeklyReviewEnabled: boolean; // Whether to send weekly review prompt (Monday 9am)
 	monthlyBudgetSetupEnabled: boolean; // Whether to send monthly budget setup prompt (1st of month)
 	migrationVersion?: number; // Tracks which migrations have been applied (skip all if current)
+	planning?: PlanningData;
 }
 
 // Default categories from your spreadsheets

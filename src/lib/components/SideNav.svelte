@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { page } from '$app/stores';
 	import { onMount } from 'svelte';
-	import { Home, Wallet, PiggyBank, TrendingUp, BarChart3, Users, Settings, ChevronLeft, ChevronRight } from 'lucide-svelte';
+	import { Home, Wallet, PiggyBank, TrendingUp, BarChart3, Users, Settings, ChevronLeft, ChevronRight, Calculator } from 'lucide-svelte';
 	import type { ComponentType } from 'svelte';
 
 	const STORAGE_KEY = 'ledger-sidebar-expanded';
@@ -15,6 +15,7 @@
 	const navItems: NavItem[] = [
 		{ href: '/', label: 'Dashboard', icon: Home as ComponentType },
 		{ href: '/budget', label: 'Budget', icon: Wallet as ComponentType },
+		{ href: '/planning', label: 'Planning', icon: Calculator as ComponentType },
 		{ href: '/savings', label: 'Savings', icon: PiggyBank as ComponentType },
 		{ href: '/networth', label: 'Net Worth', icon: TrendingUp as ComponentType },
 		{ href: '/insights', label: 'Insights', icon: BarChart3 as ComponentType },

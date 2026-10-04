@@ -14,10 +14,12 @@
 	import SubscriptionFields from './SubscriptionFields.svelte';
 	import { getMostCommonCategory } from '$lib/stores/merchants';
 	import TagAutocomplete from './TagAutocomplete.svelte';
+	import type { EntryTemplate } from '$lib/planning/types';
 
 	interface Props {
 		categories: Category[];
 		settings: Settings;
+		initialTemplate?: EntryTemplate | null;
 		onSubmit: (data: TransactionFormData) => void;
 		onSplitSubmit?: (data: SplitTransactionFormData) => void;
 		onCancel?: () => void;
@@ -35,6 +37,7 @@
 		notes?: string;
 		isEssential: boolean;
 		isSubscription: boolean;
+		isExpectedOneOff?: boolean;
 		subscriptionFrequency?: 'monthly' | 'semi-annual' | 'annual';
 	}
 
@@ -46,9 +49,11 @@
 		splitType: 'percentage' | 'fixed';
 		splitValue: number;
 		isEssential: boolean;
+		isExpectedOneOff?: boolean;
 		isSubscription: boolean;
 		subscriptionFrequency?: 'monthly' | 'semi-annual' | 'annual';
-		splits: { categoryId: number; amount: number }[];
+		splits: { categoryId: number; amount: number; notes?: string }[];
+		notes?: string;
 	}
 
 	interface SplitLine {
@@ -56,7 +61,7 @@
 		amount: number;
 	}
 
-	let { categories, settings, onSubmit, onSplitSubmit, onCancel }: Props = $props();
+	let { categories, settings, initialTemplate = null, onSubmit, onSplitSubmit, onCancel }: Props = $props();
 
 	let dateStr = $state(format(new Date(), 'yyyy-MM-dd'));
 	let merchant = $state('');
@@ -72,6 +77,7 @@
 	let notes = $state('');
 	let isEssential = $state(false);
 	let isSubscription = $state(false);
+	let oneOff = $state(false);
 	let subscriptionFrequency = $state<'monthly' | 'semi-annual' | 'annual'>('monthly');
 	let futureDateConfirmed = $state(false);
 	let isSubmitting = $state(false);
@@ -129,6 +135,17 @@
 	// Split mode state
 	let isSplitMode = $state(false);
 	let splitLines = $state<SplitLine[]>([]);
+	let splitNotes = $state<(string | undefined)[]>([]);
+	$effect(() => {
+		if (!initialTemplate) return;
+		const e = initialTemplate.entry;
+		oneOff = e.isExpectedOneOff ?? false;
+		dateStr = format(new Date(), 'yyyy-MM-dd'); merchant = e.merchant; amountStr = String(e.amount); categoryId = e.categoryId;
+		isShared = e.isShared; isSettled = false; splitType = e.splitType; splitValue = e.splitValue;
+		notes = e.notes ?? ''; isEssential = e.isEssential; isSubscription = e.isSubscription; subscriptionFrequency = e.subscriptionFrequency ?? 'monthly';
+		isSplitMode = !!initialTemplate.splits; splitLines = initialTemplate.splits?.map(s => ({ categoryId: s.categoryId, amount: s.amount })) ?? [];
+		splitNotes = initialTemplate.splits?.map(s => s.notes) ?? [];
+	});
 
 	// Get active categories for dropdowns
 	let activeCategories = $derived(categories.filter((c) => c.isActive));
@@ -197,6 +214,7 @@
 	function removeSplitLine(index: number) {
 		if (splitLines.length > 1) {
 			splitLines = splitLines.filter((_, i) => i !== index);
+			splitNotes = splitNotes.filter((_, i) => i !== index);
 		}
 	}
 
@@ -234,8 +252,10 @@
 					splitValue: validatedSplitValue,
 					isEssential,
 					isSubscription,
+					isExpectedOneOff: oneOff,
 					subscriptionFrequency: isSubscription ? subscriptionFrequency : undefined,
-					splits: splitLines
+					notes: notes.trim() || undefined,
+					splits: splitLines.map((line, index) => ({ ...line, notes: splitNotes[index] ?? (notes.trim() || undefined) }))
 				});
 			} else {
 				if (!categoryId) {
@@ -254,6 +274,7 @@
 					notes: notes.trim() || undefined,
 					isEssential,
 					isSubscription,
+					isExpectedOneOff: oneOff,
 					subscriptionFrequency: isSubscription ? subscriptionFrequency : undefined
 				});
 			}
@@ -269,6 +290,7 @@
 			notes = '';
 			isEssential = false;
 			isSubscription = false;
+			oneOff = false;
 			subscriptionFrequency = 'monthly';
 			isSplitMode = false;
 			splitLines = [];
@@ -317,6 +339,7 @@
 <!-- Form body only; the host (AddTransactionModal) provides card chrome and title. -->
 <form onsubmit={handleSubmit}>
 	<div class="px-6 py-5 space-y-4">
+		<label class="flex items-center gap-2 text-sm"><input type="checkbox" bind:checked={oneOff} /> Expected one-off (exclude from ordinary spending baseline)</label>
 		<!-- Date & Merchant Row -->
 		<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
 			<div>

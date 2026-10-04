@@ -188,6 +188,7 @@ export async function detectRecurringExpenses(
 	// Exclude transactions already tagged as subscriptions (they're shown in subscriptions section)
 	const merchantGroups = new Map<string, TransactionPurchase[]>();
 	for (const purchase of purchases) {
+		if (purchase.totalAmount <= 0 || purchase.sourceTransactions.some(t => t.refundOfTransactionId || t.isExpectedOneOff)) continue;
 		// Skip transactions already tagged as subscriptions
 		if (purchase.sourceTransactions.some((transaction) => transaction.isSubscription)) continue;
 

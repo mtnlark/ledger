@@ -8,6 +8,7 @@ import { getMonthDateRange } from '$lib/utils/date-helpers';
 import { getTransactionCache } from './transactionCache';
 import { sumCurrency, currencyEquals, getUserAmount } from '$lib/utils/currency';
 import { tagIndex } from './tags.svelte';
+import { formatDateForInput } from '$lib/utils/date-helpers';
 import { replaceTag, stripTag, appendTag } from '$lib/utils/tags';
 import {
 	validateAmount,
@@ -27,12 +28,22 @@ function invalidateTransactionCaches(): void {
 	invalidateRecurringCache();
 }
 
+async function requireNoFinancialReferences(ids: number[]): Promise<void> {
+	const selected = new Set(ids);
+	if ((await db.transactions.filter(t => !t.isDeleted && selected.has(t.refundOfTransactionId!)).count()) > 0) throw new Error('Remove linked refunds before deleting the original purchase');
+	const settings = await db.settings.get(1);
+	if (settings?.planning?.settlements.some(p => p.allocations.some(a => selected.has(a.transactionId)))) throw new Error('This purchase has recorded settlement payments; preserve it for payment history');
+	for (const row of await db.transactions.where('id').anyOf(ids).toArray()) {
+		if (row.refundOfTransactionId && (await db.transactions.get(row.refundOfTransactionId))?.settledAmount) throw new Error('This refund has been accounted for in settlement history');
+	}
+}
+
 async function requireCategory(id: number): Promise<void> {
 	if (!(await db.categories.get(id))) throw new Error('Missing category reference');
 }
 
 async function validateNewTransaction(transaction: NewTransaction & { id?: number }): Promise<void> {
-	const amountResult = validateAmount(transaction.amount);
+	const amountResult = validateAmount(transaction.refundOfTransactionId ? -transaction.amount : transaction.amount);
 	if (!amountResult.isValid) throw new Error(amountResult.error ?? 'Invalid amount');
 
 	const merchantResult = validateMerchant(transaction.merchant);
@@ -46,6 +57,15 @@ async function validateNewTransaction(transaction: NewTransaction & { id?: numbe
 	}
 
 	await requireCategory(transaction.categoryId);
+	if (transaction.refundOfTransactionId !== undefined) {
+		const original = await db.transactions.get(transaction.refundOfTransactionId);
+		if (!original || original.refundOfTransactionId || original.isDeleted || original.isSplitParent || transaction.amount >= 0 || formatDateForInput(transaction.date) < formatDateForInput(original.date)) throw new Error('Invalid refund reference or date');
+		const refunds = await db.transactions.filter(t => t.refundOfTransactionId === original.id && !t.isDeleted && t.id !== transaction.id).toArray();
+		if (sumCurrency([...refunds.map(t => -t.amount), -transaction.amount]) > original.amount) throw new Error('Refunds exceed the purchase amount');
+	} else if (transaction.id !== undefined) {
+		const refunds = await db.transactions.filter(t => t.refundOfTransactionId === transaction.id && !t.isDeleted).toArray();
+		if (sumCurrency(refunds.map(t => -t.amount)) > transaction.amount) throw new Error('Purchase amount cannot be below its refunds');
+	}
 	if (transaction.parentTransactionId !== undefined) {
 		const parent = await db.transactions.get(transaction.parentTransactionId);
 		if (!parent?.isSplitParent || parent.id === transaction.id || parent.parentTransactionId !== undefined) throw new Error('Invalid split parent reference');
@@ -58,7 +78,7 @@ async function validateNewTransaction(transaction: NewTransaction & { id?: numbe
 		const splitResult = validateSplitValue(
 			transaction.splitType,
 			transaction.splitValue,
-			transaction.amount
+			Math.abs(transaction.amount)
 		);
 		if (!splitResult.isValid) throw new Error('Invalid split value');
 	}
@@ -107,7 +127,10 @@ function createSplitChild(
 		partnerShare,
 		isSettled: parent.isSettled,
 		settledDate: parent.settledDate,
-		notes: split.notes,
+		notes: [...new Set([parent.notes, split.notes].filter((note): note is string => !!note))].join('\n') || undefined,
+		isExpectedOneOff: parent.isExpectedOneOff,
+		scheduleId: parent.scheduleId,
+		scheduleDate: parent.scheduleDate,
 		isEssential: parent.isEssential,
 		isSubscription: parent.isSubscription,
 		subscriptionFrequency: parent.subscriptionFrequency,
@@ -250,8 +273,11 @@ export async function updateTransaction(
 	return runMutation(['transactions', 'settings', 'categories'], async () => {
 		const existing = await db.transactions.get(id);
 		if (!existing) return;
+		if (existing.refundOfTransactionId && updates.amount !== undefined && updates.amount !== existing.amount) throw new Error('Refund amounts are fixed financial events. Remove an unallocated refund and record a correction.');
+		if (updates.refundOfTransactionId !== undefined && updates.refundOfTransactionId !== existing.refundOfTransactionId) throw new Error('Refund links cannot be changed');
 
 		await validateNewTransaction({ ...existing, ...updates });
+		if (existing.refundOfTransactionId && (updates.isShared !== undefined && updates.isShared !== existing.isShared || updates.splitValue !== undefined && updates.splitValue !== existing.splitValue || updates.splitType !== undefined && updates.splitType !== existing.splitType)) throw new Error('Refund sharing follows the original purchase');
 
 		// Recalculate partner share if relevant fields changed
 		let partnerShare = existing.partnerShare;
@@ -274,6 +300,8 @@ export async function updateTransaction(
 			partnerShare,
 			updatedAt: new Date()
 		};
+		if ((existing.settledAmount ?? 0) > 0 && Math.abs(partnerShare) < (existing.settledAmount ?? 0)) throw new Error('Partner share cannot be below recorded settlement payments');
+		if ((updates.amount !== undefined && updates.amount !== existing.amount || updates.isShared !== undefined && updates.isShared !== existing.isShared || updates.splitType !== undefined && updates.splitType !== existing.splitType || updates.splitValue !== undefined && updates.splitValue !== existing.splitValue) && (await db.transactions.filter(t => t.refundOfTransactionId === id && !t.isDeleted).count()) > 0) throw new Error('Purchase amount and sharing are fixed after a refund. Review its financial events first.');
 
 		await db.transactions.update(id, updatedFields);
 
@@ -306,6 +334,7 @@ export async function updateTransaction(
 
 export async function deleteTransaction(id: number): Promise<void> {
 	return runMutation(['transactions', 'settings', 'categories'], async () => {
+		await requireNoFinancialReferences([id]);
 		// Get transaction for tag index removal before deleting
 		const oldTx = await db.transactions.get(id);
 		await db.transactions.delete(id);
@@ -324,6 +353,7 @@ export async function deleteTransaction(id: number): Promise<void> {
 export async function bulkDeleteTransactions(ids: number[]): Promise<void> {
 	return runMutation(['transactions', 'settings', 'categories'], async () => {
 		if (ids.length === 0) return;
+		await requireNoFinancialReferences(ids);
 		await db.transactions.where('id').anyOf(ids).delete();
 
 		// Update the cache incrementally
@@ -341,6 +371,7 @@ export async function bulkDeleteTransactions(ids: number[]): Promise<void> {
 // Returns the transaction data for undo capture, or null if not found
 export async function softDeleteTransaction(id: number): Promise<Transaction | null> {
 	return runMutation(['transactions', 'settings', 'categories'], async () => {
+		await requireNoFinancialReferences([id]);
 		const transaction = await db.transactions.get(id);
 		if (!transaction) return null;
 
@@ -368,6 +399,7 @@ export async function softDeleteTransaction(id: number): Promise<Transaction | n
 export async function softDeleteTransactions(ids: number[]): Promise<Transaction[]> {
 	return runMutation(['transactions', 'settings', 'categories'], async () => {
 		if (ids.length === 0) return [];
+		await requireNoFinancialReferences(ids);
 
 		// Get transactions before deleting
 		const transactions = await db.transactions.where('id').anyOf(ids).toArray();
@@ -512,6 +544,7 @@ export async function splitTransaction(
 		if (!parent) {
 			throw new Error('Transaction not found');
 		}
+		if (parent.settledAmount || (await db.transactions.filter(t => t.refundOfTransactionId === id && !t.isDeleted).count()) > 0) throw new Error('Cannot split a purchase with refunds or recorded payments');
 
 		await validateNewTransaction(parent);
 		await validateSplitLines(splits, parent.amount);
@@ -599,6 +632,10 @@ export async function updateSplitGroup(
 		if (!parent.isSplitParent) {
 			throw new Error('Transaction is not a split');
 		}
+		const existingLines = await db.transactions.where('parentTransactionId').equals(parentId).toArray();
+		const idsWithHistory = new Set(existingLines.map(t => t.id));
+		const settings = await db.settings.get(1);
+		if (existingLines.some(t => (t.settledAmount ?? 0) > 0) || settings?.planning?.settlements.some(p => p.allocations.some(a => idsWithHistory.has(a.transactionId))) || (await db.transactions.filter(t => idsWithHistory.has(t.refundOfTransactionId) && !t.isDeleted).count()) > 0) throw new Error('Cannot replace split allocations with refunds or recorded settlement payments. Edit notes on individual entries.');
 
 		const now = new Date();
 		const total = sumCurrency(lines.map((l) => l.amount));
@@ -658,6 +695,9 @@ export async function updateSplitGroup(
 					notes: line.notes,
 					isEssential: parent.isEssential,
 					isSubscription: parent.isSubscription,
+					isExpectedOneOff: parent.isExpectedOneOff,
+					scheduleId: parent.scheduleId,
+					scheduleDate: parent.scheduleDate,
 					subscriptionFrequency: parent.subscriptionFrequency,
 					parentTransactionId: parentId,
 					createdAt: now,
@@ -722,7 +762,22 @@ export async function getUnsettledTransactions(): Promise<Transaction[]> {
 // Uses sumCurrency to avoid accumulated floating-point errors from many additions
 export async function calculateOutstandingBalance(): Promise<number> {
 	const unsettled = await getUnsettledTransactions();
-	return sumCurrency(unsettled.map((t) => t.partnerShare));
+	return sumCurrency(unsettled.map((t) => t.partnerShare - Math.sign(t.partnerShare) * (t.settledAmount ?? 0)));
+}
+
+/** A refund is a separate dated event, preserving the original purchase. */
+export async function addRefund(originalId: number, amount: number, date: Date, notes?: string): Promise<number> {
+	return runMutation(['transactions', 'settings', 'categories'], async () => {
+		if (!validateAmount(amount).isValid) throw new Error('Invalid refund amount');
+		const original = await db.transactions.get(originalId);
+		if (!original || original.isDeleted || original.isSplitParent || original.refundOfTransactionId) throw new Error('Choose a purchase allocation to refund');
+		if (formatDateForInput(date) > formatDateForInput(new Date())) throw new Error('Record a refund only after it occurs');
+		const prior = await db.transactions.filter(t => t.refundOfTransactionId === originalId && !t.isDeleted).toArray();
+		const cumulativeRefund = sumCurrency([amount, ...prior.map(t => -t.amount)]);
+		const cumulativePartner = Math.round(cumulativeRefund / original.amount * original.partnerShare * 100) / 100;
+		const partnerForRefund = sumCurrency([cumulativePartner, ...prior.map(t => t.partnerShare)]);
+		return addTransaction({ date, merchant: original.merchant, amount: -amount, categoryId: original.categoryId, refundOfTransactionId: originalId, isShared: original.isShared, splitType: 'percentage', splitValue: original.isShared ? partnerForRefund / amount : 0, isSettled: false, isEssential: original.isEssential, isSubscription: false, notes });
+	});
 }
 
 export async function getEarliestTransactionMonth(): Promise<string | null> {

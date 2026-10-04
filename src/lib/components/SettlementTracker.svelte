@@ -7,6 +7,7 @@
 	import { formatCurrency } from '$lib/utils/format-helpers';
 	import EmptyState from './EmptyState.svelte';
 	import ConfirmDialog from './ConfirmDialog.svelte';
+	import { outstandingForTransaction } from '$lib/stores/planning';
 
 	interface Props {
 		transactions: Transaction[];
@@ -77,7 +78,7 @@
 	let selectedBalance = $derived(
 		transactions
 			.filter((t) => selectedIds.has(t.id!))
-			.reduce((sum, t) => sum + t.partnerShare, 0)
+			.reduce((sum, t) => sum + outstandingForTransaction(t), 0)
 	);
 </script>
 
@@ -91,10 +92,12 @@
 			Outstanding with {settings.partnerName || 'Partner'}
 		</h2>
 		<p class="font-mono text-4xl font-medium {outstandingBalance > 0 ? 'text-charcoal' : 'text-success-500'}">
-			{formatCurrency(outstandingBalance)}
+			{formatCurrency(Math.abs(outstandingBalance))}
 		</p>
 		{#if outstandingBalance > 0}
 			<p class="text-sm text-charcoal-muted mt-1.5">{settings.partnerName || 'Your partner'} owes you</p>
+		{:else if outstandingBalance < 0}
+			<p class="text-sm text-charcoal-muted mt-1.5">You owe {settings.partnerName || 'your partner'} for refund credits</p>
 		{:else}
 			<p class="text-sm text-success-600 mt-1.5 inline-flex items-center gap-1">All settled! <Check size={14} strokeWidth={3} /></p>
 		{/if}
@@ -167,7 +170,7 @@
 
 					<!-- Amount -->
 					<div class="text-right">
-						<p class="font-mono font-medium text-charcoal">{formatCurrency(transaction.partnerShare)}</p>
+						<p class="font-mono font-medium text-charcoal">{formatCurrency(outstandingForTransaction(transaction))}</p>
 						<p class="text-xs text-charcoal-muted font-mono">of {formatCurrency(transaction.amount)}</p>
 					</div>
 				</button>
