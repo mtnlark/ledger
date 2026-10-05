@@ -1,3 +1,7 @@
+# Integrity audit implementation record
+
+Historical evidence for commit `8a740b5` and its verification run. Timings and test counts below describe that revision, not the current suite or pending work. Current behavior and commands are maintained in [architecture.md](architecture.md) and [development.md](development.md).
+
 The seven implementation stages below map each audit finding to its prevention code and regression coverage. Historical financial changes remain opt-in; the user's current ledger was not altered during development.
 
 | Stage | Findings | Change and evidence |

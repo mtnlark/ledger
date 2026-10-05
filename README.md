@@ -1,8 +1,22 @@
 # Ledger
 
-Ledger is a local-first macOS app for manual budgeting and personal-finance analysis. It combines transaction tracking, category budgets, savings plans, shared expenses, and net-worth balances in one desktop application.
+Ledger is a local-first macOS app for manual budgeting and personal-finance analysis. It combines transaction tracking, category budgets, savings goals, shared expenses, a month-end spending forecast, and net-worth balances in one desktop application.
 
 “Local-first” means the budget database stays on the Mac. Ledger has no hosted account, application server, or remote database. An optional iCloud backup copies a JSON backup to the user’s own iCloud Drive.
+
+## Documentation
+
+| Document | Purpose |
+| --- | --- |
+| [AGENTS.md](AGENTS.md) | Shared coding-agent instructions and financial invariants |
+| [Development guide](docs/development.md) | Setup, tests, isolated native checks, build and installation |
+| [Architecture](docs/architecture.md) | Source map, persistence lifecycle, schema-change checklist and UI conventions |
+| [Forecast](docs/planning.md) | Current estimate and preserved planning data |
+| [Net-worth design](NET_WORTH_PLAN.md) | Current balance history, SimpleFIN and credential boundary |
+| [Product roadmap](PRODUCT_ROADMAP.md) | Shipped work and unprioritized candidates |
+| [Integrity audit](docs/audit-fixes.md) | Historical fix evidence, regression coverage and benchmarks |
+
+Original proposals are preserved under [docs/history](docs/history/). Their commands, APIs and component names may be superseded; current guidance is in the documents above.
 
 ## Status
 
@@ -131,7 +145,7 @@ A durable write:
 
 Ledger keeps up to ten routine timestamped backups. Restore creates a fresh, verified recovery backup before changing records, bypassing the normal one-minute debounce. Historical repair preserves immutable, checksum-verified originals in a separate `originals/` directory. These originals are excluded from routine pruning and automatic recovery. If the main file cannot be parsed or fails its checksum, startup recovery tries `data.json.bak` first and then the timestamped backups from newest to oldest.
 
-A filesystem read failure is retried once. If it persists, initialization shows an error with Retry loading and blocks writes. Files and existing IndexedDB records remain intact. Startup selects and validates its snapshot before replacing IndexedDB. Content corruption still triggers recovery, with a verified copy of the damaged original retained first. Invalid dates, non-finite amounts, and serialization failures block saves before any backup or file rotation.
+A filesystem read failure is retried once. If it persists, initialization shows an error with Retry loading and blocks writes. Files and existing IndexedDB records remain intact. Startup selects and validates its snapshot before replacing IndexedDB. Content corruption triggers recovery, with a verified copy of the damaged original retained first. If no valid recovery candidate exists, the current implementation starts with defaults and displays a data-loss error. Invalid dates, non-finite amounts, and serialization failures block saves before any backup or file rotation. Automatic recovery reads local backups; the iCloud copy can be selected for explicit restore.
 
 Older Ledger versions could leave references to deleted categories or accounts. A readable primary file with those references is preserved at startup with a review warning; it is never silently replaced by an older backup. Restore and recovery candidates still require valid references.
 
@@ -165,7 +179,7 @@ Ledger uses SimpleFIN only to read account balances. It cannot import transactio
 
 Unlinked accounts retained as manual accounts can be explicitly reconnected in Settings. Reconnection keeps their IDs and balance history, and duplicate active external mappings are rejected. HTTP requests share a client with a 10-second connection timeout and a 30-second total timeout, covering both response headers and bodies. Token claims are never automatically retried. Timeout failures preserve last-good balances, settle account status, and release the sync lock for another attempt.
 
-The Rust backend connects to SimpleFIN and stores the account credential in the macOS Keychain. The Svelte frontend receives the balances but never sees that credential. It is not included in Ledger’s data file, local backups, or iCloud backups.
+The Rust backend connects to SimpleFIN and stores the account credential in the macOS Keychain. The Svelte frontend receives balances and link status; Rust never returns the stored credential to it. The linking input also accepts a supplied demo access URL. Credentials are not included in Ledger’s data file, local backups, or iCloud backups. See the [current command boundary and sync rules](NET_WORTH_PLAN.md).
 
 ## Technology
 
@@ -191,7 +205,8 @@ src/
 │   ├── db/                 Dexie schema, types, defaults, and migrations
 │   ├── insights/           Cached financial calculations
 │   ├── notifications/      Reminder scheduling and native delivery
-│   ├── services/           SimpleFIN frontend boundary
+│   ├── planning/           Forecast calculations and saved-data compatibility
+│   ├── services/           SimpleFIN and Quick Add frontend boundaries
 │   ├── storage/            Serialization, file persistence, and recovery
 │   ├── stores/             Data operations and reactive state
 │   └── utils/              Budget, transaction, date, import, and export logic
@@ -230,6 +245,8 @@ npm run dev
 
 The frontend-only server is useful for UI work, but it does not reproduce native storage, menu-bar, notification, Keychain, or SimpleFIN behavior.
 
+The default native dev app uses the same identifier and data directory as the installed Ledger app. Use the [isolated native smoke harnesses](tools/native-smoke/README.md) for fixture tests.
+
 Run the frontend checks:
 
 ```bash
@@ -241,6 +258,7 @@ npm run test:run
 Run the Rust checks:
 
 ```bash
+mkdir -p build
 cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
 cargo test --manifest-path src-tauri/Cargo.toml
 ```
@@ -250,6 +268,8 @@ Build the macOS application:
 ```bash
 npm run tauri:build
 ```
+
+`npm run build` builds only the static frontend; `tauri:build` builds it automatically before the desktop release. See the [development guide](docs/development.md) for test setup, build output, cache troubleshooting and installation.
 
 ## License
 

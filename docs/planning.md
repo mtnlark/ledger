@@ -1,5 +1,7 @@
 # Month-end spending forecast
 
+Current implementation: [dashboard](../src/routes/+page.svelte), [forecast card](../src/lib/components/BudgetForecastCard.svelte), [inferred bills](../src/lib/stores/forecast.ts) and [pure calculations](../src/lib/planning/forecast.ts). [Architecture](architecture.md) documents the persistence rules that also apply to saved planning data.
+
 Ledger keeps its familiar dashboard, transaction entry, savings, shared expenses, and weekly summary. The Planning tab, scenario previews, unified goal planner, review actions, templates, repeat buttons, and financial-event creation forms have been removed.
 
 The current-month dashboard shows **Expected month-end spending**: your share of recorded expenses, upcoming entries and estimated bills, plus remaining everyday spending. “How this is estimated” stays collapsed and shows the breakdown, historical spending range, reserved savings, and expected budget remainder. This is a budget estimate, not a forecast of bank balances or payment timing.
@@ -23,3 +25,5 @@ Savings contributions from `bank_transfer` and `other`, including future entries
 Existing `Settings.planning` schedules, savings plans, templates, settlements and completeness dates remain preserved and validated. Existing refunds, withdrawals, bank references and payment allocations retain their financial effects and reference protections. The UI simplification does not delete or migrate user records. The calculation and compatibility stores remain covered by tests.
 
 `tools/native-smoke/prepare-planning.mjs` creates a separate native dev app with fixture data and verifies the actual dashboard, forecast disclosure, navigation, familiar entry form, durable saves and restart. Stop dev processes before rebuilding production.
+
+Regression coverage lives in `src/lib/planning/forecast.test.ts`, `src/lib/stores/forecast.test.ts`, `src/lib/components/BudgetForecastCard.test.ts` and the compatibility tests in `src/lib/stores/planning.test.ts` and `src/tests/utils/form-split-migration.test.ts`. Run focused tests with `npm run test:run -- <test-path>`; follow [native smoke instructions](../tools/native-smoke/README.md) for real filesystem/restart checks.
