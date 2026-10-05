@@ -24,7 +24,6 @@
 	let amountStr = $state('');
 	let source = $state<'bank_transfer' | 'payroll_deduction' | 'interest' | 'employer_match' | 'other'>('bank_transfer');
 	let notes = $state('');
-	let withdrawal = $state(false);
 	let isSubmitting = $state(false);
 	let dateError = $state('');
 
@@ -37,7 +36,6 @@
 			amountStr = '';
 			source = 'bank_transfer';
 			notes = '';
-			withdrawal = false;
 			isSubmitting = false;
 			dateError = '';
 		}
@@ -62,9 +60,8 @@
 			await addContribution({
 				date: parseLocalDate(dateStr),
 				accountId: accountId as number,
-				amount: withdrawal ? -amount : amount,
-				kind: withdrawal ? 'withdrawal' : 'contribution',
-				source: withdrawal ? 'bank_transfer' : source,
+				amount,
+				source,
 				notes: notes.trim() || undefined
 			});
 			onSave();
@@ -83,8 +80,6 @@
 
 <ModalContainer {isOpen} title="Add Contribution" titleId="add-contribution-title" {onClose}>
 	<form onsubmit={handleSubmit} class="p-6 space-y-4">
-		<label class="flex items-center gap-2 text-sm"><input type="checkbox" bind:checked={withdrawal} /> Savings withdrawal</label>
-		{#if withdrawal}<p class="text-xs text-charcoal-muted">Reduces allocated goal funding and returns money to the monthly budget. Record any purchase separately.</p>{/if}
 		{#if dateError}<p role="alert">{dateError}</p>{/if}
 		<!-- Date & Amount Row -->
 		<div class="grid grid-cols-2 gap-4">
@@ -180,7 +175,7 @@
 				disabled={!dateStr || !accountId || !amountStr || isSubmitting}
 				class="flex-1 bg-primary-500 text-white py-2.5 px-4 rounded-lg font-medium hover:bg-primary-600 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-primary-500/25 focus:ring-2 focus:ring-primary-500/20 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-none transition-all duration-150"
 			>
-				{isSubmitting ? 'Saving...' : withdrawal ? 'Record withdrawal' : 'Add contribution'}
+				{isSubmitting ? 'Saving...' : 'Add Contribution'}
 			</button>
 			<button
 				type="button"

@@ -21,7 +21,7 @@
 		</div>
 		<p class="text-sm text-charcoal">
 			<span class="font-medium">{suggestionCount}</span>
-			expected recurring {suggestionCount === 1 ? 'bill' : 'bills'} to schedule this month
+			expected recurring {suggestionCount === 1 ? 'transaction' : 'transactions'} this month
 		</p>
 	</div>
 

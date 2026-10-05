@@ -23,7 +23,6 @@
 		categories: Category[];
 		settings?: Settings;
 		onEdit?: (transaction: Transaction) => void;
-		onRepeat?: (transaction: Transaction) => void;
 		onDelete?: (id: number) => void;
 		onBulkDelete?: (ids: number[]) => void;
 		onBulkCategoryChange?: (ids: number[], categoryId: number) => void;
@@ -47,7 +46,7 @@
 		onMerchantClick?: (merchant: string) => void;
 	}
 
-	let { transactions, categories, settings, onEdit, onRepeat, onDelete, onBulkDelete, onBulkCategoryChange, onBulkTagAdd, onBulkTagRemove, onEditSplit, onDeleteSplit, availableTags = [], onAddTransaction, selectionMode = false, onSelectionModeChange, onTagClick, allTransactions, resetKey = '', stickyOffset = 0, onMerchantClick }: Props = $props();
+	let { transactions, categories, settings, onEdit, onDelete, onBulkDelete, onBulkCategoryChange, onBulkTagAdd, onBulkTagRemove, onEditSplit, onDeleteSplit, availableTags = [], onAddTransaction, selectionMode = false, onSelectionModeChange, onTagClick, allTransactions, resetKey = '', stickyOffset = 0, onMerchantClick }: Props = $props();
 
 	// Selection mode state - use prop if provided, otherwise internal state
 	let internalSelectionMode = $state(false);
@@ -307,7 +306,6 @@
 		<!-- Actions (hidden in selection mode) -->
 		{#if !isSelectionMode && (onEdit || onDelete)}
 			<div class="flex gap-1 flex-shrink-0 opacity-0 group-hover/row:opacity-100 focus-within:opacity-100 transition-opacity">
-				{#if onRepeat && transaction.amount > 0}<button onclick={(e) => { e.stopPropagation(); onRepeat?.(transaction); }} class="p-2 text-xs text-primary-600 rounded-lg hover:bg-primary-50" aria-label="Repeat today">Repeat</button>{/if}
 				{#if onEdit}
 					<button
 						onclick={(e) => { e.stopPropagation(); onEdit?.(transaction); }}
@@ -449,7 +447,6 @@
 									<!-- Group-level actions, aligned with single-row controls -->
 									{#if onEditSplit || onDeleteSplit}
 										<div class="flex gap-1 flex-shrink-0 opacity-0 group-hover/split:opacity-100 focus-within:opacity-100 transition-opacity">
-											{#if onRepeat}<button onclick={(e) => { e.stopPropagation(); onRepeat?.(row.children[0]); }} class="p-2 text-xs text-primary-600 rounded-lg hover:bg-primary-50" aria-label="Repeat split today">Repeat</button>{/if}
 											{#if onEditSplit}
 												<button
 													type="button"

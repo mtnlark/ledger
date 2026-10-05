@@ -9,41 +9,13 @@
 		type WeekInReview
 	} from '$lib/utils/week-in-review';
 	import { formatCurrency } from '$lib/utils/format-helpers';
-	import type { Settings } from '$lib/db';
-	import type { BudgetForecast } from '$lib/planning/forecast';
-	import { confirmCompleteThrough, getPurchaseRows } from '$lib/stores/planning';
-	import { updateTransaction } from '$lib/stores/transactions';
-	import { formatDateForInput } from '$lib/utils/date-helpers';
-	import { getWeekRange, filterTransactionsInRange } from '$lib/utils/week-in-review';
 
 	interface Props {
 		allTransactions: Transaction[];
 		categories: Category[];
-		settings?: Settings;
-		forecast?: BudgetForecast;
-		onSaved?: () => Promise<void>;
 	}
 
-	let { allTransactions, categories, settings, forecast, onSaved }: Props = $props();
-	let completeDate = $state(formatDateForInput(getWeekRange(1).end));
-	let error = $state('');
-	let busy = $state(false);
-	let reviewCandidate = $derived(filterTransactionsInRange(allTransactions, getWeekRange(1).start, getWeekRange(1).end).filter(t => t.amount > 0 && !t.isExpectedOneOff && !t.isSubscription).sort((a, b) => b.amount - a.amount)[0]);
-	async function confirm() {
-		if (busy) return; busy = true;
-		try { await confirmCompleteThrough(completeDate); await onSaved?.(); } catch (e) { error = String(e); } finally { busy = false; }
-	}
-	async function markOneOff() {
-		if (!reviewCandidate || busy) return; busy = true;
-		try {
-			const { runMutation } = await import('$lib/storage/mutation');
-			await runMutation(['transactions', 'settings', 'categories'], async () => {
-				for (const row of await getPurchaseRows(reviewCandidate)) await updateTransaction(row.id!, { isExpectedOneOff: true });
-				if (reviewCandidate.parentTransactionId) await updateTransaction(reviewCandidate.parentTransactionId, { isExpectedOneOff: true });
-			});
-			await onSaved?.();
-		} catch (e) { error = String(e); } finally { busy = false; }
-	}
+	let { allTransactions, categories }: Props = $props();
 
 	let dismissed = $state(false);
 	let review = $state<WeekInReview | null>(null);
@@ -53,8 +25,8 @@
 	});
 
 	$effect(() => {
-		if (!dismissed && categories.length > 0) {
-			review = calculateWeekInReview(allTransactions, categories) ?? { totalSpent: 0, txCount: 0, topCategory: null, topMerchant: null, priorWeekTotal: 0, change: 0 };
+		if (!dismissed && allTransactions.length > 0 && categories.length > 0) {
+			review = calculateWeekInReview(allTransactions, categories);
 		}
 	});
 
@@ -151,11 +123,5 @@
 				{/if}
 			</div>
 		</div>
-		<ol class="mt-4 space-y-4 text-sm list-decimal list-inside">
-			<li><span class="font-medium">Confirm records are complete</span><p class="text-xs text-charcoal-muted mt-1">{settings?.planning?.completeThrough ? `Confirmed through ${settings.planning.completeThrough}.` : 'Entry activity does not confirm completeness.'} Zero-spending weeks can be confirmed.</p><label class="block mt-2 text-xs">Complete through<input type="date" max={formatDateForInput(new Date())} bind:value={completeDate} class="block w-full p-2 border border-theme rounded-lg bg-surface mt-1" /></label><button class="text-primary-600 mt-2" disabled={busy} onclick={confirm}>Confirm completeness</button></li>
-			<li><span class="font-medium">Review an expense</span>{#if reviewCandidate}<p class="text-xs text-charcoal-muted mt-1">{reviewCandidate.merchant} · {formatCurrency(reviewCandidate.amount)}. Was this expected outside your ordinary spending?</p><button class="text-primary-600 mt-2" disabled={busy} onclick={markOneOff}>Mark expected one-off</button>{:else}<p class="text-xs text-charcoal-muted mt-1">No ordinary expenses to review this week.</p>{/if}<a class="block text-primary-600 mt-2" href="/planning">Review recurring bills</a></li>
-			<li><span class="font-medium">Adjust the month ahead</span>{#if forecast?.remainder !== null && forecast?.remainder !== undefined}<p class="text-xs text-charcoal-muted mt-1">Expected remainder: {formatCurrency(forecast.remainder)}.</p>{/if}<a href="/planning" class="block text-primary-600 mt-2">Review budget and contributions</a></li>
-		</ol>
-		{#if error}<p role="alert" class="text-danger-600 text-xs mt-2">{error}</p>{/if}
 	</div>
 {/if}

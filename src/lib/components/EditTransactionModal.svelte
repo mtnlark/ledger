@@ -10,12 +10,6 @@
 	import EssentialToggle from './EssentialToggle.svelte';
 	import SubscriptionFields from './SubscriptionFields.svelte';
 	import TagAutocomplete from './TagAutocomplete.svelte';
-	import { getPurchaseRows, templateFromTransactions, saveTemplate } from '$lib/stores/planning';
-	import { getScheduleOccurrences } from '$lib/planning/forecast';
-	import { getMonthKey } from '$lib/db';
-	import { addRefund } from '$lib/stores/transactions';
-	import { formatDateForInput } from '$lib/utils/date-helpers';
-	import { formatCurrency } from '$lib/utils/format-helpers';
 
 	interface Props {
 		isOpen: boolean;
@@ -26,7 +20,6 @@
 		onSplit?: (transaction: Transaction) => void;
 		onCancelSubscription?: (merchant: string, amount?: number) => void;
 		onClose: () => void;
-		onEventSaved?: () => Promise<void>;
 	}
 
 	export interface TransactionUpdateData {
@@ -38,15 +31,12 @@
 		splitType: 'percentage' | 'fixed';
 		splitValue: number;
 		notes?: string;
-		isExpectedOneOff?: boolean;
-		scheduleId?: string;
-		scheduleDate?: string;
 		isEssential: boolean;
 		isSubscription: boolean;
 		subscriptionFrequency?: 'monthly' | 'semi-annual' | 'annual';
 	}
 
-	let { isOpen, transaction, categories, settings, onSave, onSplit, onCancelSubscription, onClose, onEventSaved }: Props = $props();
+	let { isOpen, transaction, categories, settings, onSave, onSplit, onCancelSubscription, onClose }: Props = $props();
 
 	// Confirmation state for subscription cancellation
 	let futureDateConfirmed = $state(false);
@@ -76,23 +66,6 @@
 	let isEssential = $state(false);
 	let isSubscription = $state(false);
 	let subscriptionFrequency = $state<'monthly' | 'semi-annual' | 'annual'>('monthly');
-	let oneOff = $state(false);
-	let scheduleLink = $state('');
-	let templateName = $state('');
-	let templateMessage = $state('');
-	let refundAmount = $state(0);
-	let refundDate = $state(formatDateForInput(new Date()));
-	let refundError = $state('');
-	async function recordRefund() {
-		if (!transaction?.id || isSubmitting) return;
-		isSubmitting = true; refundError = '';
-		try { await addRefund(transaction.id, refundAmount, parseLocalDate(refundDate)); await onEventSaved?.(); onClose(); } catch (e) { refundError = String(e); } finally { isSubmitting = false; }
-	}
-	let occurrences = $derived(getScheduleOccurrences(settings.planning?.schedules ?? [], dateStr.slice(0, 7) || getMonthKey(new Date())));
-	async function captureTemplate() {
-		if (!transaction || !templateName.trim()) return;
-		try { await saveTemplate(templateFromTransactions(await getPurchaseRows(transaction), templateName.trim())); templateMessage = 'Template saved'; } catch (e) { templateMessage = String(e); }
-	}
 
 	// Get selected category for essential default display
 	let selectedCategory = $derived(categories.find((c) => c.id === categoryId));
@@ -149,10 +122,6 @@
 			notes = transaction.notes ?? '';
 			isEssential = transaction.isEssential ?? false;
 			isSubscription = transaction.isSubscription ?? false;
-			oneOff = transaction.isExpectedOneOff ?? false;
-			scheduleLink = transaction.scheduleId ? `${transaction.scheduleId}|${transaction.scheduleDate}` : '';
-			templateName = transaction.merchant; templateMessage = '';
-			refundAmount = 0; refundDate = formatDateForInput(new Date()); refundError = '';
 			subscriptionFrequency = transaction.subscriptionFrequency ?? 'monthly';
 			futureDateConfirmed = false;
 			isSubmitting = false;
@@ -212,9 +181,6 @@
 				splitType,
 				splitValue: validatedSplitValue, // Use validated value
 				notes: notes.trim() || undefined,
-				isExpectedOneOff: oneOff,
-				scheduleId: scheduleLink.split('|')[0] || undefined,
-				scheduleDate: scheduleLink.split('|')[1] || undefined,
 				isEssential,
 				isSubscription,
 				subscriptionFrequency: isSubscription ? subscriptionFrequency : undefined
@@ -234,12 +200,6 @@
 			<form onsubmit={handleSubmit}>
 				<!-- Body -->
 				<div class="p-6 space-y-4">
-					{#if !transaction.refundOfTransactionId}
-						<details class="text-sm"><summary class="cursor-pointer text-primary-600">Record a partial or full refund</summary><div class="grid grid-cols-2 gap-3 mt-2"><label>Refund date<input type="date" max={formatDateForInput(new Date())} min={formatDateForInput(transaction.date)} bind:value={refundDate} class="block w-full p-2 border border-theme rounded-lg bg-surface-alt" /></label><label>Full refund amount<input type="number" min="0.01" max={transaction.amount} step="0.01" bind:value={refundAmount} class="block w-full p-2 border border-theme rounded-lg bg-surface-alt" /></label></div><p class="text-xs text-charcoal-muted mt-2">Save a {refundAmount > 0 ? formatCurrency(refundAmount) : ''} refund linked to this purchase{transaction.parentTransactionId ? ' allocation' : ''}. The original purchase stays recorded.</p><button type="button" disabled={isSubmitting || refundAmount <= 0} class="text-primary-600 mt-2" onclick={recordRefund}>Confirm refund</button>{#if refundError}<p role="alert" class="text-danger-600">{refundError}</p>{/if}</details>
-						<label class="flex items-center gap-2 text-sm"><input type="checkbox" bind:checked={oneOff} /> Expected one-off (kept in spending, excluded from ordinary baseline)</label>
-						{#if occurrences.length}<label class="block text-sm">Matched commitment<select bind:value={scheduleLink} class="block w-full p-2 border border-theme rounded-lg bg-surface-alt"><option value="">Automatic matching</option>{#each occurrences as c (`${c.schedule.id}-${c.date}`)}<option value={`${c.schedule.id}|${c.date}`}>{c.schedule.merchant} · {c.date}</option>{/each}</select></label>{/if}
-						<details class="text-sm"><summary class="cursor-pointer text-primary-600">Save recorded purchase as template</summary><label class="block mt-2">Template name<input bind:value={templateName} class="block w-full p-2 border border-theme rounded-lg bg-surface-alt" /></label><button type="button" class="text-primary-600 mt-2" onclick={captureTemplate}>Save template</button>{#if templateMessage}<p role="status">{templateMessage}</p>{/if}</details>
-					{:else}<p class="text-sm text-charcoal-muted">Refund linked to purchase #{transaction.refundOfTransactionId}. Amount and sharing are fixed financial events.</p>{/if}
 					<!-- Date & Merchant Row -->
 					<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
 						<div>
@@ -290,7 +250,7 @@
 								<input
 									type="number"
 									id="edit-amount"
-									readonly={!!transaction.refundOfTransactionId}
+								readonly={!!transaction.refundOfTransactionId}
 									bind:value={amountStr}
 									onblur={() => handleBlur('amount')}
 									step="0.01"

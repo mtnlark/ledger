@@ -164,18 +164,18 @@ function detectRecurringPattern(purchases: TransactionPurchase[]): PatternResult
  */
 export async function detectRecurringExpenses(
 	providedTransactions?: Transaction[],
-	options: { purchases?: TransactionPurchase[] } = {}
+	options: { purchases?: TransactionPurchase[]; skipCache?: boolean } = {}
 ): Promise<DetectedRecurring[]> {
 	// Return cached results if available
 	const cached = getCachedRecurring();
-	if (cached !== null) {
+	if (!options.skipCache && cached !== null) {
 		return cached;
 	}
 
 	const allTransactions = providedTransactions ?? await db.transactions.toArray();
 
 	if (allTransactions.length === 0) {
-		setCachedRecurring([]);
+		if (!options.skipCache) setCachedRecurring([]);
 		return [];
 	}
 
@@ -262,6 +262,6 @@ export async function detectRecurringExpenses(
 	detected.sort((a, b) => b.averageAmount - a.averageAmount);
 
 	// Cache the results
-	setCachedRecurring(detected);
+	if (!options.skipCache) setCachedRecurring(detected);
 	return detected;
 }

@@ -5,7 +5,7 @@
 	import { config } from '$lib/config';
 	import { getInsightsEngine } from '$lib/insights';
 	import { calculateForecast } from '$lib/planning/forecast';
-	import { emptyPlanning } from '$lib/planning/types';
+	import { emptyPlanning, type PlanningData } from '$lib/planning/types';
 	import { computeSavingsReview } from '$lib/insights/calculations/month-review';
 	import { formatCurrency, formatPercentage } from '$lib/utils/format-helpers';
 	import { filterUpToDate } from '$lib/utils/date-helpers';
@@ -30,6 +30,7 @@
 		// Category budgets for budget context
 		categoryBudgets?: CategoryBudget[];
 		rolloverAdjustment?: number;
+		forecastPlanning?: PlanningData;
 	}
 
 	let {
@@ -44,7 +45,8 @@
 		allBudgets = [],
 		settings = null,
 		categoryBudgets = [],
-		rolloverAdjustment = 0
+		rolloverAdjustment = 0,
+		forecastPlanning = emptyPlanning()
 	}: Props = $props();
 
 	const engine = getInsightsEngine();
@@ -98,7 +100,7 @@
 	// Transactions up to today (excludes future-dated recurring entries) for pace calculations
 	let pastTransactions = $derived(isCurrentMonth ? filterUpToDate(currentMonthTransactions) : []);
 
-	let budgetForecast = $derived(isCurrentMonth && budget ? calculateForecast({ month: selectedMonth, transactions: allTransactions, contributions: allContributions.length ? allContributions : contributions, planning: settings?.planning ?? emptyPlanning(), income: budget.income, rolloverAdjustment }) : null);
+	let budgetForecast = $derived(isCurrentMonth && budget ? calculateForecast({ month: selectedMonth, transactions: allTransactions, contributions: allContributions.length ? allContributions : contributions, planning: forecastPlanning, income: budget.income, rolloverAdjustment }) : null);
 
 	// Get previous month for comparison
 	let previousMonthKey = $derived(navigateMonth(selectedMonth, -1));
@@ -458,7 +460,7 @@
 				type: 'pace',
 				icon: Gauge,
 				iconColor: budgetForecast.remainder < 0 ? 'text-danger-500' : 'text-success-500',
-				text: `Expected month-end remainder: ${formatCurrency(budgetForecast.remainder)} (budget estimate)`
+				text: `Expected month-end spending: ${formatCurrency(budgetForecast.recorded + budgetForecast.upcoming + budgetForecast.variable)}`
 			});
 		}
 

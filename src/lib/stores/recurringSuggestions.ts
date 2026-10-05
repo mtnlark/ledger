@@ -360,7 +360,7 @@ function isCancelledSubscription(
  * Merges detected recurring with user-tagged subscriptions.
  * Filters out already-added transactions and cancelled subscriptions.
  */
-export async function getRecurringSuggestions(month: string, providedTransactions?: Transaction[]): Promise<RecurringSuggestion[]> {
+export async function getRecurringSuggestions(month: string, providedTransactions?: Transaction[], options: { includeRecorded?: boolean } = {}): Promise<RecurringSuggestion[]> {
 	const settings = await getSettings();
 	const cancelledSubs = await getCancelledSubscriptions();
 
@@ -374,7 +374,7 @@ export async function getRecurringSuggestions(month: string, providedTransaction
 	});
 
 	const userSubscriptions = await buildUserSubscriptions(allTxns, allPurchases);
-	const detectedRecurring = await detectRecurringExpenses(allTxns, { purchases: allPurchases });
+	const detectedRecurring = await detectRecurringExpenses(allTxns, { purchases: allPurchases, skipCache: options.includeRecorded });
 	const occurrenceMaps = buildLastOccurrenceMaps(allPurchases);
 	const latestSharedByMerchant = buildLatestSharedPurchaseMap(allPurchases);
 
@@ -392,7 +392,7 @@ export async function getRecurringSuggestions(month: string, providedTransaction
 		const lastOccurrence = getLastOccurrence(occurrenceMaps, key);
 
 		// Skip if not expected this month
-		if (!isExpectedThisMonth(detected.frequency, detected.dayOfMonth, lastOccurrence, month)) {
+		if (!isExpectedThisMonth(detected.frequency, detected.dayOfMonth, lastOccurrence, month) && !(options.includeRecorded && lastOccurrence && lastOccurrence >= monthStart && lastOccurrence < nextMonth)) {
 			continue;
 		}
 
@@ -443,7 +443,7 @@ export async function getRecurringSuggestions(month: string, providedTransaction
 				subscription.expectedDate,
 				lastOccurrence,
 				month
-			)
+			) && !(options.includeRecorded && lastOccurrence && lastOccurrence >= monthStart && lastOccurrence < nextMonth)
 		) {
 			continue;
 		}
@@ -461,7 +461,7 @@ export async function getRecurringSuggestions(month: string, providedTransaction
 	// Convert to array
 	let suggestions = Array.from(suggestionsMap.values());
 
-	suggestions = suggestions.filter((suggestion) => !isAlreadyAdded(suggestion, monthPurchases));
+	if (!options.includeRecorded) suggestions = suggestions.filter((suggestion) => !isAlreadyAdded(suggestion, monthPurchases));
 	suggestions = suggestions.filter(s => !(settings.planning?.schedules ?? []).some(p => p.active && normalizeMerchant(p.merchant) === normalizeMerchant(s.merchant) && (p.amountType === 'variable' || currencyEquals(p.amount, s.expectedAmount))));
 
 	// Sort by expected date, then amount

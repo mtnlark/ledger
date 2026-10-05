@@ -176,7 +176,7 @@
 	}
 
 	let modalTitle = $derived(
-		step === 'select' ? 'Expected recurring bills' : 'Confirm commitments'
+		step === 'select' ? 'Expected Recurring Transactions' : 'Confirm Transactions'
 	);
 </script>
 
@@ -315,7 +315,7 @@
 		<!-- STEP 2: Confirmation -->
 		<div class="px-6 py-4 space-y-4">
 			<p class="text-sm text-charcoal-muted">
-				Review dates and estimated amounts. Accepted bills become editable schedules in Planning; record payments when they happen.
+				Review and adjust dates and amounts before adding.
 			</p>
 
 			<!-- Confirmation list -->
@@ -417,7 +417,7 @@
 				{#if isSubmitting}
 					Adding...
 				{:else}
-					Schedule {selectedCount} {selectedCount === 1 ? 'commitment' : 'commitments'}
+					Add {selectedCount} {selectedCount === 1 ? 'Transaction' : 'Transactions'}
 				{/if}
 			</button>
 		</div>

@@ -25,6 +25,8 @@
 	import Skeleton from '$lib/components/Skeleton.svelte';
 	import MonthPicker from '$lib/components/MonthPicker.svelte';
 	import SmartTakeaways from '$lib/components/insights/SmartTakeaways.svelte';
+	import { getForecastPlanning } from '$lib/stores/forecast';
+	import { emptyPlanning } from '$lib/planning/types';
 	import InsightTabs from '$lib/components/insights/InsightTabs.svelte';
 	import VarianceBreakdown from '$lib/components/insights/VarianceBreakdown.svelte';
 	import NetWorthOverviewCard from '$lib/components/insights/NetWorthOverviewCard.svelte';
@@ -78,6 +80,7 @@
 	let allContributions = $state<SavingsContribution[]>([]);
 	let appSettings = $state<Settings | null>(null);
 	let activeTab = $state('overview');
+	let forecastPlanning = $state(emptyPlanning());
 	let categoryBudgets = $state<CategoryBudget[]>([]);
 	let rolloverAdjustment = $state(0);
 	let linkedAccounts = $state<LinkedAccount[]>([]);
@@ -162,6 +165,7 @@
 			allContributions = await getAllContributions();
 			// Load settings for completed goals
 			appSettings = await getSettings();
+			forecastPlanning = await getForecastPlanning(selectedMonth, allTransactions);
 			// Load selected month data
 			selectedMonthTransactions = await getTransactionsByMonth(selectedMonth);
 			budget = await getBudgetForMonth(selectedMonth);
@@ -216,6 +220,7 @@
 			getAllContributionsForMonth(month),
 			getEffectiveBudgetsForMonth(month)
 		]);
+		forecastPlanning = await getForecastPlanning(month, allTransactions);
 		selectedMonth = month;
 		selectedMonthTransactions = txns;
 		budget = monthBudget;
@@ -228,6 +233,7 @@
 	async function handleSubscriptionChange() {
 		cancelledSubscriptions = await getCancelledSubscriptions();
 		confirmedActiveSubscriptions = await getConfirmedActiveSubscriptions();
+		forecastPlanning = await getForecastPlanning(selectedMonth, allTransactions);
 	}
 
 	// Reload data when navigating to this page (handles in-app navigation)
@@ -304,6 +310,7 @@
 			<div id="insights-tabpanel" role="tabpanel" class="space-y-6">
 				{#if activeTab === 'overview'}
 					<SmartTakeaways
+						{forecastPlanning}
 						currentMonthTransactions={selectedMonthTransactions}
 						{allTransactions}
 						{categories}

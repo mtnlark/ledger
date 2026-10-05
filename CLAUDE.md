@@ -70,7 +70,7 @@ src/lib/
                  #   string-helpers (merchant norm, subscriptionKey, supersession), tags, net-worth,
                  #   transaction-grouping (buildListRows/groupRowsByDate), import/export, errors, report-cards
 src/routes/      # +layout (app shell + quick-add submit listener) + pages: dashboard (+page),
-                 #   budget, planning, savings, insights, networth, shared, settings, quick-add
+                 #   budget, savings, insights, networth, shared, settings, quick-add
 src/tests/       # Vitest specs under stores/ and utils/
 src-tauri/src/   # main.rs; lib.rs (plugins, tray/quick-add window toggle, invoke_handler); simplefin.rs
 ```
@@ -183,20 +183,18 @@ Net worth uses separate tables `linkedAccounts` / `balanceSnapshots` (`LinkedAcc
 
 ## Features
 
-**Navigation** — collapsible sidebar (state in `ledger-sidebar-expanded`): Dashboard, Budget, Planning, Savings, Insights, Net Worth (⌘6), Shared, Settings. ⌘1–5/⌘N/⌘K work app-wide via the layout-mounted `KeyboardShortcuts` + `stores/shortcuts.ts` handler registry. Pages use in-content Fraunces titles (no HeaderNav).
-
-### Planning (`/planning`)
-- Personal planning desk: editable bill/purchase schedules, commitment-aware month-end budget estimate, purchase and savings simulator with concrete confirmation, and combined goal projections sharing one funding pool. Bank links and explicit allocations display actual/intent balances with unexplained differences and stale dates. See `docs/planning.md` for calculation and persistence rules.
-- `Settings.planning` optionally stores schedules, savings plans, entry templates, settlement payments, and `completeThrough`; existing files need no migration. `planning/forecast.ts` owns pure estimates/projections; `stores/planning.ts` owns acknowledged mutations.
+**Navigation** — collapsible sidebar (state in `ledger-sidebar-expanded`): Dashboard, Budget, Savings, Insights, Net Worth (⌘6), Shared, Settings. ⌘1–5/⌘N/⌘K work app-wide via the layout-mounted `KeyboardShortcuts` + `stores/shortcuts.ts` handler registry. Pages use in-content Fraunces titles (no HeaderNav).
 
 ### Dashboard
-- Two-column (`max-w-6xl`): ledger main column + sticky right rail (Monthly budget, Expected month-end remainder, Week in Review, Top Categories). Month name is the title and the picker (`MonthPicker variant="title"`).
+- Two-column (`max-w-6xl`): ledger main column + sticky right rail (Cash Flow, Expected month-end spending, Week in Review, Top Categories). Month name is the title and the picker (`MonthPicker variant="title"`).
 - **One add entry point**: "Add" button / ⌘N → `AddTransactionModal` (wraps the full `TransactionForm`: split, shared, subscription, tags).
 - Transaction list: search (merchant + notes) + amount-range + advanced filters, 50-row progressive pagination. Sticky Transactions heading + toolbar (`bind:clientHeight` → `toolbarHeight`); date headers stick below via `stickyOffset`.
 - Day-grouped cards: sticky date headers with day totals (your share); shared rows show your share primary with "of $full" beneath; monthly/semi-annual subs show a ↻ icon.
 - **Upcoming hidden by default**: future-dated rows behind a "Show N upcoming" toggle (`ledger-show-upcoming`); skipped when viewing a future month.
 - **Split nesting**: children (same `parentTransactionId`) collapse into one summary row (merchant + Split badge + total + your-share) with a chevron to expand. Grouping/pagination at the row level so a split never splits across a page; groups with <2 visible children fall back to a plain row; selection mode renders flat. Summary row has group Edit (`EditSplitModal` → `updateSplitGroup()`: keeps hidden parent, recreates children, total = sum of lines) and Delete (`onDeleteSplit(childIds)` → soft-delete with undo).
-- **Recurring suggestions banner** (start of month): two-step selection → confirmation with editable dates/amounts; merges detected recurring with user-tagged subs; persists until scheduled or deferred. Accepted items become plans rather than recorded expenses.
+- **Recurring suggestions banner** (start of month): two-step selection → confirmation with editable dates/amounts; merges detected recurring with user-tagged subs; persists until scheduled or deferred. Accepted items become editable transactions, including future entries.
+
+- **Month-end forecast**: one compact card for current-month expected spending; explanation stays collapsed and shows recorded spending, upcoming entries/bills, estimated everyday spending, historical range, savings reservations, and expected remainder. `stores/forecast.ts` derives temporary schedules from existing recurring/subscription detection and amount overrides without writing data. Payments replace bill estimates once. `planning/forecast.ts` uses remaining-day history from up to six completed months (median; min/max range), excludes bills/one-offs/refunds from ordinary baseline, and offsets future ordinary entries. Early pace fallback excludes bills. No Planning tab, simulator, pooled goal planner, completeness workflow, templates, repeat buttons, refund/withdrawal creation, or payment forms. Saved extended data remains readable, validated and preserved. See `docs/planning.md`.
 
 ### Budget
 - Per-category tracking with progress bars; summary card (total budgeted, spent + % of budget, remaining, unbudgeted callout, income-allocation stacked bar when income set). Alerts for approaching/over budget. Month picker.
@@ -204,8 +202,6 @@ Net worth uses separate tables `linkedAccounts` / `balanceSnapshots` (`LinkedAcc
 
 ### Savings
 - Track contributions to savings/retirement/investment accounts; only `bank_transfer` and `other` reduce available-to-spend. Account cards with contribution history; savings-rate calc; Dashboard integration (available = income − savings contributions).
-- **Withdrawals**: negative savings contributions (`kind: withdrawal`) reduce allocated funding and return money to the monthly budget.
-- **Templates and refunds**: Repeat opens a reviewable copy of the whole purchase; saved templates retain sharing/splits/notes/tags. Linked negative refunds preserve the original and proportional shared credits.
 - **Goals**: target amount + date → progress bar, projected completion (6-month rolling avg), on-track/behind status with recommended monthly contribution.
 
 ### Insights — 5 tabs (Overview, Spending, Savings, Recurring, Year in Review)
@@ -218,7 +214,7 @@ Net worth uses separate tables `linkedAccounts` / `balanceSnapshots` (`LinkedAcc
 - Monthly Trends chart overlays an income line when `MonthlyBudget.income` is set (`incomeByMonth` prop).
 
 ### Shared Expenses
-Outstanding balance with partner (direction-aware hero), unsettled list with category chips, dated settlement payments with allocations and partial payments, and legacy batch settlement marking. Sent payments repay refund credits. Purchases with recorded events keep their reference IDs.
+Outstanding balance with partner, unsettled list with category chips, and batch settlement marking. Existing partial payments and refund credits remain reflected in balances; purchases with saved financial events keep their reference IDs.
 
 ### Settings
 Sticky section nav (Expense Sharing / Appearance / Notifications / Keyboard Shortcuts / Categories / Data & Backup / About; persists to `ledger-settings-section`): partner name, default split, category management, Excel import / JSON export, iCloud backup toggle, Connected Accounts (SimpleFIN).
