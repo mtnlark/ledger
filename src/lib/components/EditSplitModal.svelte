@@ -8,6 +8,7 @@
 	import { sumCurrency } from '$lib/utils/currency';
 	import ModalContainer from './ModalContainer.svelte';
 	import SharedExpenseFields from './SharedExpenseFields.svelte';
+	import TagAutocomplete from './TagAutocomplete.svelte';
 
 	interface SplitLine {
 		categoryId: number;
@@ -206,13 +207,11 @@
 							</button>
 						</div>
 
-						<!-- Notes (optional, preserves tags) -->
-						<input
-							type="text"
+						<!-- Notes (optional, with tag autocomplete) -->
+						<TagAutocomplete
 							value={line.notes}
-							oninput={(e) => updateLineNotes(index, e.currentTarget.value)}
+							onInput={(value) => updateLineNotes(index, value)}
 							placeholder="Notes / #tags (optional)"
-							class="w-full px-3 py-1.5 bg-surface border border-theme rounded-lg focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-colors text-sm placeholder:text-charcoal-muted"
 						/>
 					</div>
 				{/each}
