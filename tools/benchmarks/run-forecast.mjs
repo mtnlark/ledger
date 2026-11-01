@@ -1,0 +1,16 @@
+import { build } from 'vite';
+import { svelte } from '@sveltejs/vite-plugin-svelte';
+import { JSDOM } from 'jsdom';
+import 'fake-indexeddb/auto';
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
+const output = resolve('.svelte-kit/forecast-benchmark');
+await build({ configFile: false, plugins: [svelte({ compilerOptions: { dev: false } })], resolve: { alias: { $lib: resolve('src/lib') } }, build: { ssr: 'tools/benchmarks/forecast.benchmark.ts', outDir: output, minify: true, rollupOptions: { output: { entryFileNames: 'benchmark.mjs' } } } });
+const dom = new JSDOM('', { url: 'http://localhost/' });
+for (const key of ['window', 'document', 'localStorage', 'CustomEvent']) globalThis[key] = dom.window[key];
+const { run } = await import(pathToFileURL(resolve(output, 'benchmark.mjs')));
+const results = await run();
+mkdirSync(output, { recursive: true });
+writeFileSync(resolve(output, 'results.json'), JSON.stringify(results, null, 2));
+await dom.window.close();

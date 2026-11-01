@@ -1,6 +1,7 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import { db } from '$lib/db';
+import { toast } from '$lib/stores/toast';
 import { resetStorageState } from '$lib/storage';
 import ConnectedAccountsSection from '../settings/ConnectedAccountsSection.svelte';
 const invoke = vi.hoisted(() => vi.fn());
@@ -30,4 +31,48 @@ it('settles the loading UI after a timeout and permits another attempt', async (
 	await waitFor(() => expect(screen.getByRole('button', { name: 'Load accounts' })).toBeEnabled());
 	await fireEvent.click(screen.getByRole('button', { name: 'Load accounts' }));
 	expect(await screen.findByText('Bank account')).toBeInTheDocument();
+});
+
+it.each(['remove', 'keep'] as const)('unlinks with %s mode, preserving manual accounts and savings history', async (mode) => {
+	await db.linkedAccounts.update(7, { source: 'simplefin' });
+	await db.linkedAccounts.put({ ...(await db.linkedAccounts.get(7))!, id: 8, source: 'manual', simplefinId: undefined });
+	await db.savingsAccounts.put({ id: 1, name: 'Savings intent', accountType: 'savings', currentBalance: 55, linkedAccountId: 7, sortOrder: 1, createdAt: new Date(), updatedAt: new Date() });
+	await db.savingsContributions.put({ id: 1, accountId: 1, amount: 55, source: 'other', date: new Date(), createdAt: new Date(), updatedAt: new Date() });
+	render(ConnectedAccountsSection);
+	await fireEvent.click(await screen.findByRole('button', { name: 'Load accounts' }));
+	await screen.findByText('Connected', { exact: true });
+	await fireEvent.click(screen.getByRole('button', { name: 'Unlink' }));
+	await fireEvent.click(screen.getByRole('radio', { name: mode === 'remove' ? /Remove the synced/ : /Keep the synced/ }));
+	await fireEvent.click(screen.getAllByRole('button', { name: 'Unlink' }).at(-1)!);
+	await screen.findByLabelText('Setup token');
+	expect(invoke).toHaveBeenCalledWith('simplefin_unlink');
+	expect(await db.linkedAccounts.get(8)).toMatchObject({ source: 'manual' });
+	expect(await db.savingsAccounts.get(1)).toMatchObject({ currentBalance: 55 });
+	expect(await db.savingsContributions.get(1)).toMatchObject({ amount: 55 });
+	if (mode === 'remove') {
+		expect(await db.linkedAccounts.get(7)).toBeUndefined();
+		expect(await db.balanceSnapshots.where('accountId').equals(7).count()).toBe(0);
+		expect((await db.savingsAccounts.get(1))?.linkedAccountId).toBeUndefined();
+	} else {
+		expect(await db.linkedAccounts.get(7)).toMatchObject({ source: 'manual', simplefinId: 'external', currentBalance: 100 });
+		expect(await db.balanceSnapshots.get(1)).toMatchObject({ accountId: 7, balance: 100 });
+		expect((await db.savingsAccounts.get(1))?.linkedAccountId).toBe(7);
+	}
+});
+
+it('rolls back account deletion, snapshots and savings cleanup together on failure', async () => {
+	await db.linkedAccounts.update(7, { source: 'simplefin' });
+	await db.savingsAccounts.put({ id: 1, name: 'Linked intent', accountType: 'savings', currentBalance: 55, linkedAccountId: 7, sortOrder: 1, createdAt: new Date(), updatedAt: new Date() });
+	const before = await Promise.all([db.linkedAccounts.toArray(), db.balanceSnapshots.toArray(), db.savingsAccounts.toArray()]);
+	const failure = vi.spyOn(db.linkedAccounts, 'delete').mockRejectedValueOnce(new Error('synthetic delete failure'));
+	const errors = vi.spyOn(toast, 'error');
+	render(ConnectedAccountsSection);
+	await fireEvent.click(await screen.findByRole('button', { name: 'Load accounts' }));
+	await screen.findByText('Connected', { exact: true });
+	await fireEvent.click(screen.getByRole('button', { name: 'Unlink' }));
+	await fireEvent.click(screen.getByRole('radio', { name: /Remove the synced/ }));
+	await fireEvent.click(screen.getAllByRole('button', { name: 'Unlink' }).at(-1)!);
+	await waitFor(() => expect(errors).toHaveBeenCalledWith(expect.stringContaining('synthetic delete failure')));
+	expect(await Promise.all([db.linkedAccounts.toArray(), db.balanceSnapshots.toArray(), db.savingsAccounts.toArray()])).toEqual(before);
+	failure.mockRestore(); errors.mockRestore(); toast.clear();
 });

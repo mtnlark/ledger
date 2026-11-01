@@ -14,7 +14,8 @@ Ledger is a local-first macOS app for manual budgeting and personal-finance anal
 | [Forecast](docs/planning.md) | Current estimate and preserved planning data |
 | [Net-worth design](NET_WORTH_PLAN.md) | Current balance history, SimpleFIN and credential boundary |
 | [Product roadmap](PRODUCT_ROADMAP.md) | Shipped work and unprioritized candidates |
-| [Integrity audit](docs/audit-fixes.md) | Historical fix evidence, regression coverage and benchmarks |
+| [Forecast audit](docs/forecast-audit.md) | Forecast/refresh regressions, production-compiled timings and native verification |
+| [Integrity audit](docs/audit-fixes.md) | Historical persistence, repair and financial-integrity evidence |
 
 Original proposals are preserved under [docs/history](docs/history/). Their commands, APIs and component names may be superseded; current guidance is in the documents above.
 
@@ -45,12 +46,12 @@ Its scope is intentionally focused:
 ### Budgets
 
 - Sets monthly income and per-category spending limits.
-- Shows spending, remaining amounts, income allocation, and threshold alerts.
+- Shows spending, remaining amounts, income allocation, and threshold alerts, including updates after menu-bar Quick Add.
 - Supports optional category rollover between months.
 - Rolls unused amounts forward while treating earlier overspending as a separate one-month adjustment.
 - Uses the user’s share of a shared purchase in budget and cash-flow calculations.
 
-The dashboard estimates month-end spending from recorded expenses, recurring bills, and everyday spending history. Its collapsed explanation shows the assumptions, historical range, and remainder after reserved savings. See [forecast calculations](docs/planning.md).
+The dashboard estimates month-end spending from recorded expenses, recurring bills, and everyday spending history. Its collapsed explanation shows the assumptions, historical range, and remainder after reserved savings. Entries, edits, deletion and subscription cancellation refresh the estimate immediately. Recurring split purchases count once, with every bill allocation excluded from the everyday baseline. See [forecast calculations](docs/planning.md).
 
 ### Savings
 
@@ -133,21 +134,15 @@ Ledger stores its main data file at:
 ~/Library/Application Support/app.ledger.desktop/data.json
 ```
 
-Logical mutations run in IndexedDB transactions and share a queue through their disk acknowledgment. Related writes commit together, and unchanged tables reuse their serialized content. If disk persistence fails, the committed IndexedDB changes remain available, a persistent banner offers Retry and Export Backup, and further writes are blocked until saving succeeds. Retry saves the current snapshot without replaying the original operation.
+Changes commit together in IndexedDB and are acknowledged only after the JSON save succeeds. If saving fails, a persistent banner offers Retry and Export Backup and blocks further writes. Retry saves the current snapshot without repeating the financial operation. A dashboard refresh failure after a successful save does not undo or resubmit the entry.
 
-A durable write:
+The JSON file has a SHA-256 checksum and is replaced through a temporary file, retaining the previous version as `data.json.bak`. Ledger keeps up to ten timestamped backups. Startup validates a snapshot before replacing IndexedDB; filesystem failures expose Retry loading, while corrupted content triggers recovery from local backups. If no valid recovery candidate exists, startup displays a data-loss error and initializes defaults. Readable primary files with legacy missing references load with a review warning.
 
-1. assembles every persisted table, reusing unchanged serialized tables;
-2. adds a SHA-256 checksum;
-3. writes a temporary file;
-4. preserves the previous file as `data.json.bak`;
-5. renames the temporary file to `data.json`.
+Settings → Data & Backup provides:
 
-Ledger keeps up to ten routine timestamped backups. Restore creates a fresh, verified recovery backup before changing records, bypassing the normal one-minute debounce. Historical repair preserves immutable, checksum-verified originals in a separate `originals/` directory. These originals are excluded from routine pruning and automatic recovery. If the main file cannot be parsed or fails its checksum, startup recovery tries `data.json.bak` first and then the timestamped backups from newest to oldest.
-
-A filesystem read failure is retried once. If it persists, initialization shows an error with Retry loading and blocks writes. Files and existing IndexedDB records remain intact. Startup selects and validates its snapshot before replacing IndexedDB. Content corruption triggers recovery, with a verified copy of the damaged original retained first. If no valid recovery candidate exists, the current implementation starts with defaults and displays a data-loss error. Invalid dates, non-finite amounts, and serialization failures block saves before any backup or file rotation. Automatic recovery reads local backups; the iCloud copy can be selected for explicit restore.
-
-Older Ledger versions could leave references to deleted categories or accounts. A readable primary file with those references is preserved at startup with a review warning; it is never silently replaced by an older backup. Restore and recovery candidates still require valid references.
+- **Full Backup (JSON)** and **Preview backup restore** for checksummed exports, validation and atomic replacement after a verified recovery backup.
+- **Preview Excel import** for the `Expenses` sheet, with duplicate/invalid-row review and required mappings for unknown categories. Approved rows save together.
+- **Review historical fixed shares**, **Review ledger integrity** and **Review damaged JSON file** for explicit corrections. Previews change nothing; application revalidates the proposed data and preserves verified originals outside routine backup pruning. Historical amounts are never corrected automatically.
 
 When iCloud backup is enabled, Ledger also writes a portable backup to:
 
@@ -155,29 +150,13 @@ When iCloud backup is enabled, Ledger also writes a portable backup to:
 ~/Library/Mobile Documents/com~apple~CloudDocs/Ledger/ledger-backup.json
 ```
 
-Settings → Data provides the following workflows:
-
-- **Full Backup (JSON)** exports all nine persisted tables in the same checksummed format used by automatic and iCloud backups.
-- **Preview backup restore** validates version, structure, IDs, amounts, dates, enums and references before displaying table counts. Legacy automatic and manual exports are supported; legacy `budgets` becomes `monthlyBudgets`. Missing legacy tables are listed and emptied on restore. Replacement runs atomically after a fresh recovery backup succeeds, then refreshes caches and mounted views.
-- **Preview Excel import** reads the `Expenses` sheet and displays accepted rows, duplicates, invalid rows with source numbers and reasons, and blank rows. Numeric cells and US currency strings such as `$1,234.56` are supported. Unknown categories require a mapping. Only approved rows are committed, together in one transaction and one disk save. Fixed partner shares remain fixed amounts.
-- **Review historical fixed shares** lists inconsistent category splits. Only complete, undeleted, unsettled groups with clear evidence of the intended share can be selected for correction. The selected records are checked again, the original snapshot is preserved, and approved corrections commit atomically after strict validation. Reviewing alone changes nothing.
-- **Review ledger integrity** identifies affected tables, record IDs, and fields. Missing categories require approval of an inactive placeholder at the original ID. Missing savings accounts require either recreation with a supplied type and confirmed balance, or deletion of the listed orphaned contributions. Balances, contributions, and purchase groups are shown as context; contribution totals never establish opening balances. Replacement balances and eligible fixed-share allocations require explicit approval.
-- **Review damaged JSON file** accepts parseable, checksum-valid snapshots with date or missing-reference defects, including verified preserved originals. Supply every needed correction, preview the strictly validated result, then explicitly apply it. Unparseable files, checksum mismatches, and unsupported structural damage remain blocked. The selected file and current ledger are both preserved before replacement. Stale previews require a new review; failed database writes roll back, and disk save failures use the existing Retry barrier. The stored format remains version `1.0`.
-
-
-New category splits and group edits allocate the purchase-level partner share proportionally in integer cents, using largest remainders with line order breaking ties. Group editing reads the original parent purchase. Historical amounts never change automatically.
-
-Needs/wants calculations retain their category-essential map while category IDs and essential flags are unchanged, preserving transaction-version memoization.
-
-Deleting a savings account also atomically deletes its contributions, matching the confirmation dialog. Moving a contribution reverses its original amount on the old savings account and applies the new amount to the destination; retirement and investment contribution behavior is preserved. Referenced categories cannot be deleted, including references from historical budgets, split parents, and soft-deleted transactions. The category editor offers deactivation instead.
-
-Daily reminders query undeleted, visible transactions when due, excluding split parents. Eligibility queries cannot overlap, stopped schedulers discard pending results, and query failures remain eligible for retry.
+The iCloud copy can be selected for explicit restore. See [storage and recovery rules](docs/architecture.md#startup-backups-and-review) for validation, legacy compatibility, original preservation and failure handling.
 
 ## SimpleFIN and account credentials
 
 Ledger uses SimpleFIN only to read account balances. It cannot import transactions or move money. Each sync strictly validates balances and timestamps, preserves last-good values for failing accounts, and applies all account statuses and snapshots in one transaction and disk save. Overlapping sync requests share the same operation. Upstream balance time is stored separately from successful fetch time; balances older than 72 hours are labeled stale, and regressed upstream timestamps are rejected. History snapshots use capture time.
 
-Unlinked accounts retained as manual accounts can be explicitly reconnected in Settings. Reconnection keeps their IDs and balance history, and duplicate active external mappings are rejected. HTTP requests share a client with a 10-second connection timeout and a 30-second total timeout, covering both response headers and bodies. Token claims are never automatically retried. Timeout failures preserve last-good balances, settle account status, and release the sync lock for another attempt.
+When unlinking SimpleFIN, you can keep synced accounts as manual accounts or remove them. Keeping preserves IDs, balances and history for later reconnection. Removing deletes the synced accounts and snapshots and clears savings references atomically, preserving savings balances and contributions. Duplicate active external mappings are rejected. HTTP requests share a client with a 10-second connection timeout and a 30-second total timeout, covering both response headers and bodies. Token claims are never automatically retried. Timeout failures preserve last-good balances, settle account status, and release the sync lock for another attempt.
 
 The Rust backend connects to SimpleFIN and stores the account credential in the macOS Keychain. The Svelte frontend receives balances and link status; Rust never returns the stored credential to it. The linking input also accepts a supplied demo access URL. Credentials are not included in Ledger’s data file, local backups, or iCloud backups. See the [current command boundary and sync rules](NET_WORTH_PLAN.md).
 

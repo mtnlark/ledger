@@ -112,7 +112,7 @@ async function sfDisconnect(mode: 'keep' | 'remove') {
 	try {
 		assertCanMutate();
 		await sfUnlink();
-		await runMutation(['linkedAccounts', 'balanceSnapshots'], async () => {
+		await runMutation(['linkedAccounts', 'balanceSnapshots', 'savingsAccounts'], async () => {
 			for (const account of sfAccounts.filter((a) => a.source === 'simplefin')) {
 				if (mode === 'remove') await deleteLinkedAccount(account.id!);
 				else await updateLinkedAccount(account.id!, { source: 'manual' });

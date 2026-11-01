@@ -1,19 +1,15 @@
 <script lang="ts">
 	import { runMutation } from '$lib/storage/mutation';
 	import { afterNavigate } from '$app/navigation';
-	import { onMount } from 'svelte';
+	import { onMount, onDestroy } from 'svelte';
 	import { addDays, format, parseISO, startOfTomorrow } from 'date-fns';
 	import { getMonthKey, parseMonthKey, type Transaction, type Category, type Settings, type MonthlyBudget, DEFAULT_SETTINGS } from '$lib/db';
 	import { initializeStorage } from '$lib/storage';
-	import { getTransactionsByMonth, getTransactionsByMonthFromCache, getAllTransactions, getAvailableMonths } from '$lib/stores/transactions';
 	import { setupDashboardActions } from '$lib/stores/dashboardActions';
-	import { getAllCategories } from '$lib/stores/categories';
-	import { getSettings, dismissRecurringSuggestionsForMonth } from '$lib/stores/settings';
-	import { getBudgetForMonth, saveBudget } from '$lib/stores/budget';
-	import { getEffectiveBudgetsForMonth } from '$lib/stores/categoryBudget';
-	import { getContributionsAffectingAvailable } from '$lib/stores/savingsContributions';
-	import { addRecurringSuggestionTransaction, getRecurringSuggestions, shouldShowRecurringBanner, type RecurringSuggestion } from '$lib/stores/recurringSuggestions';
-	import { sumCurrency, calculateTotalSpent } from '$lib/utils/currency';
+	import { dismissRecurringSuggestionsForMonth } from '$lib/stores/settings';
+	import { saveBudget } from '$lib/stores/budget';
+	import { addRecurringSuggestionTransaction, getRecurringSuggestions, type RecurringSuggestion } from '$lib/stores/recurringSuggestions';
+	import { calculateTotalSpent } from '$lib/utils/currency';
 	import { groupTransactionsIntoPurchases } from '$lib/utils/transaction-grouping';
 	import { extractTags } from '$lib/utils/tags';
 	import { tagIndex } from '$lib/stores/tags.svelte';
@@ -26,11 +22,8 @@
 	import AddTransactionModal from '$lib/components/AddTransactionModal.svelte';
 	import CashFlowCard from '$lib/components/CashFlowCard.svelte';
 	import BudgetForecastCard from '$lib/components/BudgetForecastCard.svelte';
-	import { calculateForecast } from '$lib/planning/forecast';
-	import { emptyPlanning } from '$lib/planning/types';
-	import { getForecastPlanning } from '$lib/stores/forecast';
-	import { getAllContributions } from '$lib/stores/savingsContributions';
-	import type { SavingsContribution } from '$lib/db';
+	import type { BudgetForecast } from '$lib/planning/forecast';
+	import { loadDashboardData } from '$lib/stores/dashboard';
 	import BudgetModal from '$lib/components/BudgetModal.svelte';
 	import EditTransactionModal, { type TransactionUpdateData } from '$lib/components/EditTransactionModal.svelte';
 	import SplitTransactionModal from '$lib/components/SplitTransactionModal.svelte';
@@ -69,8 +62,7 @@
 	let settings = $state<Settings>(DEFAULT_SETTINGS);
 	let budget = $state<MonthlyBudget | null>(null);
 	let savedFromContributions = $state(0);
-	let forecastContributions = $state<SavingsContribution[]>([]);
-	let forecastPlanning = $state(emptyPlanning());
+	let forecast = $state<BudgetForecast | null>(null);
 	let rolloverAdjustment = $state(0);
 	let showBudgetModal = $state(false);
 	let editingTransaction = $state<Transaction | null>(null);
@@ -83,17 +75,7 @@
 	let showRecurringSuggestionsModal = $state(false);
 	let recurringSuggestions = $state<RecurringSuggestion[]>([]);
 
-	const actions = setupDashboardActions({
-		getCurrentMonth: () => currentMonth,
-		hasAllTransactions: () => allTransactions.length > 0,
-		reload: (data) => {
-			transactions = data.transactions;
-			availableMonths = data.availableMonths;
-			if (data.allTransactions) {
-				allTransactions = data.allTransactions;
-			}
-		}
-	});
+	const actions = setupDashboardActions({ refresh: () => loadData() });
 
 	let confirmDialog = $state<{
 		isOpen: boolean;
@@ -300,96 +282,63 @@
 		localStorage.setItem(SHOW_UPCOMING_KEY, String(showUpcoming));
 	}
 
-	async function handleFilterChange(newFilters: FilterState) {
-		const needsAll = newFilters.dateFrom !== '' || newFilters.dateTo !== '' || newFilters.searchAllTime;
-		if (needsAll && allTransactions.length === 0) {
-			allTransactions = await getAllTransactions();
-		}
+	function handleFilterChange(newFilters: FilterState) {
 		filters = newFilters;
 	}
 
 	let monthDisplay = $derived(format(parseMonthKey(currentMonth), 'MMMM yyyy'));
 	let totalSpent = $derived(calculateTotalSpent(transactions));
-	let forecast = $derived(calculateForecast({ month: currentMonth, transactions: allTransactions, contributions: forecastContributions, planning: forecastPlanning, income: budget?.income ?? null, rolloverAdjustment }));
-
-	onMount(() => void loadData());
+	let refreshGeneration = 0;
+	let destroyed = false;
+	onDestroy(() => { destroyed = true; refreshGeneration++; });
+	onMount(() => {
+		showUpcoming = localStorage.getItem(SHOW_UPCOMING_KEY) === 'true';
+		staleNudgeDismissedAt = localStorage.getItem(STALE_NUDGE_KEY);
+		void refreshData();
+	});
 
 	async function loadData() {
-		isLoading = true;
+		const generation = ++refreshGeneration;
+		const month = getSelectedMonth();
+		const isCurrent = () => !destroyed && generation === refreshGeneration && month === getSelectedMonth();
 		try {
 			await initializeStorage();
-			currentMonth = getSelectedMonth();
-			showUpcoming = localStorage.getItem(SHOW_UPCOMING_KEY) === 'true';
-			staleNudgeDismissedAt = localStorage.getItem(STALE_NUDGE_KEY);
-
-			const [cats, s, allTxns] = await Promise.all([
-				getAllCategories(),
-				getSettings(),
-				getAllTransactions()
-			]);
-			categories = cats;
-			settings = s;
-			allTransactions = allTxns;
-			[forecastContributions, forecastPlanning] = await Promise.all([getAllContributions(), getForecastPlanning(currentMonth, allTxns)]);
-
-			transactions = getTransactionsByMonthFromCache(currentMonth) ?? await getTransactionsByMonth(currentMonth);
-
-			const [monthBudget, months, contributions, rollover] = await Promise.all([
-				getBudgetForMonth(currentMonth),
-				getAvailableMonths(),
-				getContributionsAffectingAvailable(currentMonth),
-				getEffectiveBudgetsForMonth(currentMonth)
-			]);
-			budget = monthBudget;
-			availableMonths = months;
-			savedFromContributions = sumCurrency(contributions.map(c => c.amount));
-			rolloverAdjustment = rollover.carryoverTotal - rollover.deficitCarried;
+			const data = await loadDashboardData(month);
+			if (!isCurrent()) return;
+			currentMonth = month;
+			categories = data.categories;
+			settings = data.settings;
+			allTransactions = data.allTransactions;
+			transactions = data.transactions;
+			budget = data.budget;
+			availableMonths = data.availableMonths;
+			savedFromContributions = data.savedFromContributions;
+			rolloverAdjustment = data.rolloverAdjustment;
+			forecast = data.forecast;
+			recurringSuggestions = data.recurringSuggestions;
+			showRecurringBanner = recurringSuggestions.length > 0;
 		} catch (error) {
-			handleError(error, { context: 'loadData', showToast: false });
+			if (isCurrent()) throw error;
 		} finally {
-			isLoading = false;
-		}
-
-		// Deferred: check recurring suggestions after first paint
-		try {
-			if (shouldShowRecurringBanner(currentMonth, settings.lastAutoSuggestedMonth)) {
-				recurringSuggestions = await getRecurringSuggestions(currentMonth, allTransactions);
-				showRecurringBanner = recurringSuggestions.length > 0;
-			} else {
-				showRecurringBanner = false;
-			}
-		} catch (error) {
-			handleError(error, { context: 'loadRecurringSuggestions', showToast: false });
+			if (isCurrent()) isLoading = false;
 		}
 	}
 
-	// Fetch data first, then update all state atomically to prevent UI mismatch
+	async function refreshData() {
+		try { await loadData(); }
+		catch (error) { handleError(error, { context: 'refreshDashboard', userMessage: 'Could not refresh dashboard' }); }
+	}
+
 	async function handleMonthChange(month: string) {
 		setSelectedMonth(month);
-		try {
-			const nextForecastPlanning = await getForecastPlanning(month, allTransactions);
-			const [txns, monthBudget, contributions, rollover] = await Promise.all([
-				getTransactionsByMonth(month),
-				getBudgetForMonth(month),
-				getContributionsAffectingAvailable(month),
-				getEffectiveBudgetsForMonth(month)
-			]);
-			currentMonth = month;
-			forecastPlanning = nextForecastPlanning;
-			transactions = txns;
-			budget = monthBudget;
-			savedFromContributions = sumCurrency(contributions.map(c => c.amount));
-			rolloverAdjustment = rollover.carryoverTotal - rollover.deficitCarried;
-		} catch (error) {
-			handleError(error, { context: 'handleMonthChange', showToast: false });
-		}
+		await refreshData();
 	}
 
 	async function handleSaveBudget(data: { income: number; notes?: string }) {
 		try {
 			// Keep existing savedAmount for backward compatibility (not used in calculations anymore)
 			await saveBudget(currentMonth, { ...data, savedAmount: budget?.savedAmount ?? 0 });
-			budget = await getBudgetForMonth(currentMonth);
+			await refreshData();
 			showBudgetModal = false;
 			toast.success('Budget saved');
 		} catch (error) {
@@ -489,68 +438,44 @@
 	}
 
 	async function handleAddSelectedSuggestions(items: Array<RecurringSuggestion & { date: Date }>) {
+		const month = currentMonth;
 		try {
 			await runMutation(['transactions', 'settings', 'categories'], async () => {
 				for (const item of items) await addRecurringSuggestionTransaction(item);
 			});
-			const succeeded = items.length;
-
-			// Refresh after the entire batch has been saved.
-			transactions = await getTransactionsByMonth(currentMonth);
-			availableMonths = await getAvailableMonths();
-			if (allTransactions.length > 0) {
-				allTransactions = await getAllTransactions();
-			}
-
-			recurringSuggestions = await getRecurringSuggestions(currentMonth);
-
-			// Only dismiss if all suggestions have been added
-			if (recurringSuggestions.length === 0) {
-				await dismissRecurringSuggestionsForMonth(currentMonth);
-				settings = await getSettings();
-			}
-
-			showRecurringBanner = recurringSuggestions.length > 0;
-			showRecurringSuggestionsModal = false;
-
-			toast.success(succeeded === 1 ? 'Transaction added' : `${succeeded} transactions added`);
 		} catch (error) {
 			handleError(error, { context: 'handleAddSelectedSuggestions', userMessage: 'Failed to add transactions' });
+			return;
 		}
+		try {
+			if ((await getRecurringSuggestions(month)).length === 0) await dismissRecurringSuggestionsForMonth(month);
+		} catch (error) {
+			handleError(error, { context: 'dismissSavedSuggestions', userMessage: 'Transactions saved, but suggestions could not refresh' });
+		}
+		await refreshData();
+		showRecurringSuggestionsModal = false;
+		toast.success(items.length === 1 ? 'Transaction added' : `${items.length} transactions added`);
 	}
 
 	async function handleDismissRecurringSuggestions() {
 		try {
 			await dismissRecurringSuggestionsForMonth(currentMonth);
-			settings = await getSettings();
-			showRecurringBanner = false;
-			showRecurringSuggestionsModal = false;
 		} catch (error) {
 			handleError(error, { context: 'handleDismissRecurringSuggestions', showToast: false });
+			return;
 		}
+		showRecurringSuggestionsModal = false;
+		await refreshData();
 	}
 
-	// Refresh when a quick-add from the menu-bar window lands (event from layout)
-	$effect(() => {
-		const month = currentMonth;
-		const handler = async () => {
-			transactions = await getTransactionsByMonth(month);
-			allTransactions = await getAllTransactions();
-			availableMonths = await getAvailableMonths();
-		};
+	onMount(() => {
+		const handler = () => void refreshData();
 		window.addEventListener('ledger:transactions-changed', handler);
 		return () => window.removeEventListener('ledger:transactions-changed', handler);
 	});
 
-	// Refresh categories/settings when navigating back to this page
-	// This ensures changes made on Settings page are picked up without full reload
-	afterNavigate(async () => {
-		// Only refresh if already loaded (not during initial mount)
-		if (!isLoading) {
-			// Lightweight refresh - just categories and settings
-			categories = await getAllCategories();
-			settings = await getSettings();
-		}
+	afterNavigate(() => {
+		if (!isLoading) void refreshData();
 	});
 
 	function handleOpenQuickAdd() {
@@ -672,10 +597,7 @@
 								allTimeCount={allTransactionCount}
 								onSearchInputRef={setSearchInputRef}
 								{allTransactions}
-								onTagsChanged={async () => {
-									transactions = await getTransactionsByMonth(currentMonth);
-									allTransactions = await getAllTransactions();
-								}}
+								onTagsChanged={refreshData}
 							/>
 						</div>
 
@@ -731,7 +653,7 @@
 						{rolloverAdjustment}
 						onEditBudget={() => showBudgetModal = true}
 					/>
-					{#if currentMonth === getMonthKey(new Date())}<BudgetForecastCard {forecast} income={budget?.income ?? null} {rolloverAdjustment} />{/if}
+					{#if forecast && currentMonth === getMonthKey(new Date())}<BudgetForecastCard {forecast} income={budget?.income ?? null} {rolloverAdjustment} />{/if}
 					<WeekInReviewCard {allTransactions} {categories} />
 					{#if transactions.length > 0}
 						<div class="bg-surface rounded-xl shadow-sm shadow-theme p-4">

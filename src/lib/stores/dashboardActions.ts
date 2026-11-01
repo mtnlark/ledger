@@ -1,4 +1,4 @@
-import type { Transaction, Category } from '$lib/db';
+import type { Category } from '$lib/db';
 import {
 	addTransaction as storeAddTransaction,
 	addSplitTransaction as storeAddSplitTransaction,
@@ -9,10 +9,6 @@ import {
 	splitTransaction as storeSplitTransaction,
 	updateSplitGroup as storeUpdateSplitGroup,
 	type SplitGroupUpdate,
-	getTransactionsByMonth,
-	getTransactionsByMonthFromCache,
-	getAllTransactions,
-	getAvailableMonths,
 	softDeleteTransaction,
 	softDeleteTransactions
 } from '$lib/stores/transactions';
@@ -68,31 +64,20 @@ export interface TransactionUpdateData {
 }
 
 export interface DashboardContext {
-	getCurrentMonth: () => string;
-	hasAllTransactions: () => boolean;
-	reload: (data: {
-		transactions: Transaction[];
-		availableMonths: string[];
-		allTransactions?: Transaction[];
-	}) => void;
+	refresh: () => Promise<void>;
 }
 
 export function setupDashboardActions(ctx: DashboardContext) {
 	async function reloadAfterMutation(): Promise<void> {
-		const month = ctx.getCurrentMonth();
-		const cachedTransactions = getTransactionsByMonthFromCache(month);
-		const [transactions, availableMonths, allTransactions] = await Promise.all([
-			cachedTransactions ?? getTransactionsByMonth(month),
-			getAvailableMonths(),
-			ctx.hasAllTransactions() ? getAllTransactions() : undefined
-		]);
-		const data: {
-			transactions: Transaction[];
-			availableMonths: string[];
-			allTransactions?: Transaction[];
-		} = { transactions, availableMonths };
-		if (allTransactions) data.allTransactions = allTransactions;
-		ctx.reload(data);
+		try {
+			await ctx.refresh();
+		} catch (error) {
+			// The write is already durable. A view failure must never invite a replay.
+			handleError(error, {
+				context: 'refreshDashboard',
+				userMessage: 'Changes saved, but the dashboard could not refresh'
+			});
+		}
 	}
 
 	return {
@@ -295,6 +280,7 @@ export function setupDashboardActions(ctx: DashboardContext) {
 		async cancelSubscription(merchant: string, amount?: number): Promise<void> {
 			try {
 				await storeCancelSubscription(merchant, amount);
+				await reloadAfterMutation();
 				toast.success(`${merchant} marked as cancelled`);
 			} catch (error) {
 				handleError(error, {

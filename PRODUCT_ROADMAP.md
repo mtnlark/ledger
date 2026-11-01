@@ -1,6 +1,6 @@
 # Ledger product roadmap
 
-Reviewed against the current code in October 2026. Groups 1–9 of the [original roadmap](docs/history/product-roadmap.md) are complete; that document is an archived design record, not a list of remaining tasks. Git history is the full changelog.
+Reviewed against the current code in November 2026. Groups 1–9 of the [original roadmap](docs/history/product-roadmap.md) are complete; that document is an archived design record, not a list of remaining tasks. Git history is the full changelog.
 
 ## Current product direction
 
@@ -13,14 +13,14 @@ The separate Planning tab, scenario previews, pooled goal planner, completeness 
 | Area | Current result | Reference |
 | --- | --- | --- |
 | Durable data and recovery | Queued atomic mutations, checksummed JSON, backup/restore previews, save-failure retry barrier and preserved repair originals | [Architecture](docs/architecture.md), [audit evidence](docs/audit-fixes.md) |
-| Budgeting | Monthly income, category budgets, threshold alerts, opt-in surplus rollover and one-month deficit adjustment | `src/lib/stores/categoryBudget.ts`, `src/lib/utils/budget-rollover.ts` |
+| Budgeting | Monthly income, category budgets, threshold alerts, opt-in surplus rollover, one-month deficit adjustment and Quick Add refresh | `src/lib/stores/categoryBudget.ts`, `src/lib/utils/budget-rollover.ts` |
 | Savings | Contribution sources, goals/projections, account moves/deletion and goal-suggestion dismissal | `src/lib/stores/savingsAccounts.ts`, `src/lib/stores/savingsContributions.ts` |
 | Transactions | Category splits, tags/search, progressive grouped pagination, recurring suggestions and undo | `src/lib/stores/transactions.ts`, `src/lib/components/TransactionList.svelte` |
 | Insights | Five tabs, category/merchant/tag reports, unusual-spend detection, category variance, savings/year summaries and wealth context | `src/lib/insights/`, `src/lib/components/insights/` |
 | Subscriptions | Multiple subscriptions per merchant, price-supersession detection, cancellation/confirmed-active overrides | `src/lib/utils/string-helpers.ts`, `src/lib/stores/subscriptionSettings.ts` |
 | Net worth | Assets/liabilities, daily balance snapshots, balances-only SimpleFIN, reconnect and freshness/error status | [Net-worth design](NET_WORTH_PLAN.md) |
 | Native app | Menu-bar Quick Add with durable acknowledgment, shortcuts, opt-in reminders and window hide/reopen lifecycle | `src/lib/services/quick-add.ts`, `src/lib/notifications/`, `src-tauri/src/lib.rs` |
-| Dashboard forecast | Payment-aware bill reservations plus a historical ordinary-spending estimate; no separate planning UI | [Forecast](docs/planning.md) |
+| Dashboard forecast | Indexed bill matching, complete historical split-bill exclusion and guarded refresh after saved changes; no separate planning UI | [Forecast](docs/planning.md), [audit verification](docs/forecast-audit.md) |
 | UI and performance | Warm Ledger themes, reusable forms/modals, lazy insight/chart/import chunks, transaction-version memoization and cached recurring detection | [Architecture](docs/architecture.md) |
 
 The original milestone migration stamp was 10; the current app migration stamp is 11. Schema/migration/format versions are distinct and are maintained at their source locations, described in [the persistence checklist](docs/architecture.md#changing-persisted-data).

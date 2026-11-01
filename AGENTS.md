@@ -17,7 +17,7 @@ Ledger is a personal, local-first macOS desktop app: SvelteKit 2 / Svelte 5, Typ
 | Month-end forecast and saved planning compatibility | [docs/planning.md](docs/planning.md) |
 | Net worth, balance sync and credentials | [NET_WORTH_PLAN.md](NET_WORTH_PLAN.md) |
 | Shipped work and unprioritized ideas | [PRODUCT_ROADMAP.md](PRODUCT_ROADMAP.md) |
-| Integrity audit evidence | [docs/audit-fixes.md](docs/audit-fixes.md) |
+| Audit regressions and measured results | [docs/forecast-audit.md](docs/forecast-audit.md), [docs/audit-fixes.md](docs/audit-fixes.md) |
 
 `docs/history/` contains archived proposals, including superseded commands and component names. Read it only for historical context; it is not an implementation checklist. Git history is the full changelog.
 
@@ -69,7 +69,7 @@ cargo test --manifest-path src-tauri/Cargo.toml
 - Only `bank_transfer` and `other` contributions affect available spending money. Future contributions remain reserved. Preserve withdrawal signs and contribution balance reversal when moving or deleting records.
 - `SavingsAccount` describes intent/goals; `LinkedAccount` describes actual balances. Bank sync must never overwrite savings balances. Liabilities store positive debt balances and subtract by account class. Use `recordBalance` / `applyBalanceSync` for snapshot consistency.
 - Referenced categories are deactivated rather than deleted. Savings account deletion cascades contributions atomically. Purchase IDs referenced by refunds or payments must survive edits.
-- Forecast schedules inferred from recurring detection exist only in memory; they must not create transactions or saved plans. Keep actual payments, future entries, bills and savings reservations counted once. See [forecast details](docs/planning.md).
+- Forecast schedules inferred from recurring detection exist only in memory; they must not create transactions or saved plans. Reuse a refresh-owned purchase index for inference and calculation, preserve one-to-one matching and explicit cross-month links, and exclude every allocation of a qualifying historical bill from the everyday baseline. See [forecast details](docs/planning.md).
 
 ## Implementation conventions
 
@@ -77,6 +77,7 @@ cargo test --manifest-path src-tauri/Cargo.toml
 - Keep pure calculations in utilities, `insights/calculations/` or `planning/`; put database operations in stores. Keep storage UI-agnostic using registered callbacks.
 - Settings writes share `src/lib/db/settings.ts`; avoid recreating the settings/subscription compatibility import cycle.
 - Update/invalidate transaction, tag, merchant and recurring caches after mutations as existing stores do. Bulk data replacement uses `refreshDataCaches(true)` to refresh mounted views.
+- Dashboard actions await the complete refresh in `stores/dashboard.ts`, including history and inferred bills. Keep refresh failures separate from successful durable writes. Guard async page refreshes by generation and selected month, invalidate them on unmount, and remove event listeners. Dashboard and Budget both consume `ledger:transactions-changed`.
 - Match `src/app.css` theme tokens and existing modal/form components. Verify light/dark themes, keyboard access and focus behavior for UI changes. Category/account emoji belong in pickers/management and the treemap; display rows use color dots.
 - Tailwind 4 uses `@tailwindcss/vite` and CSS-first `@theme`, not a legacy content config. Check source detection and computed styles before adding overrides; prefer existing theme utilities.
 - SimpleFIN credentials stay behind the Rust/Keychain boundary. Commands return balances or link status, never the access URL. Do not put credentials in logs, data files or backups.

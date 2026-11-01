@@ -1,6 +1,6 @@
 # Net worth and SimpleFIN — current design
 
-Status: implemented. Reviewed against the code in October 2026. This file records current behavior; the [original phased proposal](docs/history/net-worth-plan.md) is preserved for historical context.
+Status: implemented. Reviewed against the code in November 2026. This file records current behavior; the [original phased proposal](docs/history/net-worth-plan.md) is preserved for historical context.
 
 ## Purpose and source map
 
@@ -24,6 +24,8 @@ Net worth tracks actual asset and liability balances entered manually or read fr
 The model stores liability balances as positive amounts owed; the sync mapper normalizes upstream negative debt with `Math.abs`. `recordBalance` updates the latest balance and upserts one snapshot per account per **local calendar day**. Same-day changes overwrite that snapshot. `applyBalanceSync` records a whole batch atomically. History forward-fills per-account balances using capture timestamps, not the bank's upstream timestamp.
 
 The Net Worth page has a total/30-day delta, history chart, asset/liability groups, type breakdown, sync status, and manual editing/reordering. ⌘6 navigates there. Deleting an account deletes its snapshots and clears saved savings-account links to it; reconnecting a retained manual account preserves its ID and history.
+
+Unlinking SimpleFIN offers two local account modes after removing the credential. **Keep** changes synced accounts to manual accounts while retaining their IDs, external IDs, balances and snapshots for explicit reconnection. **Remove** deletes synced accounts and their snapshots and clears `SavingsAccount.linkedAccountId` references in one mutation scoped to `linkedAccounts`, `balanceSnapshots` and `savingsAccounts`. Savings balances and contributions remain intact. Unrelated manual accounts are preserved.
 
 ## Rust command and credential boundary
 

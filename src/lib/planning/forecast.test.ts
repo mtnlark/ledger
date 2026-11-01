@@ -89,3 +89,37 @@ describe('commitment-aware budget estimate', () => {
 		expect(changed[0].completion?.getMonth()).toBe(11);
 	});
 });
+
+// A schedule inferred this month still excludes the complete historical purchase.
+it.each(['fixed', 'percentage'] as const)('excludes every allocation of a historical split bill with %s sharing', (splitType) => {
+	const splitValue = splitType === 'fixed' ? 500 : .25;
+	const rows = [
+		tx(1, new Date(2026, 8, 20), 1200, { merchant: 'Rent', parentTransactionId: 100, isShared: true, splitType, splitValue, partnerShare: 300 }),
+		tx(2, new Date(2026, 8, 20), 800, { merchant: 'Rent', categoryId: 2, parentTransactionId: 100, isShared: true, splitType, splitValue, partnerShare: 200 }),
+		tx(3, new Date(2026, 8, 21), 42, { merchant: 'Rent', categoryId: 3 })
+	];
+	const result = forecast(rows, [{ ...rent, date: '2026-10-01', isShared: true, splitType, splitValue }]);
+	expect(result.variable).toBe(42);
+	expect(result.upcoming).toBe(1500);
+});
+
+it('keeps automatic tie ordering, explicit priority and one-to-one split matching', () => {
+	const commitments = getScheduleOccurrences([{ ...rent, id: 'first' }, { ...rent, id: 'second' }, { ...rent, id: 'third', autoMatch: false }], '2026-10');
+	const transactions = [
+		tx(1, new Date(2026, 9, 2), 2000, { merchant: ' RENT ' }),
+		tx(2, new Date(2026, 8, 30), 1200, { merchant: 'Different', parentTransactionId: 100, scheduleId: 'third', scheduleDate: '2026-10-01' }),
+		tx(3, new Date(2026, 8, 30), 800, { merchant: 'Different', parentTransactionId: 100 }),
+		tx(4, new Date(2026, 9, 2), 2000, { merchant: 'Rent' }),
+		tx(5, new Date(2026, 9, 1), 2000, { merchant: 'Rent', isDeleted: true }),
+		tx(6, new Date(2026, 9, 1), -2000, { merchant: 'Rent', refundOfTransactionId: 1 })
+	];
+	expect(matchCommitments(commitments, transactions).map(c => c.matchedIds)).toEqual([[1], [4], [2, 3]]);
+});
+
+it('uses inclusive fixed-amount tolerances and permits variable payments with large amount changes', () => {
+	const rows = [tx(1, new Date(2026, 9, 1), 2100, { merchant: 'Rent' })];
+	expect(matchCommitments(getScheduleOccurrences([rent], '2026-10'), rows)[0].matchedIds).toEqual([1]);
+	rows[0].amount = 2100.01;
+	expect(matchCommitments(getScheduleOccurrences([rent], '2026-10'), rows)[0].matchedIds).toEqual([]);
+	expect(matchCommitments(getScheduleOccurrences([{ ...rent, amountType: 'variable' }], '2026-10'), rows)[0].matchedIds).toEqual([1]);
+});

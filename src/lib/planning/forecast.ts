@@ -1,8 +1,8 @@
 import { getMonthKey, navigateMonth, parseMonthKey, type SavingsAccount, type SavingsContribution, type Transaction } from '$lib/db';
-import { getUserAmount, roundCurrency, sumCurrency } from '$lib/utils/currency';
+import { roundCurrency, sumCurrency } from '$lib/utils/currency';
 import { formatDateForInput, parseLocalDate } from '$lib/utils/date-helpers';
 import { normalizeMerchant } from '$lib/utils/string-helpers';
-import { groupTransactionsIntoPurchases } from '$lib/utils/transaction-grouping';
+import { createForecastIndex, explicitPaymentKey, monthMerchantKey, type ForecastIndex } from './forecast-index';
 import type { ExpenseSchedule, PlanningData } from './types';
 
 export interface Commitment {
@@ -42,23 +42,33 @@ export function getScheduleOccurrences(schedules: ExpenseSchedule[], month: stri
 /** One-to-one matching at purchase level, including category splits. Explicit links win.
  * Conservative automatic matches use merchant, category, date proximity and fixed amount.
  */
-export function matchCommitments(commitments: Commitment[], transactions: Transaction[]): Commitment[] {
-	const purchases = groupTransactionsIntoPurchases(transactions.filter(t => !t.isDeleted && !t.isSplitParent && !t.refundOfTransactionId));
+export function matchCommitments(commitments: Commitment[], transactions: Transaction[], index = createForecastIndex(transactions)): Commitment[] {
 	const used = new Set<number>();
 	return [...commitments].sort((a, b) => a.date.localeCompare(b.date)).map(commitment => {
 		const schedule = commitment.schedule;
-		const candidates = purchases.map((purchase, index) => {
-			const lines = purchase.sourceTransactions;
-			const explicit = lines.some(t => t.scheduleId === schedule.id && t.scheduleDate === commitment.date);
-			const dateGap = Math.abs(parseLocalDate(commitment.date).getTime() - new Date(lines[0].date).getTime()) / 86400000;
-			const amount = sumCurrency(lines.map(t => t.amount));
-			const amountGap = Math.abs(amount - schedule.amount);
-			const compatible = schedule.autoMatch !== false && getMonthKey(new Date(lines[0].date)) === commitment.date.slice(0, 7) && lines.every(t => !t.scheduleId || t.scheduleId === schedule.id) && normalizeMerchant(lines[0].merchant) === normalizeMerchant(schedule.merchant) && lines.some(t => t.categoryId === schedule.categoryId) && dateGap <= 7 && (schedule.amountType === 'variable' || amountGap <= Math.max(.01, schedule.amount * .05));
-			return { index, lines, score: explicit ? -1 : dateGap + amountGap / Math.max(1, schedule.amount), eligible: !used.has(index) && (explicit || compatible) };
-		}).filter(c => c.eligible).sort((a, b) => a.score - b.score);
-		const matched = candidates[0];
-		if (matched) used.add(matched.index);
-		return { ...commitment, matchedIds: matched?.lines.flatMap(t => t.id === undefined ? [] : [t.id]) ?? [] };
+		const linked = index.explicit.get(explicitPaymentKey(schedule.id, commitment.date)) ?? [];
+		const automatic = schedule.autoMatch === false ? [] : index.byMonthMerchant.get(monthMerchantKey(commitment.date.slice(0, 7), normalizeMerchant(schedule.merchant))) ?? [];
+		const candidates = new Set([...linked, ...automatic]);
+		const expectedTime = parseLocalDate(commitment.date).getTime();
+		let matched: (typeof index.purchases)[number] | undefined;
+		let bestScore = Infinity;
+		for (const candidate of candidates) {
+			if (used.has(candidate.order)) continue;
+			const lines = candidate.purchase.sourceTransactions;
+			const explicit = linked.includes(candidate);
+			const dateGap = Math.abs(expectedTime - candidate.time) / 86400000;
+			const amountGap = Math.abs(candidate.purchase.totalAmount - schedule.amount);
+			const compatible = schedule.autoMatch !== false && candidate.month === commitment.date.slice(0, 7) && lines.every(t => !t.scheduleId || t.scheduleId === schedule.id) && candidate.merchant === normalizeMerchant(schedule.merchant) && candidate.categories.has(schedule.categoryId) && dateGap <= 7 && (schedule.amountType === 'variable' || amountGap <= Math.max(.01, schedule.amount * .05));
+			if (!explicit && !compatible) continue;
+			const score = explicit ? -1 : dateGap + amountGap / Math.max(1, schedule.amount);
+			// Input purchase order breaks ties, including explicit links across months.
+			if (score < bestScore || (score === bestScore && candidate.order < matched!.order)) {
+				matched = candidate;
+				bestScore = score;
+			}
+		}
+		if (matched) used.add(matched.order);
+		return { ...commitment, matchedIds: matched?.purchase.sourceTransactions.flatMap(t => t.id === undefined ? [] : [t.id]) ?? [] };
 	});
 }
 
@@ -84,6 +94,7 @@ export function calculateForecast(input: {
 	planning: PlanningData;
 	income: number | null;
 	rolloverAdjustment?: number;
+	index?: ForecastIndex;
 }): BudgetForecast {
 	const { month, planning, income } = input;
 	const now = input.now ?? new Date();
@@ -91,15 +102,15 @@ export function calculateForecast(input: {
 	const currentMonth = getMonthKey(now);
 	const end = new Date(parseMonthKey(month).getFullYear(), parseMonthKey(month).getMonth() + 1, 0);
 	const elapsed = month < currentMonth ? end.getDate() : month > currentMonth ? 0 : now.getDate();
-	const transactions = input.transactions.filter(t => !t.isDeleted && !t.isSplitParent);
-	const monthly = transactions.filter(t => getMonthKey(new Date(t.date)) === month);
-	const commitments = matchCommitments(getScheduleOccurrences(planning.schedules, month), transactions);
+	const index = input.index ?? createForecastIndex(input.transactions);
+	const monthly = index.rowsByMonth.get(month) ?? [];
+	const commitments = matchCommitments(getScheduleOccurrences(planning.schedules, month), input.transactions, index);
 	const matched = new Set(commitments.flatMap(c => c.matchedIds));
-	const recorded = sumCurrency(monthly.filter(t => formatDateForInput(new Date(t.date)) <= today).map(getUserAmount));
-	const future = monthly.filter(t => formatDateForInput(new Date(t.date)) > today);
+	const recorded = sumCurrency(monthly.filter(r => r.date <= today).map(r => r.userAmount));
+	const future = monthly.filter(r => r.date > today);
 	// For past months, an unmatched schedule is an unrecorded bill, not historical spend.
 	const reserved = month < currentMonth ? 0 : sumCurrency(commitments.filter(c => c.matchedIds.length === 0).map(c => c.amount));
-	const upcoming = sumCurrency([reserved, ...future.map(getUserAmount)]);
+	const upcoming = sumCurrency([reserved, ...future.map(r => r.userAmount)]);
 	const contributions = input.contributions.filter(c => getMonthKey(new Date(c.date)) === month && ['bank_transfer', 'other'].includes(c.source));
 	let savings = sumCurrency(contributions.map(c => c.amount));
 	for (const [id, amount] of plannedSavingsByAccount(planning, month)) {
@@ -108,18 +119,31 @@ export function calculateForecast(input: {
 	}
 	const ordinary = (t: Transaction, matches: Set<number>) => !matches.has(t.id!) && !t.isSubscription && !t.isExpectedOneOff && !t.refundOfTransactionId;
 	const historicalRemaining: number[] = [];
-	const earliestMonth = transactions.length ? transactions.map(t => getMonthKey(new Date(t.date))).sort()[0] : null;
+	const recurring = new Map<string, Set<number>>();
+	for (const schedule of planning.schedules.filter(s => s.active && s.frequency !== 'once')) {
+		const merchant = normalizeMerchant(schedule.merchant);
+		const categories = recurring.get(merchant) ?? new Set<number>();
+		categories.add(schedule.categoryId);
+		recurring.set(merchant, categories);
+	}
+	// A qualifying category identifies the whole purchase, including other allocations.
+	const historicalBills = new Set<Transaction>();
+	for (const [merchant, categories] of recurring) {
+		for (const candidate of index.byMerchant.get(merchant) ?? []) {
+			if ([...candidate.categories].some(id => categories.has(id))) {
+				for (const line of candidate.purchase.sourceTransactions) historicalBills.add(line);
+			}
+		}
+	}
 	for (let i = 1; i <= 6; i++) {
 		const past = navigateMonth(month > currentMonth ? currentMonth : month, -i);
-		if (past >= currentMonth || !earliestMonth || past < earliestMonth) continue;
-		const rows = transactions.filter(t => getMonthKey(new Date(t.date)) === past);
-		const pastMatches = new Set(matchCommitments(getScheduleOccurrences(planning.schedules, past), rows).flatMap(c => c.matchedIds));
-		// Schedules added after a historical payment still identify the same ordinary bill.
-		const recurring = new Set(planning.schedules.filter(s => s.active && s.frequency !== 'once').map(s => `${normalizeMerchant(s.merchant)}|${s.categoryId}`));
-		const amounts = rows.filter(t => ordinary(t, pastMatches) && !recurring.has(`${normalizeMerchant(t.merchant)}|${t.categoryId}`) && new Date(t.date).getDate() > elapsed).map(getUserAmount);
+		if (past >= currentMonth || !index.earliestMonth || past < index.earliestMonth) continue;
+		const rows = index.rowsByMonth.get(past) ?? [];
+		const pastMatches = new Set(matchCommitments(getScheduleOccurrences(planning.schedules, past), input.transactions, index).flatMap(c => c.matchedIds));
+		const amounts = rows.filter(r => ordinary(r.transaction, pastMatches) && !historicalBills.has(r.transaction) && r.day > elapsed).map(r => r.userAmount);
 		historicalRemaining.push(Math.max(0, sumCurrency(amounts)));
 	}
-	const futureVariable = sumCurrency(future.filter(t => ordinary(t, matched)).map(getUserAmount));
+	const futureVariable = sumCurrency(future.filter(r => ordinary(r.transaction, matched)).map(r => r.userAmount));
 	let variable = 0;
 	let variableMethod: BudgetForecast['variableMethod'] = 'none';
 	if (elapsed < end.getDate()) {
@@ -127,7 +151,7 @@ export function calculateForecast(input: {
 			variable = Math.max(0, median(historicalRemaining) - futureVariable);
 			variableMethod = 'history';
 		} else if (elapsed >= 8) {
-			const spent = sumCurrency(monthly.filter(t => formatDateForInput(new Date(t.date)) <= today && ordinary(t, matched)).map(getUserAmount));
+			const spent = sumCurrency(monthly.filter(r => r.date <= today && ordinary(r.transaction, matched)).map(r => r.userAmount));
 			variable = Math.max(0, spent / elapsed * (end.getDate() - elapsed) - futureVariable);
 			variableMethod = 'pace';
 		}

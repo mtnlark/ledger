@@ -11,7 +11,7 @@ This describes the current implementation. [AGENTS.md](../AGENTS.md) owns workin
 | Database | `src/lib/db/constants.ts`: types/defaults; `index.ts`: schema and write barrier; `migrations.ts`: idempotent data transforms; `settings.ts`: shared singleton writer |
 | Persistence | `src/lib/storage/`: mutation queue, status, serialization, checksums/validation, Tauri file adapter, backup/restore and historical repair |
 | Data operations | `src/lib/stores/`: transaction/category/budget/savings/linked-account operations; settings, caches, undo and reactive UI state |
-| Forecast | `src/lib/stores/forecast.ts`: inferred bills; `src/lib/planning/forecast.ts`: pure estimate; `types.ts` / `validation.ts`: preserved planning data |
+| Dashboard and forecast | `src/lib/stores/dashboard.ts`: complete dashboard load; `stores/forecast.ts`: inferred bills; `planning/forecast-index.ts`: refresh-owned purchase lookups; `planning/forecast.ts`: pure estimate; `planning/types.ts` / `validation.ts`: preserved planning data |
 | Insights | `src/lib/insights/`: memoized engine and pure `calculations/`; UI in `src/lib/components/insights/` |
 | Native services | `src/lib/services/`: SimpleFIN and Quick Add boundaries; `src/lib/notifications/`: scheduling and app-open checks |
 | Shared UI | `src/lib/components/`: forms, modals, charts, transaction lists; `settings/`: connected accounts and data reviews |
@@ -30,7 +30,7 @@ Normal logical writes go through `runMutation` in [mutation.ts](../src/lib/stora
 3. Track changed tables through the database middleware.
 4. After commit, persist the changed snapshot and wait for disk acknowledgment.
 
-Nested operations share the outer transaction. Its scope must include every table read or written by nested work, including category validation when accepting recurring suggestions. `withPersistence` is an older wrapper and alone does not provide the exclusive transaction flow; new normal writes should use `runMutation`.
+Nested operations share the outer transaction. Its scope must include every table read or written by nested work, including category validation when accepting recurring suggestions and savings-reference cleanup when removing linked accounts. `withPersistence` is an older wrapper and alone does not provide the exclusive transaction flow; new normal writes should use `runMutation`.
 
 [serialization.ts](../src/lib/storage/serialization.ts) centralizes full hydration/dehydration and incremental table reads. The adapter reuses unchanged serialized table content, validates before serialization or rotation, calculates a SHA-256 checksum, writes `data.json.tmp`, rotates the previous primary to `data.json.bak`, then renames the temporary file to the primary. File saves have their own coalescing queue.
 
@@ -84,6 +84,8 @@ The nine persisted tables are transactions, categories, monthlyBudgets, category
 ## Reactivity and native boundaries
 
 Transaction-cache versions drive memoized insights. Tag indexes rebuild from that cache; merchant/recurring caches need invalidation after mutations. Needs/wants memoization retains its category-essential map while IDs/flags are unchanged. `refreshDataCaches(true)` also emits `ledger:data-replaced`, remounting page content; narrower transaction and net-worth events refresh mounted consumers.
+
+Dashboard mutations await a complete load through `stores/dashboard.ts`: history is loaded even for an empty ledger, inferred bills are rebuilt, and the forecast is calculated from plain results before state publication. Inference and calculation share a purchase index owned by that refresh. Dashboard and Budget both listen for `ledger:transactions-changed`, including Quick Add and undo. Async refreshes publish only for the latest request and selected month; unmount invalidates pending requests and removes listeners. A read/refresh failure after a successful disk acknowledgment is reported separately and never makes the form replay its saved operation.
 
 Quick Add shares IndexedDB with the main window and reads categories/settings/merchants. It submits `ledger://quick-add-submit` with a request ID and ISO date; the main window deduplicates and responds via `ledger://quick-add-result` after durable save. Applied-but-unsaved retries save without reinserting. The quick window renders a bare shell and skips initialization, purge, sync, scheduling and global shortcuts.
 

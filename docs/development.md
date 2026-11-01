@@ -40,6 +40,8 @@ npm run test:run -- src/lib/storage/durable-save.test.ts
 
 [vitest.config.ts](../vitest.config.ts) discovers tests under all of `src/`, including colocated tests and `src/tests/`. It uses jsdom, fake IndexedDB and the setup in `src/tests/setup.ts`; Svelte resolves its browser condition so Testing Library can render components. Tauri filesystem/event APIs are mocked by the tests that need them. Follow a nearby test's setup; `src/lib/components/__tests__/setup.ts` is a separate helper, not the global setup file.
 
+If parallel component tests time out under heavy local load, use `npm run test:run -- --maxWorkers=2` for a finite full-suite run with lower concurrency; investigate reproducible failures instead of increasing timeouts.
+
 Regression tests should cover observable behavior: cent allocation, date boundaries, transaction rollback, applied-but-unsaved retry, interleaving operations and mounted UI refresh. Use synthetic data. Add rendered component coverage when a store-only test would miss the reported failure.
 
 Rust checks require macOS frameworks and an existing `build/` directory because `tauri::generate_context!` references `frontendDist`. CI creates an empty directory for compilation; running the app needs the actual frontend build.
@@ -66,6 +68,14 @@ npm run test:run -- --config tools/benchmarks/vitest.config.ts
 
 [Audit evidence](audit-fixes.md) records historical timings and test counts. Those counts are results from that revision, not expectations for the current suite.
 
+The forecast benchmark compiles its entry with Vite's production SSR pipeline, verifies output equivalence against frozen pre-fix algorithms, and reports first measured and median repeated costs for calculation, inference and complete dashboard data refresh:
+
+```bash
+node tools/benchmarks/run-forecast.mjs
+```
+
+It uses jsdom and in-memory fake IndexedDB with synthetic data. Results are written under `.svelte-kit/forecast-benchmark/results.json`; no timing thresholds run in CI. See [forecast audit verification](forecast-audit.md) for the measured fixture and limits.
+
 `test:coverage` configures Vitest's V8 coverage provider, but `@vitest/coverage-v8` is not in the committed dependencies. It is not a CI check or a guaranteed offline command; provider setup needs a deliberate dependency change.
 
 ## Native verification
@@ -82,9 +92,9 @@ For a requested desktop release:
 
 1. Stop native dev/harness processes and finish the relevant checks.
 2. Run `npm run tauri:build` in the real repository with its production configuration.
-3. Inspect `src-tauri/target/release/bundle/macos/Ledger.app`; DMGs are under `src-tauri/target/release/bundle/dmg/`. The DMG name depends on the configured version and build architecture.
+3. Inspect `src-tauri/target/release/bundle/macos/Ledger.app` and confirm its `CFBundleIdentifier` is `app.ledger.desktop`. DMGs are under `src-tauri/target/release/bundle/dmg/`. The DMG name depends on the configured version and build architecture.
 4. If installation was requested, quit the running installed Ledger app, stage a complete copy of the new bundle, retain the old bundle at a unique temporary path, then replace `/Applications/Ledger.app` and relaunch it. Preserve the application-support directory and Keychain.
-5. Verify the launched app is the new bundle and the relevant behavior works. Report build/test evidence and any check that could not run.
+5. Compare the installed bundle with the fresh build, verify the running executable comes from `/Applications/Ledger.app`, and check that startup and the relevant views work. Report build/test evidence and any check that could not run.
 
 A frontend-only build produces no `.app`. Tauri's `beforeBuildCommand` already runs `npm run build`, so an extra frontend build or unconditional Cargo clean is unnecessary. If evidence points to stale Rust artifacts, use a targeted clean:
 

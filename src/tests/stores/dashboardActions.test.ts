@@ -60,10 +60,6 @@ import {
 	updateTransaction,
 	bulkUpdateCategory,
 	splitTransaction,
-	getTransactionsByMonth,
-	getTransactionsByMonthFromCache,
-	getAllTransactions,
-	getAvailableMonths,
 	softDeleteTransaction,
 	softDeleteTransactions
 } from '$lib/stores/transactions';
@@ -74,15 +70,13 @@ import { handleError } from '$lib/utils/error-handler';
 
 describe('dashboardActions', () => {
 	let actions: ReturnType<typeof setupDashboardActions>;
-	let reloadFn: ReturnType<typeof vi.fn<DashboardContext['reload']>>;
+	let reloadFn: ReturnType<typeof vi.fn<DashboardContext['refresh']>>;
 
 	beforeEach(() => {
 		vi.clearAllMocks();
-		reloadFn = vi.fn<DashboardContext['reload']>();
+		reloadFn = vi.fn<DashboardContext['refresh']>();
 		actions = setupDashboardActions({
-			getCurrentMonth: () => '2026-01',
-			hasAllTransactions: () => false,
-			reload: reloadFn
+			refresh: reloadFn
 		});
 	});
 
@@ -114,20 +108,10 @@ describe('dashboardActions', () => {
 		it('reloads transactions and available months', async () => {
 			await actions.addTransaction(txnData);
 
-			expect(getTransactionsByMonth).toHaveBeenCalledWith('2026-01');
-			expect(getAvailableMonths).toHaveBeenCalled();
 			expect(reloadFn).toHaveBeenCalled();
 		});
 
-		it('uses the in-memory month cache after a mutation when available', async () => {
-			const cached = [{ id: 1 }] as any;
-			vi.mocked(getTransactionsByMonthFromCache).mockReturnValueOnce(cached);
 
-			await actions.addTransaction(txnData);
-
-			expect(getTransactionsByMonth).not.toHaveBeenCalled();
-			expect(reloadFn).toHaveBeenCalledWith(expect.objectContaining({ transactions: cached }));
-		});
 
 		it('toasts success on completion', async () => {
 			await actions.addTransaction(txnData);
@@ -135,42 +119,11 @@ describe('dashboardActions', () => {
 			expect(toast.success).toHaveBeenCalledWith('Transaction added');
 		});
 
-		it('does NOT load allTransactions when hasAllTransactions is false', async () => {
-			await actions.addTransaction(txnData);
 
-			expect(getAllTransactions).not.toHaveBeenCalled();
-		});
 
-		it('loads allTransactions when hasAllTransactions is true', async () => {
-			const actionsWithAll = setupDashboardActions({
-				getCurrentMonth: () => '2026-01',
-				hasAllTransactions: () => true,
-				reload: reloadFn
-			});
 
-			await actionsWithAll.addTransaction(txnData);
 
-			expect(getAllTransactions).toHaveBeenCalled();
-		});
 
-		it('passes allTransactions in reload data when hasAllTransactions is true', async () => {
-			const mockAllTxns = [{ id: 1 }, { id: 2 }];
-			vi.mocked(getAllTransactions).mockResolvedValueOnce(mockAllTxns as any);
-
-			const actionsWithAll = setupDashboardActions({
-				getCurrentMonth: () => '2026-01',
-				hasAllTransactions: () => true,
-				reload: reloadFn
-			});
-
-			await actionsWithAll.addTransaction(txnData);
-
-			expect(reloadFn).toHaveBeenCalledWith(
-				expect.objectContaining({
-					allTransactions: mockAllTxns
-				})
-			);
-		});
 
 		it('calls handleError on failure', async () => {
 			const error = new Error('fail');
@@ -231,8 +184,6 @@ describe('dashboardActions', () => {
 		it('reloads data and toasts with count', async () => {
 			await actions.addSplitTransactions(splitData);
 
-			expect(getTransactionsByMonth).toHaveBeenCalledWith('2026-01');
-			expect(getAvailableMonths).toHaveBeenCalled();
 			expect(reloadFn).toHaveBeenCalled();
 			expect(toast.success).toHaveBeenCalledWith('Transaction split across 2 categories');
 		});
@@ -287,8 +238,6 @@ describe('dashboardActions', () => {
 		it('reloads transactions and available months', async () => {
 			await actions.saveEdit(42, updateData, false);
 
-			expect(getTransactionsByMonth).toHaveBeenCalledWith('2026-01');
-			expect(getAvailableMonths).toHaveBeenCalled();
 			expect(reloadFn).toHaveBeenCalled();
 		});
 
@@ -337,8 +286,6 @@ describe('dashboardActions', () => {
 		it('reloads transactions and available months', async () => {
 			await actions.deleteTransaction(99);
 
-			expect(getTransactionsByMonth).toHaveBeenCalledWith('2026-01');
-			expect(getAvailableMonths).toHaveBeenCalled();
 			expect(reloadFn).toHaveBeenCalled();
 		});
 
@@ -370,17 +317,7 @@ describe('dashboardActions', () => {
 			expect(softDeleteTransactions).toHaveBeenCalledWith([1, 2, 3]);
 		});
 
-		it('reloads data including allTransactions when available', async () => {
-			const actionsWithAll = setupDashboardActions({
-				getCurrentMonth: () => '2026-01',
-				hasAllTransactions: () => true,
-				reload: reloadFn
-			});
 
-			await actionsWithAll.bulkDelete([1, 2]);
-
-			expect(getAllTransactions).toHaveBeenCalled();
-		});
 
 		it('captures deleted transactions for undo', async () => {
 			await actions.bulkDelete([1, 2, 3]);
@@ -418,7 +355,6 @@ describe('dashboardActions', () => {
 		it('reloads transactions', async () => {
 			await actions.bulkCategoryChange([10], 1, categories);
 
-			expect(getTransactionsByMonth).toHaveBeenCalledWith('2026-01');
 			expect(reloadFn).toHaveBeenCalled();
 		});
 
@@ -440,17 +376,7 @@ describe('dashboardActions', () => {
 			expect(toast.success).toHaveBeenCalledWith('Category changed to selected category');
 		});
 
-		it('loads allTransactions when hasAllTransactions is true', async () => {
-			const actionsWithAll = setupDashboardActions({
-				getCurrentMonth: () => '2026-01',
-				hasAllTransactions: () => true,
-				reload: reloadFn
-			});
 
-			await actionsWithAll.bulkCategoryChange([10], 1, categories);
-
-			expect(getAllTransactions).toHaveBeenCalled();
-		});
 
 		it('calls handleError on failure', async () => {
 			const error = new Error('bulk category fail');
@@ -482,21 +408,10 @@ describe('dashboardActions', () => {
 		it('reloads transactions', async () => {
 			await actions.splitTransaction(42, splits);
 
-			expect(getTransactionsByMonth).toHaveBeenCalledWith('2026-01');
 			expect(reloadFn).toHaveBeenCalled();
 		});
 
-		it('loads allTransactions when hasAllTransactions is true', async () => {
-			const actionsWithAll = setupDashboardActions({
-				getCurrentMonth: () => '2026-01',
-				hasAllTransactions: () => true,
-				reload: reloadFn
-			});
 
-			await actionsWithAll.splitTransaction(42, splits);
-
-			expect(getAllTransactions).toHaveBeenCalled();
-		});
 
 		it('toasts with split count', async () => {
 			await actions.splitTransaction(42, splits);
@@ -563,13 +478,7 @@ describe('dashboardActions', () => {
 			expect(toast.success).toHaveBeenCalledWith('Netflix marked as cancelled');
 		});
 
-		it('does NOT call reloadAfterMutation (no transaction reload)', async () => {
-			await actions.cancelSubscription('Netflix');
 
-			expect(getTransactionsByMonth).not.toHaveBeenCalled();
-			expect(getAvailableMonths).not.toHaveBeenCalled();
-			expect(reloadFn).not.toHaveBeenCalled();
-		});
 
 		it('calls handleError on failure', async () => {
 			const error = new Error('cancel fail');
@@ -584,48 +493,21 @@ describe('dashboardActions', () => {
 		});
 	});
 
-	// ─── reloadAfterMutation (indirect tests via context) ──────────────
+	it('awaits the complete refresh after cancellation', async () => {
+		await actions.cancelSubscription('Netflix');
+		expect(reloadFn).toHaveBeenCalledOnce();
+	});
 
-	describe('context behavior', () => {
-		it('uses getCurrentMonth() at call time, not setup time', async () => {
-			let month = '2026-01';
-			const dynamicActions = setupDashboardActions({
-				getCurrentMonth: () => month,
-				hasAllTransactions: () => false,
-				reload: reloadFn
-			});
+	it('keeps a durable addition successful when refreshing fails', async () => {
+		reloadFn.mockRejectedValueOnce(new Error('read failed'));
+		await expect(actions.addTransaction({ date: new Date(), merchant: 'Saved', amount: 42, categoryId: 1, isShared: false, isSettled: false, splitType: 'percentage', splitValue: .5, isEssential: false, isSubscription: false })).resolves.toBeUndefined();
+		expect(addTransaction).toHaveBeenCalledOnce();
+		expect(handleError).toHaveBeenCalledWith(expect.any(Error), expect.objectContaining({ context: 'refreshDashboard' }));
+	});
 
-			// Change month before calling
-			month = '2026-02';
-
-			await dynamicActions.addTransaction({
-				date: new Date(),
-				merchant: 'Test',
-				amount: 10,
-				categoryId: 1,
-				isShared: false,
-				isSettled: false,
-				splitType: 'percentage',
-				splitValue: 0.5,
-				isEssential: false,
-				isSubscription: false
-			} as any);
-
-			expect(getTransactionsByMonth).toHaveBeenCalledWith('2026-02');
-		});
-
-		it('reload receives transactions and availableMonths', async () => {
-			const mockTxns = [{ id: 1, merchant: 'Test' }];
-			const mockMonths = ['2026-01', '2025-12'];
-			vi.mocked(getTransactionsByMonth).mockResolvedValueOnce(mockTxns as any);
-			vi.mocked(getAvailableMonths).mockResolvedValueOnce(mockMonths);
-
-			await actions.deleteTransaction(1);
-
-			expect(reloadFn).toHaveBeenCalledWith({
-				transactions: mockTxns,
-				availableMonths: mockMonths
-			});
-		});
+	it('keeps a durable edit successful when refreshing fails', async () => {
+		reloadFn.mockRejectedValueOnce(new Error('read failed'));
+		expect(await actions.saveEdit(1, { date: new Date(), merchant: 'Saved', amount: 42, categoryId: 1, isShared: false, splitType: 'percentage', splitValue: .5, isEssential: false, isSubscription: false }, false)).toBe(true);
+		expect(updateTransaction).toHaveBeenCalledOnce();
 	});
 });

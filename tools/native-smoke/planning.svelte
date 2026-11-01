@@ -35,37 +35,74 @@
 				const categoryId = (await db.categories.toArray())[0].id!;
 				const entry = { date: now, merchant: 'Rent', amount: 2000, categoryId, isShared: false, splitType: 'percentage' as const, splitValue: .5, isSettled: false, isEssential: true, isSubscription: false };
 				for (let offset = -2; offset <= 0; offset++) await addTransaction({ ...entry, date: new Date(now.getFullYear(), now.getMonth() + offset, 1) });
-				for (const offset of [-2, -1]) {
+				for (const offset of [-6, -5, -4, -3, -2, -1]) {
 					await addTransaction({ ...entry, merchant: 'Power', amount: offset === -2 ? 100 : 140, date: new Date(now.getFullYear(), now.getMonth() + offset, 15) });
 					await addTransaction({ ...entry, merchant: `Everyday ${offset}`, amount: 300, date: new Date(now.getFullYear(), now.getMonth() + offset, 28) });
 				}
 				await updateSettings({ fixedRecurringAmounts: [{ merchant: 'power', amount: 125 }], lastAutoSuggestedMonth: month });
 			} else {
 				assert(JSON.parse(await readTextFile(resultPath)).ok, 'Prior dev checks failed');
-				assert(await db.transactions.count() === 7, 'Records did not survive native restart');
+				assert(await db.transactions.count() === 17, 'Records did not survive native restart');
 			}
 			const transactions = await getAllTransactions(), contributions = await getAllContributions();
 			const settingsBefore = JSON.stringify(await getSettings());
 			const forecast = calculateForecast({ month, transactions, contributions, planning: await getForecastPlanning(month, transactions), income: 5000 });
-			assert(forecast.recorded === 2000 && forecast.upcoming === 125 && forecast.savings === 100, 'Rent, bill estimate or future savings counted incorrectly');
+			assert(forecast.recorded === (restarted ? 2177 : 2000) && forecast.upcoming === (restarted ? 0 : 125) && forecast.savings === 100, 'Rent, bill estimate or future savings counted incorrectly');
 			assert(forecast.variable === (now.getDate() < 28 ? 300 : 0), 'Everyday spending baseline includes rent or bills');
-			assert(JSON.stringify(await getSettings()) === settingsBefore && await db.transactions.count() === 7, 'Forecast changed saved records');
+			assert(JSON.stringify(await getSettings()) === settingsBefore && await db.transactions.count() === (restarted ? 17 : 15), 'Forecast changed saved records');
 			checks.push('early rent counted once; variable bill override; future savings reserved; estimate writes nothing');
 			showDashboard = true; await tick();
-			await until(() => document.querySelector('[aria-label="Projected spending"]')?.textContent?.includes(now.getDate() < 28 ? '2,425.00' : '2,125.00') ?? false, 'Dashboard forecast did not render');
+			await until(() => document.querySelector('[aria-label="Projected spending"]')?.textContent?.includes(restarted ? (now.getDate() < 28 ? '2,477.00' : '2,177.00') : (now.getDate() < 28 ? '2,425.00' : '2,125.00')) ?? false, 'Dashboard forecast did not render');
 			assert(!document.querySelector('a[href="/planning"]'), 'Planning navigation still present');
 			const card = document.querySelector('[aria-label="Spending forecast"]')!;
 			const details = card.querySelector('details')!;
 			assert(!details.open, 'Forecast explanation is not collapsed');
 			details.querySelector('summary')!.click(); await tick();
 			assert(details.open && card.textContent?.includes('Expected remainder'), 'Forecast breakdown did not open');
-			assert(card.textContent?.includes('Power') && !card.querySelector('a[href="/planning"]'), 'Bill assumptions missing or simulator link remains');
+			assert((restarted || card.textContent?.includes('Power')) && !card.querySelector('a[href="/planning"]'), 'Bill assumptions missing or simulator link remains');
 			assert(document.documentElement.scrollWidth <= window.innerWidth + 1, 'Dashboard overflows native viewport');
-			checks.push('actual Dashboard and sidebar; collapsed forecast breakdown; no Planning navigation; viewport fits');
+			const originalDark = document.documentElement.classList.contains('dark');
+			const colors: string[] = [];
+			for (const dark of [false, true]) {
+				document.documentElement.classList.toggle('dark', dark); await tick();
+				assert(document.documentElement.scrollWidth <= window.innerWidth + 1, 'Dashboard overflows in a theme');
+				colors.push(getComputedStyle(card).backgroundColor);
+				details.querySelector('summary')!.focus();
+				assert(document.activeElement === details.querySelector('summary'), 'Forecast disclosure is not keyboard focusable');
+			}
+			document.documentElement.classList.toggle('dark', originalDark);
+			assert(colors[0] !== colors[1], 'Forecast theme tokens did not change');
+			checks.push('actual Dashboard and sidebar; collapsed forecast breakdown; light/dark themes; keyboard focus; viewport fits');
 			const add = [...document.querySelectorAll('button')].find(b => b.textContent?.trim() === 'Add'); assert(add, 'Dashboard Add action missing'); add.click(); await tick();
 			assert(document.querySelector('form'), 'Familiar entry form did not open');
+			assert(document.querySelector('[role="dialog"]')?.contains(document.activeElement), 'Entry modal did not receive focus');
 			assert(!document.body.textContent?.includes('Expected one-off') && !document.body.textContent?.includes('Saved template'), 'Extra entry controls remain');
 			checks.push('familiar entry form without templates or one-off controls');
+			if (!restarted) {
+				for (const [merchant, amount, expected] of [['Power', 135, now.getDate() < 28 ? '2,435.00' : '2,135.00'], ['Native saved purchase', 42, now.getDate() < 28 ? '2,477.00' : '2,177.00']] as const) {
+					if (!document.querySelector('form')) { add.click(); await tick(); }
+					const form = document.querySelector('form')!;
+					const fill = (selector: string, value: string) => {
+						const input = form.querySelector<HTMLInputElement | HTMLSelectElement>(selector)!;
+						input.value = value;
+						input.dispatchEvent(new Event(input.tagName === 'SELECT' ? 'change' : 'input', { bubbles: true }));
+					};
+					fill('#merchant', merchant); fill('#amount', String(amount));
+					const category = form.querySelector<HTMLInputElement>('#category-combobox')!;
+					category.focus(); await tick();
+					category.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
+					await tick();
+					form.querySelector<HTMLButtonElement>('button[type="submit"]')!.click();
+					await until(() => !document.querySelector('form'), 'Saved form did not close');
+					await until(() => document.querySelector('[aria-label="Projected spending"]')?.textContent?.includes(expected) ?? false, `Saved handler left the forecast stale: ${document.querySelector('[aria-label="Projected spending"]')?.textContent}`);
+					const disk = await parseBackup(await readTextFile(await join(directory, 'data.json')));
+					assert(disk.data.transactions.some(t => t.merchant === merchant && t.amount === amount), 'Form acknowledged before disk save');
+				}
+				checks.push('actual save handlers refresh late bill matching and ordinary spending after durable disk acknowledgment');
+			} else {
+				checks.push('saved-handler transactions and refreshed forecast survive native restart');
+			}
+
 			await parseBackup(await readTextFile(await join(directory, 'data.json')));
 			checks.push('strict native disk validation');
 			await writeTextFile(resultPath, JSON.stringify({ ok: true, mode: 'tauri dev', restarted, checks }));

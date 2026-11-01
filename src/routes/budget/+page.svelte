@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { onMount, onDestroy } from 'svelte';
 	import { afterNavigate } from '$app/navigation';
 	import { fade } from 'svelte/transition';
 	import { format } from 'date-fns';
@@ -140,63 +141,57 @@
 		budgetAlerts.filter((alert) => !dismissedAlerts.has(`${alert.type}:${alert.categoryName}`))
 	);
 
-	// Load data
-	async function loadData() {
+	let refreshGeneration = 0;
+	let destroyed = false;
+	onDestroy(() => { destroyed = true; refreshGeneration++; });
+
+	async function loadData(month = getSelectedMonth()) {
+		const generation = ++refreshGeneration;
+		const isCurrent = () => !destroyed && generation === refreshGeneration && month === getSelectedMonth();
 		if (!hasLoadedOnce) isLoading = true;
 		try {
 			await initializeStorage();
-			currentMonth = getSelectedMonth();
-			// Filter out Subscriptions category (removed in favor of subscription tags)
-			const allCategories = await getAllCategories();
-			categories = allCategories.filter((c) => c.name !== 'Subscriptions');
-			availableMonths = await getAvailableMonths();
-
-			// Ensure current month is in the list
-			if (!availableMonths.includes(currentMonth)) {
-				availableMonths = [currentMonth, ...availableMonths].sort().reverse();
-			}
-
-			await loadMonthData(currentMonth);
+			const [allCategories, months, budgetList, spendingMap, suggestionMap, monthBudget, contributions, rolloverResult] = await Promise.all([
+				getAllCategories(), getAvailableMonths(), getCategoryBudgetsForMonth(month),
+				getAllCategorySpending(month), generateAllSuggestions(month), getBudgetForMonth(month),
+				getContributionsAffectingAvailable(month), getEffectiveBudgetsForMonth(month)
+			]);
+			if (!isCurrent()) return;
+			categories = allCategories.filter(c => c.name !== 'Subscriptions');
+			availableMonths = months.includes(month) ? months : [month, ...months].sort().reverse();
+			currentMonth = month;
+			loadDismissedAlerts(month);
+			budgets = new Map(budgetList.map(b => [b.categoryId, b]));
+			spending = spendingMap;
+			suggestions = suggestionMap;
+			monthlyBudget = monthBudget;
+			rollover = rolloverResult;
+			totalSaved = sumCurrency(contributions.map(c => c.amount));
 		} catch (error) {
-			console.error('Failed to load budget data:', error);
-			toast.error('Failed to load budget data');
+			if (isCurrent()) {
+				console.error('Failed to load budget data:', error);
+				toast.error('Failed to load budget data');
+			}
 		} finally {
-			isLoading = false;
-			hasLoadedOnce = true;
+			if (isCurrent()) { isLoading = false; hasLoadedOnce = true; }
 		}
-	}
-
-	// Fetch data for a month, then update all state atomically to prevent UI mismatch
-	async function loadMonthData(month: string) {
-		const [budgetList, spendingMap, suggestionMap, monthBudget, contributions, rolloverResult] = await Promise.all([
-			getCategoryBudgetsForMonth(month),
-			getAllCategorySpending(month),
-			generateAllSuggestions(month),
-			getBudgetForMonth(month),
-			getContributionsAffectingAvailable(month),
-			getEffectiveBudgetsForMonth(month)
-		]);
-
-		// Update all state atomically
-		currentMonth = month;
-		loadDismissedAlerts(month);
-		budgets = new Map(budgetList.map((b) => [b.categoryId, b]));
-		spending = spendingMap;
-		suggestions = suggestionMap;
-		monthlyBudget = monthBudget;
-		rollover = rolloverResult;
-		totalSaved = sumCurrency(contributions.map((c) => c.amount));
 	}
 
 	async function handleMonthChange(month: string) {
 		setSelectedMonth(month);
-		await loadMonthData(month);
+		await loadData(month);
 	}
+
+	onMount(() => {
+		const handler = () => void loadData();
+		window.addEventListener('ledger:transactions-changed', handler);
+		return () => window.removeEventListener('ledger:transactions-changed', handler);
+	});
 
 	async function handleSaveBudget(categoryId: number, amount: number) {
 		try {
 			await saveCategoryBudget(categoryId, currentMonth, amount);
-			await loadMonthData(currentMonth);
+			await loadData();
 			toast.success('Budget saved');
 		} catch (error) {
 			console.error('Failed to save budget:', error);
@@ -207,7 +202,7 @@
 	async function handleToggleRollover(categoryId: number, rollsOver: boolean) {
 		try {
 			await setCategoryBudgetRollover(categoryId, currentMonth, rollsOver);
-			await loadMonthData(currentMonth);
+			await loadData();
 		} catch (error) {
 			console.error('Failed to update rollover:', error);
 			toast.error('Failed to update rollover');
@@ -217,7 +212,7 @@
 	async function handleDeleteBudget(categoryId: number) {
 		try {
 			await deleteCategoryBudget(categoryId, currentMonth);
-			await loadMonthData(currentMonth);
+			await loadData();
 			toast.success('Budget removed');
 		} catch (error) {
 			console.error('Failed to delete budget:', error);
@@ -235,7 +230,7 @@
 					applied++;
 				}
 			}
-			await loadMonthData(currentMonth);
+			await loadData();
 			if (applied > 0) {
 				toast.success(`Applied ${applied} budget suggestion${applied === 1 ? '' : 's'}`);
 			} else {
@@ -256,7 +251,7 @@
 			}
 
 			await copyBudgetsFromMonth(previousMonth, currentMonth);
-			await loadMonthData(currentMonth);
+			await loadData();
 			toast.success('Copied budgets from last month');
 		} catch (error) {
 			console.error('Failed to copy budgets:', error);

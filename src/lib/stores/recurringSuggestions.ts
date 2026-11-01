@@ -360,12 +360,12 @@ function isCancelledSubscription(
  * Merges detected recurring with user-tagged subscriptions.
  * Filters out already-added transactions and cancelled subscriptions.
  */
-export async function getRecurringSuggestions(month: string, providedTransactions?: Transaction[], options: { includeRecorded?: boolean } = {}): Promise<RecurringSuggestion[]> {
+export async function getRecurringSuggestions(month: string, providedTransactions?: Transaction[], options: { includeRecorded?: boolean; purchases?: TransactionPurchase[] } = {}): Promise<RecurringSuggestion[]> {
 	const settings = await getSettings();
 	const cancelledSubs = await getCancelledSubscriptions();
 
 	const allTxns = providedTransactions ?? await db.transactions.toArray();
-	const allPurchases = groupTransactionsIntoPurchases(allTxns.filter(t => t.amount > 0 && !t.refundOfTransactionId && !t.isExpectedOneOff));
+	const allPurchases = options.purchases ?? groupTransactionsIntoPurchases(allTxns.filter(t => t.amount > 0 && !t.refundOfTransactionId && !t.isExpectedOneOff));
 
 	const monthStart = parseMonthKey(month);
 	const nextMonth = new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 1);
