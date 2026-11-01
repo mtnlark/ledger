@@ -30,7 +30,7 @@ Normal logical writes go through `runMutation` in [mutation.ts](../src/lib/stora
 3. Track changed tables through the database middleware.
 4. After commit, persist the changed snapshot and wait for disk acknowledgment.
 
-Nested operations share the outer transaction. `withPersistence` is an older wrapper and alone does not provide the exclusive transaction flow; new normal writes should use `runMutation`.
+Nested operations share the outer transaction. Its scope must include every table read or written by nested work, including category validation when accepting recurring suggestions. `withPersistence` is an older wrapper and alone does not provide the exclusive transaction flow; new normal writes should use `runMutation`.
 
 [serialization.ts](../src/lib/storage/serialization.ts) centralizes full hydration/dehydration and incremental table reads. The adapter reuses unchanged serialized table content, validates before serialization or rotation, calculates a SHA-256 checksum, writes `data.json.tmp`, rotates the previous primary to `data.json.bak`, then renames the temporary file to the primary. File saves have their own coalescing queue.
 

@@ -490,7 +490,7 @@
 
 	async function handleAddSelectedSuggestions(items: Array<RecurringSuggestion & { date: Date }>) {
 		try {
-			await runMutation(['transactions', 'settings'], async () => {
+			await runMutation(['transactions', 'settings', 'categories'], async () => {
 				for (const item of items) await addRecurringSuggestionTransaction(item);
 			});
 			const succeeded = items.length;
