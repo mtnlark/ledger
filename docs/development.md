@@ -92,9 +92,10 @@ For a requested desktop release:
 
 1. Stop native dev/harness processes and finish the relevant checks.
 2. Run `npm run tauri:build` in the real repository with its production configuration.
-3. Inspect `src-tauri/target/release/bundle/macos/Ledger.app` and confirm its `CFBundleIdentifier` is `app.ledger.desktop`. DMGs are under `src-tauri/target/release/bundle/dmg/`. The DMG name depends on the configured version and build architecture.
-4. If installation was requested, quit the running installed Ledger app, stage a complete copy of the new bundle, retain the old bundle at a unique temporary path, then replace `/Applications/Ledger.app` and relaunch it. Preserve the application-support directory and Keychain.
-5. Compare the installed bundle with the fresh build, verify the running executable comes from `/Applications/Ledger.app`, and check that startup and the relevant views work. Report build/test evidence and any check that could not run.
+3. For a local installation without a Developer ID certificate, complete ad hoc signing of the app and regenerate its installer with `npm run tauri -- bundle --bundles app,dmg --config '{"bundle":{"macOS":{"signingIdentity":"-"}}}'`. This uses a local signature, without a signing certificate or notarization. Verify it with `codesign --verify --deep --strict src-tauri/target/release/bundle/macos/Ledger.app`.
+4. Inspect `src-tauri/target/release/bundle/macos/Ledger.app` and confirm its `CFBundleIdentifier` is `app.ledger.desktop`. DMGs are under `src-tauri/target/release/bundle/dmg/`. The DMG name depends on the configured version and build architecture.
+5. If installation was requested, quit the running installed Ledger app, stage a complete copy of the new bundle, retain the old bundle at a unique temporary path, then replace `/Applications/Ledger.app` and relaunch it. Preserve the application-support directory and Keychain.
+6. Compare the installed bundle with the fresh build, verify the running executable comes from `/Applications/Ledger.app`, and check that startup and the relevant views work. Report build/test evidence and any check that could not run.
 
 A frontend-only build produces no `.app`. Tauri's `beforeBuildCommand` already runs `npm run build`, so an extra frontend build or unconditional Cargo clean is unnecessary. If evidence points to stale Rust artifacts, use a targeted clean:
 
