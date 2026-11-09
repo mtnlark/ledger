@@ -1,4 +1,5 @@
 import { getMonthKey, navigateMonth, parseMonthKey, type SavingsAccount, type SavingsContribution, type Transaction } from '$lib/db';
+import { summarizeSavings } from '$lib/utils/savings-summary';
 import { roundCurrency, sumCurrency } from '$lib/utils/currency';
 import { formatDateForInput, parseLocalDate } from '$lib/utils/date-helpers';
 import { normalizeMerchant } from '$lib/utils/string-helpers';
@@ -16,6 +17,8 @@ export interface BudgetForecast {
 	recorded: number;
 	upcoming: number;
 	savings: number;
+	fromSavings?: number;
+	cashContributions?: number;
 	remaining: number | null;
 	variable: number;
 	remainder: number | null;
@@ -112,7 +115,8 @@ export function calculateForecast(input: {
 	const reserved = month < currentMonth ? 0 : sumCurrency(commitments.filter(c => c.matchedIds.length === 0).map(c => c.amount));
 	const upcoming = sumCurrency([reserved, ...future.map(r => r.userAmount)]);
 	const contributions = input.contributions.filter(c => getMonthKey(new Date(c.date)) === month && ['bank_transfer', 'other'].includes(c.source));
-	let savings = sumCurrency(contributions.map(c => c.amount));
+	const summary = summarizeSavings(contributions);
+	let savings = summary.netCashSaved;
 	for (const [id, amount] of plannedSavingsByAccount(planning, month)) {
 		const contributed = sumCurrency(contributions.filter(c => c.accountId === id && c.amount > 0).map(c => c.amount));
 		savings = sumCurrency([savings, Math.max(0, amount - contributed)]);
@@ -162,7 +166,7 @@ export function calculateForecast(input: {
 		low: roundCurrency(remaining - Math.max(0, Math.max(...historicalRemaining) - futureVariable)),
 		high: roundCurrency(remaining - Math.max(0, Math.min(...historicalRemaining) - futureVariable))
 	};
-	return { recorded, upcoming, savings, remaining, variable: roundCurrency(variable), remainder, range, historyMonths: historicalRemaining.length, commitments, variableMethod };
+	return { recorded, upcoming, savings, fromSavings: summary.withdrawals, cashContributions: sumCurrency([savings, summary.withdrawals]), remaining, variable: roundCurrency(variable), remainder, range, historyMonths: historicalRemaining.length, commitments, variableMethod };
 }
 
 export function projectGoals(accounts: SavingsAccount[], fundingPool: number, requested: Map<number, number>, now = new Date()) {

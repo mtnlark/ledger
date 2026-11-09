@@ -1,4 +1,4 @@
-import type { CategoryBudget } from '$lib/db';
+import { getMonthKey, type SavingsContribution, type CategoryBudget } from '$lib/db';
 import { roundCurrency } from './currency';
 
 /**
@@ -18,7 +18,9 @@ export interface EffectiveBudget {
 	base: number;
 	/** Surplus carried into this category from the rollover chain (≥ 0). */
 	carryover: number;
-	/** base + carryover. */
+	/** Cash already released by savings withdrawals, allocated to this category. */
+	savingsFunding?: number;
+	/** base + carryover + savingsFunding. */
 	effective: number;
 	/** This month's rollsOver flag. */
 	rollsOver: boolean;
@@ -39,6 +41,7 @@ export interface RolloverResult {
 export interface RolloverOptions {
 	/** How many months back the surplus chain may reach (default 24). */
 	maxChainMonths?: number;
+	contributions?: SavingsContribution[];
 }
 
 /**
@@ -75,6 +78,19 @@ export function computeEffectiveBudgets(
 		byMonth.set(b.month, b);
 	}
 
+	const funding = new Map<string, Map<number, number>>();
+	for (const c of options.contributions ?? []) {
+		if (c.kind !== 'withdrawal' || c.budgetCategoryId === undefined) continue;
+		const month = getMonthKey(c.date);
+		if (month > targetMonth) continue;
+		const amounts = funding.get(month) ?? new Map<number, number>();
+		amounts.set(c.budgetCategoryId, roundCurrency((amounts.get(c.budgetCategoryId) ?? 0) - c.amount));
+		funding.set(month, amounts);
+		const rows = rowsByCategory.get(c.budgetCategoryId) ?? new Map<string, CategoryBudget>();
+		if (!rows.has(month)) rows.set(month, { month, categoryId: c.budgetCategoryId, budgetAmount: 0, createdAt: c.createdAt, updatedAt: c.updatedAt });
+		rowsByCategory.set(c.budgetCategoryId, rows);
+	}
+
 	// Ascending walk window ending at targetMonth
 	const months: string[] = [targetMonth];
 	for (let i = 0; i < maxChainMonths; i++) {
@@ -103,7 +119,8 @@ export function computeEffectiveBudgets(
 			}
 
 			const carryover = roundCurrency(surplusCarry);
-			const effective = roundCurrency(budgetRow.budgetAmount + carryover);
+			const savingsFunding = funding.get(month)?.get(categoryId) ?? 0;
+			const effective = roundCurrency(budgetRow.budgetAmount + carryover + savingsFunding);
 			const monthSpent = spent(month, categoryId);
 
 			if (month === targetMonth) {
@@ -111,6 +128,7 @@ export function computeEffectiveBudgets(
 					categoryId,
 					base: budgetRow.budgetAmount,
 					carryover,
+					savingsFunding,
 					effective,
 					rollsOver: budgetRow.rollsOver === true
 				});

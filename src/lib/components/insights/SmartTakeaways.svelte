@@ -265,7 +265,7 @@
 				icon: Trophy,
 				iconColor: 'text-success-500',
 				headline: 'Your highest savings month!',
-				subtext: `${formatCurrency(savingsReview.totalSaved)} saved${savingsReview.savingsRate !== null ? ` · ${formatPercentage(savingsReview.savingsRate)} savings rate` : ''}`
+				subtext: `${formatCurrency(savingsReview.totalSaved)} saved${savingsReview.savingsRate !== null ? ` · ${formatPercentage(savingsReview.savingsRate)} net savings rate` : ''}`
 			};
 		}
 
@@ -305,7 +305,7 @@
 				icon: PiggyBank,
 				iconColor: 'text-success-500',
 				headline: ratePercent !== null
-					? `${ratePercent}% savings rate · ${savingsReview.vsAverage.percentDiff}% above average`
+					? `${ratePercent}% net savings rate · ${savingsReview.vsAverage.percentDiff}% above average`
 					: `Saved ${savingsReview.vsAverage.percentDiff}% more than usual`,
 				subtext: `${formatCurrency(savingsReview.totalSaved)} saved this month`
 			};
@@ -381,7 +381,7 @@
 			const ratePercent = savingsReview.savingsRate !== null ? Math.round(savingsReview.savingsRate * 100) : null;
 			items.push({
 				text: ratePercent !== null
-					? `${ratePercent}% savings rate · ${savingsReview.vsAverage.percentDiff}% above average`
+					? `${ratePercent}% net savings rate · ${savingsReview.vsAverage.percentDiff}% above average`
 					: `Saved ${savingsReview.vsAverage.percentDiff}% more than usual`
 			});
 		} else if (savingsReview.totalSaved >= 100) {

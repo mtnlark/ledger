@@ -9,13 +9,15 @@
 		isOpen: boolean;
 		budget: MonthlyBudget | null;
 		savedFromContributions: number;
+		fromSavings?: number;
+		rolloverAdjustment?: number;
 		month: string;
 		monthDisplay: string;
 		onSave: (data: { income: number; notes?: string }) => void;
 		onClose: () => void;
 	}
 
-	let { isOpen, budget, savedFromContributions, monthDisplay, onSave, onClose }: Props = $props();
+	let { isOpen, budget, savedFromContributions, fromSavings = 0, rolloverAdjustment = 0, monthDisplay, onSave, onClose }: Props = $props();
 
 	// Form state - initialize from existing budget or defaults
 	let incomeStr = $state('');
@@ -79,10 +81,10 @@
 		<!-- Saved (read-only, from contributions) -->
 		<div>
 			<span class="block text-sm font-medium text-charcoal-soft mb-1.5">
-				Amount Saved
+				Added to savings
 			</span>
 			<div class="px-3 py-2.5 bg-surface-alt border border-theme rounded-lg">
-				<span class="font-mono text-charcoal">{formatCurrency(savedFromContributions)}</span>
+				<span class="font-mono text-charcoal">{formatCurrency(savedFromContributions + fromSavings)}</span>
 			</div>
 			<div class="mt-1.5 flex items-center justify-between">
 				<p class="text-xs text-charcoal-muted">From savings contributions this month</p>
@@ -97,6 +99,8 @@
 			</div>
 		</div>
 
+		<div class="flex justify-between text-sm"><span>From savings</span><span class="font-mono">{formatCurrency(fromSavings)}</span></div>
+		{#if rolloverAdjustment !== 0}<div class="flex justify-between text-sm"><span>Budget rollover</span><span class="font-mono">{formatCurrency(rolloverAdjustment)}</span></div>{/if}
 		<!-- Notes -->
 		<div>
 			<label for="notes" class="block text-sm font-medium text-charcoal-soft mb-1.5">
@@ -114,7 +118,7 @@
 		<!-- Preview -->
 		{#if incomeStr}
 			{@const income = parseFloat(cleanNumberInput(incomeStr)) || 0}
-			{@const available = income - savedFromContributions}
+			{@const available = income - savedFromContributions + rolloverAdjustment}
 			<div class="bg-surface-alt rounded-lg p-4 border border-dashed border-theme-dashed">
 				<div class="flex items-baseline text-charcoal-soft">
 					<span class="text-sm">Available to spend:</span>

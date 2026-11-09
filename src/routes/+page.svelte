@@ -62,6 +62,7 @@
 	let settings = $state<Settings>(DEFAULT_SETTINGS);
 	let budget = $state<MonthlyBudget | null>(null);
 	let savedFromContributions = $state(0);
+	let fromSavings = $state(0);
 	let forecast = $state<BudgetForecast | null>(null);
 	let rolloverAdjustment = $state(0);
 	let showBudgetModal = $state(false);
@@ -313,6 +314,7 @@
 			budget = data.budget;
 			availableMonths = data.availableMonths;
 			savedFromContributions = data.savedFromContributions;
+			fromSavings = data.fromSavings;
 			rolloverAdjustment = data.rolloverAdjustment;
 			forecast = data.forecast;
 			recurringSuggestions = data.recurringSuggestions;
@@ -650,6 +652,7 @@
 						{budget}
 						{totalSpent}
 						{savedFromContributions}
+						{fromSavings}
 						{rolloverAdjustment}
 						onEditBudget={() => showBudgetModal = true}
 					/>
@@ -672,6 +675,8 @@
 	isOpen={showBudgetModal}
 	{budget}
 	{savedFromContributions}
+	{fromSavings}
+	{rolloverAdjustment}
 	month={currentMonth}
 	{monthDisplay}
 	onSave={handleSaveBudget}

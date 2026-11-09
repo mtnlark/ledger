@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { summarizeSavings } from '$lib/utils/savings-summary';
 	import { format } from 'date-fns';
 	import type { ComponentType } from 'svelte';
 	import { goto } from '$app/navigation';
@@ -7,7 +8,7 @@
 	import type { SavingsAccount, SavingsContribution, MonthlyBudget } from '$lib/db';
 	import { parseMonthKey, getMonthKey } from '$lib/db';
 	import { formatCurrency, formatCurrencyWhole } from '$lib/utils/format-helpers';
-	import { sumCurrency, calculatePercent } from '$lib/utils/currency';
+	import { calculatePercent } from '$lib/utils/currency';
 	import { getGoalStatus, type GoalStatus } from '$lib/stores/savingsContributions';
 	import SavingsRateTrendChart from './SavingsRateTrendChart.svelte';
 
@@ -46,6 +47,7 @@
 
 	// Fetch goal statuses when accounts change
 	$effect(() => {
+		let active = true;
 		if (accountsWithGoals.length > 0) {
 			Promise.all(
 				accountsWithGoals.map(async (account) => {
@@ -59,11 +61,12 @@
 					return null;
 				})
 			).then((results) => {
-				goalInfos = results.filter((r): r is AccountGoalInfo => r !== null);
-			});
+				if (active) goalInfos = results.filter((r): r is AccountGoalInfo => r !== null);
+			}).catch(error => { if (active) console.error('Could not refresh savings goals:', error); });
 		} else {
 			goalInfos = [];
 		}
+		return () => { active = false; };
 	});
 
 	// Goal summary stats
@@ -77,16 +80,9 @@
 	// Month display
 	let monthDisplay = $derived(format(parseMonthKey(currentMonth), 'MMMM yyyy'));
 
-	// Total saved this month
-	let totalSaved = $derived(sumCurrency(contributions.map((c) => c.amount)));
-
-	// Contributions that affect available (bank_transfer, other)
-	let contributionsAffectingAvailable = $derived(
-		contributions.filter((c) => c.source === 'bank_transfer' || c.source === 'other')
-	);
-	let totalAffectingAvailable = $derived(
-		sumCurrency(contributionsAffectingAvailable.map((c) => c.amount))
-	);
+	let summary = $derived(summarizeSavings(contributions));
+	let totalSaved = $derived(summary.netSaved);
+	let totalAffectingAvailable = $derived(summary.netCashSaved);
 
 	// Savings rate (contributions affecting available / income)
 	let savingsRate = $derived(
@@ -138,14 +134,14 @@
 		<p class="text-sm text-charcoal-muted mt-0.5">{isCurrentMonth ? 'Current month savings' : monthDisplay}</p>
 	</div>
 	<div class="px-6 pb-6 space-y-6">
-		<!-- Total Saved + Savings Rate -->
+		<!-- Net saved + Net savings rate -->
 		<div class="flex items-center justify-between">
 			<div>
-				<p class="font-mono text-2xl font-medium text-success-600">
+				<p class="font-mono text-2xl font-medium {totalSaved > 0 ? 'text-success-600' : 'text-charcoal'}">
 					{formatCurrencyWhole(totalSaved)}
 				</p>
 				<p class="text-sm text-charcoal-muted">
-					{contributions.length} contribution{contributions.length !== 1 ? 's' : ''}
+					Net saved · {contributions.length} savings event{contributions.length !== 1 ? 's' : ''}
 				</p>
 			</div>
 			{#if savingsRate !== null}
@@ -153,7 +149,7 @@
 					<p class="font-mono text-lg font-medium text-charcoal">
 						{(savingsRate * 100).toFixed(0)}%
 					</p>
-					<p class="text-sm text-charcoal-muted">savings rate</p>
+					<p class="text-sm text-charcoal-muted">Net savings rate</p>
 				</div>
 			{/if}
 		</div>
@@ -328,7 +324,7 @@
 			{#if totalAffectingAvailable !== totalSaved}
 				<div class="bg-surface-alt rounded-lg p-4 border border-theme">
 					<div class="flex items-baseline justify-between">
-						<span class="text-sm text-charcoal-soft">Reduces available to spend</span>
+						<span class="text-sm text-charcoal-soft">Net saved from take-home</span>
 						<span class="font-mono font-medium text-charcoal">
 							{formatCurrency(totalAffectingAvailable)}
 						</span>
@@ -340,10 +336,16 @@
 			{/if}
 		{/if}
 
-		<!-- Savings Rate Trend -->
+		<div class="flex justify-between text-sm">
+			<span>Added to savings</span><span class="font-mono">{formatCurrency(summary.added)}</span>
+		</div>
+		<div class="flex justify-between text-sm">
+			<span>Used from savings</span><span class="font-mono">{formatCurrency(summary.withdrawals)}</span>
+		</div>
+		<!-- Net savings rate trend -->
 		{#if allBudgets.length > 0 && allContributions.length > 0}
 			<div>
-				<h3 class="text-sm font-semibold text-charcoal-soft mb-3">Savings Rate Over Time</h3>
+				<h3 class="text-sm font-semibold text-charcoal-soft mb-3">Net savings rate over time</h3>
 				<SavingsRateTrendChart
 					contributions={allContributions}
 					budgets={allBudgets}

@@ -4,7 +4,7 @@
 	import { goto } from '$app/navigation';
 	import ChartWrapper from '../ChartWrapper.svelte';
 	import { parseMonthKey, getMonthKey, type MonthlyBudget, type SavingsContribution } from '$lib/db';
-	import { sumCurrency } from '$lib/utils/currency';
+	import { summarizeSavings } from '$lib/utils/savings-summary';
 	import { getChartTheme, onThemeChange, type ChartTheme } from '$lib/utils/chart-theme';
 
 	interface Props {
@@ -24,25 +24,20 @@
 		});
 	});
 
-	// Sources that affect available to spend (and thus count toward savings rate)
-	const SOURCES_AFFECTING_AVAILABLE = ['bank_transfer', 'other'];
-
-	// Calculate savings rate for each month using contributions
+	// Group events once so every month uses the shared signed cash summary.
 	let savingsData = $derived.by(() => {
-		// Group contributions by month
-		const contribByMonth = new Map<string, number>();
+		const contribByMonth = new Map<string, SavingsContribution[]>();
 		for (const c of contributions) {
-			// Only count contributions that affect available spending
-			if (!SOURCES_AFFECTING_AVAILABLE.includes(c.source)) continue;
-			const month = getMonthKey(new Date(c.date));
-			contribByMonth.set(month, (contribByMonth.get(month) || 0) + c.amount);
+			const month = getMonthKey(c.date);
+			const events = contribByMonth.get(month) ?? [];
+			events.push(c); contribByMonth.set(month, events);
 		}
 
 		// Create data points for months with both income and contributions
 		return budgets
 			.filter((b) => b.income > 0)
 			.map((b) => {
-				const saved = sumCurrency([contribByMonth.get(b.month) || 0]);
+				const saved = summarizeSavings(contribByMonth.get(b.month) ?? []).netCashSaved;
 				return {
 					month: b.month,
 					label: format(parseMonthKey(b.month), 'MMM yyyy'),
@@ -67,7 +62,7 @@
 			labels: savingsData.map((d) => d.label),
 			datasets: [
 				{
-					label: 'Savings Rate',
+					label: 'Net savings rate',
 					data: savingsData.map((d) => d.rate * 100),
 					borderColor: '#5B8C5A',
 					backgroundColor: '#5B8C5A20',
@@ -124,7 +119,7 @@
 			},
 			scales: {
 				y: {
-					min: 0,
+					min: Math.min(0, ...savingsData.map(d => d.rate < 0 ? d.rate * 100 - 10 : 0)),
 					max: Math.max(50, ...savingsData.map((d) => d.rate * 100 + 10)),
 					ticks: {
 						color: theme.mutedTextColor,
@@ -148,7 +143,7 @@
 {#if savingsData.length === 0}
 	<div class="text-center py-8 text-charcoal-muted">
 		<p>No savings data available</p>
-		<p class="text-sm mt-1">Add contributions to track your savings rate</p>
+		<p class="text-sm mt-1">Add contributions to track your net savings rate</p>
 		<button
 			onclick={() => goto('/savings')}
 			class="mt-3 px-4 py-2 bg-primary-500 text-white text-sm font-medium rounded-lg hover:bg-primary-600 transition-colors"
@@ -159,7 +154,7 @@
 {:else if savingsData.length === 1}
 	<div class="text-center py-8">
 		<p class="text-3xl font-bold text-success-600">{(savingsData[0].rate * 100).toFixed(1)}%</p>
-		<p class="text-sm text-charcoal-muted mt-1">Savings rate for {savingsData[0].label}</p>
+		<p class="text-sm text-charcoal-muted mt-1">Net savings rate for {savingsData[0].label}</p>
 		<p class="text-xs text-charcoal-muted mt-2">Add more months to see trends</p>
 	</div>
 {:else}

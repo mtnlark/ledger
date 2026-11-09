@@ -1,8 +1,9 @@
 <script lang="ts">
+	import { summarizeSavings } from '$lib/utils/savings-summary';
 	import type { Transaction, MonthlyBudget, SavingsContribution } from '$lib/db';
 	import { getMonthKey } from '$lib/db';
 	import type { CategoryBudget } from '$lib/db';
-	import { sumCurrency, calculatePercent, roundCurrency, getUserAmount } from '$lib/utils/currency';
+	import { calculatePercent, roundCurrency, getUserAmount } from '$lib/utils/currency';
 	import { formatCurrencyWhole } from '$lib/utils/format-helpers';
 	import { getBudgetStatus } from '$lib/utils/budget-status';
 	import { groupTransactionsIntoPurchases } from '$lib/utils/transaction-grouping';
@@ -65,12 +66,10 @@
 		return 'text-danger-600'; // < half on track
 	});
 
-	// Savings Rate
+	// Net savings rate
 	let savingsRate = $derived.by(() => {
 		if (!budget || budget.income <= 0) return null;
-		const affectingAvailable = contributions
-			.filter((c) => c.source === 'bank_transfer' || c.source === 'other');
-		const totalSaved = sumCurrency(affectingAvailable.map((c) => c.amount));
+		const totalSaved = summarizeSavings(contributions).netCashSaved;
 		return Math.round(calculatePercent(totalSaved, budget.income));
 	});
 
@@ -102,14 +101,14 @@
 		{/if}
 	</div>
 
-	<!-- Savings Rate -->
+	<!-- Net savings rate -->
 	<div class="bg-surface rounded-xl p-4 text-center shadow-sm shadow-[var(--color-shadow)]">
 		{#if savingsRate !== null}
 			<p class="font-mono text-xl font-medium {savingsColor}">{savingsRate}%</p>
-			<p class="text-xs text-charcoal-muted mt-1">savings rate</p>
+			<p class="text-xs text-charcoal-muted mt-1">net savings rate</p>
 		{:else}
 			<p class="font-mono text-xl font-medium text-charcoal-muted">—</p>
-			<p class="text-xs text-charcoal-muted mt-1">savings rate</p>
+			<p class="text-xs text-charcoal-muted mt-1">net savings rate</p>
 		{/if}
 	</div>
 </div>

@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { onMount, onDestroy } from 'svelte';
 	import { afterNavigate } from '$app/navigation';
 	import {
 		getMonthKey,
@@ -147,44 +147,39 @@
 		localStorage.setItem('ledger-insights-tab', tab);
 	}
 
-	// Load data
-	async function loadData() {
+	let requestedMonth = getMonthKey(new Date());
+	let refreshGeneration = 0;
+	let destroyed = false;
+	onDestroy(() => { destroyed = true; refreshGeneration++; });
+	async function loadData(month = requestedMonth) {
+		requestedMonth = month;
+		const generation = ++refreshGeneration;
+		const isCurrent = () => !destroyed && generation === refreshGeneration;
 		if (!hasLoadedOnce) isLoading = true;
 		try {
 			await initializeStorage();
-			selectedMonth = getMonthKey(new Date());
-			categories = await getAllCategories();
-			availableMonths = await getAvailableMonths();
-			allTransactions = await getAllTransactions();
-			allBudgets = await getAllBudgets();
-			recurring = await detectRecurringExpenses(allTransactions);
-			cancelledSubscriptions = await getCancelledSubscriptions();
-			confirmedActiveSubscriptions = await getConfirmedActiveSubscriptions();
-			// Load savings data
-			savingsAccounts = await getAllSavingsAccounts();
-			allContributions = await getAllContributions();
-			// Load settings for completed goals
-			appSettings = await getSettings();
-			forecastPlanning = await getForecastPlanning(selectedMonth, allTransactions);
-			// Load selected month data
-			selectedMonthTransactions = await getTransactionsByMonth(selectedMonth);
-			budget = await getBudgetForMonth(selectedMonth);
-			selectedMonthContributions = await getAllContributionsForMonth(selectedMonth);
-			const effective = await getEffectiveBudgetsForMonth(selectedMonth);
-			categoryBudgets = effectiveBudgetRows(effective, selectedMonth);
-			rolloverAdjustment = effective.carryoverTotal - effective.deficitCarried;
-			// Get trends for all available months
-			monthlyTrends = await getMonthlySpendingTrends(availableMonths);
-			// Net worth data (month-independent)
-			[linkedAccounts, balanceSnapshots] = await Promise.all([
-				getAllLinkedAccounts(),
-				getAllSnapshots()
+			const [categoryList, months, transactions, budgets, cancelled, confirmed, accounts, contributions, settings, txns, monthBudget, monthContributions, effective, linked, snapshots] = await Promise.all([
+				getAllCategories(), getAvailableMonths(), getAllTransactions(), getAllBudgets(),
+				getCancelledSubscriptions(), getConfirmedActiveSubscriptions(), getAllSavingsAccounts(),
+				getAllContributions(), getSettings(), getTransactionsByMonth(month), getBudgetForMonth(month),
+				getAllContributionsForMonth(month), getEffectiveBudgetsForMonth(month), getAllLinkedAccounts(), getAllSnapshots()
 			]);
+			const [patterns, planning, trends] = await Promise.all([
+				detectRecurringExpenses(transactions), getForecastPlanning(month, transactions), getMonthlySpendingTrends(months)
+			]);
+			if (!isCurrent()) return;
+			selectedMonth = month; categories = categoryList; availableMonths = months;
+			allTransactions = transactions; allBudgets = budgets; recurring = patterns;
+			cancelledSubscriptions = cancelled; confirmedActiveSubscriptions = confirmed;
+			savingsAccounts = accounts; allContributions = contributions; appSettings = settings;
+			forecastPlanning = planning; selectedMonthTransactions = txns; budget = monthBudget;
+			selectedMonthContributions = monthContributions; categoryBudgets = effectiveBudgetRows(effective, month);
+			rolloverAdjustment = effective.carryoverTotal - effective.deficitCarried;
+			monthlyTrends = trends; linkedAccounts = linked; balanceSnapshots = snapshots;
 		} catch (error) {
-			console.error('Failed to load data:', error);
+			if (isCurrent()) console.error('Could not refresh insights:', error);
 		} finally {
-			isLoading = false;
-			hasLoadedOnce = true;
+			if (isCurrent()) { isLoading = false; hasLoadedOnce = true; }
 		}
 	}
 
@@ -214,26 +209,11 @@
 	// Handle month change - update transactions and budget for selected month
 	// Fetch data first, then update all state atomically to prevent UI mismatch
 	async function handleMonthChange(month: string) {
-		const [txns, monthBudget, monthContributions, monthCategoryBudgets] = await Promise.all([
-			getTransactionsByMonth(month),
-			getBudgetForMonth(month),
-			getAllContributionsForMonth(month),
-			getEffectiveBudgetsForMonth(month)
-		]);
-		forecastPlanning = await getForecastPlanning(month, allTransactions);
-		selectedMonth = month;
-		selectedMonthTransactions = txns;
-		budget = monthBudget;
-		selectedMonthContributions = monthContributions;
-		categoryBudgets = effectiveBudgetRows(monthCategoryBudgets, month);
-		rolloverAdjustment = monthCategoryBudgets.carryoverTotal - monthCategoryBudgets.deficitCarried;
+		await loadData(month);
 	}
 
-	// Reload subscription-related data when subscriptions change
 	async function handleSubscriptionChange() {
-		cancelledSubscriptions = await getCancelledSubscriptions();
-		confirmedActiveSubscriptions = await getConfirmedActiveSubscriptions();
-		forecastPlanning = await getForecastPlanning(selectedMonth, allTransactions);
+		await loadData();
 	}
 
 	// Reload data when navigating to this page (handles in-app navigation)
@@ -254,9 +234,12 @@
 		}
 
 		document.addEventListener('visibilitychange', handleVisibilityChange);
+		const refresh = () => void loadData();
+		window.addEventListener('ledger:transactions-changed', refresh);
 
 		return () => {
 			document.removeEventListener('visibilitychange', handleVisibilityChange);
+			window.removeEventListener('ledger:transactions-changed', refresh);
 		};
 	});
 </script>

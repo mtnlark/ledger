@@ -36,6 +36,14 @@ The custom Tauri config disables `beforeDevCommand` because Vite is already runn
 
 The native dev route mounts the actual Dashboard and sidebar, verifies early rent, a variable bill override, future savings, a collapsed forecast explanation, removal of Planning navigation, the familiar entry form, light/dark rendering, keyboard focus, and strict disk validation. On the first launch it submits a moved variable bill and an ordinary $42 expense through the real form handlers, waits for the updated forecast and modal dismissal, and verifies each acknowledged entry in the durable file. Six months of bill history keep the detection fixture stable throughout the calendar month. Restart verifies all 17 records and the updated estimate. Read `planning-result.json` in the manifest's separate data directory; it must report `ok: true`. Restart Tauri dev with the same command; the result must also report `restarted: true`. Stop both dev processes before the production build. The harness adds no route to production and does not touch the user's Ledger data.
 
+## Savings funding and reviewed income correction
+
+```bash
+node tools/native-smoke/prepare-funding.mjs
+```
+
+Read `/private/tmp/ledger-funding-dev-manifest.json`. In that disposable workspace, run Vite on port 5175 as above and `CARGO_NET_OFFLINE=true npm run tauri -- dev --no-watch --config funding-dev.json`. The injected fixture mounts the actual Savings, Budget and Settings pages. The correction also exercises Settings remounting after data replacement, without a navigation event. It verifies an unallocated default, fund/category previews, keyboard focus, light/dark tokens, durable form acknowledgment, derived allowances, and a synthetic income correction whose fund balance already reflects the withdrawal. Strict disk validation checks unchanged availability and forecast, one correction event, and preserved category funding. Quit and restart the native dev process with the same configuration; `funding-result.json` in the manifest’s data directory must report `ok: true` and `restarted: true`. Keep fixture processes stopped before building production. `progress.json` contains synthetic debugging context only.
+
 ## After verification
 
 Leave fixture results/originals available for inspection. Rebuild from the real repository with the production config before installing a release. Do not install the shared debug binary or a fixture-config bundle as Ledger. See [development.md](../../docs/development.md) for checks and release workflow.

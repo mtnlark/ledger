@@ -8,16 +8,17 @@
 		budget: MonthlyBudget | null;
 		totalSpent: number;
 		savedFromContributions: number;
+		fromSavings?: number;
 		rolloverAdjustment?: number;
 		onEditBudget?: () => void;
 	}
 
-	let { budget, totalSpent, savedFromContributions, rolloverAdjustment = 0, onEditBudget }: Props = $props();
+	let { budget, totalSpent, savedFromContributions, fromSavings = 0, rolloverAdjustment = 0, onEditBudget }: Props = $props();
 
 	// Computed values
 	let income = $derived(budget?.income ?? 0);
-	let saved = $derived(savedFromContributions);
-	let available = $derived(income - saved + rolloverAdjustment);
+	let saved = $derived(savedFromContributions + fromSavings);
+	let available = $derived(income + fromSavings - saved + rolloverAdjustment);
 	let surplus = $derived(available - totalSpent);
 
 	// Use getBudgetStatus for consistent color determination across the app
@@ -42,7 +43,7 @@
 	</div>
 
 	<div class="px-5 pb-5 pt-4 border-t border-dashed border-theme-dashed">
-		{#if !budget}
+		{#if !budget && fromSavings === 0 && saved === 0}
 			<div class="text-center py-4 text-charcoal-muted">
 				<p class="text-sm">No budget set for this month</p>
 				{#if onEditBudget}
@@ -63,9 +64,10 @@
 					<span class="font-mono font-medium text-charcoal">{formatCurrency(income)}</span>
 				</div>
 
+				<div class="flex items-baseline"><span class="text-charcoal-soft text-sm">+ From savings</span><span class="ledger-line"></span><span class="font-mono text-charcoal-soft">{formatCurrency(fromSavings)}</span></div>
 				<!-- Saved -->
 				<div class="flex items-baseline">
-					<span class="text-charcoal-soft text-sm">− Saved</span>
+					<span class="text-charcoal-soft text-sm">− Added to savings</span>
 					<span class="ledger-line"></span>
 					<span class="font-mono text-charcoal-soft">{formatCurrency(saved)}</span>
 				</div>

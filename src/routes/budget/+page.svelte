@@ -23,6 +23,7 @@
 	import { getAvailableMonths } from '$lib/stores/transactions';
 	import { toast } from '$lib/stores/toast';
 	import { formatCurrencyWhole } from '$lib/utils/format-helpers';
+	import { summarizeSavings } from '$lib/utils/savings-summary';
 	import { sumCurrency, roundCurrency } from '$lib/utils/currency';
 	import { getBudgetStatus } from '$lib/utils/budget-status';
 	import { Sparkles, Copy, AlertTriangle, X } from 'lucide-svelte';
@@ -41,19 +42,19 @@
 	let monthlyBudget = $state<MonthlyBudget | null>(null);
 	let rollover = $state<RolloverResult | null>(null);
 	let totalSaved = $state(0);
+	let fromSavings = $state(0);
 	let currentMonth = $state(getMonthKey(new Date()));
 	let availableMonths = $state<string[]>([getMonthKey(new Date())]);
 
 	// Summary calculations — scoped to budgeted categories only
 	let totalBudgeted = $derived(
-		sumCurrency(Array.from(budgets.values()).map((b) => b.budgetAmount))
+		sumCurrency(Array.from(rollover?.byCategory.values() ?? []).map(b => b.base + (b.savingsFunding ?? 0)))
 	);
 	let budgetedSpent = $derived(
-		sumCurrency(Array.from(budgets.keys()).map((categoryId) => spending.get(categoryId) || 0))
+		sumCurrency(Array.from(rollover?.byCategory.keys() ?? budgets.keys()).map((categoryId) => spending.get(categoryId) || 0))
 	);
-	// Effective total = base budgets + rollover surpluses − last month's overspend pool.
-	// The income-allocation bar intentionally keeps the BASE total: carryovers are
-	// funded by prior months' income, not this month's.
+	// Category funding is included once in allowances; rollover uses prior-month money.
+	// Budget Funding compares base + savings allocations against income + withdrawals.
 	let effectiveTotalBudgeted = $derived(rollover ? rollover.effectiveTotal : totalBudgeted);
 	let carryoverTotal = $derived(rollover?.carryoverTotal ?? 0);
 	let deficitCarried = $derived(rollover?.deficitCarried ?? 0);
@@ -65,26 +66,26 @@
 
 	// Income allocation
 	let income = $derived(monthlyBudget?.income ?? 0);
-	let unallocated = $derived(roundCurrency(income - totalSaved - totalBudgeted));
+	let unallocated = $derived(roundCurrency(income + fromSavings - totalSaved - totalBudgeted));
 
 	// Unbudgeted spending tracking (categories with spending but no budget set)
 	let unbudgetedSpent = $derived(
 		sumCurrency(
 			Array.from(spending.entries())
-				.filter(([categoryId]) => !budgets.has(categoryId))
+				.filter(([categoryId]) => !rollover?.byCategory.has(categoryId))
 				.map(([, amount]) => amount)
 		)
 	);
 	let unbudgetedCategoryCount = $derived(
 		Array.from(spending.entries())
-			.filter(([categoryId, amount]) => !budgets.has(categoryId) && amount > 0)
+			.filter(([categoryId, amount]) => !rollover?.byCategory.has(categoryId) && amount > 0)
 			.length
 	);
 
 	// Check if there are suggestions to apply (categories with suggestions but no budget)
 	let hasSuggestionsToApply = $derived.by(() => {
 		for (const [categoryId, amount] of suggestions) {
-			if (amount > 0 && !budgets.has(categoryId)) {
+			if (amount > 0 && !rollover?.byCategory.has(categoryId)) {
 				return true;
 			}
 		}
@@ -123,12 +124,12 @@
 
 	// Calculate budget alerts using utility function (handles floating point precision)
 	let budgetAlerts = $derived.by(() => {
-		const categoryBudgetData = Array.from(budgets.entries()).map(([categoryId, budget]) => {
+		const categoryBudgetData = Array.from(rollover?.byCategory.entries() ?? []).map(([categoryId, budget]) => {
 			const category = categories.find((c) => c.id === categoryId);
 			return {
 				categoryId,
 				categoryName: category?.name ?? 'Unknown',
-				budgetAmount: rollover?.byCategory.get(categoryId)?.effective ?? budget.budgetAmount,
+				budgetAmount: rollover?.byCategory.get(categoryId)?.effective ?? budget.effective,
 				spent: spending.get(categoryId) || 0
 			};
 		}).filter((data) => categories.some((c) => c.id === data.categoryId));
@@ -166,7 +167,9 @@
 			suggestions = suggestionMap;
 			monthlyBudget = monthBudget;
 			rollover = rolloverResult;
-			totalSaved = sumCurrency(contributions.map(c => c.amount));
+			const summary = summarizeSavings(contributions);
+			totalSaved = summary.cashContributions;
+			fromSavings = summary.withdrawals;
 		} catch (error) {
 			if (isCurrent()) {
 				console.error('Failed to load budget data:', error);
@@ -183,6 +186,7 @@
 	}
 
 	onMount(() => {
+		void loadData();
 		const handler = () => void loadData();
 		window.addEventListener('ledger:transactions-changed', handler);
 		return () => window.removeEventListener('ledger:transactions-changed', handler);
@@ -225,7 +229,7 @@
 			let applied = 0;
 			for (const [categoryId, amount] of suggestions) {
 				// Only apply to categories without existing budgets
-				if (amount > 0 && !budgets.has(categoryId)) {
+				if (amount > 0 && !rollover?.byCategory.has(categoryId)) {
 					await saveCategoryBudget(categoryId, currentMonth, amount);
 					applied++;
 				}
@@ -260,8 +264,8 @@
 	}
 
 	// Reload data on navigation (handles back/forward)
-	afterNavigate(() => {
-		loadData();
+	afterNavigate(({ from }) => {
+		if (from !== null) void loadData();
 	});
 </script>
 
@@ -446,14 +450,14 @@
 						</p>
 					{/if}
 
-					{#if income > 0}
-						{@const savingsPct = Math.min((totalSaved / income) * 100, 100)}
-						{@const budgetedPct = Math.min((totalBudgeted / income) * 100, 100 - savingsPct)}
+					{#if income + fromSavings > 0}
+						{@const savingsPct = Math.min((totalSaved / (income + fromSavings)) * 100, 100)}
+						{@const budgetedPct = Math.min((totalBudgeted / (income + fromSavings)) * 100, 100 - savingsPct)}
 						{@const unallocatedPct = Math.max(0, 100 - savingsPct - budgetedPct)}
 						<div class="mt-4 pt-4 border-t border-dashed border-theme-dashed">
 							<div class="flex justify-between text-xs text-charcoal-muted mb-2">
-								<span>Income Allocation</span>
-								<span class="font-mono">{formatCurrencyWhole(income)} income</span>
+								<span>Budget Funding</span>
+								<span class="font-mono">{formatCurrencyWhole(income)} income + {formatCurrencyWhole(fromSavings)} from savings</span>
 							</div>
 							<div
 								class="h-4 bg-surface-alt rounded-full overflow-hidden shadow-[inset_0_1px_2px_rgba(45,42,38,0.08)] flex"

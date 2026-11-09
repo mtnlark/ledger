@@ -12,6 +12,7 @@
 		account: SavingsAccount;
 		contributions: SavingsContribution[];
 		onAddContribution: () => void;
+		onUseSavings?: () => void;
 		onEditContribution: (contribution: SavingsContribution) => void;
 		onEditAccount: () => void;
 		onAccountUpdated: () => void;
@@ -23,7 +24,7 @@
 		availableSurplus?: number;
 	}
 
-	let { account, contributions, onAddContribution, onEditContribution, onEditAccount, onAccountUpdated, onMoveUp, onMoveDown, isFirst = false, isLast = false, availableSurplus }: Props =
+	let { account, contributions, onAddContribution, onUseSavings, onEditContribution, onEditAccount, onAccountUpdated, onMoveUp, onMoveDown, isFirst = false, isLast = false, availableSurplus }: Props =
 		$props();
 
 	// Expand/collapse state for contributions list
@@ -180,6 +181,7 @@
 		{/if}
 
 		<!-- Actions -->
+		{#if account.accountType === 'savings' && onUseSavings}<button onclick={onUseSavings} class="text-sm text-primary-600 px-2 py-1 rounded hover:bg-surface-hover">Use savings</button>{/if}
 		<div class="flex items-center gap-1 shrink-0">
 			<button
 				onclick={onAddContribution}
@@ -364,13 +366,14 @@
 					<li>
 						<button
 							onclick={() => onEditContribution(contribution)}
+							aria-label={contribution.kind === 'withdrawal' ? 'Edit withdrawal' : 'Edit contribution'}
 							class="w-full px-4 py-3 flex items-center gap-4 hover:bg-surface-hover transition-colors text-left"
 						>
 							<span class="text-sm text-charcoal-muted w-20 shrink-0">
 								{format(new Date(contribution.date), 'MMM d')}
 							</span>
 							<span class="text-xs px-2 py-0.5 rounded-full {getSourceColor(contribution.source)}">
-								{formatSource(contribution.source)}
+								{contribution.kind === 'withdrawal' ? 'Used from savings' : formatSource(contribution.source)}
 							</span>
 							<span class="flex-1 text-sm text-charcoal-muted truncate">
 								{contribution.notes || ''}

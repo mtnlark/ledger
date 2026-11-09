@@ -139,6 +139,7 @@ export interface SavingsContribution {
 	amount: number;
 	source: ContributionSource;
 	kind?: 'contribution' | 'withdrawal'; // Withdrawals have a negative amount
+	budgetCategoryId?: number; // Optional allocation of withdrawn cash; never a second cash credit
 	notes?: string;
 	createdAt: Date;
 	updatedAt: Date;

@@ -1,6 +1,9 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { cleanup, render, screen, waitFor } from '@testing-library/svelte';
 import { afterNavigate } from '$app/navigation';
+import { fireEvent } from '@testing-library/svelte';
+import Insights from '../../routes/insights/+page.svelte';
+import * as savingsStore from '$lib/stores/savingsContributions';
 import Dashboard from '../../routes/+page.svelte';
 import Budget from '../../routes/budget/+page.svelte';
 import { db, DEFAULT_SETTINGS } from '$lib/db';
@@ -113,7 +116,7 @@ it('discards a pending Budget response after the selected month changes', async 
 		const old = await spending(month); await gate.promise; return old;
 	});
 	changed(); await waitFor(() => expect(categoryBudgetStore.getAllCategorySpending).toHaveBeenCalledOnce());
-	setSelectedMonth('2026-10'); await navigate(); await screen.findByText('October 2026');
+	setSelectedMonth('2026-10'); await navigate(); await screen.findAllByText('October 2026');
 	gate.resolve(); await new Promise(r => setTimeout(r, 30));
 	expect(screen.getByText('October 2026')).toBeInTheDocument();
 });
@@ -131,4 +134,19 @@ it.each(['dashboard', 'budget'] as const)('invalidates pending %s requests and r
 	view.unmount(); gate.resolve(); await new Promise(r => setTimeout(r, 30));
 	changed(); await new Promise(r => setTimeout(r, 30));
 	expect(query).toHaveBeenCalledOnce(); expect(error).not.toHaveBeenCalled();
+});
+
+it('keeps the selected Insights month when an older funding refresh finishes later', async () => {
+	await addTransaction(entry('History', 10, new Date(2026, 9, 1)));
+	localStorage.setItem('ledger-insights-tab', 'savings');
+	render(Insights); await navigate(); await screen.findByText('Savings This Month');
+	const gate = deferred(); const query = savingsStore.getAllContributionsForMonth;
+	vi.spyOn(savingsStore, 'getAllContributionsForMonth').mockImplementationOnce(async month => {
+		const old = await query(month); await gate.promise; return old;
+	});
+	changed(); await waitFor(() => expect(savingsStore.getAllContributionsForMonth).toHaveBeenCalledOnce());
+	await fireEvent.click(screen.getByRole('button', { name: 'Previous month' }));
+	await screen.findAllByText('October 2026');
+	gate.resolve(); await new Promise(r => setTimeout(r, 30));
+	expect(screen.getAllByText('October 2026').length).toBeGreaterThan(0);
 });

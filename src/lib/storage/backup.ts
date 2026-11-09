@@ -104,6 +104,7 @@ function validateData(input: unknown, preserveMissingReferences: boolean, allowD
 			if (table === 'linkedAccounts' && !['checking', 'savings', 'credit', 'investment', 'retirement', 'loan', 'other'].includes(entry.accountType as string)) fail('invalid linked account type');
 			if (table === 'savingsContributions' && !['payroll_deduction', 'bank_transfer', 'interest', 'employer_match', 'other'].includes(entry.source as string)) fail('invalid contribution source');
 			if (table === 'savingsContributions' && entry.kind !== undefined && (!['contribution', 'withdrawal'].includes(entry.kind as string) || (entry.kind === 'withdrawal' ? !((entry.amount as number) < 0) : !((entry.amount as number) > 0)))) fail('invalid savings event');
+			if (table === 'savingsContributions' && entry.budgetCategoryId !== undefined && (entry.kind !== 'withdrawal' || !((entry.amount as number) < 0) || !['bank_transfer', 'other'].includes(entry.source as string))) fail('category funding requires a cash withdrawal');
 			if (['linkedAccounts', 'balanceSnapshots'].includes(table) && !['manual', 'simplefin'].includes(entry.source as string)) fail('invalid balance source');
 		}
 		ids.set(table, seen);
@@ -113,7 +114,7 @@ function validateData(input: unknown, preserveMissingReferences: boolean, allowD
 	const transactionsById = new Map((normalized.transactions as Row[]).map((row) => [row.id, row]));
 	for (const table of TABLE_NAMES.filter((name) => name !== 'settings')) {
 		for (const row of normalized[table] as Row[]) {
-			for (const [key, target] of [['categoryId', 'categories'], ['parentTransactionId', 'transactions'], ['refundOfTransactionId', 'transactions'], ['linkedAccountId', 'linkedAccounts'], ['accountId', table === 'savingsContributions' ? 'savingsAccounts' : 'linkedAccounts']]) {
+			for (const [key, target] of [['categoryId', 'categories'], ['budgetCategoryId', 'categories'], ['parentTransactionId', 'transactions'], ['refundOfTransactionId', 'transactions'], ['linkedAccountId', 'linkedAccounts'], ['accountId', table === 'savingsContributions' ? 'savingsAccounts' : 'linkedAccounts']]) {
 				if (row[key] === undefined) continue;
 				if (typeof row[key] !== 'number' || !Number.isSafeInteger(row[key]) || (row[key] as number) <= 0) fail(`${table} ${row.id} has an invalid ${key}`);
 				if (!ids.get(target)?.has(row[key] as number)) {

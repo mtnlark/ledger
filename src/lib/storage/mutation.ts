@@ -30,6 +30,10 @@ export function runMutation<T>(tables: PersistedTableName[], operation: () => Pr
 		}
 		const scope = [...changed] as PersistedTableName[];
 		if (scope.length) await persistData(scope.length === 1 ? scope[0] : scope);
+		if (scope.some(table => ['savingsContributions', 'savingsAccounts', 'monthlyBudgets', 'categoryBudgets'].includes(table))) {
+			// Invalidate insight memoization and notify mounted funding consumers after acknowledgment.
+			await refreshDataCaches().catch(error => console.error('Saved funding; view refresh failed:', error));
+		}
 		return result;
 	});
 }

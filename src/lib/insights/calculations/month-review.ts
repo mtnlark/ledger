@@ -14,6 +14,7 @@ import {
 	computeWeightedMean,
 	computeWeightedStdDev
 } from './stats';
+import { summarizeSavings } from '$lib/utils/savings-summary';
 import { calculatePercent } from '$lib/utils/currency';
 import { normalizeMerchant } from '$lib/utils/string-helpers';
 import { groupTransactionsIntoPurchases } from '$lib/utils/transaction-grouping';
@@ -357,16 +358,14 @@ export function computeSavingsReview(
 	allBudgets: { month: string; income: number }[]
 ): SavingsReviewResult | null {
 	// Total saved includes ALL contributions (for consistency with Savings tab)
-	const totalSaved = contributions.reduce((sum, c) => sum + c.amount, 0);
+	const summary = summarizeSavings(contributions);
+	const totalSaved = summary.netSaved;
 
 	// If no savings this month, nothing to report
 	if (totalSaved === 0) return null;
 
 	// For savings rate, only count contributions that affect available to spend
-	const affectingAvailable = contributions.filter((c) =>
-		SOURCES_AFFECTING_AVAILABLE.has(c.source)
-	);
-	const totalAffectingAvailable = affectingAvailable.reduce((sum, c) => sum + c.amount, 0);
+	const totalAffectingAvailable = summary.netCashSaved;
 
 	// Calculate savings rate (if income is available)
 	const savingsRate = income && income > 0 ? totalAffectingAvailable / income : null;

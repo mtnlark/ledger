@@ -1,9 +1,9 @@
 import { db, type SavingsContribution, type ContributionSource } from '$lib/db';
 import { runMutation } from '$lib/storage/mutation';
 import { getSavingsAccount, updateAccountBalance } from './savingsAccounts';
-import { getMonthDateRange } from '$lib/utils/date-helpers';
+import { getMonthDateRange, formatDateForInput } from '$lib/utils/date-helpers';
 import { validateAmount, validateDate } from '$lib/utils/transaction-validation';
-import { sumCurrency } from '$lib/utils/currency';
+import { roundCurrency, sumCurrency } from '$lib/utils/currency';
 
 // Sources that affect "available to spend" (reduce it when contributed)
 // Payroll deductions, interest, and employer matches are "free money" or pre-tax
@@ -15,13 +15,22 @@ async function validateContribution(contribution: Omit<SavingsContribution, 'id'
 	if (!validateDate(contribution.date).isValid || !(contribution.date instanceof Date)) throw new Error('Invalid date');
 	if (!validateAmount(contribution.kind === 'withdrawal' ? -contribution.amount : contribution.amount).isValid) throw new Error('Invalid contribution amount');
 	if (!Number.isSafeInteger(contribution.accountId) || !(await getSavingsAccount(contribution.accountId))) throw new Error('Missing savings account reference');
+	const account = await getSavingsAccount(contribution.accountId);
+	if (contribution.kind === 'withdrawal') {
+		if (roundCurrency(contribution.amount) !== contribution.amount) throw new Error('Supply an amount in cents');
+		if (account?.accountType !== 'savings') throw new Error('Use a savings fund for withdrawals');
+		if (formatDateForInput(contribution.date) > formatDateForInput(new Date())) throw new Error('Withdrawal date must be today or earlier');
+	}
+	if (contribution.budgetCategoryId !== undefined) {
+		if (contribution.kind !== 'withdrawal' || !Number.isSafeInteger(contribution.budgetCategoryId) || !(await db.categories.get(contribution.budgetCategoryId))) throw new Error('Invalid withdrawal category reference');
+	}
 	if (!['payroll_deduction', 'bank_transfer', 'interest', 'employer_match', 'other'].includes(contribution.source)) throw new Error('Invalid contribution source');
 }
 
 export async function addContribution(
 	contribution: Omit<SavingsContribution, 'id' | 'createdAt' | 'updatedAt'>
 ): Promise<number> {
-	return runMutation(['savingsAccounts', 'savingsContributions'], async () => {
+	return runMutation(['savingsAccounts', 'savingsContributions', 'categories'], async () => {
 		await validateContribution(contribution);
 		const balanceAccount = await getSavingsAccount(contribution.accountId);
 		if (contribution.kind === 'withdrawal' && balanceAccount?.accountType === 'savings' && sumCurrency([balanceAccount.currentBalance ?? 0, contribution.amount]) < 0) throw new Error('Withdrawal exceeds allocated savings');
@@ -102,7 +111,7 @@ export async function updateContribution(
 	id: number,
 	updates: Partial<Omit<SavingsContribution, 'id' | 'createdAt'>>
 ): Promise<void> {
-	return runMutation(['savingsAccounts', 'savingsContributions'], async () => {
+	return runMutation(['savingsAccounts', 'savingsContributions', 'categories'], async () => {
 		const existing = await db.savingsContributions.get(id);
 		if (!existing) return;
 
@@ -125,7 +134,7 @@ export async function updateContribution(
 }
 
 export async function deleteContribution(id: number): Promise<void> {
-	return runMutation(['savingsAccounts', 'savingsContributions'], async () => {
+	return runMutation(['savingsAccounts', 'savingsContributions', 'categories'], async () => {
 		const contribution = await db.savingsContributions.get(id);
 		if (!contribution) return;
 

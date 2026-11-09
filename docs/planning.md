@@ -18,7 +18,7 @@ The ordinary baseline uses the median spending over the equivalent remaining day
 
 The range uses the minimum and maximum historical remaining-day amounts. It describes past variation, not a confidence interval. With limited history, the explanation makes the reduced coverage clear.
 
-Savings contributions from `bank_transfer` and `other`, including future entries, stay reserved. Previously saved monthly savings plans reserve only the portion not already entered. Payroll deductions, interest and employer matches do not reduce the spending budget. Income and category rollover determine the estimated budget remainder after spending and savings.
+Savings contributions from `bank_transfer` and `other`, including future entries, stay reserved. Previously saved monthly savings plans reserve only the portion not already entered. Payroll deductions, interest and employer matches do not reduce the spending budget. Withdrawals release money for their month and appear as **From savings** beside positive reserved savings in the disclosure. The forecast’s `savings` field remains signed (cash contributions minus withdrawals), preserving saved goal calculations. Optional category funding allocates the released money once; it changes allowances, not spending estimates. Income and category rollover determine the estimated budget remainder after spending and savings.
 
 ## Refresh and save acknowledgments
 

@@ -1,0 +1,45 @@
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/svelte';
+import { afterNavigate } from '$app/navigation';
+import Settings from '../../routes/settings/+page.svelte';
+import SettingsReplacement from './fixtures/SettingsReplacement.svelte';
+import { db, DEFAULT_SETTINGS } from '$lib/db';
+import { toast } from '$lib/stores/toast';
+import { resetStorageState } from '$lib/storage';
+const original = vi.hoisted(() => vi.fn());
+vi.mock('$lib/storage', async imported => ({ ...await imported<typeof import('$lib/storage')>(), preserveOriginalSnapshot: original }));
+vi.mock('$lib/storage/tauri-adapter', () => ({ isICloudAvailable: vi.fn().mockResolvedValue(false), getICloudBackupDir: vi.fn().mockReturnValue('/synthetic-cloud') }));
+beforeEach(async () => {
+	resetStorageState(); localStorage.clear(); localStorage.setItem('ledger-settings-section', 'data');
+	original.mockReset().mockResolvedValue('/synthetic-original.json');
+	await db.delete(); await db.open(); await db.settings.put(DEFAULT_SETTINGS);
+	const now = new Date();
+	await db.savingsAccounts.put({ id: 1, name: 'Synthetic fund', accountType: 'savings', currentBalance: 0, sortOrder: 1, createdAt: now, updatedAt: now });
+	await db.monthlyBudgets.put({ id: 1, month: '2026-01', income: 2000, savedAmount: 0 });
+});
+afterEach(() => { cleanup(); toast.clear(); vi.restoreAllMocks(); resetStorageState(); });
+it('loads Settings when mounted without a new navigation event', async () => {
+	render(Settings);
+	await screen.findByRole('button', { name: 'Correct savings counted as income' });
+});
+it('reloads Settings after the reviewed correction remounts the page, without replaying the correction', async () => {
+	const success = vi.spyOn(toast, 'success');
+	render(SettingsReplacement);
+	const navigate = vi.mocked(afterNavigate).mock.calls.at(-1)![0];
+	navigate({} as never);
+	await fireEvent.click(await screen.findByRole('button', { name: 'Correct savings counted as income' }));
+	await fireEvent.change(await screen.findByLabelText('Fund'), { target: { value: '1' } });
+	await fireEvent.input(screen.getByLabelText('Actual date'), { target: { value: '2026-01-01' } });
+	await fireEvent.input(screen.getByLabelText('Amount'), { target: { value: '500' } });
+	await fireEvent.click(screen.getByRole('checkbox', { name: 'Fund balance already reflects this withdrawal' }));
+	await fireEvent.click(screen.getByRole('button', { name: 'Preview income correction' }));
+	await fireEvent.click(await screen.findByRole('button', { name: 'Preserve original and apply income correction' }));
+	await waitFor(async () => expect(await db.savingsContributions.count()).toBe(1));
+	await waitFor(() => expect(document.querySelector('.animate-spin')).not.toBeInTheDocument());
+	expect(screen.getByRole('button', { name: 'Correct savings counted as income' })).toBeInTheDocument();
+	expect(screen.getByRole('button', { name: 'Data & Backup' })).toHaveAttribute('aria-current', 'true');
+	expect((await db.monthlyBudgets.get(1))?.income).toBe(1500);
+	expect((await db.savingsAccounts.get(1))?.currentBalance).toBe(0);
+	expect(original).toHaveBeenCalledOnce();
+	expect(success).toHaveBeenCalledWith('Income corrected; savings withdrawal recorded');
+});

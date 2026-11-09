@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { onMount, onDestroy } from 'svelte';
 	import { afterNavigate } from '$app/navigation';
 	import { Download, Database, Sun, Moon, Monitor, Cloud, CloudOff, Command, Bell, BellOff } from 'lucide-svelte';
 	import { type Settings, type Category, type Transaction, DEFAULT_SETTINGS } from '$lib/db';
@@ -34,31 +34,31 @@
 	let defaultSplitType = $state<'percentage' | 'fixed'>('percentage');
 	let defaultSplitValue = $state(0.5);
 
-	// Load data
+	let refreshGeneration = 0;
+	let destroyed = false;
+	onDestroy(() => { destroyed = true; refreshGeneration++; });
+
 	async function loadData() {
+		const generation = ++refreshGeneration;
+		const isCurrent = () => !destroyed && generation === refreshGeneration;
 		if (!hasLoadedOnce) isLoading = true;
 		try {
 			await initializeStorage();
-			settings = await getSettings();
-			categories = await getAllCategories();
-			// Initialize form state from settings
-			partnerName = settings.partnerName;
-			defaultSplitType = settings.defaultSplitType;
-			defaultSplitValue = settings.defaultSplitValue;
-			// Check iCloud availability
-			try {
-				iCloudAvailable = await isICloudAvailable();
-				if (iCloudAvailable) {
-					iCloudPath = getICloudBackupDir();
-				}
-			} catch {
-				iCloudAvailable = false;
-			}
+			const [loadedSettings, loadedCategories] = await Promise.all([getSettings(), getAllCategories()]);
+			let cloudAvailable = false;
+			try { cloudAvailable = await isICloudAvailable(); } catch { /* Cloud backup is optional. */ }
+			if (!isCurrent()) return;
+			settings = loadedSettings;
+			categories = loadedCategories;
+			partnerName = loadedSettings.partnerName;
+			defaultSplitType = loadedSettings.defaultSplitType;
+			defaultSplitValue = loadedSettings.defaultSplitValue;
+			iCloudAvailable = cloudAvailable;
+			iCloudPath = cloudAvailable ? getICloudBackupDir() : '';
 		} catch (error) {
-			console.error('Failed to load settings:', error);
+			if (isCurrent()) console.error('Failed to load settings:', error);
 		} finally {
-			isLoading = false;
-			hasLoadedOnce = true;
+			if (isCurrent()) { isLoading = false; hasLoadedOnce = true; }
 		}
 	}
 
@@ -215,8 +215,8 @@
 	}
 
 	// Reload data when navigating to this page
-	afterNavigate(() => {
-		loadData();
+	afterNavigate(({ from }) => {
+		if (from !== null) void loadData();
 	});
 
 	// Section navigation (one section shown at a time, like macOS System Settings)
@@ -239,6 +239,8 @@
 	}
 
 	onMount(() => {
+		// Data replacement remounts the page without a navigation event.
+		void loadData();
 		const storedSection = localStorage.getItem(SETTINGS_SECTION_KEY);
 		if (storedSection && sections.some((s) => s.id === storedSection)) activeSection = storedSection;
 		// Reload data when page becomes visible (e.g., switching browser tabs)

@@ -13,6 +13,7 @@
 		suggestedAmount?: number;
 		/** Surplus rolled into this category from last month (≥ 0). */
 		carryover?: number;
+		savingsFunding?: number;
 		/** Whether this month's budget rolls unused amounts forward. */
 		rollsOver?: boolean;
 		onSaveBudget: (amount: number) => void | Promise<void>;
@@ -27,6 +28,7 @@
 		budgetAmount,
 		suggestedAmount = 0,
 		carryover = 0,
+		savingsFunding = 0,
 		rollsOver = false,
 		onSaveBudget,
 		onDeleteBudget,
@@ -42,7 +44,7 @@
 
 	function startEditing() {
 		// With a carryover, the user edits the month total (base + rollover) directly
-		editValue = hasBudget ? String(roundCurrency(budgetAmount! + carryover)) : '';
+		editValue = hasBudget ? String(roundCurrency((budgetAmount ?? 0) + carryover + savingsFunding)) : '';
 		editRollsOver = rollsOver;
 		isEditing = true;
 		// Use queueMicrotask for better screen reader UX vs autofocus attribute
@@ -59,7 +61,7 @@
 		isEditing = false;
 		if (!isNaN(amount) && amount > 0) {
 			// Await so the row exists before the rollover flag is written to it
-			await onSaveBudget(baseFromEffective(amount, carryover));
+			await onSaveBudget(baseFromEffective(amount, carryover + savingsFunding));
 			if (editRollsOver !== rollsOver) {
 				await onToggleRollover?.(editRollsOver);
 			}
@@ -76,14 +78,14 @@
 		}
 	}
 
-	let hasBudget = $derived(budgetAmount !== null && (budgetAmount > 0 || carryover > 0));
-	let effectiveBudget = $derived(hasBudget ? roundCurrency(budgetAmount! + carryover) : null);
+	let hasBudget = $derived(budgetAmount !== null && (budgetAmount > 0 || carryover > 0 || savingsFunding > 0));
+	let effectiveBudget = $derived(hasBudget ? roundCurrency((budgetAmount ?? 0) + carryover + savingsFunding) : null);
 	let showSuggestion = $derived(!hasBudget && suggestedAmount > 0);
 	// Live preview of the base amount that saving the typed month total would store
 	let editBasePreview = $derived.by(() => {
-		if (carryover <= 0) return null;
+		if (carryover + savingsFunding <= 0) return null;
 		const parsed = parseFloat(editValue);
-		return !isNaN(parsed) && parsed > 0 ? baseFromEffective(parsed, carryover) : null;
+		return !isNaN(parsed) && parsed > 0 ? baseFromEffective(parsed, carryover + savingsFunding) : null;
 	});
 </script>
 
@@ -166,9 +168,11 @@
 						<X size={16} />
 					</button>
 				</div>
+				{#if savingsFunding > 0}<p class="text-xs text-charcoal-muted">Remove savings funding by editing the withdrawal.</p>{/if}
 				{#if editBasePreview !== null}
 					<p class="text-xs text-charcoal-muted pr-1">
 						incl. <span class="font-mono text-success-600">{formatCurrencyWhole(carryover)}</span> rollover
+						+ {formatCurrencyWhole(savingsFunding)} from savings
 						→ <span class="font-mono">{formatCurrencyWhole(editBasePreview)}</span> budget
 					</p>
 				{/if}
@@ -181,6 +185,7 @@
 						<span class="font-mono text-sm text-charcoal-muted"> / {formatCurrencyWhole(effectiveBudget!)}</span>
 					{/if}
 				</div>
+				{#if savingsFunding > 0}<p class="text-xs text-charcoal-muted">incl. <span class="font-mono">{formatCurrencyWhole(savingsFunding)}</span> from savings</p>{/if}
 				{#if hasBudget && carryover > 0}
 					<p
 						class="text-xs text-success-600"

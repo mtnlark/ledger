@@ -1,9 +1,11 @@
-import { db, type SavingsAccountType } from '$lib/db';
+import { getMonthKey, db, type SavingsAccountType } from '$lib/db';
 import { runExclusive } from './mutation';
 import { assertCanMutate, persistData, preserveOriginalSnapshot, refreshDataCaches } from './index';
 import { dehydrateAll, hydrateAll } from './serialization';
 import { TABLE_NAMES, DATE_FIELDS, REQUIRED_FIELDS, checksum, checksumText, isStoredDateValid, validateBackup, validateReviewableData } from './backup';
 import { reviewSplitRepairs, type SplitRepair } from './split-repair';
+import { formatDateForInput } from '$lib/utils/date-helpers';
+import { validateAmount, validateDate } from '$lib/utils/transaction-validation';
 import { sumCurrency, roundCurrency } from '$lib/utils/currency';
 import type { PersistedTableName, StoredData } from './types';
 
@@ -67,6 +69,7 @@ function diagnostics(data: StoredData): DataDiagnostic[] {
 	}
 	const categories = new Map<number, RecordReference[]>();
 	for (const table of ['transactions', 'categoryBudgets'] as const) for (const [id, refs] of groupReferences(data, table, 'categoryId', 'categories')) categories.set(id, [...(categories.get(id) ?? []), ...refs]);
+	for (const [id, refs] of groupReferences(data, 'savingsContributions', 'budgetCategoryId', 'categories')) categories.set(id, [...(categories.get(id) ?? []), ...refs]);
 	for (const [id, references] of categories) result.push({ ...references[0], id: `category:${id}`, kind: 'missing_category', value: id, references, message: `Approve an inactive placeholder category at ID ${id}` });
 	for (const [id, references] of groupReferences(data, 'savingsContributions', 'accountId', 'savingsAccounts')) result.push({ ...references[0], id: `account:${id}`, kind: 'missing_savings_account', value: id, references, message: `Recreate account ${id} with a confirmed balance, or delete its listed contributions` });
 	for (const [table, field, target] of [['transactions', 'parentTransactionId', 'transactions'], ['balanceSnapshots', 'accountId', 'linkedAccounts']] as const) for (const [, refs] of groupReferences(data, table, field, target)) for (const ref of refs) result.push({ ...ref, id: `${table}:${ref.recordId}:${field}`, kind: 'reference', target, value: rows(data, table).find((r) => r.id === ref.recordId)![field], message: `Supply an existing ${target} ID` });
@@ -182,4 +185,64 @@ export async function applyHistoricalRepairs(plan: HistoricalRepairPlan): Promis
 		await persistData();
 		await refreshDataCaches(true);
 	});
+}
+
+export interface SavingsIncomeCorrectionInput {
+	accountId: number;
+	date: Date;
+	amount: number;
+	balanceAlreadyAdjusted: boolean;
+	notes?: string;
+}
+export interface SavingsIncomeCorrectionPreview {
+	plan: HistoricalRepairPlan;
+	month: string;
+	fundName: string;
+	date: string;
+	amount: number;
+	incomeBefore: number;
+	incomeAfter: number;
+	balanceBefore: number;
+	balanceAfter: number;
+	notes: string;
+}
+/** Manual correction only: an income entry included cash previously taken from savings. */
+export async function previewSavingsIncomeCorrection(input: SavingsIncomeCorrectionInput): Promise<SavingsIncomeCorrectionPreview> {
+	if (!validateDate(input.date).isValid || !(input.date instanceof Date) || formatDateForInput(input.date) > formatDateForInput(new Date())) throw new Error('Supply an actual date through today');
+	if (!validateAmount(input.amount).isValid || roundCurrency(input.amount) !== input.amount) throw new Error('Supply a positive amount in cents');
+	if (typeof input.balanceAlreadyAdjusted !== 'boolean') throw new Error('Confirm how the fund balance should be handled');
+	const live = await dehydrateAll();
+	validateBackup(live);
+	const repaired = structuredClone(live);
+	const account = repaired.savingsAccounts?.find(a => a.id === input.accountId);
+	if (!account || account.accountType !== 'savings') throw new Error('Choose a savings fund');
+	const month = getMonthKey(input.date);
+	const budget = repaired.monthlyBudgets.find(b => b.month === month);
+	if (!budget || budget.income < input.amount) throw new Error('Correction exceeds recorded monthly income');
+	if (repaired.savingsContributions?.some(c => c.accountId === input.accountId && c.kind === 'withdrawal' && c.amount === -input.amount && formatDateForInput(c.date) === formatDateForInput(input.date))) throw new Error('A matching withdrawal already exists; review savings activity');
+	const incomeBefore = budget.income, balanceBefore = account.currentBalance ?? 0;
+	const balanceAfter = input.balanceAlreadyAdjusted ? balanceBefore : sumCurrency([balanceBefore, -input.amount]);
+	if (balanceAfter < 0) throw new Error('Withdrawal exceeds allocated savings; confirm whether the balance already reflects it');
+	const now = new Date();
+	budget.income = sumCurrency([incomeBefore, -input.amount]);
+	account.currentBalance = balanceAfter;
+	if (balanceAfter !== balanceBefore) account.updatedAt = now;
+	const events = repaired.savingsContributions ??= [];
+	const event = {
+		id: Math.max(0, ...events.map(c => c.id!)) + 1,
+		accountId: input.accountId, date: new Date(input.date), amount: -input.amount,
+		kind: 'withdrawal' as const, source: 'bank_transfer' as const,
+		notes: input.notes?.trim() || 'Correction: savings previously counted as income',
+		createdAt: now, updatedAt: now
+	};
+	events.push(event);
+	const changes: RepairChange[] = [
+		{ table: 'monthlyBudgets', recordId: budget.id!, field: 'income', before: incomeBefore, after: budget.income },
+		{ table: 'savingsContributions', recordId: event.id, field: '*', before: null, after: event }
+	];
+	if (balanceAfter !== balanceBefore) changes.push({ table: 'savingsAccounts', recordId: account.id!, field: 'currentBalance', before: balanceBefore, after: balanceAfter });
+	const validated = validateBackup(repaired);
+	const plan: HistoricalRepairPlan = { source: 'savings counted as income', changes, counts: validated.counts };
+	plans.set(plan, { data: structuredClone(live), liveFingerprint: fingerprint(live), repaired: structuredClone(validated.data) });
+	return { plan, month, fundName: account.name, date: formatDateForInput(input.date), amount: input.amount, incomeBefore, incomeAfter: budget.income, balanceBefore, balanceAfter, notes: event.notes };
 }

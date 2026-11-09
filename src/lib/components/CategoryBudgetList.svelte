@@ -30,7 +30,7 @@
 	let groupedCategories = $derived.by(() => {
 		const withBudgets: Array<{
 			category: Category;
-			budget: CategoryBudget;
+			budget: CategoryBudget | undefined;
 			spent: number;
 		}> = [];
 		const unbudgetedWithSpending: Array<{
@@ -44,14 +44,14 @@
 		}> = [];
 
 		for (const category of categories) {
-			if (!category.isActive) continue;
+			if (!category.isActive && !rollover?.has(category.id!)) continue;
 
 			const categoryId = category.id!;
 			const budget = budgets.get(categoryId);
 			const spent = spending.get(categoryId) || 0;
 			const suggestion = suggestions.get(categoryId) || 0;
 
-			if (budget) {
+			if (budget || rollover?.has(categoryId)) {
 				// Note: percentSpent is calculated by BudgetProgressBar using rounded values
 				// to ensure display/status consistency
 				withBudgets.push({ category, budget, spent });
@@ -83,7 +83,8 @@
 					<CategoryBudgetCard
 						{category}
 						{spent}
-						budgetAmount={budget.budgetAmount}
+						budgetAmount={budget?.budgetAmount ?? 0}
+						savingsFunding={rollover?.get(category.id!)?.savingsFunding ?? 0}
 						suggestedAmount={suggestions.get(category.id!) || 0}
 						carryover={rollover?.get(category.id!)?.carryover ?? 0}
 						rollsOver={rollover?.get(category.id!)?.rollsOver ?? false}

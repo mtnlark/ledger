@@ -46,7 +46,7 @@ Its scope is intentionally focused:
 ### Budgets
 
 - Sets monthly income and per-category spending limits.
-- Shows spending, remaining amounts, income allocation, and threshold alerts, including updates after menu-bar Quick Add.
+- Shows spending, remaining amounts, budget funding, and threshold alerts, including updates after menu-bar Quick Add.
 - Supports optional category rollover between months.
 - Rolls unused amounts forward while treating earlier overspending as a separate one-month adjustment.
 - Uses the user’s share of a shared purchase in budget and cash-flow calculations.
@@ -56,6 +56,8 @@ The dashboard estimates month-end spending from recorded expenses, recurring bil
 ### Savings
 
 - Tracks savings, retirement, and investment accounts.
+- Uses savings to fund spending in the withdrawal’s month, with an optional category allowance top-up.
+- Shows added savings, used savings, net saved, and a take-home-based net savings rate separately.
 - Records contributions by source, including transfers, payroll deductions, interest, and employer matches.
 - Distinguishes contributions that reduce available cash from contributions that do not.
 - Tracks goal amounts and dates, projected completion, and the contribution needed to stay on schedule.
@@ -142,7 +144,7 @@ Settings → Data & Backup provides:
 
 - **Full Backup (JSON)** and **Preview backup restore** for checksummed exports, validation and atomic replacement after a verified recovery backup.
 - **Preview Excel import** for the `Expenses` sheet, with duplicate/invalid-row review and required mappings for unknown categories. Approved rows save together.
-- **Review historical fixed shares**, **Review ledger integrity** and **Review damaged JSON file** for explicit corrections. Previews change nothing; application revalidates the proposed data and preserves verified originals outside routine backup pruning. Historical amounts are never corrected automatically.
+- **Review historical fixed shares**, **Review ledger integrity** and **Review damaged JSON file** for explicit corrections. Previews change nothing; application revalidates the proposed data and preserves verified originals outside routine backup pruning. Historical amounts are never corrected automatically. **Correct savings counted as income** previews an income reduction and missing withdrawal together, with an explicit option to preserve an already-adjusted fund balance. This records past activity; it never moves bank money.
 
 When iCloud backup is enabled, Ledger also writes a portable backup to:
 

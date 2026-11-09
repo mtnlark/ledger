@@ -5,12 +5,13 @@ import { addTransaction, addSplitTransaction } from '$lib/stores/transactions';
 import { saveStatus, retryPersistence, resetStorageState, PersistenceError, replaceAllData } from './index';
 import { dehydrateAll } from './serialization';
 import { createQuickAddHandler } from '$lib/services/quick-add';
+import { applyHistoricalRepairs, previewSavingsIncomeCorrection } from './historical-repair';
 import { addContribution } from '$lib/stores/savingsContributions';
-const mocks = vi.hoisted(() => ({ save: vi.fn(), backup: vi.fn() }));
-vi.mock('./tauri-adapter', () => ({ saveToFile: mocks.save, createBackup: mocks.backup }));
+const mocks = vi.hoisted(() => ({ save: vi.fn(), backup: vi.fn(), original: vi.fn() }));
+vi.mock('./tauri-adapter', () => ({ saveToFile: mocks.save, createBackup: mocks.backup, preserveOriginalContent: mocks.original }));
 const input = () => ({ date: new Date(), merchant: 'Purchase', amount: 100, categoryId: 1, isShared: true, splitType: 'fixed' as const, splitValue: 25, isSettled: false, isEssential: false, isSubscription: false });
 beforeEach(async () => {
-	resetStorageState(); mocks.save.mockReset().mockResolvedValue(undefined); mocks.backup.mockReset().mockResolvedValue(undefined);
+	resetStorageState(); mocks.original.mockReset().mockResolvedValue('/original.json'); mocks.save.mockReset().mockResolvedValue(undefined); mocks.backup.mockReset().mockResolvedValue(undefined);
 	Object.assign(window, { __TAURI__: {} });
 	await db.delete(); await db.open();
 	await db.categories.put({ id: 1, name: 'Food', isActive: true, sortOrder: 1, isEssential: true });
@@ -107,4 +108,22 @@ describe('Quick Add acknowledgments', () => {
 		expect((await handler(req)).status).toBe('unsaved');
 		expect((await handler(req)).status).toBe('unsaved');
 	});
+});
+
+it('retries an applied income correction snapshot without reducing income or inserting its withdrawal twice', async () => {
+	const now = new Date(), month = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+	await db.savingsAccounts.put({ id: 1, name: 'Previously adjusted fund', accountType: 'savings', currentBalance: 0, sortOrder: 1, createdAt: now, updatedAt: now });
+	await db.monthlyBudgets.put({ id: 1, month, income: 500, savedAmount: 0 });
+	const { plan } = await previewSavingsIncomeCorrection({ accountId: 1, amount: 100, date: now, balanceAlreadyAdjusted: true });
+	mocks.save.mockRejectedValueOnce(new Error('Disk full'));
+	await expect(applyHistoricalRepairs(plan)).rejects.toMatchObject({ applied: true });
+	expect(get(saveStatus)).toBe('unsaved');
+	await expect(addContribution({ accountId: 1, amount: 10, date: now, source: 'other' })).rejects.toMatchObject({ applied: false });
+	await retryPersistence();
+	expect(get(saveStatus)).toBe('saved');
+	expect((await db.monthlyBudgets.get(1))?.income).toBe(400);
+	expect((await db.savingsAccounts.get(1))?.currentBalance).toBe(0);
+	expect(await db.savingsContributions.count()).toBe(1);
+	await expect(applyHistoricalRepairs(plan)).rejects.toThrow('Review');
+	expect(mocks.original).toHaveBeenCalledOnce();
 });

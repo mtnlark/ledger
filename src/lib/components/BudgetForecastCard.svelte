@@ -40,7 +40,8 @@
 			<dl class="space-y-2 mt-4 pt-3 border-t border-dashed border-theme-dashed">
 				<div class="flex justify-between gap-3"><dt>Income</dt><dd class="font-mono">{formatCurrency(income)}</dd></div>
 				{#if rolloverAdjustment}<div class="flex justify-between gap-3"><dt>Budget rollover</dt><dd class="font-mono">{formatCurrency(rolloverAdjustment)}</dd></div>{/if}
-				<div class="flex justify-between gap-3"><dt>Reserved savings</dt><dd class="font-mono">{formatCurrency(forecast.savings)}</dd></div>
+				<div class="flex justify-between gap-3"><dt>From savings</dt><dd class="font-mono">{formatCurrency(forecast.fromSavings ?? 0)}</dd></div>
+				<div class="flex justify-between gap-3"><dt>Reserved savings</dt><dd class="font-mono">{formatCurrency(forecast.cashContributions ?? forecast.savings)}</dd></div>
 				<div class="flex justify-between gap-3 font-medium"><dt>Expected remainder</dt><dd class="font-mono {forecast.remainder !== null && forecast.remainder < 0 ? 'text-danger-600' : 'text-success-600'}">{formatCurrency(forecast.remainder ?? 0)}</dd></div>
 			</dl>
 			<p class="text-xs text-charcoal-muted mt-2">A monthly budget estimate; bank balances and payment timing are separate.</p>

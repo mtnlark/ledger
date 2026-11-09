@@ -14,7 +14,7 @@ The separate Planning tab, scenario previews, pooled goal planner, completeness 
 | --- | --- | --- |
 | Durable data and recovery | Queued atomic mutations, checksummed JSON, backup/restore previews, save-failure retry barrier and preserved repair originals | [Architecture](docs/architecture.md), [audit evidence](docs/audit-fixes.md) |
 | Budgeting | Monthly income, category budgets, threshold alerts, opt-in surplus rollover, one-month deficit adjustment and Quick Add refresh | `src/lib/stores/categoryBudget.ts`, `src/lib/utils/budget-rollover.ts` |
-| Savings | Contribution sources, goals/projections, account moves/deletion and goal-suggestion dismissal | `src/lib/stores/savingsAccounts.ts`, `src/lib/stores/savingsContributions.ts` |
+| Savings | Monthly spending funded from savings, optional category allowances, separate additions/withdrawals/net savings, reviewed savings-as-income correction, contribution sources, goals/projections, account moves/deletion and goal-suggestion dismissal | `src/lib/stores/savingsAccounts.ts`, `src/lib/stores/savingsContributions.ts` |
 | Transactions | Category splits, tags/search, progressive grouped pagination, recurring suggestions and undo | `src/lib/stores/transactions.ts`, `src/lib/components/TransactionList.svelte` |
 | Insights | Five tabs, category/merchant/tag reports, unusual-spend detection, category variance, savings/year summaries and wealth context | `src/lib/insights/`, `src/lib/components/insights/` |
 | Subscriptions | Multiple subscriptions per merchant, price-supersession detection, cancellation/confirmed-active overrides | `src/lib/utils/string-helpers.ts`, `src/lib/stores/subscriptionSettings.ts` |

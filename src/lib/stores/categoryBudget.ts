@@ -119,7 +119,10 @@ export async function getEffectiveBudgetsForMonth(
 	options: RolloverOptions = {}
 ): Promise<RolloverResult> {
 	const maxChainMonths = options.maxChainMonths ?? 24;
-	const allRows = await db.categoryBudgets.where('month').belowOrEqual(month).toArray();
+	const [allRows, contributions] = await Promise.all([
+		db.categoryBudgets.where('month').belowOrEqual(month).toArray(),
+		db.savingsContributions.toArray()
+	]);
 
 	// Spending is only needed for window months that actually have budget rows
 	const rowMonths = new Set(allRows.map((r) => r.month));
@@ -134,7 +137,7 @@ export async function getEffectiveBudgetsForMonth(
 		fetchMonths.map(async (m) => [m, await getAllCategorySpending(m)] as const)
 	);
 
-	return computeEffectiveBudgets(allRows, new Map(spendingEntries), month, options);
+	return computeEffectiveBudgets(allRows, new Map(spendingEntries), month, { ...options, contributions });
 }
 
 /**

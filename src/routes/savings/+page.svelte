@@ -1,5 +1,8 @@
 <script lang="ts">
 	import { groupContributionsByAccount } from '$lib/utils/contribution-grouping';
+	import { onMount, onDestroy } from 'svelte';
+	import { summarizeSavings } from '$lib/utils/savings-summary';
+	import UseSavingsModal from '$lib/components/UseSavingsModal.svelte';
 	import { afterNavigate } from '$app/navigation';
 	import { getMonthKey, type SavingsAccount, type SavingsContribution } from '$lib/db';
 	import { initializeStorage } from '$lib/storage';
@@ -12,7 +15,6 @@
 	import { getAvailableMonths } from '$lib/stores/transactions';
 	import { toast } from '$lib/stores/toast';
 	import { formatCurrencyWhole, formatPercentage } from '$lib/utils/format-helpers';
-	import { sumCurrency } from '$lib/utils/currency';
 	import { Plus } from 'lucide-svelte';
 	import MonthPicker from '$lib/components/MonthPicker.svelte';
 	import Skeleton from '$lib/components/Skeleton.svelte';
@@ -32,6 +34,7 @@
 	let monthlyIncome = $state(0);
 
 	// Modal state
+	let showUseSavings = $state(false);
 	let showAddContribution = $state(false);
 	let showEditContribution = $state(false);
 	let showAddAccount = $state(false);
@@ -40,62 +43,46 @@
 	let selectedAccount = $state<SavingsAccount | null>(null);
 	let preselectedAccountId = $state<number | undefined>(undefined);
 
-	// Summary calculations
-	let totalSavedThisMonth = $derived(sumCurrency(contributions.map((c) => c.amount)));
-
-	// Get contributions that affect available (bank_transfer, other)
-	let contributionsAffectingAvailable = $derived(
-		contributions.filter((c) => c.source === 'bank_transfer' || c.source === 'other')
-	);
-	let totalAffectingAvailable = $derived(
-		sumCurrency(contributionsAffectingAvailable.map((c) => c.amount))
-	);
-
-	// Savings rate (contributions affecting available / income)
+	let summary = $derived(summarizeSavings(contributions));
+	let totalSavedThisMonth = $derived(summary.netSaved);
+	let totalAffectingAvailable = $derived(summary.netCashSaved);
 	let savingsRate = $derived(monthlyIncome > 0 ? totalAffectingAvailable / monthlyIncome : 0);
 
 	// Group contributions by account
 	let contributionsByAccount = $derived(groupContributionsByAccount(contributions));
 
-	// Load data
-	async function loadData() {
+	let refreshGeneration = 0;
+	let destroyed = false;
+	onDestroy(() => { destroyed = true; refreshGeneration++; });
+	async function loadData(month = getSelectedMonth()) {
+		const generation = ++refreshGeneration;
+		const isCurrent = () => !destroyed && generation === refreshGeneration && month === getSelectedMonth();
 		if (!hasLoadedOnce) isLoading = true;
 		try {
 			await initializeStorage();
-			currentMonth = getSelectedMonth();
-			availableMonths = await getAvailableMonths();
-
-			// Ensure current month is in the list
-			if (!availableMonths.includes(currentMonth)) {
-				availableMonths = [currentMonth, ...availableMonths].sort().reverse();
-			}
-
-			await loadMonthData(currentMonth);
+			const [accountList, contribList, budget, months] = await Promise.all([
+				getAllSavingsAccounts(), getAllContributionsForMonth(month), getBudgetForMonth(month), getAvailableMonths()
+			]);
+			if (!isCurrent()) return;
+			accounts = accountList; contributions = contribList; monthlyIncome = budget?.income ?? 0;
+			currentMonth = month;
+			availableMonths = months.includes(month) ? months : [month, ...months].sort().reverse();
 		} catch (error) {
-			console.error('Failed to load savings data:', error);
-			toast.error('Failed to load savings data');
+			if (isCurrent()) toast.error('Could not refresh savings');
 		} finally {
-			isLoading = false;
-			hasLoadedOnce = true;
+			if (isCurrent()) { isLoading = false; hasLoadedOnce = true; }
 		}
 	}
-
-	async function loadMonthData(month: string) {
-		const [accountList, contribList, budget] = await Promise.all([
-			getAllSavingsAccounts(),
-			getAllContributionsForMonth(month),
-			getBudgetForMonth(month)
-		]);
-
-		accounts = accountList;
-		contributions = contribList;
-		currentMonth = month;
-		monthlyIncome = budget?.income ?? 0;
-	}
-
+	const loadMonthData = loadData;
+	onMount(() => {
+		void loadData();
+		const handler = () => void loadData();
+		window.addEventListener('ledger:transactions-changed', handler);
+		return () => window.removeEventListener('ledger:transactions-changed', handler);
+	});
 	async function handleMonthChange(month: string) {
 		setSelectedMonth(month);
-		await loadMonthData(month);
+		await loadData(month);
 	}
 
 	function handleAddContribution(accountId?: number) {
@@ -105,35 +92,38 @@
 
 	function handleEditContribution(contribution: SavingsContribution) {
 		selectedContribution = contribution;
-		showEditContribution = true;
+		if (contribution.kind === 'withdrawal') showUseSavings = true;
+		else showEditContribution = true;
 	}
 
 	async function handleContributionSaved() {
+		showUseSavings = false;
 		showAddContribution = false;
 		showEditContribution = false;
 		selectedContribution = null;
 		preselectedAccountId = undefined;
-		await loadMonthData(currentMonth);
-		toast.success('Contribution saved');
+		await loadMonthData(getSelectedMonth());
+		toast.success('Savings activity saved');
 	}
 
 	async function handleContributionDeleted() {
+		showUseSavings = false;
 		showEditContribution = false;
 		selectedContribution = null;
-		await loadMonthData(currentMonth);
-		toast.success('Contribution deleted');
+		await loadMonthData(getSelectedMonth());
+		toast.success('Savings activity deleted');
 	}
 
 	async function handleAccountAdded() {
 		showAddAccount = false;
-		await loadMonthData(currentMonth);
+		await loadMonthData(getSelectedMonth());
 		toast.success('Account added');
 	}
 
 	async function handleMoveUp(id: number) {
 		try {
 			await moveSavingsAccountUp(id);
-			await loadMonthData(currentMonth);
+			await loadMonthData(getSelectedMonth());
 		} catch (error) {
 			toast.error('Failed to move account');
 		}
@@ -142,7 +132,7 @@
 	async function handleMoveDown(id: number) {
 		try {
 			await moveSavingsAccountDown(id);
-			await loadMonthData(currentMonth);
+			await loadMonthData(getSelectedMonth());
 		} catch (error) {
 			toast.error('Failed to move account');
 		}
@@ -156,20 +146,20 @@
 	async function handleAccountUpdated() {
 		showEditAccount = false;
 		selectedAccount = null;
-		await loadMonthData(currentMonth);
+		await loadMonthData(getSelectedMonth());
 		toast.success('Account updated');
 	}
 
 	async function handleAccountDeleted() {
 		showEditAccount = false;
 		selectedAccount = null;
-		await loadMonthData(currentMonth);
+		await loadMonthData(getSelectedMonth());
 		toast.success('Account deleted');
 	}
 
 	// Reload data on navigation
-	afterNavigate(() => {
-		loadData();
+	afterNavigate(({ from }) => {
+		if (from !== null) void loadData();
 	});
 </script>
 
@@ -218,6 +208,7 @@
 				<div class="min-w-0 space-y-4 order-last lg:order-none">
 				<!-- Quick Actions -->
 				<div class="flex flex-wrap gap-3">
+				<button class="px-4 py-2 rounded-lg bg-surface-alt text-charcoal-soft hover:bg-surface-hover" onclick={() => { selectedContribution = null; preselectedAccountId = undefined; showUseSavings = true; }}>Use savings</button>
 					<button
 						onclick={() => handleAddContribution()}
 						class="inline-flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm
@@ -256,6 +247,7 @@
 								{account}
 								contributions={contributionsByAccount.get(account.id!) || []}
 								onAddContribution={() => handleAddContribution(account.id)}
+								onUseSavings={() => { selectedContribution = null; preselectedAccountId = account.id; showUseSavings = true; }}
 								onEditContribution={handleEditContribution}
 								onEditAccount={() => handleEditAccount(account)}
 								onAccountUpdated={() => loadMonthData(currentMonth)}
@@ -275,15 +267,17 @@
 				<div class="bg-surface rounded-xl shadow-md shadow-theme p-5">
 					<h2 class="text-xs font-medium uppercase tracking-wider text-charcoal-muted mb-4">Savings Summary</h2>
 					<div class="space-y-4">
+						<div><span class="text-sm text-charcoal-muted">Added to savings</span><p class="font-mono text-xl">{formatCurrencyWhole(summary.added)}</p></div>
+						<div><span class="text-sm text-charcoal-muted">Used from savings</span><p class="font-mono text-xl">{formatCurrencyWhole(summary.withdrawals)}</p></div>
 						<div>
-							<span class="text-sm text-charcoal-muted">Saved This Month</span>
-							<p class="font-mono text-xl font-medium text-success-600">
+							<span class="text-sm text-charcoal-muted">Net saved</span>
+							<p class="font-mono text-xl font-medium {totalSavedThisMonth > 0 ? 'text-success-600' : 'text-charcoal'}">
 								{formatCurrencyWhole(totalSavedThisMonth)}
 							</p>
 						</div>
 						{#if monthlyIncome > 0}
 							<div>
-								<span class="text-sm text-charcoal-muted">Savings Rate</span>
+								<span class="text-sm text-charcoal-muted">Net savings rate</span>
 								<p class="font-mono text-xl font-medium text-charcoal">
 									{formatPercentage(savingsRate)}
 								</p>
@@ -294,12 +288,12 @@
 						{/if}
 						{#if totalAffectingAvailable !== totalSavedThisMonth}
 							<div>
-								<span class="text-sm text-charcoal-muted">From Take-Home</span>
+								<span class="text-sm text-charcoal-muted">Net saved from take-home</span>
 								<p class="font-mono text-xl font-medium text-charcoal">
 									{formatCurrencyWhole(totalAffectingAvailable)}
 								</p>
 								<p class="text-xs text-charcoal-muted mt-0.5">
-									reduces available to spend
+									negative means more used than added
 								</p>
 							</div>
 						{/if}
@@ -352,3 +346,5 @@
 		selectedAccount = null;
 	}}
 />
+
+<UseSavingsModal isOpen={showUseSavings} {accounts} {preselectedAccountId} contribution={selectedContribution} onSave={handleContributionSaved} onDelete={handleContributionDeleted} onClose={() => { showUseSavings = false; selectedContribution = null; }} />

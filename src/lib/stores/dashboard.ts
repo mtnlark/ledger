@@ -8,7 +8,7 @@ import { getForecastPlanning } from './forecast';
 import { getRecurringSuggestions, shouldShowRecurringBanner } from './recurringSuggestions';
 import { calculateForecast } from '$lib/planning/forecast';
 import { createForecastIndex } from '$lib/planning/forecast-index';
-import { sumCurrency } from '$lib/utils/currency';
+import { summarizeSavings } from '$lib/utils/savings-summary';
 
 /** Build a complete view from plain store results before publishing reactive state. */
 export async function loadDashboardData(month: string) {
@@ -26,6 +26,7 @@ export async function loadDashboardData(month: string) {
 	return {
 		categories, settings, allTransactions, budget, availableMonths, recurringSuggestions, rolloverAdjustment, forecast,
 		transactions: (index.rowsByMonth.get(month) ?? []).map(r => r.transaction),
-		savedFromContributions: sumCurrency(contributions.map(c => c.amount))
+		savedFromContributions: summarizeSavings(contributions).netCashSaved,
+		fromSavings: summarizeSavings(contributions).withdrawals
 	};
 }
